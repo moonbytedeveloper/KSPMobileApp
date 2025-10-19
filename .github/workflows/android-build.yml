@@ -1,0 +1,69 @@
+name: Android Production Build
+
+on:
+  push:
+    branches: [ UniversalLinking ]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+        
+    - name: Cache Gradle packages
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      
+    - name: Create keystore from secrets
+      run: |
+        echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/ksp-release-key.keystore
+        
+    - name: Build Android AAB and APK
+      run: |
+        cd android
+        ./gradlew bundleRelease assembleRelease
+      env:
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        
+    - name: Upload AAB
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-aab
+        path: android/app/build/outputs/bundle/release/*.aab
+        
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-apk
+        path: android/app/build/outputs/apk/release/*.apk

@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.KspConsults.AndroidApp",
+      "sha256_cert_fingerprints": [
+        "AA:7C:AB:A6:51:BC:1B:26:76:FD:F8:84:3C:C4:05:6C:F3:B1:E8:8C:2B:6A:3F:07:F0:8C:8E:D8:AB:9D:79:74"
+      ]
+    }
+  }
+]
