@@ -110,6 +110,9 @@ const OpportunityCard = ({
   
   const [currentSnapIndex, setCurrentSnapIndex] = useState(0);
 
+  // Check if status is 'Won' to disable certain actions
+  const isWonStatus = status === 'Won';
+
   useEffect(() => {
     if (pickerVisible) {
       sheetRef.current?.present();
@@ -250,7 +253,11 @@ const OpportunityCard = ({
             </>
           )}
 
-          <TouchableOpacity activeOpacity={0.8} onPress={() => setPickerVisible(true)}>
+          <TouchableOpacity 
+            activeOpacity={isWonStatus ? 1 : 0.8} 
+            onPress={() => !isWonStatus && setPickerVisible(true)}
+            disabled={isWonStatus}
+          >
             <View style={styles.detailRow}> 
               <Text style={[text.caption, styles.detailLabel]}>Status</Text>
               <StatusBadge  label={status} />
@@ -259,8 +266,24 @@ const OpportunityCard = ({
 
           {/* Primary filled actions */}
           <View style={styles.actionsRowPrimary}>
-            <TouchableOpacity onPress={() => { setSelected(status); handlePickerOpen(); }} activeOpacity={0.85} style={[buttonStyles.buttonNeutralFill, buttonStyles.UpdateBtns]}>
-              <Icon name="fact-check" size={rf(5)} style={buttonStyles.UpdateStatusBtn} />
+            <TouchableOpacity 
+              onPress={() => { setSelected(status); handlePickerOpen(); }} 
+              activeOpacity={isWonStatus ? 1 : 0.85} 
+              style={[
+                buttonStyles.buttonNeutralFill, 
+                buttonStyles.UpdateBtns,
+                isWonStatus && styles.disabledButton
+              ]}
+              disabled={isWonStatus}
+            >
+              <Icon 
+                name="fact-check" 
+                size={rf(5)} 
+                style={[
+                  buttonStyles.UpdateStatusBtn,
+                  isWonStatus && styles.disabledIcon
+                ]} 
+              />
               {/* <Text style={styles.buttonFillText}>Update Status</Text> */}
             </TouchableOpacity>
          
@@ -270,11 +293,43 @@ const OpportunityCard = ({
             <TouchableOpacity onPress={onEdit} activeOpacity={0.8} style={[buttonStyles.buttonNeutralFill, buttonStyles.scheduleBtn]}> 
               <Icon name="schedule" size={rf(5)} style={buttonStyles.iconSchedule} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={onEditLead} activeOpacity={0.8} style={[buttonStyles.buttonNeutralFill, buttonStyles.editBtn]}> 
-              <Icon name="edit" size={rf(5)} style={buttonStyles.iconEdit} />
+            <TouchableOpacity 
+              onPress={onEditLead} 
+              activeOpacity={isWonStatus ? 1 : 0.8} 
+              style={[
+                buttonStyles.buttonNeutralFill, 
+                buttonStyles.editBtn,
+                isWonStatus && styles.disabledButton
+              ]}
+              disabled={isWonStatus}
+            > 
+              <Icon 
+                name="edit" 
+                size={rf(5)} 
+                style={[
+                  buttonStyles.iconEdit,
+                  isWonStatus && styles.disabledIcon
+                ]} 
+              />
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleDeletePress} activeOpacity={0.85} style={[buttonStyles.buttonNeutralFill, buttonStyles.deleteBtn]}>
-              <Icon name="delete" size={rf(5)} style={buttonStyles.iconDelete} />
+            <TouchableOpacity 
+              onPress={handleDeletePress} 
+              activeOpacity={isWonStatus ? 1 : 0.85} 
+              style={[
+                buttonStyles.buttonNeutralFill, 
+                buttonStyles.deleteBtn,
+                isWonStatus && styles.disabledButton
+              ]}
+              disabled={isWonStatus}
+            >
+              <Icon 
+                name="delete" 
+                size={rf(5)} 
+                style={[
+                  buttonStyles.iconDelete,
+                  isWonStatus && styles.disabledIcon
+                ]} 
+              />
               {/* <Text style={styles.buttonFillText}>Delete</Text> */}
             </TouchableOpacity>
           </View>
@@ -913,6 +968,14 @@ const styles = StyleSheet.create({
   scheduleBtn: {
     borderWidth:1,
     borderColor: COLORS.success,
+  },
+  // Disabled button styles
+  disabledButton: {
+    opacity: 0.4,
+    backgroundColor: COLORS.textMuted + '20',
+  },
+  disabledIcon: {
+    opacity: 0.5,
   },
 });
 

@@ -95,6 +95,7 @@ const Admindashboard = ({ navigation }) => {
 
   const fetchDashboardData = async () => {
     try {
+      if (!selectedCompanyUUID) return; 
       setLoading(true);
       setError(null);
       
@@ -109,9 +110,11 @@ const Admindashboard = ({ navigation }) => {
       console.log('Dashboard API response:', response);
       setDashboardData(response);
     } catch (err) {
-      console.error('Error fetching dashboard data:', err);
-      setError(err.message || 'Failed to fetch dashboard data');
-      Alert.alert('Error', 'Failed to load dashboard data. Please try again.');
+      if (selectedCompanyUUID) { // 👈 Only show alert if still logged in
+        console.error('Error fetching dashboard data:', err);
+        setError(err.message || 'Failed to fetch dashboard data');
+        Alert.alert('Error', 'Failed to load dashboard data. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

@@ -430,12 +430,19 @@ export async function getHRALeaves({ cmpUuid, envUuid, userUuid, start = 0, leng
     console.log(resp,'resp');
     return resp.data;
 }
-export async function getHRAApproveLeaves({ approverDesignationUuid } = {}) {
-    if (!approverDesignationUuid) {
-        approverDesignationUuid = await getReportingDesignation();
+export async function getHRAApproveLeaves({ approverDesignationUuid, cmpUuid, envUuid } = {}) {
+    if (!cmpUuid || !envUuid || !approverDesignationUuid) {
+        const [c, e, r] = await Promise.all([
+            cmpUuid || getCMPUUID(),
+            envUuid || getENVUUID(),
+            approverDesignationUuid || getReportingDesignation(),
+        ]);
+        cmpUuid = c; envUuid = e; approverDesignationUuid = u;
     }
+    if (!cmpUuid) throw new Error('cmpUuid is required');
+    if (!envUuid) throw new Error('envUuid is required');
     if (!approverDesignationUuid) throw new Error('approverDesignationUuid is required');
-    const params = { approverDesignationUuid };
+    const params = { approverDesignationUuid, cmpUuid, envUuid };
     const resp = await api.get(PATHS.ApproveLeaves, { params });
     console.log(resp,'resp');
     
@@ -463,6 +470,7 @@ export async function approveOrRejectLeave({ headUuid, remark = '', action }, ov
         Remark: String(remark || ''),
         Action: String(action), // 'Approve' | 'Reject'
     };
+    console.log(payload,'payload');
     const resp = await api.post(PATHS.approveOrRejectLeave, payload);
     console.log(resp,'approveOrRejectLeave');
     return resp.data;

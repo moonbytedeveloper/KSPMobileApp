@@ -6,7 +6,7 @@ import AppHeader from '../../components/common/AppHeader';
 import { wp, hp, rf, safeAreaTop } from '../../utils/responsive';
 import { buttonStyles, COLORS, TYPOGRAPHY } from '../styles/styles'
 import { getHRAApproveLeaves, approveOrRejectLeave } from '../../api/authServices';
-import { getUUID, getCMPUUID, getENVUUID } from '../../api/tokenStorage';
+import { getUUID, getCMPUUID, getENVUUID, getReportingDesignation } from '../../api/tokenStorage';
 const LeaveCard = ({ leave, onActionPress, getStatusColor, getStatusBgColor }) => {
   return (
     <View style={styles.leaveCard}>
@@ -66,7 +66,7 @@ const ViewAttendanceScreen = ({ navigation }) => {
           getENVUUID(),
         ]);
         if (!userUuid || !cmpUuid || !envUuid) return;
-        const resp = await getHRAApproveLeaves({ cmpUuid, envUuid });
+        const resp = await getHRAApproveLeaves({approverDesignationUuid: await getReportingDesignation(), cmpUuid, envUuid }); 
         const raw = resp;
         console.log(resp,'raw');
         let list = [];

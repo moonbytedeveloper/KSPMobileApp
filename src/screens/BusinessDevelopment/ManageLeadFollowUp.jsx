@@ -6,6 +6,7 @@ import { wp, hp, rf, safeAreaTop } from '../../utils/responsive';
 import { TYPOGRAPHY } from '../styles/styles';
 import AppHeader from '../../components/common/AppHeader';
 import DatePickerBottomSheet from '../../components/common/CustomDatePicker';
+import BottomSheetConfirm from '../../components/common/BottomSheetConfirm';
 import { addLeadFollowUp, updateLeadFollowUp, deleteLeadFollowUp, getEmployees, getFollowUpsByLead } from '../../api/authServices';
 import Dropdown from '../../components/common/Dropdown';
 import { getUUID, getCMPUUID, getENVUUID } from '../../api/tokenStorage';
@@ -107,6 +108,9 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
   const [employees, setEmployees] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [apiError, setApiError] = useState('');
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [followUpToDelete, setFollowUpToDelete] = useState(null);
+  const scrollViewRef = useRef(null);
 
   React.useEffect(() => {
     const load = async () => {
@@ -186,15 +190,34 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
       if (!leadUuid) return;
       const data = await getFollowUpsByLead({ leadUuid });
       const list = Array.isArray(data?.Data) ? data.Data : [];
-      const mapped = list.map((r, idx) => ({
-        id: String(r?.uuid || r?.Uuid || r?.UUID || idx + 1),
-        uuid: String(r?.uuid || r?.Uuid || r?.UUID || ''),
-        taker: r?.FollowUpTaker || '',
-        displayDate: r?.FollowUpDate || '',
-        uiDate: toUiDate(r?.FollowUpDate),
-        type: r?.FollowUpType || '',
-        raw: r,
-      }));
+      const mapped = list.map((r, idx) => {
+        // Find employee name by UUID
+        const takerUuid = r?.FollowUpTaker || '';
+        console.log('Looking for employee with UUID:', takerUuid);
+        console.log('Available employees:', employees.length);
+        
+        const foundEmployee = employees.find((emp) => {
+          const empUuid = emp?.UUID || emp?.Uuid || emp?.EmployeeUUID || emp?.EmpUuid || '';
+          const match = String(empUuid).trim().toLowerCase() === String(takerUuid).trim().toLowerCase();
+          if (match) {
+            console.log('Found employee:', resolveEmployeeName(emp));
+          }
+          return match;
+        });
+        const takerName = foundEmployee ? resolveEmployeeName(foundEmployee) : takerUuid;
+        console.log('Final taker name:', takerName);
+        
+        return {
+          id: String(r?.uuid || r?.Uuid || r?.UUID || idx + 1),
+          uuid: String(r?.uuid || r?.Uuid || r?.UUID || ''),
+          taker: takerName, // Display name instead of UUID
+          takerUuid: takerUuid, // Keep UUID for reference
+          displayDate: r?.FollowUpDate || '',
+          uiDate: toUiDate(r?.FollowUpDate),
+          type: r?.FollowUpType || '',
+          raw: r,
+        };
+      });
       setAllRows(mapped);
       setTotalRecords(mapped.length);
       if (!Array.isArray(list) || list.length === 0) {
@@ -210,11 +233,14 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
       setAllRows([]);
       setTotalRecords(0);
     } finally { setIsRefreshing(false); }
-  }, [route?.params?.leadUuid]);
+  }, [route?.params?.leadUuid, employees]);
 
   useEffect(() => {
-    fetchFollowUps();
-  }, [fetchFollowUps]);
+    // Only fetch follow-ups after employees are loaded
+    if (employees.length > 0) {
+      fetchFollowUps();
+    }
+  }, [fetchFollowUps, employees]);
 
   // Client-side pagination effect
   useEffect(() => {
@@ -257,6 +283,38 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
     setCurrentPage(0);
   };
 
+  const handleDeleteConfirm = (followUp) => {
+    console.log('handleDeleteConfirm called with:', followUp);
+    setFollowUpToDelete(followUp);
+    setDeleteConfirmVisible(true);
+  };
+
+  const handleDeleteConfirmAction = async () => {
+    console.log('handleDeleteConfirmAction called with followUpToDelete:', followUpToDelete);
+    if (!followUpToDelete) return;
+    
+    try {
+      const [cmpUuid, envUuid] = await Promise.all([getCMPUUID(), getENVUUID()]);
+      console.log('Deleting follow-up with UUID:', followUpToDelete.uuid);
+      await deleteLeadFollowUp({ 
+        followupUuid: followUpToDelete.uuid, 
+        overrides: { 
+          userUuid: takerUuid || (await getUUID()), 
+          cmpUuid, 
+          envUuid 
+        } 
+      });
+      console.log('Follow-up deleted successfully, refreshing list...');
+      // Refresh from API instead of local state update
+      await fetchFollowUps();
+    } catch (e) {
+      try { console.log('Delete follow-up failed', e?.response?.data || e?.message || e); } catch (_e) {}
+    } finally {
+      setDeleteConfirmVisible(false);
+      setFollowUpToDelete(null);
+    }
+  };
+
   const addRow = async () => {
     const nextErrors = {};
     // Fix: Check takerEmp instead of takerUuid for validation
@@ -272,7 +330,7 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
     try {
       if (editingFollowup?.uuid) { setIsUpdating(true); } else { setIsAdding(true); }
       const payload = {
-        FollowUpTaker: taker,
+        FollowUpTaker: takerUuid, // Send UUID instead of name
         FollowUpDate: uiDateToNoonISO(date),
         FollowUpType: type,
         Description: desc,
@@ -305,8 +363,9 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
     <View style={styles.safeArea}>
       <AppHeader title="Add Follow up" onLeftPress={() => navigation.goBack()} />
 
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.field}>
+      <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false}>
+        <View style={styles.container}>
+          <View style={styles.field}>
           <Dropdown
             placeholder="Follow Up Taker*"
             value={resolveEmployeeName(takerEmp)}
@@ -385,7 +444,7 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
           >
             {isRequired ? <Icon name="check" size={rf(4.5)} color="#fff" /> : null}
           </TouchableOpacity>
-          <Text style={styles.checkboxLabel}>Is this follow-up required</Text>
+          <Text style={styles.checkboxLabel}>Is Next Follow up is Required ?</Text>
         </View>
         {/* Conditional Next Follow-up Date will render below this row */}
 
@@ -450,8 +509,19 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
                 // description from API
                 const apiDesc = r?.raw?.Description || r?.raw?.description || '';
                 setDesc(String(apiDesc));
-                // try to resolve employee UUID by name
-                const found = employees.find((e) => (e?.EmployeeName || e?.Name || e?.DisplayName || e?.FullName || '').trim().toLowerCase() === String(r.taker || '').trim().toLowerCase());
+                // try to resolve employee by UUID (preferred) or by name (fallback)
+                let found = null;
+                if (r.takerUuid) {
+                  // First try to find by UUID
+                  found = employees.find((e) => {
+                    const empUuid = e?.UUID || e?.Uuid || e?.EmployeeUUID || e?.EmpUuid || '';
+                    return String(empUuid).trim().toLowerCase() === String(r.takerUuid).trim().toLowerCase();
+                  });
+                }
+                if (!found) {
+                  // Fallback to finding by name
+                  found = employees.find((e) => (e?.EmployeeName || e?.Name || e?.DisplayName || e?.FullName || '').trim().toLowerCase() === String(r.taker || '').trim().toLowerCase());
+                }
                 if (found) {
                   setTakerEmp(found);
                   const empUuid = found?.UUID || found?.Uuid || found?.EmployeeUUID || found?.EmpUuid || '';
@@ -468,17 +538,27 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
                 } else {
                   setNextDate('');
                 }
+                // Scroll to top when editing
+                console.log('Attempting to scroll to top...');
+                setTimeout(() => {
+                  if (scrollViewRef.current) {
+                    console.log('Scrolling to top with scrollTo');
+                    try {
+                      scrollViewRef.current.scrollTo({ y: 0, animated: true });
+                    } catch (e) {
+                      console.log('scrollTo failed, trying scrollToOffset:', e);
+                      try {
+                        scrollViewRef.current.scrollToOffset({ y: 0, animated: true });
+                      } catch (e2) {
+                        console.log('scrollToOffset also failed:', e2);
+                      }
+                    }
+                  } else {
+                    console.log('ScrollView ref is null');
+                  }
+                }, 100);
               }}
-              onDelete={async () => {
-                try {
-                  const [cmpUuid, envUuid] = await Promise.all([getCMPUUID(), getENVUUID()]);
-                  await deleteLeadFollowUp({ followupUuid: r.uuid, overrides: { userUuid: takerUuid || (await getUUID()), cmpUuid, envUuid } });
-                } catch (e) {
-                  try { console.log('Delete follow-up failed', e?.response?.data || e?.message || e); } catch (_e) {}
-                }
-                // Refresh from API instead of local state update
-                await fetchFollowUps();
-              }}
+              onDelete={() => handleDeleteConfirm(r)}
             />
           ))}
         </View>
@@ -524,7 +604,7 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
             </View>
           </View>
         )}
-
+        </View>
       </ScrollView>
 
       <DatePickerBottomSheet
@@ -549,7 +629,21 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
           if (errors.nextDate) setErrors((e) => ({ ...e, nextDate: null }));
         }}
         title="Select Next Follow Up Date"
-        minDate={new Date()}
+        minDate={pickerVal ? new Date(pickerVal.getTime() + 24 * 60 * 60 * 1000) : new Date()}
+      />
+
+      {/* Delete Confirmation Bottom Sheet */}
+      <BottomSheetConfirm
+        visible={deleteConfirmVisible}
+        onCancel={() => {
+          setDeleteConfirmVisible(false);
+          setFollowUpToDelete(null);
+        }}
+        onConfirm={handleDeleteConfirmAction}
+        title="Delete Follow-up"
+        message="Are you sure you want to delete this follow-up?"
+        confirmText="Delete"
+        cancelText="Cancel"
       />
     </View>
   );
@@ -787,7 +881,7 @@ const FollowUpCard = ({ data, onEdit, onDelete }) => {
             <TouchableOpacity activeOpacity={0.9} style={cardStyles.btnOutlineSuccess} onPress={onEdit}>
               <Icon name="edit" size={rf(3.6)} color={COLORS.edit} />
             </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.9} style={cardStyles.btnOutlineDanger} onPress={onDelete}>
+            <TouchableOpacity activeOpacity={0.9} style={cardStyles.btnOutlineDanger} onPress={() => onDelete && onDelete()}>
               <Icon name="delete" size={rf(3.6)} color={COLORS.delete} />
             </TouchableOpacity>
           </View>

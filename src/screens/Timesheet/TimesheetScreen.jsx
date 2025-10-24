@@ -151,11 +151,19 @@ const TimesheetScreen = ({ navigation }) => {
 
   // Fetch timesheet data
   const fetchTimesheetData = async (fromDateParam, toDateParam) => {
+    // Prevent multiple simultaneous calls
+    if (isFetchingRef.current) {
+      console.log('🔧 [TimesheetScreen] Already fetching data, skipping...');
+      return;
+    }
+    
     try {
+      console.log('🔧 [TimesheetScreen] Starting fetchTimesheetData:', { fromDateParam, toDateParam, isLoading });
+      isFetchingRef.current = true;
       setIsLoading(true);
-      // Clear previous UI data to avoid showing stale content
-      setData([]);
-      setTimesheetData(null);
+      // Don't clear data immediately to prevent flickering
+      // setData([]);
+      // setTimesheetData(null);
       
       // Log the request parameters including dates
       console.log('🚀 [TimesheetScreen] API Request Parameters:', {
@@ -165,10 +173,12 @@ const TimesheetScreen = ({ navigation }) => {
         toDateType: typeof toDateParam
       });
       
+      console.log('🔧 [TimesheetScreen] Making API call to getManageTimesheet');
       const response = await getManageTimesheet({
         frmD: fromDateParam,
         toD: toDateParam
       });
+      console.log('🔧 [TimesheetScreen] API response received:', { success: response.Success, hasData: !!response.Data });
       
       // Log raw line data structure
       if (response.Data?.Lines && response.Data.Lines.length > 0) {
@@ -202,12 +212,12 @@ const TimesheetScreen = ({ navigation }) => {
           });
         }
         
-        // Set dates if provided
-        if (response.Data.From_Date) {
+        // Set dates if provided (only if they're different to prevent infinite loops)
+        if (response.Data.From_Date && response.Data.From_Date !== fromDate) {
           setFromDate(response.Data.From_Date);
           setFromDateValue(new Date(response.Data.From_Date));
         }
-        if (response.Data.To_Date) {
+        if (response.Data.To_Date && response.Data.To_Date !== toDate) {
           setToDate(response.Data.To_Date);
           setToDateValue(new Date(response.Data.To_Date));
         }
@@ -222,7 +232,9 @@ const TimesheetScreen = ({ navigation }) => {
       console.error('Error fetching timesheet data:', error);
       Alert.alert('Error', 'Failed to fetch timesheet data. Please try again.');
     } finally {
+      console.log('🔧 [TimesheetScreen] fetchTimesheetData completed, setting loading to false');
       setIsLoading(false);
+      isFetchingRef.current = false;
     }
   };
 
@@ -234,9 +246,9 @@ const TimesheetScreen = ({ navigation }) => {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null); // { id, name, tasks }
   const [selectedTask, setSelectedTask] = useState(null); // string
-  const sheetRef = useRef(null);
   const snapPoints = useMemo(() => [hp(55), hp(75)], []);
   const [currentSnapIndex, setCurrentSnapIndex] = useState(0);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Description bottom sheet state
   const [descVisible, setDescVisible] = useState(false);
@@ -250,19 +262,14 @@ const TimesheetScreen = ({ navigation }) => {
   const [eligibilityVisible, setEligibilityVisible] = useState(false);
   const [eligibilityMessage, setEligibilityMessage] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const isFetchingRef = useRef(false);
 
   const availableTasks = useMemo(() => {
     if (!selectedProject) return [];
     return tasks;
   }, [selectedProject, tasks]);
 
-  useEffect(() => {
-    if (pickerVisible) {
-      sheetRef.current?.present();
-    } else {
-      sheetRef.current?.dismiss();
-    }
-  }, [pickerVisible]);
+  // useEffect removed - CommonBottomSheet handles visibility internally
 
   // Load projects for project/task pickers
   useEffect(() => {
@@ -283,15 +290,32 @@ const TimesheetScreen = ({ navigation }) => {
   // Fetch data on component focus for fresh data every time
   useFocusEffect(
     React.useCallback(() => {
-      fetchTimesheetData();
+      // Only fetch if we don't have data or if dates are not set
+      if (data.length === 0 || fromDate === 'From Date' || toDate === 'To Date') {
+        // Use selected dates if available, otherwise fetch without parameters
+        if (fromDate !== 'From Date' && toDate !== 'To Date') {
+          console.log('🔧 [TimesheetScreen] useFocusEffect: Fetching with selected dates:', { fromDate, toDate });
+          fetchTimesheetData(fromDate, toDate);
+        } else {
+          console.log('🔧 [TimesheetScreen] useFocusEffect: Fetching without date parameters');
+          fetchTimesheetData();
+        }
+      }
       return () => {};
-    }, [])
+    }, [data.length, fromDate, toDate])
   );
 
   // Fetch data when dates change
   useEffect(() => {
-    if (fromDate !== 'From Date' && toDate !== 'To Date') {
-      fetchTimesheetData(fromDate, toDate);
+    if (fromDate !== 'From Date' && toDate !== 'To Date' && !isLoading) {
+      console.log('🔧 [TimesheetScreen] Date changed, fetching data:', { fromDate, toDate });
+      
+      // Add a small delay to prevent rapid successive calls when both dates are set simultaneously
+      const timeoutId = setTimeout(() => {
+        fetchTimesheetData(fromDate, toDate);
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [fromDate, toDate]);
 
@@ -299,6 +323,10 @@ const TimesheetScreen = ({ navigation }) => {
     // Use API data if available, otherwise calculate from local data
     if (timesheetData && timesheetData.Total_Hours) {
       return timesheetData.Total_Hours;
+    }
+    
+    if (!data || data.length === 0) {
+      return '00:00';
     }
     
     const minutes = data.reduce((acc, item) => {
@@ -327,37 +355,68 @@ const TimesheetScreen = ({ navigation }) => {
 
   const confirmDelete = async () => {
     try {
-      if (!pendingDeleteId) return;
+      if (!pendingDeleteId) {
+        console.log('🔧 [TimesheetScreen] No pending delete ID, closing confirmation');
+        setConfirmVisible(false);
+        setPendingDeleteId(null);
+        return;
+      }
+      
+      console.log('🔧 [TimesheetScreen] Starting delete operation for ID:', pendingDeleteId);
       const currentItem = data.find((t) => t.id === pendingDeleteId);
-      if (!currentItem) return;
+      if (!currentItem) {
+        console.log('🔧 [TimesheetScreen] Item not found, closing confirmation');
+        setConfirmVisible(false);
+        setPendingDeleteId(null);
+        return;
+      }
+      
       const headerUuid = timesheetData?.HeaderUUID || timesheetData?.UUID || '';
       const projectUuid = currentItem?.projectUuid || currentItem?.lines?.[0]?.Project_UUID || '';
       const taskUuid = currentItem?.taskUuid || currentItem?.lines?.[0]?.Task_UUID || '';
+      
       if (!headerUuid || !projectUuid || !taskUuid) {
         Alert.alert('Missing data', 'Unable to find required identifiers to delete.');
+        setConfirmVisible(false);
+        setPendingDeleteId(null);
         return;
       }
+      
+      console.log('🔧 [TimesheetScreen] Calling delete API');
       await deleteTimesheetLine({ headerUuid, projectUuid, taskUuid });
+      
+      console.log('🔧 [TimesheetScreen] Delete successful, updating local state');
       // Remove locally and collapse
       setData((prev) => prev.filter((t) => t.id !== pendingDeleteId));
       setActiveId((prev) => (prev === pendingDeleteId ? null : prev));
-      // Refetch fresh data
-      setIsLoading(true);
-      await fetchTimesheetData(fromDate !== 'From Date' ? fromDate : undefined, toDate !== 'To Date' ? toDate : undefined);
+      
+      console.log('🔧 [TimesheetScreen] Closing confirmation sheet');
+      setConfirmVisible(false);
+      setPendingDeleteId(null);
+      
+      // Refetch fresh data in background without blocking UI
+      setTimeout(async () => {
+        try {
+          console.log('🔧 [TimesheetScreen] Refreshing data in background');
+          await fetchTimesheetData(fromDate !== 'From Date' ? fromDate : undefined, toDate !== 'To Date' ? toDate : undefined);
+        } catch (error) {
+          console.error('🔧 [TimesheetScreen] Error refreshing data:', error);
+        }
+      }, 100);
+      
     } catch (e) {
+      console.error('🔧 [TimesheetScreen] Delete error:', e);
       const msg = e?.response?.data?.Message || e?.message || 'Failed to delete timesheet entry.';
       Alert.alert('Error', String(msg));
-    } finally {
       setConfirmVisible(false);
       setPendingDeleteId(null);
     }
   };
 
   const closeConfirm = () => {
-    requestAnimationFrame(() => {
-      setConfirmVisible(false);
-      setPendingDeleteId(null);
-    });
+    console.log('🔧 [TimesheetScreen] Closing confirmation sheet via cancel');
+    setConfirmVisible(false);
+    setPendingDeleteId(null);
   };
 
   // Selection and transfer functions
@@ -475,19 +534,39 @@ const TimesheetScreen = ({ navigation }) => {
     return;
   };
 
+  // Check if add time item is allowed based on timesheet status
+  const isAddTimeItemAllowed = status === 'Pending' || status === 'Rejected';
+  
+  // Check if submit is allowed based on timesheet status
+  const isSubmitAllowed = status === 'Pending' || status === 'Rejected';
+
   const addRow = async () => {
     try {
+      console.log('🔧 [TimesheetScreen] Add Time Item button pressed');
+      console.log('🔧 [TimesheetScreen] Current status:', status, 'isAddTimeItemAllowed:', isAddTimeItemAllowed);
+      
+      if (!isAddTimeItemAllowed) {
+        Alert.alert('Not Allowed', 'Cannot add time items when timesheet is submitted.');
+        return;
+      }
+      
       setIsLoading(true);
+      
       const resp = await checkAddTimesheetEligibility();
+      console.log('🔧 [TimesheetScreen] Eligibility check response:', resp);
       const success = resp?.Success === true || resp?.success === true;
       const message = resp?.Message || resp?.message || 'You are not allowed to add timesheet.';
+      console.log('🔧 [TimesheetScreen] Eligibility success:', success, 'Message:', message);
       if (success) {
+        console.log('🔧 [TimesheetScreen] Setting picker visible to true');
         setPickerVisible(true);
       } else {
+        console.log('🔧 [TimesheetScreen] Showing eligibility error:', message);
         setEligibilityMessage(String(message));
         setEligibilityVisible(true);
       }
     } catch (e) {
+      console.error('🔧 [TimesheetScreen] Eligibility check error:', e);
       const msg = e?.response?.data?.Message || e?.message || 'Failed to check eligibility.';
       setEligibilityMessage(String(msg));
       setEligibilityVisible(true);
@@ -510,7 +589,15 @@ const TimesheetScreen = ({ navigation }) => {
   };
 
   const handleSaveProjectTask = () => {
-    if (!selectedProject || !selectedTask) return; // simple guard
+    console.log('🔧 [TimesheetScreen] handleSaveProjectTask called');
+    console.log('🔧 [TimesheetScreen] selectedProject:', selectedProject);
+    console.log('🔧 [TimesheetScreen] selectedTask:', selectedTask);
+    
+    if (!selectedProject || !selectedTask) {
+      console.log('🔧 [TimesheetScreen] Missing project or task, cannot save');
+      return; // simple guard
+    }
+    
     const next = {
       id: `ts-${Date.now()}`,
       taskName: `${selectedProject.name} • ${selectedTask.name}`,
@@ -523,11 +610,14 @@ const TimesheetScreen = ({ navigation }) => {
       taskUuid: selectedTask.id,
       lines: [],
     };
+    
+    console.log('🔧 [TimesheetScreen] Creating new timesheet item:', next);
     setData((prev) => [next, ...prev]);
     setActiveId(next.id);
     setPickerVisible(false);
     setSelectedProject(null);
     setSelectedTask(null);
+    console.log('🔧 [TimesheetScreen] Timesheet item added successfully');
   };
 
   // Full-screen loader while first load is in progress (safe position after all hooks)
@@ -614,13 +704,28 @@ const TimesheetScreen = ({ navigation }) => {
           <View style={styles.headerActions}>
             {!isSelectionMode ? (
               <>
-                <TouchableOpacity activeOpacity={0.85} style={styles.addRowButton} onPress={addRow}>
-                  <Text style={styles.addRowText}>+ Add Time Item</Text>
+                <TouchableOpacity 
+                  activeOpacity={0.85} 
+                  style={[styles.addRowButton, !isAddTimeItemAllowed && styles.buttonDisabled]} 
+                  onPress={() => {
+                    console.log('🔧 [TimesheetScreen] Add Time Item button onPress triggered');
+                    addRow();
+                  }}
+                  disabled={!isAddTimeItemAllowed}
+                >
+                  <Text style={[styles.addRowText, !isAddTimeItemAllowed && styles.buttonDisabledText]}>
+                    + Add Time Item
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   activeOpacity={0.85}
-                  style={styles.submitInlineButton}
+                  style={[styles.submitInlineButton, !isSubmitAllowed && styles.buttonDisabled]}
                   onPress={async () => {
+                    if (!isSubmitAllowed) {
+                      Alert.alert('Not Allowed', 'Cannot submit timesheet when it is already submitted.');
+                      return;
+                    }
+                    
                     try {
                       const headerUuid = timesheetData?.HeaderUUID || timesheetData?.UUID || '';
                       if (!headerUuid) {
@@ -633,8 +738,24 @@ const TimesheetScreen = ({ navigation }) => {
                       if (!ok) {
                         const msg = resp?.Message || resp?.message || 'Failed to submit timesheet.';
                         Alert.alert('Error', String(msg));
+                      } else {
+                        // Show success message and refresh data to update status
+                        Alert.alert(
+                          'Success', 
+                          'Timesheet submitted successfully!',
+                          [
+                            {
+                              text: 'OK',
+                              onPress: async () => {
+                                // Refresh data to update status from Pending to Submitted
+                                console.log('🔧 [TimesheetScreen] Refreshing data after submission');
+                                setIsLoading(true);
+                                await fetchTimesheetData(fromDate !== 'From Date' ? fromDate : undefined, toDate !== 'To Date' ? toDate : undefined);
+                              }
+                            }
+                          ]
+                        );
                       }
-                      await fetchTimesheetData(fromDate !== 'From Date' ? fromDate : undefined, toDate !== 'To Date' ? toDate : undefined);
                     } catch (e) {
                       const msg = e?.response?.data?.Message || e?.message || 'Failed to submit timesheet.';
                       Alert.alert('Error', String(msg));
@@ -642,8 +763,11 @@ const TimesheetScreen = ({ navigation }) => {
                       setIsLoading(false);
                     }
                   }}
+                  disabled={!isSubmitAllowed}
                 >
-                  <Text style={styles.submitInlineText}>Submit</Text>
+                  <Text style={[styles.submitInlineText, !isSubmitAllowed && styles.buttonDisabledText]}>
+                    Submit
+                  </Text>
                 </TouchableOpacity>
               </>
             ) : (
@@ -689,6 +813,7 @@ const TimesheetScreen = ({ navigation }) => {
             }}
             onSelect={() => selectItem(item.id)}
             leaveData={timesheetData?.LeaveData || []}
+            timesheetStatus={status}
             onDayHoursFilled={(itemId, dateKey, timeText) => {
               // Find the existing remark for this date
               const item = data.find(item => item.id === itemId);
@@ -710,34 +835,32 @@ const TimesheetScreen = ({ navigation }) => {
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No timesheets found.</Text>
           </View>
-        )}
-
-        
-
+        )} 
       </ScrollView>
 
       {/* Project/Task Picker Bottom Sheet */}
-      <BottomSheetModal
-        ref={sheetRef}
-        snapPoints={snapPoints}
+      <CommonBottomSheet
+        visible={pickerVisible}
+        onDismiss={() => {
+          console.log('🔧 [TimesheetScreen] Bottom sheet dismissed');
+          setPickerVisible(false);
+          setIsDropdownOpen(false);
+        }}
+        snapPoints={isDropdownOpen ? [hp(75), hp(75)] : snapPoints}
         enablePanDownToClose
         enableContentPanningGesture={false}
-        onDismiss={() => setPickerVisible(false)}
-        onChange={(index) => setCurrentSnapIndex(index)}
+        backdropOpacity={0.45}
+        backdropPressBehavior="close"
         handleIndicatorStyle={styles.bsHandle}
-        handleStyle={{ backgroundColor: 'transparent' }}
         backgroundStyle={styles.bsBackground}
-        backdropComponent={(props) => (
-          <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.45} pressBehavior="close" />
-        )}
+        contentContainerStyle={styles.bsContent}
       >
-        <BottomSheetView style={styles.bsContent}>
-          <View style={styles.bsHeaderRow}>
-            <Text style={styles.bsTitle}>Select Project and Task Detail</Text>
-            <TouchableOpacity onPress={() => setPickerVisible(false)} activeOpacity={0.8}>
-              <Icon name="close" size={rf(4)} color="#111827" />
-            </TouchableOpacity>
-          </View>
+        <View style={styles.bsHeaderRow}>
+          <Text style={styles.bsTitle}>Select Project and Task Detail</Text>
+          <TouchableOpacity onPress={() => setPickerVisible(false)} activeOpacity={0.8}>
+            <Icon name="close" size={rf(4)} color="#111827" />
+          </TouchableOpacity>
+        </View>
 
           <Dropdown
             placeholder="Select Project"
@@ -760,17 +883,17 @@ const TimesheetScreen = ({ navigation }) => {
                 } catch (_e) {
                   setTasks([]);
                 } finally {
-                  sheetRef.current?.snapToIndex(0);
+                  // Snap to index handled by CommonBottomSheet
                 }
               })();
             }}
             onOpenChange={(open) => {
+              console.log('🔧 [TimesheetScreen] Project dropdown open change:', open);
+              setIsDropdownOpen(open);
               if (open) {
                 setCurrentSnapIndex(1);
-                sheetRef.current?.snapToIndex(1);
               } else {
                 setCurrentSnapIndex(0);
-                sheetRef.current?.snapToIndex(0);
               }
             }}
           />
@@ -785,15 +908,14 @@ const TimesheetScreen = ({ navigation }) => {
             disabled={!selectedProject}
             onSelect={(t) => {
               setSelectedTask(t);
-              sheetRef.current?.snapToIndex(0);
             }}
             onOpenChange={(open) => {
+              console.log('🔧 [TimesheetScreen] Task dropdown open change:', open);
+              setIsDropdownOpen(open);
               if (open) {
                 setCurrentSnapIndex(1);
-                sheetRef.current?.snapToIndex(1);
               } else {
                 setCurrentSnapIndex(0);
-                sheetRef.current?.snapToIndex(0);
               }
             }}
           />
@@ -807,8 +929,7 @@ const TimesheetScreen = ({ navigation }) => {
               <Text style={styles.bsSaveText}>Save</Text>
             </TouchableOpacity>
           </View>
-        </BottomSheetView>
-      </BottomSheetModal>
+      </CommonBottomSheet>
 
       {/* Description Bottom Sheet */}
       <CommonBottomSheet
@@ -931,6 +1052,7 @@ const TimesheetScreen = ({ navigation }) => {
         onClose={() => setOpenFrom(false)}
         selectedDate={fromDateValue}
         onDateSelect={(date) => {
+          console.log('🔧 [TimesheetScreen] Date selected:', date);
           setFromDateValue(date);
           setFromDate(formatUiDate(date));
           
@@ -938,6 +1060,11 @@ const TimesheetScreen = ({ navigation }) => {
           const sundayDate = getSundayOfWeek(date);
           setToDateValue(sundayDate);
           setToDate(formatUiDate(sundayDate));
+          
+          console.log('🔧 [TimesheetScreen] Dates set:', { 
+            fromDate: formatUiDate(date), 
+            toDate: formatUiDate(sundayDate) 
+          });
         }}
         title="Select Monday (From Date)"
         mondayOnly={true}
@@ -976,6 +1103,7 @@ const TimesheetScreen = ({ navigation }) => {
         cancelText={'Cancel'}
         onConfirm={confirmDelete}
         onCancel={closeConfirm}
+        autoCloseOnConfirm={false}
       />
 
       <BottomSheetConfirm
@@ -1262,5 +1390,13 @@ const styles = StyleSheet.create({
     fontSize: rf(3.6),
     textAlignVertical: 'top',
     fontFamily: TYPOGRAPHY.fontFamilyRegular,
+  },
+  buttonDisabled: {
+    backgroundColor: "#f3f4f6",
+    borderColor: '#d1d5db',
+    borderWidth: 1,
+  },
+  buttonDisabledText: {
+    color: COLORS.textMuted,
   },
 });

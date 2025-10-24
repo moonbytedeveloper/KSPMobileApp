@@ -89,9 +89,15 @@ const sumHhMm = (records) => {
   return `${hh}:${mm}`;
 };
 
-const TimesheetItem = ({ item, isActive, onToggle, onSave, onDelete, onDayHoursFilled, isSelectionMode, isSelected, onLongPress, onSelect, leaveData = [] }) => {
+const TimesheetItem = ({ item, isActive, onToggle, onSave, onDelete, onDayHoursFilled, isSelectionMode, isSelected, onLongPress, onSelect, leaveData = [], timesheetStatus }) => {
   const statusStyles = statusStyleMap[item.status] || statusStyleMap.Pending;
   const [isEditing, setIsEditing] = useState(false);
+  
+  // Check if editing is allowed based on timesheet status
+  const isEditAllowed = timesheetStatus === 'Rejected' || timesheetStatus === 'Pending';
+  
+  // Check if delete is allowed - only for Pending status or new items
+  const isDeleteAllowed = timesheetStatus === 'Pending' || timesheetStatus === 'Rejected';
   const from = parseDateSafe(item.fromDate);
   const to = parseDateSafe(item.toDate);
 
@@ -220,10 +226,19 @@ const TimesheetItem = ({ item, isActive, onToggle, onSave, onDelete, onDayHoursF
 
           <View style={styles.separator} />
 
+          {!isEditAllowed && timesheetStatus === 'Submitted' && (
+            <View style={styles.disabledMessage}>
+              <Text style={styles.disabledMessageText}>
+                This timesheet has been submitted and cannot be edited until it is rejected by the approver.
+              </Text>
+            </View>
+          )}
+
           <View style={styles.actionsRow}>
             <TouchableOpacity
-              style={styles.buttonPositive}
+              style={[styles.buttonPositive, !isEditAllowed && styles.buttonDisabled]}
               onPress={() => {
+                if (!isEditAllowed) return;
                 if (isEditing) {
                   setIsEditing(false);
                   onSave && onSave(item.id, perDayHours, computedTotal);
@@ -231,10 +246,13 @@ const TimesheetItem = ({ item, isActive, onToggle, onSave, onDelete, onDayHoursF
                   setIsEditing(true);
                 }
               }}
+              disabled={!isEditAllowed}
             >
-              <Text style={styles.buttonPositiveText}>{isEditing ? 'Save' : 'Edit'}</Text>
+              <Text style={[styles.buttonPositiveText, !isEditAllowed && styles.buttonDisabledText]}>
+                {isEditing ? 'Save' : 'Edit'}
+              </Text>
             </TouchableOpacity>
-            {!!onDelete && (
+            {!!onDelete && isDeleteAllowed && (
               <TouchableOpacity style={styles.buttonNegative} onPress={() => onDelete && onDelete(item.id)}>
                 <Text style={styles.buttonNegativeText}>Delete</Text>
               </TouchableOpacity>
@@ -284,9 +302,9 @@ const TimesheetItem = ({ item, isActive, onToggle, onSave, onDelete, onDayHoursF
                               return next;
                             });
                           }}
-                          editable={isEditing}
+                          editable={isEditing && isEditAllowed}
                           keyboardType="number-pad"
-                          style={styles.hoursInput}
+                          style={[styles.hoursInput, !isEditAllowed && styles.inputDisabled]}
                           placeholder="HH:MM"
                           placeholderTextColor="#9ca3af"
                           onBlur={() => {
@@ -633,5 +651,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#92400e',
     textAlign: 'center',
+  },
+  buttonDisabled: {
+    backgroundColor: '#f3f4f6',
+    borderColor: '#d1d5db',
+    opacity: 0.6,
+  },
+  buttonDisabledText: {
+    color: '#9ca3af',
+  },
+  inputDisabled: {
+    backgroundColor: '#f9fafb',
+    borderColor: '#e5e7eb',
+    color: '#9ca3af',
+  },
+  disabledMessage: {
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+    borderRadius: wp(2),
+    padding: hp(1.2),
+    marginBottom: hp(1),
+  },
+  disabledMessageText: {
+    fontSize: rf(3),
+    color: '#92400e',
+    textAlign: 'center',
+    fontWeight: '500',
   },
 }); 

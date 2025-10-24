@@ -18,7 +18,7 @@ const Input = ({ label, required, multiline, value, onChangeText, rightAccessory
           style={[
             inputStyles.input,
             styles.leadInputText,
-            multiline && { includeFontPadding: false, textAlignVertical: value ? 'top' : 'center' }
+            multiline && { textAlignVertical: 'top' }
           ]}
           placeholder={label + (required ? '*' : '')}
           placeholderTextColor={COLORS.textLight}
@@ -129,6 +129,18 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const formatDateForAPI = (date) => {
+    // Create a new date object to avoid timezone issues
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const day = d.getDate();
+    
+    // Create date in local timezone to avoid timezone conversion issues
+    const localDate = new Date(year, month, day, 12, 0, 0, 0); // Set to noon to avoid DST issues
+    return localDate.toISOString();
   };
 
   // Load countries on component mount
@@ -397,7 +409,7 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
             Country_UUID: selectedCountry?.Uuid || selectedCountry?.UUID || '',
             State_UUID: selectedState?.Uuid || selectedState?.UUID || '',
             CompanyName: values.companyName,
-            ActionDueDate: new Date(actionDateValue).toISOString(),
+            ActionDueDate: formatDateForAPI(actionDateValue),
             PhoneNumber: values.phone,
             ClientName: values.clientName,
             Email: values.email,

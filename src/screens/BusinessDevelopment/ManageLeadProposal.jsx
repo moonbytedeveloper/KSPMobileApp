@@ -1,10 +1,11 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef  } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, PermissionsAndroid, Platform } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { COLORS, formStyles, buttonStyles, TYPOGRAPHY, inputStyles, SPACING } from '../styles/styles';
 import { wp, hp, rf, safeAreaTop } from '../../utils/responsive';
 import Dropdown from '../../components/common/Dropdown';
 import AppHeader from '../../components/common/AppHeader';
+import BottomSheetConfirm from '../../components/common/BottomSheetConfirm';
 import { addLeadProposal, updateLeadProposal, deleteLeadProposal, getEmployees, getLeadProposalsList } from '../../api/authServices';
 import { getUUID, getCMPUUID, getENVUUID } from '../../api/tokenStorage';
 import DatePickerBottomSheet from '../../components/common/CustomDatePicker';
@@ -108,6 +109,9 @@ const ManageLeadProposal = ({ navigation, route }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [apiError, setApiError] = useState('');
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [proposalToDelete, setProposalToDelete] = useState(null);
+  const scrollViewRef = useRef(null);
 
   React.useEffect(() => {
     const load = async () => {
@@ -388,6 +392,34 @@ const ManageLeadProposal = ({ navigation, route }) => {
     setCurrentPage(0);
   };
 
+  const handleDeleteConfirm = (proposal) => {
+    console.log('handleDeleteConfirm called with:', proposal);
+    setProposalToDelete(proposal);
+    setDeleteConfirmVisible(true);
+    console.log('deleteConfirmVisible set to true');
+  };
+
+  const handleDeleteConfirmAction = async () => {
+    console.log('handleDeleteConfirmAction called with proposalToDelete:', proposalToDelete);
+    if (!proposalToDelete) return;
+    
+    try {
+      const [userUuid, cmpUuid, envUuid] = await Promise.all([getUUID(), getCMPUUID(), getENVUUID()]);
+      console.log('Deleting proposal with ID:', proposalToDelete.id);
+      await deleteLeadProposal({ 
+        leadOppUuid: proposalToDelete.id, 
+        overrides: { userUuid, cmpUuid, envUuid } 
+      });
+      console.log('Proposal deleted successfully, refreshing list...');
+      await fetchProposals();
+    } catch (e) {
+      console.log('Delete proposal failed', e?.response?.data || e?.message || e);
+    } finally {
+      setDeleteConfirmVisible(false);
+      setProposalToDelete(null);
+    }
+  };
+
   // Actions
   const validate = () => {
     const next = {};
@@ -560,6 +592,26 @@ const ManageLeadProposal = ({ navigation, route }) => {
 
     // Clear any existing errors
     setErrors({});
+    
+    // Scroll to top when editing
+    console.log('Attempting to scroll to top...');
+    setTimeout(() => {
+      if (scrollViewRef.current) {
+        console.log('Scrolling to top with scrollTo');
+        try {
+          scrollViewRef.current.scrollTo({ y: 0, animated: true });
+        } catch (e) {
+          console.log('scrollTo failed, trying scrollToOffset:', e);
+          try {
+            scrollViewRef.current.scrollToOffset({ y: 0, animated: true });
+          } catch (e2) {
+            console.log('scrollToOffset also failed:', e2);
+          }
+        }
+      } else {
+        console.log('ScrollView ref is null');
+      }
+    }, 100);
   };
 
   const updateProposal = async () => {
@@ -619,14 +671,8 @@ const ManageLeadProposal = ({ navigation, route }) => {
     }
   };
 
-  const deleteProposal = async (id) => {
-    try {
-      const [userUuid, cmpUuid, envUuid] = await Promise.all([getUUID(), getCMPUUID(), getENVUUID()]);
-      await deleteLeadProposal({ leadOppUuid: id, overrides: { userUuid, cmpUuid, envUuid } });
-      await fetchProposals();
-    } catch (e) {
-      console.log('Delete proposal failed', e?.response?.data || e?.message || e);
-    }
+  const deleteProposal = (proposal) => {
+    handleDeleteConfirm(proposal);
   };
 
   const cancelEdit = () => {
@@ -649,8 +695,9 @@ const ManageLeadProposal = ({ navigation, route }) => {
     <View style={styles.safeArea}>
       <AppHeader title="Manage Lead Proposal" onLeftPress={() => navigation.goBack()} />
 
-      <ScrollView contentContainerStyle={formStyles.container} showsVerticalScrollIndicator={false}>
-        <View style={{ ...styles.field, }} >
+      <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false}>
+        <View style={formStyles.container}>
+          <View style={{ ...styles.field, }} >
           <Dropdown
             placeholder="Follow Up Taker*"
             value={followUpTaker ? resolveEmployeeName(followUpTaker) : (pendingFollowUpTakerName || '')}
@@ -788,11 +835,7 @@ const ManageLeadProposal = ({ navigation, route }) => {
               </TouchableOpacity>
             )}
           </View>
-        </View>
-        {apiError ? (
-          <Text style={styles.apiErrorText} numberOfLines={3}>{apiError}</Text>
-        ) : null}
-
+        </View> 
 
         {/* Pagination Controls */}
         <View style={styles.paginationContainer}>
@@ -868,6 +911,7 @@ const ManageLeadProposal = ({ navigation, route }) => {
             </View>
           </View>
         )}
+        </View>
       </ScrollView>
 
       {/* Date Pickers */}
@@ -892,6 +936,25 @@ const ManageLeadProposal = ({ navigation, route }) => {
         }}
         title="Select Follow Up Date"
         minDate={new Date()}
+      />
+
+      {/* Delete Confirmation Bottom Sheet */}
+      {console.log('Rendering BottomSheetConfirm with deleteConfirmVisible:', deleteConfirmVisible)}
+      <BottomSheetConfirm
+        visible={deleteConfirmVisible}
+        onCancel={() => {
+          console.log('Bottom sheet onCancel called');
+          setDeleteConfirmVisible(false);
+          setProposalToDelete(null);
+        }}
+        onConfirm={() => {
+          console.log('Bottom sheet onConfirm called');
+          handleDeleteConfirmAction();
+        }}
+        title="Delete Proposal"
+        message="Are you sure you want to delete this proposal?"
+        confirmText="Delete"
+        cancelText="Cancel"
       />
     </View>
   );
@@ -1307,7 +1370,7 @@ const ProposalCard = ({ data, onEdit, onDelete, opportunityTitle }) => {
             <TouchableOpacity
               activeOpacity={0.9}
               style={styles.actionBtnOutlineDanger}
-              onPress={() => onDelete && onDelete(local.id)}
+              onPress={() => onDelete && onDelete(local)}
             >
               <Icon name="delete" size={rf(3.6)} color={COLORS.delete} />
             </TouchableOpacity>
