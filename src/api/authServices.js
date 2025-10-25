@@ -5,6 +5,7 @@ import api from './axios';
 import Config from 'react-native-config';
 import uuid from 'react-native-uuid';
 import base64 from 'react-native-base64';
+import DeviceInfo from 'react-native-device-info';
 // NOTE: Keep this in sync with BASE_URL in axios.js
 const BASE_URL = Config.API_URL;
 const PATHS = {
@@ -99,6 +100,19 @@ const PATHS = {
 
 };
 console.log(PATHS,'PATHS');
+ 
+async function getLocalIp() {
+  try {
+    const ip = await DeviceInfo.getIpAddress();
+    console.log(ip,'ip address');
+     // returns string like '192.168.x.x'
+    return ip;
+  } catch (e) {
+    console.warn('getIpAddress error', e);
+    return null;
+  }
+}
+
 
 const refreshClient = axios.create({
     baseURL: BASE_URL,
@@ -596,8 +610,9 @@ export async function saveManageLeadOpportunity(payload, overrides = {}) {
 
 // Business Development: Update Manage Lead Opportunity
 export async function updateManageLeadOpportunity(payload, overrides = {}) {
+    const userIp = await getLocalIp();
     console.log('Update Manage Lead Opportunity payload:', payload);
-    let { userUuid, cmpUuid, envUuid, userIp } = overrides || {};
+    let { userUuid, cmpUuid, envUuid } = overrides || {};
     if (!userUuid || !cmpUuid || !envUuid) {
         const [u, c, e] = await Promise.all([
             userUuid || getUUID(),
@@ -610,7 +625,7 @@ export async function updateManageLeadOpportunity(payload, overrides = {}) {
     if (!cmpUuid) throw new Error('Missing company UUID');
     if (!envUuid) throw new Error('Missing environment UUID');
 
-    const params = { uuid: payload.uuid, cmpUuid, envUuid, userUuid, userIp: userIp || '192.168.29.181' };
+    const params = { uuid: payload.uuid, cmpUuid, envUuid, userUuid, userIp: userIp };
     const resp = await api.put(PATHS.updateManageLeadOpportunity, 
         payload,
         { params }
@@ -621,8 +636,9 @@ export async function updateManageLeadOpportunity(payload, overrides = {}) {
 
 // Business Development: Add Lead Proposal
 export async function addLeadProposal({ leadOppUuid, payload, overrides = {} }) {
+    const userIp = await getLocalIp();
     if (!leadOppUuid) throw new Error('Missing leadOppUuid');
-    let { userUuid, cmpUuid, envUuid, userIp } = overrides || {};
+    let { userUuid, cmpUuid, envUuid } = overrides || {};
     if (!userUuid || !cmpUuid || !envUuid) {
         const [u, c, e] = await Promise.all([
             userUuid || getUUID(),
@@ -631,7 +647,7 @@ export async function addLeadProposal({ leadOppUuid, payload, overrides = {} }) 
         ]);
         userUuid = u; cmpUuid = c; envUuid = e;
     }
-    const params = { leadOppUuid, cmpUuid, envUuid, userUuid, userIp: '192.168.29.181' };
+    const params = { leadOppUuid, cmpUuid, envUuid, userUuid, userIp: userIp };
     console.log('Add Lead Proposal params:', params);
     console.log('Add Lead Proposal payload:', payload);
 
@@ -669,9 +685,10 @@ console.log(payload,'222');
 
 // Business Development: Update Lead Proposal
 export async function updateLeadProposal({ proposalUuid, leadUuid, payload, overrides = {} }) {
+    const userIp = await getLocalIp();
     if (!proposalUuid) throw new Error('Missing proposalUuid');
     if (!leadUuid) throw new Error('Missing leadUuid');
-    let { userUuid, cmpUuid, envUuid, userIp } = overrides || {};
+    let { userUuid, cmpUuid, envUuid } = overrides || {};
     if (!userUuid || !cmpUuid || !envUuid) {
         const [u, c, e] = await Promise.all([
             userUuid || getUUID(),
@@ -680,7 +697,7 @@ export async function updateLeadProposal({ proposalUuid, leadUuid, payload, over
         ]);
         userUuid = u; cmpUuid = c; envUuid = e;
     }
-    const params = { uuid: proposalUuid, leadOppUuid: leadUuid, cmpUuid, envUuid, userUuid, userIp: '192.168.29.181' };
+    const params = { uuid: proposalUuid, leadOppUuid: leadUuid, cmpUuid, envUuid, userUuid, userIp: userIp };
     console.log('Update Lead Proposal params:', params);
     console.log('Update Lead Proposal payload:', payload);
 
@@ -718,8 +735,9 @@ export async function updateLeadProposal({ proposalUuid, leadUuid, payload, over
 
 // Business Development: Add Lead Follow-Up
 export async function addLeadFollowUp({ leadOppUuid, payload, overrides = {} }) {
+    const userIp = await getLocalIp();
     if (!leadOppUuid) throw new Error('Missing leadOppUuid');
-    let { userUuid, cmpUuid, envUuid, userIp } = overrides || {};
+    let { userUuid, cmpUuid, envUuid } = overrides || {};
     if (!userUuid || !cmpUuid || !envUuid) {
         const [u, c, e] = await Promise.all([
             userUuid || getUUID(),
@@ -728,7 +746,7 @@ export async function addLeadFollowUp({ leadOppUuid, payload, overrides = {} }) 
         ]);
         userUuid = u; cmpUuid = c; envUuid = e;
     }
-    const params = { leadOppUuid, cmpUuid, envUuid, userUuid, userIp: '192.168.29.181' };
+    const params = { leadOppUuid, cmpUuid, envUuid, userUuid, userIp: userIp };
     console.log('Add Lead Follow-Up params:', params);
     console.log('Add Lead Follow-Up payload:', payload);
     const resp = await api.post(PATHS.addLeadFollowUp, payload, { params });
@@ -738,8 +756,9 @@ export async function addLeadFollowUp({ leadOppUuid, payload, overrides = {} }) 
 
 // Business Development: Update Lead Follow-Up (PUT)
 export async function updateLeadFollowUp({ followupUuid, payload, overrides = {} }) {
+    const userIp = await getLocalIp();
     if (!followupUuid) throw new Error('Missing followupUuid');
-    let { userUuid, cmpUuid, envUuid, userIp } = overrides || {};
+    let { userUuid, cmpUuid, envUuid } = overrides || {};
     if (!userUuid || !cmpUuid || !envUuid) {
         const [u, c, e] = await Promise.all([
             userUuid || getUUID(),
@@ -748,7 +767,7 @@ export async function updateLeadFollowUp({ followupUuid, payload, overrides = {}
         ]);
         userUuid = u; cmpUuid = c; envUuid = e;
     }
-    const params = { followupUuid, cmpUuid, envUuid, userUuid, userIp: '192.168.29.181' };
+    const params = { followupUuid, cmpUuid, envUuid, userUuid, userIp: userIp };
     console.log('Update Lead Follow-Up params:', params);
     console.log('Update Lead Follow-Up payload:', payload);
     const resp = await api.put(PATHS.addLeadFollowUp, payload, { params });
@@ -758,8 +777,9 @@ export async function updateLeadFollowUp({ followupUuid, payload, overrides = {}
 
 // Business Development: Delete Follow-Up (DELETE)
 export async function deleteLeadFollowUp({ followupUuid, overrides = {} }) {
+    const userIp = await getLocalIp();
     if (!followupUuid) throw new Error('Missing followupUuid');
-    let { userUuid, cmpUuid, envUuid, userIp } = overrides || {};
+    let { userUuid, cmpUuid, envUuid } = overrides || {};
     if (!userUuid || !cmpUuid || !envUuid) {
         const [u, c, e] = await Promise.all([
             userUuid || getUUID(),
@@ -768,7 +788,7 @@ export async function deleteLeadFollowUp({ followupUuid, overrides = {} }) {
         ]);
         userUuid = u; cmpUuid = c; envUuid = e;
     }
-    const params = { followupUuid, cmpUuid, envUuid, userUuid, userIp: '192.168.29.181' };
+    const params = { followupUuid, cmpUuid, envUuid, userUuid, userIp: userIp };
     console.log('Delete Follow-Up params:', params);
     const resp = await api.delete(PATHS.deleteLeadFollowUp, { params });
     console.log('Delete Follow-Up response:', resp);
@@ -777,8 +797,9 @@ export async function deleteLeadFollowUp({ followupUuid, overrides = {} }) {
 
 // Business Development: Delete Lead Proposal (DELETE)
 export async function deleteLeadProposal({ leadOppUuid, overrides = {} }) {
+    const userIp = await getLocalIp();
     if (!leadOppUuid) throw new Error('Missing leadOppUuid');
-    let { userUuid, cmpUuid, envUuid, userIp } = overrides || {};
+    let { userUuid, cmpUuid, envUuid } = overrides || {};
     if (!userUuid || !cmpUuid || !envUuid) {
         const [u, c, e] = await Promise.all([
             userUuid || getUUID(),
@@ -787,7 +808,7 @@ export async function deleteLeadProposal({ leadOppUuid, overrides = {} }) {
         ]);
         userUuid = u; cmpUuid = c; envUuid = e;
     }
-    const params = { leadOppUuid, cmpUuid, envUuid, userUuid, userIp: '192.168.29.181' };
+    const params = { leadOppUuid, cmpUuid, envUuid, userUuid, userIp: userIp };
     console.log('Delete Lead Proposal params:', params);
     const resp = await api.delete(PATHS.deleteLeadProposal, { params });
     console.log('Delete Lead Proposal response:', resp);
@@ -796,8 +817,9 @@ export async function deleteLeadProposal({ leadOppUuid, overrides = {} }) {
 
 // Business Development: Delete Lead (DELETE)
 export async function deleteLead({ uuid, overrides = {} }) {
+    const userIp = await getLocalIp();
     if (!uuid) throw new Error('Missing uuid');
-    let { userUuid, cmpUuid, envUuid, userIp } = overrides || {};
+    let { userUuid, cmpUuid, envUuid } = overrides || {};
     if (!userUuid || !cmpUuid || !envUuid) {
         const [u, c, e] = await Promise.all([
             userUuid || getUUID(),
@@ -806,7 +828,7 @@ export async function deleteLead({ uuid, overrides = {} }) {
         ]);
         userUuid = u; cmpUuid = c; envUuid = e;
     }
-    const params = { uuid, cmpUuid, envUuid, userUuid, userIp: '192.168.29.181' };
+    const params = { uuid, cmpUuid, envUuid, userUuid, userIp: userIp };
     console.log('Delete Lead params:', params);
     const resp = await api.delete(PATHS.deleteLead, { params });
     console.log('Delete Lead response:', resp);

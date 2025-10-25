@@ -156,7 +156,8 @@ const OpportunityCard = ({
       <TouchableOpacity activeOpacity={0.8} onPress={toggle}>
         <View style={styles.rowHeader}>
           <View style={styles.headerLeft}>
-            <View style={[styles.dot, { backgroundColor: color }]} />
+            <View style={[styles.dot, { backgroundColor: (status === 'Won' ? COLORS.success : 
+              status === 'Pending' ? COLORS.warning :status === 'Not Updated' ?   'grey' : COLORS.info) }]} />
             <View style={styles.headerLeftContent}>
               <Text style={[text.caption, styles.caption]}>Opportunity Title</Text>
               <Text style={[text.title, styles.title]} numberOfLines={1}>{OpportunityTitle}</Text>
@@ -434,7 +435,6 @@ const OpportunityCard = ({
                   setMode('success');
                 }
               } catch (e) {
-                console.log('Update lead status failed', e?.response?.data || e?.message || e);
                 const errorMsg = e?.response?.data?.Message || e?.response?.data?.message || e?.message || 'Update failed';
                 setErrorMessage(errorMsg);
                 setMode('error');

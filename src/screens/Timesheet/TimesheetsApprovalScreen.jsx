@@ -202,12 +202,14 @@ const TimesheetsApprovalScreen = ({ navigation }) => {
   };
   if (loading && !refreshing) {
     return  (
-      <View style={{ flex: 1 }}>
-      <AppHeader title="Timesheets Approval" onLeftPress={handleBack} onRightPress={handleNotificationPress} />
-       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Loader />
-       </View>
-    </View>
+      <View style={styles.containers}>
+      <AppHeader
+        title="Total Project"
+        onLeftPress={() => navigation.goBack()}
+        onRightPress={() => navigation.navigate('Notification')}
+      />
+      <Loader />
+    </View> 
     );
   }
   return (
@@ -309,6 +311,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.bg,
     //paddingTop: safeAreaTop,
+  },
+  containers: {
+    flex: 1,
+    backgroundColor: COLORS.bg,
   },
   container: {
     flex: 1,

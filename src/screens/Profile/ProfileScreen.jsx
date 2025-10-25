@@ -163,10 +163,10 @@ const ProfileScreen = () => {
       await uploadProfileImage(file);
     } catch (err) {
       if (isCancel && isCancel(err)) return;
-      console.warn('Image pick error:', err);
-      setMessageTitle('Picker Error');
-      setMessageText(String(err?.message || err));
-      messageSheetRef.current?.present();
+      // console.warn('Image pick error:', err);
+      // setMessageTitle('Picker Error');
+      // setMessageText(String(err?.message || err));
+      // messageSheetRef.current?.present();
     }
   };
 
@@ -501,7 +501,7 @@ const ProfileScreen = () => {
               activeOpacity={0.7}
             >
               <Icon name="photo-library" size={rf(5)} color={COLORS.primary} />
-              <Text style={styles.bottomSheetOptionText}>Choose from Gallery</Text>
+              <Text style={[styles.bottomSheetOptionText, {marginLeft: wp(3)}]}>Choose from Gallery</Text>
             </TouchableOpacity>
             
             {serverProfileImage && (
@@ -511,7 +511,7 @@ const ProfileScreen = () => {
                 activeOpacity={0.7}
               >
                 <Icon name="delete" size={rf(5)} color="#ef4444" />
-                <Text style={[styles.bottomSheetOptionText, styles.deleteOptionText]}>Delete Image</Text>
+                <Text style={[styles.bottomSheetOptionText, styles.deleteOptionText, {marginLeft: wp(3)}]}>Delete Image</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -537,9 +537,9 @@ const ProfileScreen = () => {
           <View style={{ paddingHorizontal: wp(2), paddingBottom: hp(1.5) }}>
             <Text style={{ fontSize: rf(3.6), color: COLORS.text, textAlign: 'center' }}>{messageText}</Text>
           </View>
-          <View style={{ alignItems: 'center', marginTop: hp(1) }}>
-            <TouchableOpacity activeOpacity={0.8} onPress={() => messageSheetRef.current?.dismiss()} style={[styles.bottomSheetOption, { width: '60%' }]}>
-              <Text style={[styles.bottomSheetOptionText, { textAlign: 'center' }]}>OK</Text>
+          <View style={{ alignItems: 'center', marginTop: hp(1), }}>
+            <TouchableOpacity activeOpacity={0.8} onPress={() => messageSheetRef.current?.dismiss()} style={[styles.bottomSheetOptionz, { width: '60%'  }]}>
+              <Text style={[styles.bottomSheetOptionText , { textAlign: 'center' }]}>OK</Text>
             </TouchableOpacity>
           </View>
         </BottomSheetView>
@@ -565,10 +565,10 @@ const ProfileScreen = () => {
             <Text style={{ fontSize: rf(3.6), color: COLORS.text, textAlign: 'center' }}>{confirmConfig.text || ''}</Text>
           </View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-evenly', paddingHorizontal: wp(4), marginTop: hp(1) }}>
-            <TouchableOpacity activeOpacity={0.8} onPress={() => confirmSheetRef.current?.dismiss()} style={[styles.bottomSheetOption, { flex: 1, marginRight: wp(2) }]}>
+            <TouchableOpacity activeOpacity={0.8} onPress={() => confirmSheetRef.current?.dismiss()} style={[styles.bottomSheetOptionz, { flex: 1, marginRight: wp(2) }]}>
               <Text style={[styles.bottomSheetOptionText, { textAlign: 'center' }]}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.8} onPress={() => confirmConfig.onConfirm && confirmConfig.onConfirm()} style={[styles.bottomSheetOption, styles.deleteOption, { flex: 1, marginLeft: wp(2) }]}>
+            <TouchableOpacity activeOpacity={0.8} onPress={() => confirmConfig.onConfirm && confirmConfig.onConfirm()} style={[styles.bottomSheetOptionz, styles.deleteOption, { flex: 1, marginLeft: wp(2) }]}>
               <Text style={[styles.bottomSheetOptionText, styles.deleteOptionText, { textAlign: 'center' }]}>Confirm</Text>
             </TouchableOpacity>
           </View>
@@ -797,6 +797,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
+  bottomSheetOptionz: { 
+    alignItems: 'center',
+    paddingVertical: hp(1.5),
+    paddingHorizontal: wp(4),
+    backgroundColor: COLORS.bgMuted,
+    borderRadius: wp(3),
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
   deleteOption: {
     backgroundColor: '#fef2f2',
     borderColor: '#fecaca',
@@ -805,7 +814,6 @@ const styles = StyleSheet.create({
     fontSize: rf(3.8),
     fontWeight: '500',
     color: COLORS.text,
-    marginLeft: wp(3),
     fontFamily: TYPOGRAPHY.fontFamilyMedium,
   },
   deleteOptionText: {

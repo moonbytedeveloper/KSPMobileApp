@@ -148,12 +148,14 @@ const TotalProjectScreen = ({ navigation }) => {
   );
   if (loading && !refreshing) {
     return (
-      <View style={{ flex: 1 }}>
-        <AppHeader title="Total Project" onLeftPress={handleBackPress} onRightPress={handleNotificationPress} />
-         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Loader />
-         </View>
-      </View>
+      <View style={styles.containers}>
+      <AppHeader
+        title="Total Project"
+        onLeftPress={() => navigation.goBack()}
+        onRightPress={() => navigation.navigate('Notification')}
+      />
+      <Loader />
+    </View> 
       
     );
   }
@@ -282,6 +284,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: wp(4),
+  },
+  containers: {
+    flex: 1,
+    backgroundColor: COLORS.bg,
   },
   scrollView: {
     flex: 1,

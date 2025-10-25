@@ -166,7 +166,6 @@ const ManageLeadProposal = ({ navigation, route }) => {
           }
         }
       } catch (e) {
-        try { console.log('Failed to load employees', e?.response?.data || e?.message || e); } catch (_e) { }
         setEmployees([]);
       } finally {
         setLoadingEmployees(false);
@@ -204,7 +203,6 @@ const ManageLeadProposal = ({ navigation, route }) => {
     }
   }, [employees, isEditMode, editingProposal, pendingFollowUpTakerName]);
   const initialOpportunityTitle = route?.params?.initialOpportunityTitle
-  console.log(initialOpportunityTitle, 'initialOpportunityTitle');
   // Non-edit: once employees load, auto-select default Follow Up Taker (initial taker or Opportunity Owner)
   React.useEffect(() => {
     if (!employees?.length) return;
@@ -282,10 +280,8 @@ const ManageLeadProposal = ({ navigation, route }) => {
     try {
       setLoadingProposals(true);
       const leadUuid = route?.params?.leadUuid;
-      console.log('Fetching proposals for leadUuid:', leadUuid);
 
       if (!leadUuid) {
-        console.log('No leadUuid provided, skipping proposals fetch');
         setAllProposals([]);
         setProposals([]);
         setTotalRecords(0);
@@ -293,21 +289,15 @@ const ManageLeadProposal = ({ navigation, route }) => {
       }
 
       const [cmpUuid, envUuid] = await Promise.all([getCMPUUID(), getENVUUID()]);
-      console.log('API params:', { leadUuid, cmpUuid, envUuid });
 
       const response = await getLeadProposalsList({
         leadUuid,
         overrides: { cmpUuid, envUuid }
       });
 
-      console.log('API response:', response);
-      console.log('Response Data:', response?.Data);
-
       const proposalsList = Array.isArray(response?.Data) ? response.Data : [];
-      console.log('Proposals list length:', proposalsList.length);
 
       const mappedProposals = proposalsList.map((proposal, idx) => {
-        console.log(`Proposal ${idx}:`, proposal);
         return {
           id: String(proposal?.UUID || idx + 1),
           proposalNumber: proposal?.Proposal_Number || '',
@@ -325,7 +315,6 @@ const ManageLeadProposal = ({ navigation, route }) => {
         };
       });
 
-      console.log('Mapped proposals:', mappedProposals);
       setAllProposals(mappedProposals);
       setTotalRecords(mappedProposals.length);
       if (!Array.isArray(proposalsList) || proposalsList.length === 0) {
@@ -335,7 +324,6 @@ const ManageLeadProposal = ({ navigation, route }) => {
         setApiError('');
       }
     } catch (e) {
-      console.log('Failed to fetch proposals', e?.response?.data || e?.message || e);
       setAllProposals([]);
       setProposals([]);
       setTotalRecords(0);
@@ -393,27 +381,21 @@ const ManageLeadProposal = ({ navigation, route }) => {
   };
 
   const handleDeleteConfirm = (proposal) => {
-    console.log('handleDeleteConfirm called with:', proposal);
     setProposalToDelete(proposal);
     setDeleteConfirmVisible(true);
-    console.log('deleteConfirmVisible set to true');
   };
 
   const handleDeleteConfirmAction = async () => {
-    console.log('handleDeleteConfirmAction called with proposalToDelete:', proposalToDelete);
     if (!proposalToDelete) return;
     
     try {
       const [userUuid, cmpUuid, envUuid] = await Promise.all([getUUID(), getCMPUUID(), getENVUUID()]);
-      console.log('Deleting proposal with ID:', proposalToDelete.id);
       await deleteLeadProposal({ 
         leadOppUuid: proposalToDelete.id, 
         overrides: { userUuid, cmpUuid, envUuid } 
       });
-      console.log('Proposal deleted successfully, refreshing list...');
       await fetchProposals();
     } catch (e) {
-      console.log('Delete proposal failed', e?.response?.data || e?.message || e);
     } finally {
       setDeleteConfirmVisible(false);
       setProposalToDelete(null);
@@ -473,7 +455,6 @@ const ManageLeadProposal = ({ navigation, route }) => {
       await fetchProposals();
       setErrors({});
     } catch (e) {
-      try { console.log('Failed to add lead proposal', e?.response?.data || e?.message || e); } catch (_e) { }
       const msg = (e?.response?.data?.Message) || (e?.response?.data?.message) || (e?.message) || 'Something went wrong';
       setApiError(String(msg));
     } finally {
@@ -544,9 +525,6 @@ const ManageLeadProposal = ({ navigation, route }) => {
 
 
   const editProposal = (proposal) => {
-    console.log('Edit proposal called with:', proposal);
-    console.log('Available employees:', employees.length);
-
     setEditingProposal(proposal);
     setIsEditMode(true);
 
@@ -555,12 +533,10 @@ const ManageLeadProposal = ({ navigation, route }) => {
     const followUpTakerUuid = proposal.followUpTakerUuid || proposal.Followup_Taker_UUID;
     const followUpTakerName = proposal.followUpTakerName || proposal.Followup_Taker_Name || proposal.customerName;
 
-    console.log('Looking for follow up taker:', { followUpTakerUuid, followUpTakerName });
 
     let foundEmployee = null;
     if (followUpTakerUuid && employees?.length) {
       foundEmployee = employees.find(emp => String(resolveEmployeeKey(emp)).trim() === String(followUpTakerUuid).trim()) || null;
-      console.log('Found by UUID:', foundEmployee);
     }
     if (!foundEmployee && followUpTakerName && employees?.length) {
       const targetName = String(followUpTakerName).toLowerCase().trim();
@@ -568,15 +544,12 @@ const ManageLeadProposal = ({ navigation, route }) => {
         const empName = String(resolveEmployeeName(emp)).toLowerCase().trim();
         return empName === targetName || empName.includes(targetName) || targetName.includes(empName);
       }) || null;
-      console.log('Found by name:', foundEmployee);
     }
 
     if (foundEmployee) {
-      console.log('Setting follow up taker to:', foundEmployee);
       setFollowUpTaker(foundEmployee);
     } else {
       // Defer selection until employees are available
-      console.log('Deferring selection, setting pending name:', followUpTakerName);
       setPendingFollowUpTakerName(followUpTakerName || '');
       setFollowUpTaker(null);
     }
@@ -594,22 +567,17 @@ const ManageLeadProposal = ({ navigation, route }) => {
     setErrors({});
     
     // Scroll to top when editing
-    console.log('Attempting to scroll to top...');
     setTimeout(() => {
       if (scrollViewRef.current) {
-        console.log('Scrolling to top with scrollTo');
         try {
           scrollViewRef.current.scrollTo({ y: 0, animated: true });
         } catch (e) {
-          console.log('scrollTo failed, trying scrollToOffset:', e);
           try {
             scrollViewRef.current.scrollToOffset({ y: 0, animated: true });
           } catch (e2) {
-            console.log('scrollToOffset also failed:', e2);
           }
         }
       } else {
-        console.log('ScrollView ref is null');
       }
     }, 100);
   };
@@ -663,7 +631,6 @@ const ManageLeadProposal = ({ navigation, route }) => {
       setProposalDoc(null);
       setErrors({});
     } catch (e) {
-      console.log('Failed to update proposal', e?.response?.data || e?.message || e);
       const msg = (e?.response?.data?.Message) || (e?.response?.data?.message) || (e?.message) || 'Something went wrong';
       setApiError(String(msg));
     } finally {
@@ -706,7 +673,6 @@ const ManageLeadProposal = ({ navigation, route }) => {
             getKey={resolveEmployeeKey}
             hint="Follow Up Taker*"
             onSelect={(v) => {
-              console.log('Dropdown selected:', v);
               setFollowUpTaker(v);
               setPendingFollowUpTakerName(''); // Clear pending name when manually selected
               if (errors.followUpTaker) setErrors((e) => ({ ...e, followUpTaker: null }));
@@ -939,16 +905,13 @@ const ManageLeadProposal = ({ navigation, route }) => {
       />
 
       {/* Delete Confirmation Bottom Sheet */}
-      {console.log('Rendering BottomSheetConfirm with deleteConfirmVisible:', deleteConfirmVisible)}
       <BottomSheetConfirm
         visible={deleteConfirmVisible}
-        onCancel={() => {
-          console.log('Bottom sheet onCancel called');
+        onCancel={() => { 
           setDeleteConfirmVisible(false);
           setProposalToDelete(null);
         }}
         onConfirm={() => {
-          console.log('Bottom sheet onConfirm called');
           handleDeleteConfirmAction();
         }}
         title="Delete Proposal"

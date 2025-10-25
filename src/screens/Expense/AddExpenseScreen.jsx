@@ -33,6 +33,9 @@ const LabeledInput = ({ placeholder, rightIcon, value, onPress, onChangeText, ed
       pointerEvents={editable ? "auto" : "none"}
       onChangeText={onChangeText}
       keyboardType={editable ? "numeric" : "default"}
+      returnKeyType="done"
+      blurOnSubmit={true}
+      onSubmitEditing={() => {}}
     />
     {!!rightIcon && (
       <Icon name={rightIcon} size={rf(3.8)} color="#8e8e93" />
@@ -70,6 +73,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   // Location data states
   const [countries, setCountries] = useState([]);
@@ -915,6 +919,12 @@ const AddExpenseScreen = ({ navigation, route }) => {
       return;
     }
 
+    // Check if there are any line items
+    if (items.length === 0) {
+      Alert.alert('No line items', 'Please add at least one expense line before submitting.');
+      return;
+    }
+
     const payload = {
       UUID: (await getUUID()) || '',
       Master_Company_UUID: (await getCMPUUID()) || '',
@@ -938,7 +948,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
     try {
       setSubmitting(true);
       if (isEditMode && (editHeaderUuid || headerUuidRef.current)) {
-        // Update existing header
+        // Update existing header with approval status
         const updateBody = {
           ...payload,
           UUID: editHeaderUuid || headerUuidRef.current,
@@ -951,38 +961,33 @@ const AddExpenseScreen = ({ navigation, route }) => {
           setHeaderUuid(updatedUuid);
         }
 
-        // Also update currently selected line if any
-        if (activeCode) {
-          const linePayload = {
-            UUID: activeCode,
-            Master_Company_UUID: (await getCMPUUID()) || '',
-            Master_Environment_UUID: (await getENVUUID()) || '',
-            ERExpenseHeader_UUID: headerUuidRef?.current || updatedUuid || '',
-            UserUUID: (await getUUID()) || '',
-            UnitType_UUID: selectedUnitType?.id || '',
-            UnitCost: form.unitCost,
-            Quantity: form.quantity,
-            TaxAmount: form.taxAmount,
-            Document_Date: toIsoString(documentDate || form.documentDate),
-            BillUrl: '',
-            Expense_Remarks: form.purpose,
-            documentFile: selectedAttachment ? { uri: selectedAttachment.uri, name: selectedAttachment.name || 'bill', type: selectedAttachment.type || 'application/octet-stream' } : undefined,
-          };
-          try { console.log('Update Expense Line payload (via Update):', JSON.stringify(linePayload, null, 2)); } catch (_e) {}
-          try { await updateExpenseLine(linePayload); } catch (_) {}
-        }
-
         Alert.alert('Success', 'Expense updated successfully.');
         try { await fetchExpenses(); } catch (_e) {}
       } else {
-        // Create new header
-        const resp = await addExpenseHeader(payload);
-        const newHeaderUuid = resp?.Data?.UUID || resp?.Data?.Uuid || resp?.UUID || resp?.Uuid || '';
-        if (newHeaderUuid) {
-          headerUuidRef.current = newHeaderUuid;
-          setHeaderUuid(newHeaderUuid);
+        // If no header exists, create one first
+        if (!headerUuidRef.current) {
+          const headerPayload = {
+            ...payload,
+            IsApprovalApply: false, // Create header without approval first
+          };
+          const headerResp = await addExpenseHeader(headerPayload);
+          const newHeaderUuid = headerResp?.Data?.UUID || headerResp?.Data?.Uuid || headerResp?.UUID || headerResp?.Uuid || '';
+          if (newHeaderUuid) {
+            headerUuidRef.current = newHeaderUuid;
+            setHeaderUuid(newHeaderUuid);
+          }
         }
-        Alert.alert('Success', 'Expense header submitted successfully. You can now add lines.');
+
+        // Now update the header with final approval status
+        if (headerUuidRef.current) {
+          const finalPayload = {
+            ...payload,
+            UUID: headerUuidRef.current,
+          };
+          await updateExpenseHeader(finalPayload);
+        }
+
+        Alert.alert('Success', 'Expense submitted successfully.');
         try { await fetchExpenses(); } catch (_e) {}
       }
       setConfirmVisible(false);
@@ -999,21 +1004,13 @@ const AddExpenseScreen = ({ navigation, route }) => {
   };
 
   const handleAdd = async () => {
-    // Basic validation (reuse submit rules)
-    if (!selectedProject) {
-      Alert.alert('Missing data', 'Please select a Project.');
-      return;
-    }
-    if (!selectedExpenseType) {
-      Alert.alert('Missing data', 'Please select an Expense Type.');
-      return;
-    }
-    if ((selectedExpenseType?.Uuid === 'OTHER' || selectedExpenseType?.UUID === 'OTHER') && !otherExpenseType.trim()) {
-      Alert.alert('Missing data', 'Please type the Expense name for "Other".');
+    // Basic validation for line items only
+    if (!form.quantity || !form.unitCost) {
+      Alert.alert('Missing data', 'Please fill Quantity and Unit Cost.');
       return;
     }
 
-    // Ensure a header exists; if not, create it first
+    // Ensure a header exists; if not, create it first (but don't submit it)
     if (!headerUuidRef.current) {
       const headerPayload = {
         UUID: (await getUUID()) || '',
@@ -1028,14 +1025,14 @@ const AddExpenseScreen = ({ navigation, route }) => {
         State_UUID: getUuidLike(selectedState),
         City_UUID: getUuidLike(selectedCity),
         Currency_UUID: getUuidLike(selectedCurrency, ['UUID', 'Uuid', 'id']),
-        IsApprovalApply: !!applyForApproval,
+        IsApprovalApply: false, // Don't apply for approval when just adding lines
         IsDisplay: true,
         ...(selectedExpenseType?.Uuid === 'OTHER' || selectedExpenseType?.UUID === 'OTHER'
           ? { OtherFields: otherExpenseType.trim() }
           : {}),
       };
       try {
-        setSubmitting(true);
+        setAdding(true);
         const headerResp = await addExpenseHeader(headerPayload);
          const newHeaderUuid = headerResp?.Data?.UUID || headerResp?.Data?.Uuid || headerResp?.UUID || headerResp?.Uuid || '';
          if (newHeaderUuid) {
@@ -1043,8 +1040,8 @@ const AddExpenseScreen = ({ navigation, route }) => {
            setHeaderUuid(newHeaderUuid);
          }
       } catch (e) {
-        Alert.alert('Submit failed', String(e?.response?.data?.Message || e?.message || 'Failed to create header'));
-        setSubmitting(false);
+        Alert.alert('Failed to create header', String(e?.response?.data?.Message || e?.message || 'Failed to create header'));
+        setAdding(false);
         return;
       }
     }
@@ -1067,14 +1064,16 @@ const AddExpenseScreen = ({ navigation, route }) => {
     };
 
     try {
-      setSubmitting(true);
+      setAdding(true);
       const apiResp = await addExpenseLine(linePayload);
       await loadHeaderLines();
-      Alert.alert('Success', 'Expense line submitted successfully.');
+      Alert.alert('Success', 'Expense line added successfully.');
+      // Reset form for next line entry
+      resetLineForm();
     } catch (e) {
-      Alert.alert('Submit failed', String(e?.response?.data?.Message || e?.message || 'Failed to submit'));
+      Alert.alert('Add failed', String(e?.response?.data?.Message || e?.message || 'Failed to add line'));
     } finally {
-      setSubmitting(false);
+      setAdding(false);
     }
   };
 
@@ -1105,7 +1104,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
     };
 
     try {
-      setSubmitting(true);
+      setAdding(true);
       try { console.log('Update Expense Line payload:', JSON.stringify(linePayload, null, 2)); } catch (_e) {}
       await updateExpenseLine(linePayload);
       await loadHeaderLines();
@@ -1115,7 +1114,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
     } catch (e) {
       Alert.alert('Update failed', String(e?.response?.data?.Message || e?.message || 'Failed to update line'));
     } finally {
-      setSubmitting(false);
+      setAdding(false);
     }
   };
 
@@ -1256,6 +1255,9 @@ const AddExpenseScreen = ({ navigation, route }) => {
               placeholderTextColor="#8e8e93"
               value={otherExpenseType}
               onChangeText={setOtherExpenseType}
+              returnKeyType="done"
+              blurOnSubmit={true}
+              onSubmitEditing={() => {}}
             />
           </View>
         )}
@@ -1415,6 +1417,9 @@ const AddExpenseScreen = ({ navigation, route }) => {
             multiline
             value={form.purpose}
             onChangeText={updateForm('purpose')}
+            returnKeyType="done"
+            blurOnSubmit={true}
+            onSubmitEditing={() => {}}
           />
         </View>
 
@@ -1427,18 +1432,20 @@ const AddExpenseScreen = ({ navigation, route }) => {
           <TouchableOpacity
             activeOpacity={0.85}
             style={styles.addBtnSmall}
-            onPress={() => {
-              if (submitting) return;
+            onPress={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (adding || submitting) return;
               if (isEditMode && activeCode) {
                 handleUpdateLine();
               } else {
                 handleAdd();
               }
             }}
-            disabled={submitting}
+            disabled={adding || submitting}
           >
             <Text style={styles.addBtnSmallText}>
-              {submitting ? 'Submitting...' : (isEditMode && activeCode ? 'Update' : 'Add')}
+              {adding ? 'Adding...' : (isEditMode && activeCode ? 'Update' : 'Add')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -1480,7 +1487,11 @@ const AddExpenseScreen = ({ navigation, route }) => {
           <TouchableOpacity
             activeOpacity={0.9}
             style={styles.submitBtn}
-            onPress={() => setConfirmVisible(true)}
+            onPress={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setConfirmVisible(true);
+            }}
             disabled={submitting}
           >
             <Text style={styles.submitBtnText}>{submitting ? 'Submitting...' : (isEditMode ? 'Update' : 'Submit')}</Text>

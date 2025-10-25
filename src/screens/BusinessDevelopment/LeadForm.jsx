@@ -61,18 +61,7 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
     initialLeadOpportunityActionDueDate,
     isEditMode = false, // Parameter to determine if we're editing existing lead
   } = route.params || {}; // 👈 important
-
-  console.log('=== LEAD FORM DEBUG ===');
-  console.log('initialLead', initialLead);
-  console.log('initialLeadUuid', initialLeadUuid);
-  console.log('initialLeadName', initialLeadName);
-  console.log('initialLeadOwner', initialLeadOwner);
-  console.log('initialLeadStatus', initialLeadStatus);
-  console.log('initialLeadPhone', initialLeadPhone);
-  console.log('initialLeadEmail', initialLeadEmail);
-  console.log('Location data:', { country, state, city, countryUuid, stateUuid, cityUuid });
-  console.log('isEditMode:', isEditMode);
-  console.log('=== END DEBUG ===');
+ 
 
   const [form, setForm] = useState({
     companyName: initialLeadCompanyName || '',
@@ -208,7 +197,6 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
 
   // Handle country selection
   const handleCountrySelect = (country) => {
-    console.log('Country selected:', country);
     setSelectedCountry(country);
     setSelectedState(null);
     setSelectedCity(null);
@@ -221,7 +209,6 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
 
   // Handle state selection
   const handleStateSelect = (state) => {
-    console.log('State selected:', state);
     setSelectedState(state);
     setSelectedCity(null);
     setCities([]);
@@ -232,12 +219,10 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
 
   // Handle city selection
   const handleCitySelect = (city) => {
-    console.log('City selected:', city);
     setSelectedCity(city);
   };
   // Prefill dropdowns (Country, State, City) - using names only
   React.useEffect(() => {
-    console.log('Prefill useEffect triggered with:', { country, state, city });
     
     if (country) {
       setSelectedCountry({
@@ -259,6 +244,22 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
     }
   }, [country, state, city]);
 
+  // Prefill Opportunity Owner when in edit mode
+  React.useEffect(() => {
+    if (initialLeadOwner && employees.length > 0) {
+      const foundOwner = employees.find(emp => 
+        emp?.EmployeeName === initialLeadOwner || 
+        emp?.Name === initialLeadOwner ||
+        emp?.DisplayName === initialLeadOwner ||
+        emp?.FullName === initialLeadOwner
+      );
+      if (foundOwner) {
+        setSelectedOwner(foundOwner);
+        setForm(prev => ({ ...prev, ownerFromKsp: foundOwner?.EmployeeName || foundOwner?.Name || foundOwner?.DisplayName || foundOwner?.FullName || initialLeadOwner }));
+      }
+    }
+  }, [initialLeadOwner, employees]);
+
   // Load master data
   React.useEffect(() => {
     loadCountries();
@@ -268,18 +269,15 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
   // Match pre-filled country with loaded countries list
   React.useEffect(() => {
     if (countries.length > 0 && country && selectedCountry?.CountryName === country && !selectedCountry?.Uuid) {
-      console.log('Trying to match country in loaded list:', country);
       const foundCountry = countries.find(c => 
         c.CountryName === country || 
         c.CountryName?.toLowerCase() === country?.toLowerCase()
       );
       if (foundCountry) {
-        console.log('Found matching country:', foundCountry);
         setSelectedCountry(foundCountry);
         
         // If we have state data, load states for this country
         if (state && foundCountry.Uuid) {
-          console.log('Loading states for matched country:', foundCountry.CountryName);
           loadStates(foundCountry.Uuid);
         }
       }
@@ -289,18 +287,15 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
   // Match pre-filled state with loaded states list
   React.useEffect(() => {
     if (states.length > 0 && state && selectedState?.StateName === state && !selectedState?.Uuid) {
-      console.log('Trying to match state in loaded list:', state);
       const foundState = states.find(s => 
         s.StateName === state || 
         s.StateName?.toLowerCase() === state?.toLowerCase()
       );
       if (foundState) {
-        console.log('Found matching state:', foundState);
         setSelectedState(foundState);
         
         // If we have city data, load cities for this state
         if (city && foundState.Uuid) {
-          console.log('Loading cities for matched state:', foundState.StateName);
           loadCities(foundState.Uuid);
         }
       }
@@ -310,13 +305,11 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
   // Match pre-filled city with loaded cities list
   React.useEffect(() => {
     if (cities.length > 0 && city && selectedCity?.CityName === city && !selectedCity?.Uuid) {
-      console.log('Trying to match city in loaded list:', city);
       const foundCity = cities.find(c => 
         c.CityName === city || 
         c.CityName?.toLowerCase() === city?.toLowerCase()
       );
       if (foundCity) {
-        console.log('Found matching city:', foundCity);
         setSelectedCity(foundCity);
       }
     }
@@ -362,17 +355,10 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
       validationSchema={ValidationSchema}
       onSubmit={async (values, { setSubmitting, setStatus, setFieldTouched }) => {
         try {
-          console.log('LeadForm: Form submission started');
-          console.log('LeadForm: Form values:', values);
-          console.log('LeadForm: Selected country:', selectedCountry);
-          console.log('LeadForm: Selected state:', selectedState);
-          console.log('LeadForm: Selected city:', selectedCity);
-
           setStatus(undefined);
 
           // Validate dropdown selections
           if (!selectedCountry) {
-            console.log('LeadForm: Country validation failed');
             setFieldTouched('country', true);
             setStatus({ apiError: 'Please select a country' });
             // open address accordion so user sees the error
@@ -382,7 +368,6 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
             return;
           }
           if (!selectedState) {
-            console.log('LeadForm: State validation failed');
             setFieldTouched('state', true);
             setStatus({ apiError: 'Please select a state' });
             setOpenSection1(false);
@@ -391,7 +376,6 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
             return;
           }
           if (!selectedCity) {
-            console.log('LeadForm: City validation failed');
             setFieldTouched('city', true);
             setStatus({ apiError: 'Please select a city' });
             setOpenSection1(false);
@@ -421,31 +405,22 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
             payload.uuid = initialLeadUuid;
           }
 
-          console.log('LeadForm: Payload prepared:', payload);
-
           const [userUuid, cmpUuid, envUuid] = await Promise.all([
             getUUID(),
             getCMPUUID(),
             getENVUUID(),
           ]);
 
-          console.log('LeadForm: UUIDs retrieved:', { userUuid, cmpUuid, envUuid });
-
           let resp;
           if (isEditMode) {
-            console.log('LeadForm: Calling updateManageLeadOpportunity API (PUT)...');
             resp = await updateManageLeadOpportunity(payload, { userUuid, cmpUuid, envUuid });
           } else {
-            console.log('LeadForm: Calling saveManageLeadOpportunity API (POST)...');
             resp = await saveManageLeadOpportunity(payload, { userUuid, cmpUuid, envUuid });
           }
-          console.log('LeadForm: API response:', resp);
-
-          onSubmit && onSubmit(values, resp);
+          
+          // Call onSubmit with success flag to trigger page refresh
+          onSubmit && onSubmit(values, resp, true); // true indicates success
         } catch (e) {
-          console.log('LeadForm: API call failed:', e);
-          console.log('LeadForm: Error response:', e?.response?.data);
-          console.log('LeadForm: Error message:', e?.message);
           const errorMessage = isEditMode ? 'Failed to update lead' : 'Failed to save lead';
           setStatus({ apiError: e?.response?.data?.Message || e?.message || errorMessage });
         } finally {
@@ -592,7 +567,7 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
                 <View style={styles.sectionBody}>
                   <View style={styles.row}>
                     <View style={styles.col}>
-                      <Input label="Opportunity Brief" required style={formStyles.input} inputBoxStyle={(touched.brief && errors.brief) ? styles.inputError : null} multiline value={values.brief} onChangeText={(v) => { setStatus && setStatus(undefined); setFieldValue('brief', v); }} />
+                      <Input label="Opportunity Brief" required style={formStyles.input} inputBoxStyle={(touched.brief && errors.brief) ? styles.inputError : null}  value={values.brief} onChangeText={(v) => { setStatus && setStatus(undefined); setFieldValue('brief', v); }} />
                       {touched.brief && errors.brief && (
                         <Text style={styles.fieldError}>{errors.brief}</Text>
                       )}
@@ -611,7 +586,7 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
                         onPress={openDatePicker}
                         style={[styles.datePickerContainer, { marginTop: hp(1) }]}
                       >
-                        <View style={[inputStyles.box, styles.innerFieldBox, styles.datePickerBox, (touched.actionDueDate && errors.actionDueDate) ? styles.inputError : null, { alignItems: 'center' }]}>
+                        <View style={[inputStyles.box,{marginBottom: hp(1.6)}, styles.innerFieldBox, styles.datePickerBox, (touched.actionDueDate && errors.actionDueDate) ? styles.inputError : null, { alignItems: 'center' }]}>
                           <Text style={[
                             inputStyles.input,
                             styles.datePickerText,

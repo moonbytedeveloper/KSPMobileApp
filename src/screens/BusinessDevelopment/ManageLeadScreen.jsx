@@ -17,7 +17,18 @@ const ManageLeadScreen = ({ navigation,route}) => {
           rightButtonLabel="Add New Lead"
          showRight={false}
         /> 
-      <LeadForm  route={route} onSubmit={() => navigation.goBack()} onCancel={() => navigation.goBack()} />
+      <LeadForm  
+        route={route} 
+        onSubmit={(values, resp, success) => {
+          if (success) {
+            // Navigate back and trigger refresh in parent screen
+            navigation.goBack();
+            // You can also add a callback to refresh the parent screen if needed
+            // navigation.getParent()?.setParams({ refresh: Date.now() });
+          }
+        }} 
+        onCancel={() => navigation.goBack()} 
+      />
     </View>
   );
 };

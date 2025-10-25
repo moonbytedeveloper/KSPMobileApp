@@ -4,7 +4,7 @@ import OpportunityCard from './OpportunityCard';
 import { TabContext } from '../../navigation/BottomTabs/TabContext';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf, safeAreaTop } from '../../utils/responsive';
-import { useNavigation, DrawerActions } from '@react-navigation/native';
+import { useNavigation, DrawerActions, useFocusEffect } from '@react-navigation/native';
 import AppHeader from '../../components/common/AppHeader';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { getWonLeads, deleteLead } from '../../api/authServices';
@@ -57,7 +57,6 @@ const BusinessDevelopmentScreen = () => {
         getENVUUID(),
         getUUID(),
       ]);
-      console.log('compUuid', cmpUuid, envUuid, userUuid);
       const start = page * pageSize;
       const resp = await getWonLeads({
         cmpUuid,
@@ -84,7 +83,6 @@ const BusinessDevelopmentScreen = () => {
         rows.length;
       setTotalRecords(totalFromResponse);
     } catch (e) {
-      console.log('Failed to load won leads', e);
       setData([]);
       setTotalRecords(0);
       const msg = (e?.response?.data?.Message) || (e?.response?.data?.message) || (e?.message) || 'Failed to load leads';
@@ -97,6 +95,13 @@ const BusinessDevelopmentScreen = () => {
   useEffect(() => {
     fetchWonLeads();
   }, []);
+
+  // Refresh data when screen comes back into focus (after edit/save)
+  useFocusEffect(
+    useCallback(() => {
+      fetchWonLeads();
+    }, [])
+  );
 
   const toggleRow = useCallback((id) => {
     setExpandedId(prev => prev === id ? null : id);
@@ -302,7 +307,7 @@ const BusinessDevelopmentScreen = () => {
                     await deleteLead({ uuid: item.uuid, overrides: { userUuid, cmpUuid, envUuid } });
                     await fetchWonLeads(currentPage, itemsPerPage, searchValue);
                   } catch (e) {
-                    console.log('Delete lead failed', e?.response?.data || e?.message || e);
+                    console.log('Delete lead failed', e);
                   }
                 }}
               />

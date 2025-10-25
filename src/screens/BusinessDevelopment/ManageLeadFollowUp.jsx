@@ -120,7 +120,6 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
         const list = Array.isArray(resp?.Data) ? resp.Data : [];
         setEmployees(list);
       } catch (e) {
-        try { console.log('Failed to load employees', e?.response?.data || e?.message || e); } catch (_e) {}
         setEmployees([]);
       } finally {
         setLoadingEmployees(false);
@@ -186,26 +185,20 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
     setIsRefreshing(true);
     try {
       const leadUuid = route?.params?.leadUuid || '';
-      console.log('leadUuid', leadUuid);
       if (!leadUuid) return;
       const data = await getFollowUpsByLead({ leadUuid });
       const list = Array.isArray(data?.Data) ? data.Data : [];
       const mapped = list.map((r, idx) => {
         // Find employee name by UUID
         const takerUuid = r?.FollowUpTaker || '';
-        console.log('Looking for employee with UUID:', takerUuid);
-        console.log('Available employees:', employees.length);
         
         const foundEmployee = employees.find((emp) => {
           const empUuid = emp?.UUID || emp?.Uuid || emp?.EmployeeUUID || emp?.EmpUuid || '';
           const match = String(empUuid).trim().toLowerCase() === String(takerUuid).trim().toLowerCase();
-          if (match) {
-            console.log('Found employee:', resolveEmployeeName(emp));
-          }
           return match;
         });
         const takerName = foundEmployee ? resolveEmployeeName(foundEmployee) : takerUuid;
-        console.log('Final taker name:', takerName);
+        
         
         return {
           id: String(r?.uuid || r?.Uuid || r?.UUID || idx + 1),
@@ -227,7 +220,6 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
         setApiError('');
       }
     } catch (e) {
-      try { console.log('Failed to fetch follow-ups', e?.response?.data || e?.message || e); } catch (_e) {}
       const msg = (e?.response?.data?.Message) || (e?.response?.data?.message) || (e?.message) || 'Failed to load follow ups';
       setApiError(String(msg));
       setAllRows([]);
@@ -284,18 +276,15 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
   };
 
   const handleDeleteConfirm = (followUp) => {
-    console.log('handleDeleteConfirm called with:', followUp);
     setFollowUpToDelete(followUp);
     setDeleteConfirmVisible(true);
   };
 
   const handleDeleteConfirmAction = async () => {
-    console.log('handleDeleteConfirmAction called with followUpToDelete:', followUpToDelete);
     if (!followUpToDelete) return;
     
     try {
       const [cmpUuid, envUuid] = await Promise.all([getCMPUUID(), getENVUUID()]);
-      console.log('Deleting follow-up with UUID:', followUpToDelete.uuid);
       await deleteLeadFollowUp({ 
         followupUuid: followUpToDelete.uuid, 
         overrides: { 
@@ -304,11 +293,9 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
           envUuid 
         } 
       });
-      console.log('Follow-up deleted successfully, refreshing list...');
       // Refresh from API instead of local state update
       await fetchFollowUps();
     } catch (e) {
-      try { console.log('Delete follow-up failed', e?.response?.data || e?.message || e); } catch (_e) {}
     } finally {
       setDeleteConfirmVisible(false);
       setFollowUpToDelete(null);
@@ -341,15 +328,12 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
       const [cmpUuid, envUuid] = await Promise.all([getCMPUUID(), getENVUUID()]);
       const leadUuid = route?.params?.leadUuid || '';
       if (editingFollowup?.uuid) {
-        console.log('PUT follow-up', { followupUuid: editingFollowup.uuid, overrides: { userUuid: takerUuid, cmpUuid, envUuid }, payload });
         await updateLeadFollowUp({ followupUuid: editingFollowup.uuid, payload, overrides: { userUuid: takerUuid, cmpUuid, envUuid } });
       } else {
-        console.log('POST follow-up', { leadOppUuid: leadUuid, overrides: { userUuid: takerUuid, cmpUuid, envUuid }, payload });
         await addLeadFollowUp({ leadOppUuid: leadUuid, payload, overrides: { userUuid: takerUuid, cmpUuid, envUuid } });
       }
       await fetchFollowUps();
     } catch (e) {
-      try { console.log('Add follow-up failed', e?.response?.data || e?.message || e); } catch (_e) {}
     }
     // refresh from API to show real data
     await fetchFollowUps();
@@ -539,22 +523,17 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
                   setNextDate('');
                 }
                 // Scroll to top when editing
-                console.log('Attempting to scroll to top...');
                 setTimeout(() => {
                   if (scrollViewRef.current) {
-                    console.log('Scrolling to top with scrollTo');
                     try {
                       scrollViewRef.current.scrollTo({ y: 0, animated: true });
                     } catch (e) {
-                      console.log('scrollTo failed, trying scrollToOffset:', e);
                       try {
                         scrollViewRef.current.scrollToOffset({ y: 0, animated: true });
                       } catch (e2) {
-                        console.log('scrollToOffset also failed:', e2);
                       }
                     }
                   } else {
-                    console.log('ScrollView ref is null');
                   }
                 }, 100);
               }}

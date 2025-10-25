@@ -193,12 +193,14 @@ const PendingTimesheetScreen = ({ navigation }) => {
   };
   if (loading && !refreshing) {
     return( 
-    <View style={{ flex: 1 }}>
-    <AppHeader title="Timesheets Overdue For Submission" onLeftPress={() => navigation.goBack()} onRightPress={() => navigation.navigate('Notification')} />
-     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={styles.containers}>
+      <AppHeader
+        title="Total Project"
+        onLeftPress={() => navigation.goBack()}
+        onRightPress={() => navigation.navigate('Notification')}
+      />
       <Loader />
-     </View>
-  </View>
+    </View> 
   );
   }
 
@@ -330,6 +332,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#ffffff', 
+  },
+  containers: {
+    flex: 1,
+    backgroundColor: COLORS.bg,
   },
   paginationContainer: {
     backgroundColor: '#ffffff',

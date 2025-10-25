@@ -5,7 +5,7 @@ import { SafeAreaView, StyleSheet } from 'react-native';
 import AppHeader from './AppHeader';
 import { useNavigation } from '@react-navigation/native';
 const ZoomableImageViewer = ({ route }) => {
-  const { pdfUrl, opportunityTitle, companyName } = route.params;
+  const { imageUrl, opportunityTitle, companyName } = route.params;
   const navigation = useNavigation();
 
   if (!imageUrl) return null;

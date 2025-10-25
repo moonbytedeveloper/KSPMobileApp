@@ -46,13 +46,35 @@ function HomeScreen({ navigation }) {
   });
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  // Chart data based on summary statistics
+  console.log('dashboardData', dashboardData);
+  
+  // Chart data based on summary statistics - using raw values
   const chartData = [
-    { label: 'Project', percentage: dashboardData.totalProjects, color: '#4A90E2' }, // 15/15 = 100%
-    { label: 'Completed', percentage: dashboardData.completedProjects, color: '#4CAF50' }, // 6/15 = 40%
-    { label: 'On Hold', percentage: dashboardData.onHoldProjects, color: '#FF9800' }, // 3/15 = 20%
-    { label: 'Running', percentage: dashboardData.runningProjects, color: '#4C9DFF' }, // 6/15 = 40%
-  ];
+    { 
+      label: 'Completed', 
+      value: dashboardData.completedProjects || 0, 
+      color: '#4CAF50' // Green
+    },
+    { 
+      label: 'On Hold', 
+      value: dashboardData.onHoldProjects || 0, 
+      color: '#9E9E9E' // Gray
+    },
+    { 
+      label: 'Running', 
+      value: dashboardData.runningProjects || 0, 
+      color: '#FFEB3B' // Yellow
+    },
+    { 
+      label: 'Total', 
+      value: dashboardData.totalProjects || 0, 
+      color: '#2196F3' // Blue
+    }
+  ]; // Show all items, even with 0 values
+
+  // Debug log
+  console.log('Chart data:', chartData);
+  console.log('Dashboard data:', dashboardData);
 
   const handleMenuPress = () => {
     if (navigation && typeof navigation.openDrawer === 'function') {
@@ -254,9 +276,28 @@ function HomeScreen({ navigation }) {
                 <RadialChart 
                   data={chartData}
                   size={wp(50)} 
-                  strokeWidth={10}
-                  gap={5}
+                  strokeWidth={8}
+                  gap={3}
+                  showLabels={true}
                 />
+                {/* Chart Legend */}
+                {/* {chartData.length > 0 && (
+                  <View style={styles.chartLegend}>
+                    {chartData.map((item, index) => (
+                      <View key={index} style={styles.legendItem}>
+                        <View 
+                          style={[
+                            styles.legendColor, 
+                            { backgroundColor: item.color }
+                          ]} 
+                        />
+                        <Text style={styles.legendText}>
+                          {item.label}: {item.value}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )} */}
               </View>
             </View>
           </View>
@@ -393,6 +434,26 @@ const styles = StyleSheet.create({
   chartContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  chartLegend: {
+    marginTop: hp(1),
+    alignItems: 'center',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: hp(0.5),
+  },
+  legendColor: {
+    width: wp(3),
+    height: wp(3),
+    borderRadius: wp(1.5),
+    marginRight: wp(2),
+  },
+  legendText: {
+    fontSize: rf(3.2),
+    color: COLORS.text,
+    fontFamily: TYPOGRAPHY.fontFamilyRegular,
   },
   
   // Dashboard Cards Styles
