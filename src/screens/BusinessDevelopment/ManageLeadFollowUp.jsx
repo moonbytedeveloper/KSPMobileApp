@@ -337,10 +337,19 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
     }
     // refresh from API to show real data
     await fetchFollowUps();
-    setTaker(''); setTakerUuid(''); setDate(''); setType(''); setDesc('');
-    setIsRequired(false); setNextDate(''); setErrors({});
+    // Clear all form fields including employee selection
+    setTaker(''); 
+    setTakerUuid(''); 
+    setTakerEmp(null); // Clear the selected employee object
+    setDate(''); 
+    setType(''); 
+    setDesc('');
+    setIsRequired(false); 
+    setNextDate(''); 
+    setErrors({});
     setEditingFollowup(null);
-    setIsAdding(false); setIsUpdating(false);
+    setIsAdding(false); 
+    setIsUpdating(false);
   };
 
   return (

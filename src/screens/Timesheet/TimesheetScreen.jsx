@@ -537,8 +537,8 @@ const TimesheetScreen = ({ navigation }) => {
   // Check if add time item is allowed based on timesheet status
   const isAddTimeItemAllowed = status === 'Pending' || status === 'Rejected';
   
-  // Check if submit is allowed based on timesheet status
-  const isSubmitAllowed = status === 'Pending' || status === 'Rejected';
+  // Check if submit is allowed based on timesheet status and data
+  const isSubmitAllowed = (status === 'Pending' || status === 'Rejected') && data.length > 0 && totalHours !== '00:00';
 
   const addRow = async () => {
     try {
@@ -722,7 +722,15 @@ const TimesheetScreen = ({ navigation }) => {
                   style={[styles.submitInlineButton, !isSubmitAllowed && styles.buttonDisabled]}
                   onPress={async () => {
                     if (!isSubmitAllowed) {
-                      Alert.alert('Not Allowed', 'Cannot submit timesheet when it is already submitted.');
+                      if (status === 'Submitted' || status === 'Approved') {
+                        Alert.alert('Not Allowed', 'Cannot submit timesheet when it is already submitted.');
+                      } else if (data.length === 0) {
+                        Alert.alert('No Data', 'Please add at least one timesheet entry before submitting.');
+                      } else if (totalHours === '00:00') {
+                        Alert.alert('No Hours', 'Please enter hours for at least one timesheet entry before submitting.');
+                      } else {
+                        Alert.alert('Not Allowed', 'Cannot submit timesheet at this time.');
+                      }
                       return;
                     }
                     

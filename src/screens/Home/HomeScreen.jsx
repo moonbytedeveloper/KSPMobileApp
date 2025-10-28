@@ -168,6 +168,13 @@ function HomeScreen({ navigation }) {
       loadDashboardData();
     }, [])
   );
+
+  // Auto-refresh data when selected company changes
+  useEffect(() => {
+    if (selectedCompanyUUID) {
+      loadDashboardData();
+    }
+  }, [selectedCompanyUUID]);
   if (loading && !refreshing) {
     return <Loader />;
   }

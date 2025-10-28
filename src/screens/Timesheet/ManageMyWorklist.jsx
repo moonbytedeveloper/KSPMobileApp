@@ -31,7 +31,7 @@ const TimesheetCard = ({ timesheet, onActionPress, getStatusColor, getStatusBgCo
       <TouchableOpacity activeOpacity={0.8} onPress={toggle}>
         <View style={styles.tsRowHeader}>
           <View style={styles.tsHeaderLeft}>
-            <View style={[styles.tsDot, { backgroundColor: COLORS.primary }]} />
+            <View style={[styles.tsDot, { backgroundColor: statusColor }]} />
             <View style={styles.tsHeaderLeftContent}>
               <Text style={[text.caption, styles.tsCaption]}>TIMESHEET</Text>
               <Text style={[text.title, styles.tsTitle]} numberOfLines={1}>{timesheet.employeeName || `Timesheet #${timesheet.srNo}`}</Text>
@@ -276,13 +276,13 @@ const ManageMyWorklist = ({ navigation }) => {
   const getStatusColor = (status) => {
     switch (status.toLowerCase()) {
       case 'approved':
-        return '#10B981';
+        return COLORS.success;
       case 'submitted':
-        return '#3B82F6';
+        return COLORS.success;
       case 'pending':
-        return '#F59E0B';
+        return COLORS.warning;
       case 'rejected':
-        return '#EF4444';
+        return COLORS.danger;
       default:
         return '#6B7280';
     }
@@ -291,13 +291,13 @@ const ManageMyWorklist = ({ navigation }) => {
   const getStatusBgColor = (status) => {
     switch (status.toLowerCase()) {
       case 'approved':
-        return '#d1fae5';
+        return COLORS.successBg;
       case 'submitted':
-        return '#dbeafe';
+        return COLORS.successBg;
       case 'pending':
-        return '#fef3c7';
+        return COLORS.warningBg;
       case 'rejected':
-        return '#fee2e2';
+        return COLORS.dangerBg;
       default:
         return '#f3f4f6';
     }
@@ -1082,7 +1082,6 @@ const styles = StyleSheet.create({
   tsBadgeText: {
     fontSize: TYPOGRAPHY.body,
     fontWeight: '800',
-    textTransform: 'uppercase',
   },
   tsActionsRowPrimary: {
     ...layout.rowCenter,

@@ -20,9 +20,13 @@ const Dropdown = ({
   textStyle,
   hideSearch = false,
   onOpenChange,
+  isOpen: controlledIsOpen,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [uncontrolledIsOpen, setUncontrolledIsOpen] = useState(false);
   const [query, setQuery] = useState('');
+  
+  // Use controlled state if provided, otherwise use internal state
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : uncontrolledIsOpen;
 
   const filteredOptions = useMemo(() => {
     const source = options || [];
@@ -33,7 +37,9 @@ const Dropdown = ({
 
   const handleChoose = (item) => {
     onSelect && onSelect(item);
-    setIsOpen(false);
+    if (controlledIsOpen === undefined) {
+      setUncontrolledIsOpen(false);
+    }
     onOpenChange && onOpenChange(false);
     setQuery('');
   };
@@ -47,11 +53,11 @@ const Dropdown = ({
         style={[styles.inputBox, isOpen && styles.inputFocused, disabled && { opacity: 0.6 }, inputBoxStyle]}
         onPress={() => {
           if (disabled) return;
-          setIsOpen((prev) => {
-            const next = !prev;
-            onOpenChange && onOpenChange(next);
-            return next;
-          });
+          const next = !isOpen;
+          if (controlledIsOpen === undefined) {
+            setUncontrolledIsOpen(next);
+          }
+          onOpenChange && onOpenChange(next);
         }}
         disabled={disabled}
       >

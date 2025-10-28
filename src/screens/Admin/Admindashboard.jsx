@@ -88,9 +88,11 @@ const Admindashboard = ({ navigation }) => {
     })();
   }, []);
 
-  // Fetch dashboard data
+  // Fetch dashboard data when component mounts or selected company changes
   useEffect(() => {
-    fetchDashboardData();
+    if (selectedCompanyUUID) {
+      fetchDashboardData();
+    }
   }, [selectedCompanyUUID]);
 
   const fetchDashboardData = async () => {

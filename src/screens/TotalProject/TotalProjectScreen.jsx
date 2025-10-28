@@ -41,6 +41,7 @@ const TotalProjectScreen = ({ navigation }) => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalRecords, setTotalRecords] = useState(0);
   const [searchValue, setSearchValue] = useState('');
+  const [expandedProject, setExpandedProject] = useState(null);
   const fetchPage = useCallback(async (page = currentPage, pageSize = itemsPerPage, isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     setErrorText('');
@@ -141,6 +142,10 @@ const TotalProjectScreen = ({ navigation }) => {
     setCurrentPage(0);
   };
 
+  const toggleProjectExpansion = (projectIndex) => {
+    setExpandedProject(expandedProject === projectIndex ? null : projectIndex);
+  };
+
   const renderStatusTag = (status, statusColor) => (
     <View style={[styles.statusTag, { backgroundColor: statusColor }]}>
       <Text style={styles.statusText}>{status}</Text>
@@ -190,46 +195,73 @@ const TotalProjectScreen = ({ navigation }) => {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh.current} />}
           contentContainerStyle={styles.listContent}
         >
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>My Project</Text>
-
-            {projects.length === 0 && (
-              <View style={styles.emptyBox}>
-                <Text style={styles.emptyText}>{errorText || 'No projects found.'}</Text>
-              </View>
-            )}
-            {projects.map((project, index) => {
-              const name = project.ProjectName ?? project.projectName ?? project.Name ?? project.name ?? '—';
-              const dueDate = project.DueDate ?? project.dueDate ?? project.Due ?? project.due ?? '—';
-              const status = project.Status ?? project.status ?? 'Pending';
-              const progressValue = Number(
-                project.Progress ?? project.progress ?? 0
-              ) || 0;
-              const statusColor = status === 'Completed' ? '#10b981' : status === 'On Hold' ? '#f59e0b' : '#3b82f6';
-              return (
-                <View key={`${name}-${dueDate}-${index}`}>
-                  <View style={styles.projectItem}>
-                    <View style={styles.projectInfo}>
-                      <Text style={styles.projectName}>Project Name: {name}</Text>
-                      <Text style={styles.projectDate}>Due Date: {dueDate}</Text>
-                      <View style={styles.statusContainer}>
-                        <Text style={styles.statusLabel}>Status: </Text>
-                        <StatusBadge label={status} />
-                      </View>
-                      <View style={styles.progressRow}>
-                        <Text style={styles.statusLabel}>Progress: </Text>
-                        <View style={styles.progressContainer}>
-                          <View style={[styles.progressFill, { width: `${Math.max(0, Math.min(100, progressValue))}%` }]} />
-                        </View>
-                        <Text style={styles.progressPercent}>{String(progressValue)}%</Text>
-                      </View>
+          {projects.length === 0 && (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyText}>{errorText || 'No projects found.'}</Text>
+            </View>
+          )}
+          {projects.map((project, index) => {
+            const name = project.ProjectName ?? project.projectName ?? project.Name ?? project.name ?? '—';
+            const dueDate = project.DueDate ?? project.dueDate ?? project.Due ?? project.due ?? '—';
+            const status = project.Status ?? project.status ?? 'Pending';
+            const progressValue = Number(
+              project.Progress ?? project.progress ?? 0
+            ) || 0;
+            const statusColor = status === 'Completed' ? '#10b981' : status === 'On Hold' ? '#f59e0b' : '#3b82f6';
+            const isExpanded = expandedProject === index;
+            
+            return (
+              <View key={`${name}-${dueDate}-${index}`} style={styles.accordionCard}>
+                {/* Accordion Header */}
+                <TouchableOpacity 
+                  activeOpacity={0.8} 
+                  style={styles.accordionHeader}
+                  onPress={() => toggleProjectExpansion(index)}
+                >
+                  <View style={styles.headerLeft}>
+                    <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                    <View style={styles.headerContent}>
+                      <Text style={styles.projectTitle}>{name}</Text>
+                      {/* <Text style={styles.projectSubtitle}>Due: {dueDate}</Text> */}
                     </View>
                   </View>
-                  {index < projects.length - 1 && <View style={styles.separator} />}
-                </View>
-              );
-            })}
-          </View>
+                  <View style={styles.headerRight}>
+                    {/* <StatusBadge label={status} /> */}
+                    <Icon 
+                      name={isExpanded ? 'expand-less' : 'expand-more'} 
+                      size={rf(4.2)} 
+                      color={COLORS.textMuted} 
+                    />
+                  </View>
+                </TouchableOpacity>
+
+                {/* Accordion Body */}
+                {isExpanded && (
+                  <View style={styles.accordionBody}>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Project Name</Text>
+                      <Text style={styles.detailValue}>{name}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Due Date</Text>
+                      <Text style={styles.detailValue}>{dueDate}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Status</Text>
+                      <StatusBadge label={status} />
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Progress</Text>
+                      <View style={styles.progressContainer}>
+                        <View style={[styles.progressFill, { width: `${Math.max(0, Math.min(100, progressValue))}%` }]} />
+                      </View>
+                      <Text style={styles.progressPercent}>{String(progressValue)}%</Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </ScrollView>
       </View>
 
@@ -387,56 +419,86 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontFamilyRegular,
   },
 
-  // Card Styles
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: wp(4),
-    padding: wp(6),
-    marginTop: hp(2),
+  // Accordion Card Styles
+  accordionCard: {
+    backgroundColor: COLORS.bg,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: hp(1.6),
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-    borderWidth: wp(0.1),
-    borderColor: '#eee',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  sectionTitle: {
-    fontSize: rf(6),
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: hp(2),
-    borderBottomWidth: 1,
-    borderBottomColor: '#e34f25',
-    paddingBottom: hp(1),
-    fontFamily: TYPOGRAPHY.fontFamilyBold,
-  },
-
-  // Project Item Styles
-  projectItem: {
-    paddingVertical: hp(1.5),
-  },
-  projectInfo: {
-    gap: hp(1),
-  },
-  projectName: {
-    fontSize: rf(4.2),
-    fontWeight: '500',
-    color: '#333',
-    fontFamily: TYPOGRAPHY.fontFamilyMedium,
-  },
-  projectDate: {
-    fontSize: rf(4.2),
-    fontWeight: '500',
-    color: '#333',
-    fontFamily: TYPOGRAPHY.fontFamilyMedium,
-  },
-  statusContainer: {
+  accordionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(4),
+    backgroundColor: COLORS.bg,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: wp(2),
+  },
+  statusDot: {
+    width: wp(3.5),
+    height: wp(3.5),
+    borderRadius: wp(2),
+  },
+  headerContent: {
+    flex: 1,
+  },
+  projectTitle: {
+    fontSize: rf(4.2),
+    fontWeight: '700',
+    color: COLORS.text,
+    fontFamily: TYPOGRAPHY.fontFamilyBold,
+    marginBottom: hp(0.3),
+  },
+  projectSubtitle: {
+    fontSize: rf(3.2),
+    color: COLORS.textLight,
+    fontFamily: TYPOGRAPHY.fontFamilyRegular,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
+  },
+  accordionBody: {
+    paddingHorizontal: wp(4),
+    paddingTop: hp(1),
+    paddingBottom: hp(1.2),
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.bg,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: hp(1),
+  },
+  detailLabel: {
+    fontSize: rf(3.6),
+    color: COLORS.textLight,
+    fontWeight: '500',
+    fontFamily: TYPOGRAPHY.fontFamilyMedium,
+  },
+  detailValue: {
+    fontSize: rf(3.6),
+    color: COLORS.text,
+    fontWeight: '500',
+    fontFamily: TYPOGRAPHY.fontFamilyMedium,
+    flex: 1,
+    textAlign: 'right',
   },
   badge: {
     borderWidth: 1,
@@ -467,11 +529,6 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#10b981',
   },
-  progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: hp(0.5),
-  },
   progressPercent: {
     fontSize: rf(3.8),
     fontWeight: '700',
@@ -490,12 +547,6 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontFamilyBold,
   },
 
-  // Separator
-  separator: {
-    height: 1,
-    backgroundColor: '#e34f25',
-    marginVertical: hp(1.5),
-  },
 
 });
 

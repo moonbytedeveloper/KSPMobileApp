@@ -218,7 +218,7 @@ const OpportunityCard = ({
               {nextAction ? (
                 <View style={styles.detailRow}> 
                   <Text style={[text.caption, styles.detailLabel]}>Next Action</Text>
-                  <Text style={[text.body, styles.detailValue]}>{nextAction}</Text>
+                  <Text style={[text.body, styles.detailValue,{maxWidth: wp(60)}]}>{nextAction}</Text>
                 </View>
               ) : null}
               {actionDueDate ? (

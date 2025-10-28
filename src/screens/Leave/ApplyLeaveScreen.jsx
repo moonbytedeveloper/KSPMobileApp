@@ -29,6 +29,7 @@ const ApplyLeaveScreen = ({ navigation }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [totalRecords, setTotalRecords] = useState(0);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [leavesLoading, setLeavesLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
 
@@ -75,15 +76,40 @@ const ApplyLeaveScreen = ({ navigation }) => {
     return s;
   };
 
+  // Function to check for overlapping leave dates
+  const checkForOverlappingLeaves = (fromDate, toDate) => {
+    if (!fromDate || !toDate || fromDate === 'From Date' || toDate === 'To Date') {
+      return false;
+    }
+    
+    const newFrom = new Date(fromDate);
+    const newTo = new Date(toDate);
+    
+    return leaves.some(leave => {
+      if (leave.status === 'Pending' || leave.status === 'Approved') {
+        const existingFrom = new Date(leave.from);
+        const existingTo = new Date(leave.to);
+        
+        // Check if dates overlap
+        return (newFrom <= existingTo && newTo >= existingFrom);
+      }
+      return false;
+    });
+  };
+
   const ValidationSchema = Yup.object().shape({
     leaveType: Yup.string().trim().required('Leave Type is required'),
     leaveTypeUuid: Yup.string().required('Leave Type is required'),
     parameter: Yup.string().trim().required('Parameter is required'),
-    fromDate: Yup.string().required('From Date is required'),
-    toDate: Yup.string().required('To Date is required'),
+    fromDate: Yup.string()
+      .test('not-default', 'From Date is required', value => value !== 'From Date')
+      .required('From Date is required'),
+    toDate: Yup.string()
+      .test('not-default', 'To Date is required', value => value !== 'To Date')
+      .required('To Date is required'),
     contact: Yup.string()
       .transform(v => (v || '').replace(/\D/g, ''))
-      .min(10, 'Enter a valid 10-digit number')
+      .length(10, 'Contact number must be exactly 10 digits')
       .required('Contact No. is required'),
     reason: Yup.string().trim().min(3, 'Reason must be at least 3 characters').required('Reason is required'),
   });
@@ -101,7 +127,9 @@ const ApplyLeaveScreen = ({ navigation }) => {
         if (!userUuid || !cmpUuid || !envUuid) return;
         const start = currentPage * (parseInt(pageSize,10)||10);
         const length = parseInt(pageSize,10)||10;
-        const resp = await getHRALeaves({ userUuid, cmpUuid, envUuid, start, length, searchValue: query });
+        console.log('🔍 [ApplyLeaveScreen] Search query:', debouncedQuery);
+        const resp = await getHRALeaves({ userUuid, cmpUuid, envUuid, start, length, searchValue: debouncedQuery || '' });
+        console.log('🔍 [ApplyLeaveScreen] API response:', resp);
         const container = resp?.Data?.Data ?? resp?.Data ?? resp;
         const list = Array.isArray(container?.data)
           ? container.data
@@ -141,10 +169,29 @@ const ApplyLeaveScreen = ({ navigation }) => {
       }
     })();
     return () => { isMounted = false; };
-  }, [currentPage, pageSize, query]);
+  }, [currentPage, pageSize, debouncedQuery]);
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const pageLimit = parseInt(pageSize || '10', 10) || 10;
-  const visibleLeaves = leaves;
+  
+  // Client-side filtering as fallback if API search doesn't work
+  const visibleLeaves = debouncedQuery ? leaves.filter(leave => 
+    leave.leaveType?.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
+    leave.status?.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
+    leave.appliedBy?.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
+    leave.reason?.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
+    leave.from?.includes(debouncedQuery) ||
+    leave.to?.includes(debouncedQuery) ||
+    leave.applyDate?.includes(debouncedQuery)
+  ) : leaves;
   const StatusBadge = ({ label = 'Pending' }) => {
     const palette = {
       Pending: { bg: COLORS.warningBg, color: COLORS.warning, border: COLORS.warning },
@@ -278,6 +325,12 @@ const ApplyLeaveScreen = ({ navigation }) => {
               const from = vals.fromDate === 'From Date' ? formatUiDate(fromDateValue) : vals.fromDate;
               const to = vals.toDate === 'To Date' ? formatUiDate(toDateValue) : vals.toDate;
 
+              // Check for overlapping leave dates
+              if (checkForOverlappingLeaves(from, to)) {
+                setStatus({ apiError: 'A leave request already exists for the selected date range. Please choose different dates.' });
+                return;
+              }
+
               // optimistic UI
               const newLeave = {
                 id: `lv-${Date.now()}`,
@@ -328,85 +381,107 @@ const ApplyLeaveScreen = ({ navigation }) => {
                 <Text style={styles.errorText}>{status.apiError}</Text>
               ) : null}
 
-              <Dropdown
-                placeholder="Leave Type"
-                value={values.leaveType}
-                options={leaveTypeOptions}
-                getLabel={(item) => item.label}
-                getKey={(item) => item.value}
-                onSelect={(item) => {
-                  // item is the entire object {value, label}
-                  setFieldValue('leaveType', item.label);
-                  setFieldValue('leaveTypeUuid', item.value);
-                }}
-                style={{ zIndex: 20 }}
-                inputBoxStyle={[(touched.leaveType && errors.leaveType) && styles.inputError]}
-                hideSearch={true}
-              />
-              {touched.leaveType && errors.leaveType ? (
-                <Text style={styles.helperError}>{errors.leaveType}</Text>
-              ) : null}
+              <View style={styles.formFieldContainer}>
+                <Dropdown
+                  placeholder="Leave Type"
+                  value={values.leaveType}
+                  options={leaveTypeOptions}
+                  getLabel={(item) => item.label}
+                  getKey={(item) => item.value}
+                  onSelect={(item) => {
+                    // item is the entire object {value, label}
+                    setFieldValue('leaveType', item.label);
+                    setFieldValue('leaveTypeUuid', item.value);
+                  }}
+                  style={{ zIndex: 20 }}
+                  inputBoxStyle={[(touched.leaveType && errors.leaveType) && styles.inputError]}
+                  hideSearch={true}
+                />
+                {touched.leaveType && errors.leaveType ? (
+                  <Text style={styles.helperError}>{errors.leaveType}</Text>
+                ) : null}
+              </View>
 
-              <Dropdown
-                placeholder="Select Parameter"
-                value={values.parameter}
-                options={parameterOptions}
-                onSelect={(val) => setFieldValue('parameter', typeof val === 'string' ? val : String(val))}
-                style={{ zIndex: 10 }}
-                inputBoxStyle={[(touched.parameter && errors.parameter) && styles.inputError]}
-                hideSearch={true}
-              />
-              {touched.parameter && errors.parameter ? (
-                <Text style={styles.helperError}>{errors.parameter}</Text>
-              ) : null}
+              <View style={styles.formFieldContainer}>
+                <Dropdown
+                  placeholder="Select Parameter"
+                  value={values.parameter}
+                  options={parameterOptions}
+                  onSelect={(val) => setFieldValue('parameter', typeof val === 'string' ? val : String(val))}
+                  style={{ zIndex: 10 }}
+                  inputBoxStyle={[(touched.parameter && errors.parameter) && styles.inputError]}
+                  hideSearch={true}
+                />
+                {touched.parameter && errors.parameter ? (
+                  <Text style={styles.helperError}>{errors.parameter}</Text>
+                ) : null}
+              </View>
 
-              <View style={styles.row}>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => { setOpenFrom(true); }}
-                  style={[styles.picker]}
-                >
-                  <Text style={styles.pickerText}>{values.fromDate}</Text>
-                  <Icon name="calendar-today" size={rf(3.2)} color="#9ca3af" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => { setOpenTo(true); }}
-                  style={[styles.picker]}
-                >
-                  <Text style={styles.pickerText}>{values.toDate}</Text>
-                  <Icon name="calendar-today" size={rf(3.2)} color="#9ca3af" />
-                </TouchableOpacity>
+              <View style={styles.formFieldContainer}>
+                <View style={styles.row}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => { setOpenFrom(true); }}
+                    style={[styles.picker, (touched.fromDate && errors.fromDate) && styles.inputError]}
+                  >
+                    <Text style={styles.pickerText}>{values.fromDate}</Text>
+                    <Icon name="calendar-today" size={rf(3.2)} color="#9ca3af" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => { setOpenTo(true); }}
+                    style={[styles.picker, (touched.toDate && errors.toDate) && styles.inputError]}
+                  >
+                    <Text style={styles.pickerText}>{values.toDate}</Text>
+                    <Icon name="calendar-today" size={rf(3.2)} color="#9ca3af" />
+                  </TouchableOpacity>
+                </View>
+                {(touched.fromDate && errors.fromDate) || (touched.toDate && errors.toDate) ? (
+                  <Text style={styles.helperErrorWithMargin}>
+                    {errors.fromDate || errors.toDate}
+                  </Text>
+                ) : null}
               </View>
               
 
-              <View style={[styles.input, (touched.contact && errors.contact) && styles.inputError]}>
-                <TextInput
-                  placeholder="Contact No."
-                  placeholderTextColor="#9ca3af"
-                  keyboardType="phone-pad"
-                  value={values.contact}
-                  onChangeText={(t) => setFieldValue('contact', t)}
-                  style={styles.inputField}
-                />
+              <View style={[styles.formFieldContainer, { marginBottom: hp(1.2) }]}>
+                 <View style={[styles.input, (touched.contact && errors.contact) && styles.inputError]}>
+                  <TextInput
+                    placeholder="Contact No."
+                    placeholderTextColor="#9ca3af"
+                    keyboardType="phone-pad"
+                    value={values.contact}
+                    onChangeText={(t) => {
+                      // Limit to 10 digits only
+                      const digitsOnly = t.replace(/\D/g, '');
+                      if (digitsOnly.length <= 10) {
+                        setFieldValue('contact', digitsOnly);
+                      }
+                    }}
+                    style={styles.inputField}
+                    maxLength={10}
+                  />
+                </View>
+                {touched.contact && errors.contact ? (
+                  <Text style={styles.helperErrorNoMargin}>{errors.contact}</Text>
+                ) : null}
               </View>
-              {touched.contact && errors.contact ? (
-                <Text style={styles.helperError}>{errors.contact}</Text>
-              ) : null}
 
-              <View style={[styles.input, { height: hp(16) }, (touched.reason && errors.reason) && styles.inputError]}>
-                <TextInput
-                  placeholder="Reason"
-                  placeholderTextColor="#9ca3af"
-                  multiline
-                  value={values.reason}
-                  onChangeText={(t) => setFieldValue('reason', t)}
-                  style={[styles.inputField, { textAlignVertical: 'top' }]}
-                />
+              <View style={styles.formFieldContainer}>
+                <View style={[styles.input, { height: hp(16) }, (touched.reason && errors.reason) && styles.inputError]}>
+                  <TextInput
+                    placeholder="Reason"
+                    placeholderTextColor="#9ca3af"
+                    multiline
+                    value={values.reason}
+                    onChangeText={(t) => setFieldValue('reason', t)}
+                    style={[styles.inputField, { textAlignVertical: 'top' }]}
+                  />
+                </View>
+                {touched.reason && errors.reason ? (
+                  <Text style={styles.helperErrorNoMargin}>{errors.reason}</Text>
+                ) : null}
               </View>
-              {touched.reason && errors.reason ? (
-                <Text style={styles.helperError}>{errors.reason}</Text>
-              ) : null}
 
               <TouchableOpacity activeOpacity={0.9} style={styles.submitButton} onPress={handleSubmit}>
                 <Text style={styles.submitText}>Submit</Text>
@@ -456,7 +531,14 @@ const ApplyLeaveScreen = ({ navigation }) => {
           )}
         </Formik>
 
-        <Text style={styles.sectionHeading}>View My Leave Data</Text>
+        <View style={styles.sectionHeadingRow}>
+          <Text style={styles.sectionHeading}>View My Leave Data</Text>
+          {query && (
+            <Text style={styles.searchIndicator}>
+              Searching: "{query}"
+            </Text>
+          )}
+        </View>
 
         <View style={styles.controlsRow}>
           <Text style={styles.showLabel}>Show</Text>
@@ -549,6 +631,9 @@ const styles = StyleSheet.create({
     marginTop: hp(1),
     marginBottom: hp(1.2),
   },
+  formFieldContainer: {
+    // marginBottom: hp(1.2),
+  },
   selectText: {
     color: COLORS.textMuted,
     fontSize: rf(4),
@@ -557,7 +642,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: wp(3),
-    marginBottom: hp(1.2),
+    // marginBottom: hp(1.2),
   },
   picker: {
     flex: 1,
@@ -584,7 +669,6 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     paddingHorizontal: wp(3),
     height: hp(6.2),
-    marginBottom: hp(1.2),
   },
   inputField: {
     fontSize: TYPOGRAPHY.input,
@@ -615,13 +699,35 @@ const styles = StyleSheet.create({
     fontSize: rf(2.8),
     marginTop: hp(0.3),
   },
-  sectionHeading: {
+  helperErrorWithMargin: {
+    color: '#ef4444',
+    fontSize: rf(2.8),
+    marginTop: hp(0.3),
+    marginBottom: hp(1.2),
+  },
+  helperErrorNoMargin: {
+    color: '#ef4444',
+    fontSize: rf(2.8),
+    marginTop: hp(0.3),
+  },
+  sectionHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginTop: hp(1),
     marginBottom: hp(1),
+  },
+  sectionHeading: {
     fontSize: rf(3.6),
     fontWeight: '700',
     color: COLORS.text,
     fontFamily: TYPOGRAPHY.fontFamilyBold,
+  },
+  searchIndicator: {
+    fontSize: rf(3),
+    color: COLORS.primary,
+    fontFamily: TYPOGRAPHY.fontFamilyMedium,
+    fontStyle: 'italic',
   },
   controlsRow: {
     flexDirection: 'row',

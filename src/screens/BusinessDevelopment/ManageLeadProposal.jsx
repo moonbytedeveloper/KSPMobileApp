@@ -463,8 +463,10 @@ const ManageLeadProposal = ({ navigation, route }) => {
     await fetchProposals();
     setIsAdding(false);
     setErrors({});
+    // Clear all form fields including employee selection
     setProposalDoc(null);
     setFollowUpTaker(null);
+    setPendingFollowUpTakerName(''); // Clear pending name
     setSubmittedDate('');
     setFollowUpDate('');
     setAmount('');
@@ -619,8 +621,9 @@ const ManageLeadProposal = ({ navigation, route }) => {
       setIsEditMode(false);
       setEditingProposal(null);
 
-      // Reset form
+      // Reset form completely
       setFollowUpTaker(null);
+      setPendingFollowUpTakerName(''); // Clear pending name
       setSubmittedDate('');
       setFollowUpDate('');
       setAmount('');
@@ -645,8 +648,9 @@ const ManageLeadProposal = ({ navigation, route }) => {
   const cancelEdit = () => {
     setIsEditMode(false);
     setEditingProposal(null);
-    // Reset form
+    // Reset form completely
     setFollowUpTaker(null);
+    setPendingFollowUpTakerName(''); // Clear pending name
     setSubmittedDate('');
     setFollowUpDate('');
     setAmount('');

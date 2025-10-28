@@ -12,9 +12,10 @@ import AppHeader from '../../components/common/AppHeader';
 import Dropdown from '../../components/common/Dropdown';
 import { wp, hp, rf } from '../../utils/responsive';
 import DatePickerBottomSheet from '../../components/common/CustomDatePicker';
+import SuccessBottomSheet from '../../components/common/SuccessBottomSheet';
 import { COLORS, TYPOGRAPHY } from '../styles/styles';
 import { getEmployees, getAttendance, submitAttendance } from '../../api/authServices';
-import { getUUID, getCMPUUID, getENVUUID } from '../../api/tokenStorage';
+import { getUUID, getCMPUUID, getENVUUID, getDisplayName } from '../../api/tokenStorage';
 
 const formatDate = (d) => {
   if (!d) return '';
@@ -25,6 +26,7 @@ const formatDate = (d) => {
 };
 
 const HRAAttendance = ({navigation}) => {
+  const [openDropdown, setOpenDropdown] = useState(null);
   const [attendanceType, setAttendanceType] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [selectedEmployees, setSelectedEmployees] = useState([]);
@@ -41,6 +43,8 @@ const HRAAttendance = ({navigation}) => {
   const [loadingBulkData, setLoadingBulkData] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
   const [isDateTypeOpen, setIsDateTypeOpen] = useState(false);
+  const [currentUserInfo, setCurrentUserInfo] = useState({ uuid: null, displayName: null });
+  const [showSuccessSheet, setShowSuccessSheet] = useState(false);
 
   // Sample data for dropdowns
   const attendanceTypeOptions = ['Single', 'Bulk' ];
@@ -50,9 +54,38 @@ const HRAAttendance = ({navigation}) => {
   const loadEmployees = async () => {
     try {
       setLoadingEmployees(true);
+      
+      // Load current user information
+      const [currentUserUuid, currentUserDisplayName] = await Promise.all([
+        getUUID(),
+        getDisplayName()
+      ]);
+      
+      setCurrentUserInfo({
+        uuid: currentUserUuid,
+        displayName: currentUserDisplayName
+      });
+      
       const resp = await getEmployees();
       const list = Array.isArray(resp?.Data) ? resp.Data : [];
-      setEmployees(list);
+      
+      // Filter out current user from employees list
+      const filteredList = list.filter(emp => {
+        const empUuid = emp?.Uuid || emp?.UUID || emp?.EmployeeUUID || emp?.EmpUuid;
+        const empName = emp?.EmployeeName || emp?.Name || emp?.DisplayName || emp?.FullName || '';
+        
+        // Filter by UUID if available, otherwise by name
+        if (currentUserUuid && empUuid) {
+          return empUuid !== currentUserUuid;
+        } else if (currentUserDisplayName && empName) {
+          return empName !== currentUserDisplayName;
+        }
+        
+        // If no current user info available, include all employees
+        return true;
+      });
+      
+      setEmployees(filteredList);
     } catch (err) {
       console.log('Failed to load employees', err);
       setEmployees([]);
@@ -80,11 +113,28 @@ const HRAAttendance = ({navigation}) => {
       });
       
       const bulkData = Array.isArray(resp?.Data) ? resp.Data : [];
-      setBulkEmployees(bulkData);
+      
+      // Filter out current user from bulk employees list
+      const filteredBulkData = bulkData.filter(emp => {
+        const empUuid = emp?.RawUuid || emp?.Uuid || emp?.UUID;
+        const empName = emp?.Employee || '';
+        
+        // Filter by UUID if available, otherwise by name
+        if (currentUserInfo.uuid && empUuid) {
+          return empUuid !== currentUserInfo.uuid;
+        } else if (currentUserInfo.displayName && empName) {
+          return empName !== currentUserInfo.displayName;
+        }
+        
+        // If no current user info available, include all employees
+        return true;
+      });
+      
+      setBulkEmployees(filteredBulkData);
       
       // Auto-populate status map from API response
       const statusMap = {};
-      bulkData.forEach(emp => {
+      filteredBulkData.forEach(emp => {
         if (emp.Employee) {
           // Map Format field to Present/Absent status
           const status = emp.Format === 'Present' ? 'Present' : 
@@ -199,7 +249,8 @@ const HRAAttendance = ({navigation}) => {
       const response = await submitAttendance(payload);
       console.log('Attendance submitted successfully:', response);
       
-      alert('Attendance submitted successfully!');
+      // Show success bottom sheet
+      setShowSuccessSheet(true);
       
       // Reset form after successful submission
       setAttendanceType('');
@@ -283,6 +334,10 @@ const HRAAttendance = ({navigation}) => {
     navigation.goBack();
   };
 
+  const handleSuccessDismiss = () => {
+    setShowSuccessSheet(false);
+  };
+
   return (
     <View style={styles.container}>
       <AppHeader
@@ -310,10 +365,15 @@ const HRAAttendance = ({navigation}) => {
                 if (validationErrors.attendanceType) {
                   setValidationErrors(prev => ({ ...prev, attendanceType: null }));
                 }
+                setOpenDropdown(null);
               }}
               hideSearch={true}
               inputBoxStyle={validationErrors.attendanceType ? styles.errorBorder : null}
               style={{ zIndex: 2000, elevation: 5 }}
+              isOpen={openDropdown === 'attendanceType'}
+              onOpenChange={(open) => {
+                setOpenDropdown(open ? 'attendanceType' : null);
+              }}
             />
           </View>
 
@@ -333,10 +393,13 @@ const HRAAttendance = ({navigation}) => {
                   if (validationErrors.selectedEmployee) {
                     setValidationErrors(prev => ({ ...prev, selectedEmployee: null }));
                   }
+                  setOpenDropdown(null);
                 }}
                 loading={loadingEmployees}
                 inputBoxStyle={validationErrors.selectedEmployee ? styles.errorBorder : null}
                 style={{ zIndex: 1900, elevation: 5 }}
+                isOpen={openDropdown === 'employee'}
+                onOpenChange={(open) => setOpenDropdown(open ? 'employee' : null)}
               />
             </View>
           )}
@@ -460,6 +523,7 @@ const HRAAttendance = ({navigation}) => {
               options={dateTypeOptions}
               onSelect={(item) => {
                 setDateType(item);
+                setOpenDropdown(null);
                 // Clear validation error when user selects
                 if (validationErrors.dateType) {
                   setValidationErrors(prev => ({ ...prev, dateType: null }));
@@ -467,10 +531,12 @@ const HRAAttendance = ({navigation}) => {
               }}
               onOpenChange={(open) => {
                 setIsDateTypeOpen(open);
+                setOpenDropdown(open ? 'dayType' : null);
               }}
               hideSearch={true}
               inputBoxStyle={validationErrors.dateType ? styles.errorBorder : null}
               style={{ zIndex: 1800, elevation: 4 }}
+              isOpen={openDropdown === 'dayType'}
             />
           </View>
 
@@ -543,6 +609,15 @@ const HRAAttendance = ({navigation}) => {
           }
         }}
         title="Select Date for Bulk Attendance"
+      />
+
+      <SuccessBottomSheet
+        visible={showSuccessSheet}
+        title="Attendance Submitted!"
+        message="Attendance has been submitted successfully."
+        buttonText="OK"
+        onDismiss={handleSuccessDismiss}
+        autoCloseDelay={3000}
       />
     </View>
   );
