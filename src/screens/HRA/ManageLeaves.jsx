@@ -178,7 +178,26 @@ const ManageLeaves = ({ navigation }) => {
   if (loading) {
     return (
       <View style={styles.container}>
-        <AppHeader title="Manage Leaves" onLeftPress={() => navigation.goBack()} onRightPress={() => navigation.navigate('Notification')} />
+        <AppHeader
+          title="Manage Leaves"
+          onLeftPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+              return;
+            }
+            let parent = navigation;
+            for (let i = 0; i < 3; i++) {
+              parent = parent?.getParent?.();
+              if (!parent) break;
+              if (typeof parent.openDrawer === 'function') {
+                parent.openDrawer();
+                return;
+              }
+            }
+            navigation.dispatch?.({ type: 'OPEN_DRAWER' });
+          }}
+          onRightPress={() => navigation.navigate('Notification')}
+        />
         <Loader />
       </View>
     );
@@ -187,7 +206,22 @@ const ManageLeaves = ({ navigation }) => {
     <View style={styles.container}>
       <AppHeader
         title="Manage Leaves"
-        onLeftPress={() => navigation.goBack()}
+        onLeftPress={() => {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+            return;
+          }
+          let parent = navigation;
+          for (let i = 0; i < 3; i++) {
+            parent = parent?.getParent?.();
+            if (!parent) break;
+            if (typeof parent.openDrawer === 'function') {
+              parent.openDrawer();
+              return;
+            }
+          }
+          navigation.dispatch?.({ type: 'OPEN_DRAWER' });
+        }}
         onRightPress={() => navigation.navigate('Notification')}
       />
 
@@ -348,19 +382,24 @@ const styles = StyleSheet.create({
   },
   paginationContainer: {
     backgroundColor: '#ffffff',
-    borderTopWidth: 0.5,
-    borderBottomWidth: 0.5,
-    borderTopColor: '#e5e7eb',
-    borderBottomColor: '#e5e7eb',
-    paddingHorizontal: wp(4),
-    paddingVertical: hp(1.2),
-    zIndex: 1000,
-    elevation: 6,
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1),
+    borderRadius: wp(3),
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    marginTop: hp(1),
+    marginBottom: hp(1),
+    zIndex: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
   },
   itemsPerPageContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: hp(1),
+    justifyContent: 'flex-start',
   },
   paginationLabel: {
     fontSize: rf(3.5),
@@ -369,7 +408,7 @@ const styles = StyleSheet.create({
   },
   paginationDropdown: {
     width: wp(18),
-    height: hp(5),
+    height: hp(5.4),
     marginHorizontal: wp(1),
   },
   pageInfo: {
@@ -394,7 +433,7 @@ const styles = StyleSheet.create({
   },
   pageText: {
     fontSize: rf(3.5),
-    color: '#e34f25',
+    color: COLORS.primary,
     fontWeight: '600',
   },
   pageTextDisabled: {
@@ -418,12 +457,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   pageNumberBtnActive: {
-    backgroundColor: '#e34f25',
-    borderColor: '#e34f25',
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   pageNumberText: {
     fontSize: rf(3.6),
-    color: '#e34f25',
+    color: COLORS.primary,
     fontWeight: '700',
   },
   pageNumberTextActive: {

@@ -418,7 +418,7 @@ const ApplyLeaveScreen = ({ navigation }) => {
               </View>
 
               <View style={styles.formFieldContainer}>
-                <View style={styles.row}>
+                <View style={[styles.row,{marginBottom:(touched.fromDate && errors.fromDate) || (touched.toDate && errors.toDate) ? 0 :hp(1.2) }]}>
                   <TouchableOpacity
                     activeOpacity={0.8}
                     onPress={() => { setOpenFrom(true); }}
@@ -442,7 +442,6 @@ const ApplyLeaveScreen = ({ navigation }) => {
                   </Text>
                 ) : null}
               </View>
-              
 
               <View style={[styles.formFieldContainer, { marginBottom: hp(1.2) }]}>
                  <View style={[styles.input, (touched.contact && errors.contact) && styles.inputError]}>

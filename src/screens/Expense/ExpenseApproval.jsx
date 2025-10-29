@@ -170,6 +170,35 @@ const ExpenseApproval = ({ navigation }) => {
   // Approval/rejection process state management
   const [processingApproval, setProcessingApproval] = useState(false);
   const [processingRejection, setProcessingRejection] = useState(false);
+
+  // Dropdown open states to ensure only one is open at a time
+  const [isTabDropdownOpen, setIsTabDropdownOpen] = useState(false);
+  const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
+  const [isEmployeeDropdownOpen, setIsEmployeeDropdownOpen] = useState(false);
+
+  // Normalize API error to human-friendly message
+  const getReadableError = useCallback((err, fallback = 'Something went wrong. Please try again.') => {
+    try {
+      const res = err?.response;
+      const data = res?.data ?? {};
+      const candidates = [
+        data?.message,
+        data?.Message,
+        data?.error,
+        data?.errorMessage,
+        data?.Error,
+        data?.Data?.Message,
+        Array.isArray(data?.errors) ? data.errors.map(e => e?.message || e).filter(Boolean).join(', ') : null,
+      ].filter(Boolean);
+      if (candidates.length) return String(candidates[0]);
+
+      if (typeof err?.message === 'string') {
+        if (/network error/i.test(err.message)) return 'Network error. Check your connection and retry.';
+        if (/timeout/i.test(err.message) || err?.code === 'ECONNABORTED') return 'Request timed out. Please try again.';
+      }
+    } catch (_) {}
+    return fallback;
+  }, []);
   
   const expenseDetailsSheetRef = useRef(null);
   const approvalDetailsSheetRef = useRef(null);
@@ -203,7 +232,7 @@ const ExpenseApproval = ({ navigation }) => {
       setTotalRecords(totalFromResponse);
     } catch (err) {
       console.error('Error fetching approved by me expenses:', err);
-      setError(err.message || 'Failed to fetch approved expenses');
+      setError(getReadableError(err, 'Failed to load approved expenses'));
     } finally {
       setLoading(false);
     }
@@ -237,7 +266,7 @@ const ExpenseApproval = ({ navigation }) => {
       setTotalRecords(totalFromResponse);
     } catch (err) {
       console.error('Error fetching expense to approve data:', err);
-      setError(err.message || 'Failed to fetch expense to approve data');
+      setError(getReadableError(err, 'Failed to load expenses to approve'));
     } finally {
       setLoading(false);
     }
@@ -271,7 +300,7 @@ const ExpenseApproval = ({ navigation }) => {
       setTotalRecords(totalFromResponse);
     } catch (err) {
       console.error('Error fetching my approved expenses:', err);
-      setError(err.message || 'Failed to fetch my approved expenses');
+      setError(getReadableError(err, 'Failed to load my approved expenses'));
     } finally {
       setLoading(false);
     }
@@ -305,7 +334,7 @@ const ExpenseApproval = ({ navigation }) => {
       setTotalRecords(totalFromResponse);
     } catch (err) {
       console.error('Error fetching my rejected expenses:', err);
-      setError(err.message || 'Failed to fetch my rejected expenses');
+      setError(getReadableError(err, 'Failed to load my rejected expenses'));
     } finally {
       setLoading(false);
     }
@@ -341,7 +370,7 @@ const ExpenseApproval = ({ navigation }) => {
       setTotalRecords(totalFromResponse);
     } catch (err) {
       console.error('Error fetching pending approvals:', err);
-      setError(err.message || 'Failed to fetch pending approvals');
+      setError(getReadableError(err, 'Failed to load pending approvals'));
     } finally {
       setLoading(false);
     }
@@ -706,12 +735,12 @@ const ExpenseApproval = ({ navigation }) => {
       const [projectsResp, employeesResp] = await Promise.all([
         fetchUserProjects().catch(err => {
           console.error('[ExpenseApproval] fetchUserProjects error:', err);
-          setProjectsError(err?.message || 'Failed to load projects');
+          setProjectsError(getReadableError(err, 'Could not load projects'));
           return { Data: { Projects: [] } };
         }),
         getEmployees().catch(err => {
           console.error('[ExpenseApproval] getEmployees error:', err);
-          setEmployeesError(err?.message || 'Failed to load employees');
+          setEmployeesError(getReadableError(err, 'Could not load employees'));
           return { Data: [] };
         })
       ]);
@@ -737,7 +766,7 @@ const ExpenseApproval = ({ navigation }) => {
       console.log('[ExpenseApproval] mapped employees:', employeeOptions);
     } catch (e) {
       console.error('[ExpenseApproval] load error:', e);
-      setError(e?.message || 'Failed to load projects and employees');
+      setError(getReadableError(e, 'Failed to load projects and employees'));
     } finally {
       setProjectsLoading(false);
       setEmployeesLoading(false);
@@ -1211,6 +1240,14 @@ const ExpenseApproval = ({ navigation }) => {
             getKey={(tab) => tab.key}
             hint="Select Expense Type"
             onSelect={(tab) => setActiveTab(tab.key)}
+            isOpen={isTabDropdownOpen}
+            onOpenChange={(next) => {
+              setIsTabDropdownOpen(next);
+              if (next) {
+                setIsProjectDropdownOpen(false);
+                setIsEmployeeDropdownOpen(false);
+              }
+            }}
             style={{ width: '100%' }}
           />
         </View>
@@ -1229,6 +1266,14 @@ const ExpenseApproval = ({ navigation }) => {
             hint="Project Name"
             onSelect={(project) => setSelectedProject(project)}
             disabled={projectsLoading}
+            isOpen={isProjectDropdownOpen}
+            onOpenChange={(next) => {
+              setIsProjectDropdownOpen(next);
+              if (next) {
+                setIsTabDropdownOpen(false);
+                setIsEmployeeDropdownOpen(false);
+              }
+            }}
           />
           </View>
 
@@ -1242,6 +1287,14 @@ const ExpenseApproval = ({ navigation }) => {
             hint="Employee"
             onSelect={(employee) => setSelectedEmployee(employee)}
             disabled={employeesLoading}
+            isOpen={isEmployeeDropdownOpen}
+            onOpenChange={(next) => {
+              setIsEmployeeDropdownOpen(next);
+              if (next) {
+                setIsTabDropdownOpen(false);
+                setIsProjectDropdownOpen(false);
+              }
+            }}
           />
           </View>
           </View>

@@ -2,17 +2,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Keyboard, Animated, Easing, Alert } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { wp, hp, rf, safeAreaTop } from '../../utils/responsive';
-// import CustomIcon from '../../utils/CustomIcon';
+import { wp, hp, rf, safeAreaTop } from '../../utils/responsive'; 
 import { COLORS } from '../styles/styles';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import AppHeader from '../../components/common/AppHeader';
 import { forgotPassword } from '../../api/authServices';
 import Icon from '../../utils/CustomIcon';
+import Loader from '../../components/common/Loader';
 
 const ForgotPasswordScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   // Animation refs for floating icons
   const randomIconsRef = useRef([]);
@@ -215,20 +216,28 @@ const ForgotPasswordScreen = ({ navigation }) => {
   }, []);
 
   const handleSendCode = async () => {
+    setIsLoading(true);
     try {
       console.log('Sending reset code to:', email);
       const resp = await forgotPassword({ email });
       console.log('Forgot password API data:', resp);
-      navigation.navigate('OTPVerification', { email });
+      // Use replace to immediately switch without flicker/back possibility
+      navigation.replace('OTPVerification', { email });
+      return;
     } catch (e) {
+      setIsLoading(false);
       const serverData = e?.response?.data;
+      console.log('Server data:',  e?.response?.data?.Message);
       const message = typeof serverData === 'string'
         ? serverData
         : (serverData?.message || e?.message || 'Something went wrong.');
-      Alert.alert('Forgot password error', message);
+      Alert.alert('Invalid email', serverData?.Message);
     }
   };
-
+  
+  if (isLoading) {
+    return <Loader />;
+  }
   return (
     <KeyboardAvoidingView
       style={styles.wrapper}
@@ -310,7 +319,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
         <Ionicons name="mail" size={rf(5)} color="#666" style={styles.icon} />
         <TextInput
           style={styles.input}
-          placeholder="Email Id"
+          placeholder="Enter your email here..."
           placeholderTextColor="#999"
           value={email}
           onChangeText={setEmail}

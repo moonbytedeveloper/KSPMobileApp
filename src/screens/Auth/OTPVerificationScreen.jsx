@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Keyboard, Animated, Easing, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Keyboard, Animated, Easing } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { wp, hp, rf, safeAreaTop } from '../../utils/responsive';
@@ -7,14 +7,25 @@ import { wp, hp, rf, safeAreaTop } from '../../utils/responsive';
 import { COLORS } from '../styles/styles';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import AppHeader from '../../components/common/AppHeader';
-import { verifyCode } from '../../api/authServices';
+import { verifyCode, forgotPassword } from '../../api/authServices';
 import Icon from '../../utils/CustomIcon';
+import Loader from '../../components/common/Loader';
+import SuccessBottomSheet from '../../components/common/SuccessBottomSheet';
+import CommonBottomSheet from '../../components/common/CommonBottomSheet';
 
 
 const OTPVerificationScreen = ({ navigation, route }) => {
   const [otp, setOtp] = useState(['', '', '', '']);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const inputRefs = useRef([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+  const [successSheetVisible, setSuccessSheetVisible] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorSheetVisible, setErrorSheetVisible] = useState(false);
+  const [errorTitle, setErrorTitle] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   
   // Animation refs for floating icons
   const randomIconsRef = useRef([]);
@@ -219,6 +230,15 @@ const OTPVerificationScreen = ({ navigation, route }) => {
     };
   }, []);
 
+  // Manage resend cooldown countdown
+  useEffect(() => {
+    if (resendTimer <= 0) return;
+    const intervalId = setInterval(() => {
+      setResendTimer(prev => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(intervalId);
+  }, [resendTimer]);
+
   const handleOtpChange = (value, index) => {
     const newOtp = [...otp];
     newOtp[index] = value;
@@ -237,6 +257,7 @@ const OTPVerificationScreen = ({ navigation, route }) => {
   };
 
   const handleSubmit = async () => {
+    setIsLoading(true);
     const otpCode = otp.join('');
     if (otpCode.length !== 4) return;
     try {
@@ -244,22 +265,75 @@ const OTPVerificationScreen = ({ navigation, route }) => {
       console.log('Verify code API data:', resp);
       navigation.navigate('NewPassword', { email });
     } catch (e) {
+      setIsLoading(false);
       const serverData = e?.response?.data;
       const message = typeof serverData === 'string'
         ? serverData
         : (serverData?.message || e?.message || 'Invalid code. Please try again.');
-      Alert.alert('Verification failed', message);
+      setErrorTitle('Verification failed');
+      setErrorMessage(message);
+      setErrorSheetVisible(true);
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (!email || isResending || resendTimer > 0) return;
+    try {
+      setIsResending(true);
+      await forgotPassword({ email });
+      setSuccessMessage('A new verification code has been sent.');
+      setSuccessSheetVisible(true);
+      setResendTimer(120);
+    } catch (e) {
+      const serverData = e?.response?.data;
+      const message = typeof serverData === 'string'
+        ? serverData
+        : (serverData?.message || e?.message || 'Failed to resend code.');
+      setErrorTitle('Resend failed');
+      setErrorMessage(message);
+      setErrorSheetVisible(true);
+    } finally {
+      setIsResending(false);
     }
   };
 
   const isOtpComplete = otp.every(digit => digit !== '');
-
+  if(isLoading) {
+    return <Loader />;
+  }
   return (
     <KeyboardAvoidingView
       style={styles.wrapper}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? safeAreaTop : 0}
     >
+      {/* Success bottom sheet */}
+      <SuccessBottomSheet
+        visible={successSheetVisible}
+        title="Success"
+        message={successMessage}
+        buttonText="OK"
+        onDismiss={() => setSuccessSheetVisible(false)}
+        autoCloseDelay={2000}
+      />
+
+      {/* Error bottom sheet */}
+      <CommonBottomSheet
+        visible={errorSheetVisible}
+        onDismiss={() => setErrorSheetVisible(false)}
+        snapPoints={[hp(30)]}
+      >
+        <View style={styles.errorSheetContent}>
+          <View style={styles.errorIconCircle}>
+            <MCIcon name="alert-circle" size={rf(7)} color="#EF4444" />
+          </View>
+          <Text style={styles.errorTitle}>{errorTitle || 'Something went wrong'}</Text>
+          <Text style={styles.errorMessage}>{errorMessage}</Text>
+          <TouchableOpacity style={styles.errorButton} activeOpacity={0.85} onPress={() => setErrorSheetVisible(false)}>
+            <Text style={styles.errorButtonText}>OK</Text>
+          </TouchableOpacity>
+        </View>
+      </CommonBottomSheet>
       <Svg pointerEvents="none" style={StyleSheet.absoluteFillObject}>
         <Defs>
           <LinearGradient id="otpGradient" x1="0" y1="0" x2="0" y2="1">
@@ -326,7 +400,7 @@ const OTPVerificationScreen = ({ navigation, route }) => {
       ]}>
         <Text style={styles.codeVerificationTitle}>Code Verification</Text>
       </View>
-
+     
       {/* OTP Input Fields */}
       <View style={[
         styles.otpContainer,
@@ -349,6 +423,23 @@ const OTPVerificationScreen = ({ navigation, route }) => {
             selectTextOnFocus
           />
         ))}
+      </View>
+
+      {/* Resend link below OTP inputs (right aligned) */}
+      <View style={[
+        styles.resendLinkContainer,
+        { top: (isKeyboardOpen ? safeAreaTop + hp(38) : safeAreaTop + hp(63)) + hp(8) }
+      ]}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={handleResendCode}
+          disabled={isResending || resendTimer > 0}
+        >
+          <Text style={[
+            styles.resendButtonText,
+            (isResending || resendTimer > 0) && styles.resendButtonTextDisabled
+          ]}>{resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend Code'}</Text>
+        </TouchableOpacity>
       </View>
       
       {/* Floating Submit Button */}
@@ -374,6 +465,8 @@ const OTPVerificationScreen = ({ navigation, route }) => {
             !isOtpComplete && styles.submitButtonTextDisabled
           ]}>Submit</Text>
         </TouchableOpacity>
+
+       
       </View>
     </KeyboardAvoidingView>
   );
@@ -474,5 +567,76 @@ const styles = StyleSheet.create({
   },
   submitButtonTextDisabled: {
     color: '#999',
+  },
+  resendLinkContainer: {
+    position: 'absolute',
+    left: wp(5),
+    right: wp(5),
+  },
+  resendButton: {
+    width: '100%',
+    height: hp(6.8),
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    borderRadius: wp(3),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: hp(2),
+  },
+  resendButtonDisabled: {
+    borderColor: '#ccc',
+    backgroundColor: '#f5f5f5',
+  },
+  resendButtonText: {
+    color: COLORS.primary,
+    fontSize: rf(3.6),
+    fontWeight: '600',
+    marginLeft: wp(2.2),
+  },
+  resendButtonTextDisabled: {
+    color: '#999',
+  },
+  errorSheetContent: {
+    alignItems: 'center',
+    paddingTop: hp(2),
+    paddingBottom: hp(2),
+  },
+  errorIconCircle: {
+    width: wp(14),
+    height: wp(14),
+    borderRadius: wp(7),
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: hp(1.5),
+  },
+  errorTitle: {
+    fontSize: rf(4.2),
+    fontWeight: '700',
+    color: COLORS.text,
+    textAlign: 'center',
+    marginBottom: hp(1),
+  },
+  errorMessage: {
+    fontSize: rf(3.6),
+    color: COLORS.textLight,
+    textAlign: 'center',
+    lineHeight: rf(4.6),
+    marginBottom: hp(2),
+    paddingHorizontal: wp(2),
+  },
+  errorButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: wp(8),
+    paddingVertical: hp(1.2),
+    borderRadius: wp(2.5),
+    minWidth: wp(25),
+  },
+  errorButtonText: {
+    color: '#fff',
+    fontSize: rf(3.8),
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

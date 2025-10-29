@@ -22,9 +22,10 @@ const HeaderLabel = ({ title }) => (
   <Text style={styles.sectionHeading}>{title}</Text>
 );
 
-const LabeledInput = ({ placeholder, rightIcon, value, onPress, onChangeText, editable = false }) => (
+const LabeledInput = ({ placeholder, rightIcon, value, onPress, onChangeText, editable = false, inputRef, onSubmitEditing }) => (
   <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={styles.inputWrapper}>
     <TextInput
+      ref={inputRef}
       style={styles.textInput}
       placeholder={placeholder}
       placeholderTextColor="#8e8e93"
@@ -35,7 +36,7 @@ const LabeledInput = ({ placeholder, rightIcon, value, onPress, onChangeText, ed
       keyboardType={editable ? "numeric" : "default"}
       returnKeyType="done"
       blurOnSubmit={true}
-      onSubmitEditing={() => {}}
+      onSubmitEditing={onSubmitEditing}
     />
     {!!rightIcon && (
       <Icon name={rightIcon} size={rf(3.8)} color="#8e8e93" />
@@ -133,8 +134,16 @@ const AddExpenseScreen = ({ navigation, route }) => {
   const [items, setItems] = useState([]);
   const [activeCode, setActiveCode] = useState(null);
 
+  // Refs for controlled focus order
+  const quantityRef = useRef(null);
+  const unitCostRef = useRef(null);
+  const taxAmountRef = useRef(null);
+  const remarksRef = useRef(null);
+
   // Submit confirmation sheet
   const [confirmVisible, setConfirmVisible] = useState(false);
+  const [validationVisible, setValidationVisible] = useState(false);
+  const [validationMessage, setValidationMessage] = useState('');
   const headerUuidRef = useRef('');
   const [headerUuid, setHeaderUuid] = useState('');
   const [isDataLoaded, setIsDataLoaded] = useState(false);
@@ -348,10 +357,12 @@ const AddExpenseScreen = ({ navigation, route }) => {
   const handleCitySelect = (city) => {
     setSelectedCity(city);
     updateForm('city')(city?.CityName || '');
+    // prevent accidental focus jumps
+    try { require('react-native').Keyboard.dismiss(); } catch (_) { }
   };
 
   const handleToggle = (code) => setActiveCode(prev => (prev === code ? null : code));
-  const handleView = () => {};
+  const handleView = () => { };
   const applyLineToForm = async (lineItem) => {
     if (!lineItem) return;
     // Quantity, costs, tax, totals
@@ -411,12 +422,23 @@ const AddExpenseScreen = ({ navigation, route }) => {
       setSelectedAttachment({ name: 'Existing Bill', uri: lineItem.billUrl, type: 'application/pdf', size: 0 });
     }
   };
-
+  const scrollViewRef = useRef(null);  
+  const headerRef  = useRef(null);
   const handleEdit = async (item) => {
+   
     try {
       setActiveCode(item?.soleExpenseCode || null);
       await applyLineToForm(item);
-    } catch (_e) {}
+        // 👇 Wait a short moment to ensure layout is ready
+        setTimeout(() => {
+          headerRef.current?.measureLayout(
+            scrollViewRef.current.getInnerViewNode(),
+            (x, y) => {
+              scrollViewRef.current.scrollTo({ y, animated: true }); // 👈 scrolls to header
+            }
+          );
+        }, 100);
+    } catch (_e) { }
   };
   const openDeleteSheet = (code) => {
     setDeleteTarget(code);
@@ -428,7 +450,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
     try {
       await deleteExpenseLine({ lineUuid: deleteTarget });
       await loadHeaderLines();
-      try { await fetchExpenses(); } catch (_e) {}
+      try { await fetchExpenses(); } catch (_e) { }
       setDeleteTarget(null);
       setDeleteConfirmVisible(false);
       Alert.alert('Deleted', 'Expense line deleted successfully.');
@@ -467,9 +489,9 @@ const AddExpenseScreen = ({ navigation, route }) => {
         return;
       }
 
-      const [file] = await pick({ 
-        type: [types.pdf, types.images], 
-        allowMultiSelection: false 
+      const [file] = await pick({
+        type: [types.pdf, types.images],
+        allowMultiSelection: false
       });
 
       if (file) {
@@ -498,7 +520,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
         return;
       }
       console.warn('Document pick error:', err);
-     // Alert.alert('Document Picker Error', String(err?.message || err));
+      // Alert.alert('Document Picker Error', String(err?.message || err));
     }
   };
 
@@ -581,12 +603,12 @@ const AddExpenseScreen = ({ navigation, route }) => {
     const totalCost = parseFloat(String(line?.TotalCost ?? '').replace(/,/g, '.')) || 0;
     const billAmount = parseFloat(String(line?.BillAmount ?? '').replace(/,/g, '.')) || 0;
     const doc = line?.Document_Date || line?.DocumentDate || '';
-    
+
     // Use header data for expense type if available, otherwise fallback to line data
     const expenseType = headerData?.ExpenseType || line?.ExpenseType || 'Expense';
     const isOtherExpenseType = line?.IsOtherExpenseType === true;
     const otherExpenseTypeName = line?.OtherFields || line?.OtherExpenseType || '';
-    
+
     return {
       soleExpenseCode: String(id),
       expenseName: expenseType, // This will now show the actual expense type from header
@@ -615,12 +637,12 @@ const AddExpenseScreen = ({ navigation, route }) => {
       const currentHeader = headerUuidRef?.current || headerUuid;
       if (!currentHeader) return;
       const resp = await fetchExpenseLinesByHeader({ headerUuid: currentHeader });
-      
+
       // Handle the new API response structure with Header and Lines
       const dataRoot = resp?.Data ?? resp?.data ?? resp;
       let lines = [];
       let headerData = null;
-      
+
       if (dataRoot && typeof dataRoot === 'object') {
         // Check for the new structure with Header and Lines
         if (Array.isArray(dataRoot.Lines)) {
@@ -638,8 +660,8 @@ const AddExpenseScreen = ({ navigation, route }) => {
           lines = candidateArrays.length ? candidateArrays[0] : [];
         }
       }
-      
-      
+
+
       // Map line data with header information
       const mapped = lines.map(line => mapLineToItem(line, headerData));
       setItems(mapped);
@@ -659,18 +681,18 @@ const AddExpenseScreen = ({ navigation, route }) => {
   // Load expense data for editing using existing API
   const loadExpenseForEdit = async () => {
     if (!isEditMode || !editHeaderUuid) return;
-    
+
     try {
       setLoading(true);
-      
+
       // Use the existing fetchExpenseLinesByHeader API
       const resp = await fetchExpenseLinesByHeader({ headerUuid: editHeaderUuid });
-      
+
       // Handle the response structure
       const dataRoot = resp?.Data ?? resp?.data ?? resp;
       let lines = [];
       let headerData = null;
-      
+
       if (dataRoot && typeof dataRoot === 'object') {
         // Check for the new structure with Header and Lines
         if (Array.isArray(dataRoot.Lines)) {
@@ -688,17 +710,17 @@ const AddExpenseScreen = ({ navigation, route }) => {
           lines = candidateArrays.length ? candidateArrays[0] : [];
         }
       }
-      
-      
-      
+
+
+
       // Auto-fill form with header data if available
       if (headerData) {
         // Set header UUID
         headerUuidRef.current = editHeaderUuid;
         setHeaderUuid(editHeaderUuid);
-        
+
         // Auto-fill project if available
-        
+
 
         if (headerData.ProjectName || headerData.Project_Title) {
           const projectName = headerData.ProjectName || headerData.Project_Title;
@@ -721,7 +743,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
           if (project) {
             setSelectedProject(project);
             updateForm('projectName')(project.name);
-            
+
             // Load tasks for this project
             try {
               const taskResp = await fetchUserProjectTasks({ projectUuid: project.id });
@@ -753,20 +775,20 @@ const AddExpenseScreen = ({ navigation, route }) => {
             }
           }
         }
-        
+
         // Auto-fill dates
         if (headerData.DocDateFrom || headerData.Doc_Date_From || headerData.DocumentDateFrom) {
           const fromDate = new Date(headerData.DocDateFrom || headerData.Doc_Date_From || headerData.DocumentDateFrom);
           setFromDate(fromDate);
           updateForm('fromDate')(formatDate(fromDate));
         }
-        
+
         if (headerData.DocDateTo || headerData.Doc_Date_To || headerData.DocumentDateTo) {
           const toDate = new Date(headerData.DocDateTo || headerData.Doc_Date_To || headerData.DocumentDateTo);
           setToDate(toDate);
           updateForm('toDate')(formatDate(toDate));
         }
-        
+
         // Auto-fill expense type with robust logic
 
         // Ensure expense types are loaded before matching
@@ -809,7 +831,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
             setOtherExpenseType(String(expenseTypeName));
           }
         }
-        
+
         // Auto-fill location data with proper timing
 
         // Normalize header field variants (new API may use Country/State/City/Currency)
@@ -877,14 +899,14 @@ const AddExpenseScreen = ({ navigation, route }) => {
               }
             }
           }
-        } catch (autoErr) {}
-        
+        } catch (autoErr) { }
+
         // Set approval status
         if (headerData.IsApprovalApply !== undefined) {
           setApplyForApproval(!!headerData.IsApprovalApply);
         }
       }
-      
+
       // Map line data with header information
       const mapped = lines.map(line => mapLineToItem(line, headerData));
       setItems(mapped);
@@ -896,9 +918,10 @@ const AddExpenseScreen = ({ navigation, route }) => {
 
       // Mark data as loaded
       setIsDataLoaded(true);
-      
-    } catch (e) {
+
+    } catch (e) { 
       console.error('Error loading expense for edit:', e);
+      setLoading(false);
     } finally {
       setLoading(false);
     }
@@ -953,7 +976,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
           ...payload,
           UUID: editHeaderUuid || headerUuidRef.current,
         };
-        try { console.log('Update Expense Header payload:', JSON.stringify(updateBody, null, 2)); } catch (_e) {}
+        try { console.log('Update Expense Header payload:', JSON.stringify(updateBody, null, 2)); } catch (_e) { }
         const resp = await updateExpenseHeader(updateBody);
         const updatedUuid = resp?.Data?.UUID || resp?.Data?.Uuid || resp?.UUID || resp?.Uuid || (editHeaderUuid || headerUuidRef.current);
         if (updatedUuid) {
@@ -962,7 +985,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
         }
 
         Alert.alert('Success', 'Expense updated successfully.');
-        try { await fetchExpenses(); } catch (_e) {}
+        try { await fetchExpenses(); } catch (_e) { }
       } else {
         // If no header exists, create one first
         if (!headerUuidRef.current) {
@@ -988,21 +1011,31 @@ const AddExpenseScreen = ({ navigation, route }) => {
         }
 
         Alert.alert('Success', 'Expense submitted successfully.');
-        try { await fetchExpenses(); } catch (_e) {}
+        try { await fetchExpenses(); } catch (_e) { }
       }
       setConfirmVisible(false);
       // Load existing lines for this header if any
       await loadHeaderLines();
-      try { await fetchExpenses(); } catch (_e) {}
+      try { await fetchExpenses(); } catch (_e) { }
       // Redirect to Expense list after final submit/update
-      try { navigation.goBack(); } catch (_navErr) {}
+      try { navigation.goBack(); } catch (_navErr) { }
     } catch (e) {
       Alert.alert('Submit failed', String(e?.response?.data?.Message || e?.message || 'Failed to submit'));
     } finally {
       setSubmitting(false);
     }
   };
-
+  // Normalize to yyyy-mm-dd (no time)
+  const dateOnly = (val) => {
+    if (!val) return '';
+    try {
+      if (val instanceof Date) return formatDate(val);
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) return formatDate(d);
+    } catch (_) { }
+    const s = String(val);
+    return s.length >= 10 ? s.slice(0, 10) : s;
+  };
   const handleAdd = async () => {
     // Basic validation for line items only
     if (!form.quantity || !form.unitCost) {
@@ -1034,11 +1067,11 @@ const AddExpenseScreen = ({ navigation, route }) => {
       try {
         setAdding(true);
         const headerResp = await addExpenseHeader(headerPayload);
-         const newHeaderUuid = headerResp?.Data?.UUID || headerResp?.Data?.Uuid || headerResp?.UUID || headerResp?.Uuid || '';
-         if (newHeaderUuid) {
-           headerUuidRef.current = newHeaderUuid;
-           setHeaderUuid(newHeaderUuid);
-         }
+        const newHeaderUuid = headerResp?.Data?.UUID || headerResp?.Data?.Uuid || headerResp?.UUID || headerResp?.Uuid || '';
+        if (newHeaderUuid) {
+          headerUuidRef.current = newHeaderUuid;
+          setHeaderUuid(newHeaderUuid);
+        }
       } catch (e) {
         Alert.alert('Failed to create header', String(e?.response?.data?.Message || e?.message || 'Failed to create header'));
         setAdding(false);
@@ -1057,7 +1090,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
       UnitCost: form.unitCost,
       Quantity: form.quantity,
       TaxAmount: form.taxAmount,
-      Document_Date: toIsoString(documentDate || form.documentDate),
+      Document_Date: dateOnly(documentDate || form.documentDate),
       BillUrl: '',
       Expense_Remarks: form.purpose,
       documentFile: selectedAttachment ? { uri: selectedAttachment.uri, name: selectedAttachment.name || 'bill', type: selectedAttachment.type || 'application/octet-stream' } : undefined,
@@ -1087,6 +1120,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
       return;
     }
 
+
     const linePayload = {
       UUID: activeCode,
       Master_Company_UUID: (await getCMPUUID()) || '',
@@ -1097,7 +1131,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
       UnitCost: form.unitCost,
       Quantity: form.quantity,
       TaxAmount: form.taxAmount,
-      Document_Date: toIsoString(documentDate || form.documentDate),
+      Document_Date: dateOnly(documentDate || form.documentDate),
       BillUrl: '',
       Expense_Remarks: form.purpose,
       documentFile: selectedAttachment ? { uri: selectedAttachment.uri, name: selectedAttachment.name || 'bill', type: selectedAttachment.type || 'application/octet-stream' } : undefined,
@@ -1105,7 +1139,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
 
     try {
       setAdding(true);
-      try { console.log('Update Expense Line payload:', JSON.stringify(linePayload, null, 2)); } catch (_e) {}
+      try { console.log('Update Expense Line payload:', JSON.stringify(linePayload, null, 2)); } catch (_e) { }
       await updateExpenseLine(linePayload);
       await loadHeaderLines();
       Alert.alert('Success', 'Expense line updated successfully.');
@@ -1159,7 +1193,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
           .filter(p => p && p.Project_Title)
           .map(p => ({ id: p.UUID || p.Uuid || p.id, name: String(p.Project_Title) }));
         if (isMounted) setProjects(projectOptions);
-        
+
         // If in edit mode, load expense data after basic data is loaded
         if (isEditMode && editHeaderUuid) {
           await loadExpenseForEdit();
@@ -1175,7 +1209,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
     loadData();
     return () => {
       isMounted = false;
-      try { controller.abort(); } catch (_e) {}
+      try { controller.abort(); } catch (_e) { }
     };
   }, [isEditMode, editHeaderUuid]);
 
@@ -1188,15 +1222,16 @@ const AddExpenseScreen = ({ navigation, route }) => {
   return (
     <View style={styles.container}>
       <AppHeader
-        title={isEditMode ? "Edit Expense" : "Expense Reimbursement"} 
+        title={isEditMode ? "Edit Expense" : "Expense Reimbursement"}
         onLeftPress={() => navigation.goBack()}
         onRightPress={() => navigation.navigate('Notification')}
       />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <HeaderLabel title="Expense Information" />
-        <View style={styles.row}>
-        <View style={styles.half}>
+      <ScrollView ref={scrollViewRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        
+       
+          <HeaderLabel title="Expense Information" /> 
+
         <Dropdown
           placeholder="Project Name"
           value={selectedProject?.name}
@@ -1206,8 +1241,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
           hint="Project Name"
           onSelect={handleSelectProject}
         />
-        </View>
-        <View style={styles.half}>
+
         <Dropdown
           placeholder="Project Task"
           value={selectedTask?.name}
@@ -1218,8 +1252,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
           disabled={!selectedProject}
           onSelect={handleSelectTask}
         />
-        </View>
-        </View>
+
 
         <View style={styles.row}>
           <View style={styles.half}>
@@ -1257,7 +1290,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
               onChangeText={setOtherExpenseType}
               returnKeyType="done"
               blurOnSubmit={true}
-              onSubmitEditing={() => {}}
+              onSubmitEditing={() => { }}
             />
           </View>
         )}
@@ -1313,15 +1346,18 @@ const AddExpenseScreen = ({ navigation, route }) => {
           loading={loadingCurrencies}
           disabled={!selectedCountry}
         />
-
+      <View ref={headerRef}>
         <HeaderLabel title="Expense Parameter Section" />
+      </View>
 
         <LabeledInput 
-          placeholder="Quantity" 
-          value={form.quantity} 
-          onPress={() => {}} 
+          placeholder="Quantity"
+          value={form.quantity}
+          onPress={() => { }}
           editable={true}
           onChangeText={updateForm('quantity')}
+          inputRef={quantityRef}
+          onSubmitEditing={() => unitCostRef.current?.focus()}
         />
 
         <Dropdown
@@ -1334,83 +1370,103 @@ const AddExpenseScreen = ({ navigation, route }) => {
           onSelect={(t) => {
             setSelectedUnitType(t);
             updateForm('unitType')(t?.name || '');
+            // after choosing unit type, move to Unit Cost field
+            setTimeout(() => unitCostRef.current?.focus(), 0);
           }}
           loading={loadingUnits}
         />
 
-        <LabeledInput 
-          placeholder="Unit Cost" 
-          value={form.unitCost} 
-          onPress={() => {}} 
+        <LabeledInput
+          placeholder="Unit Cost"
+          value={form.unitCost}
+          onPress={() => { }}
           editable={true}
           onChangeText={updateForm('unitCost')}
+          inputRef={unitCostRef}
+          onSubmitEditing={() => taxAmountRef.current?.focus()}
         />
-        <LabeledInput 
-          placeholder="Total Cost (auto fill)" 
+        <LabeledInput
+          placeholder="Total Cost (auto fill)"
           value={form.totalCost}
-          onPress={() => {}} 
+          onPress={() => { }}
           editable={false}
-          onChangeText={() => {}}
+          onChangeText={() => { }}
         />
-        <LabeledInput 
-          placeholder="Tax Amount" 
-          value={form.taxAmount} 
-          onPress={() => {}} 
+        <LabeledInput
+          placeholder="Tax Amount"
+          value={form.taxAmount}
+          onPress={() => { }}
           editable={true}
           onChangeText={updateForm('taxAmount')}
+          inputRef={taxAmountRef}
+          onSubmitEditing={() => { }}
         />
-        <LabeledInput 
-          placeholder="Bill Amount (auto fill)" 
+        <LabeledInput
+          placeholder="Bill Amount (auto fill)"
           value={form.billAmount}
-          onPress={() => {}} 
+          onPress={() => { }}
           editable={false}
-          onChangeText={() => {}}
+          onChangeText={() => { }}
         />
         <LabeledInput placeholder="Document Date" rightIcon="calendar-today" value={form.documentDate || formatDate(documentDate)} onPress={() => setOpenDoc(true)} />
 
         <HeaderLabel title="General Info" />
 
-        <View style={styles.uploadRow}>
-          {selectedAttachment && isImageFile(selectedAttachment) && !!selectedAttachment?.uri ? (
-            <View style={styles.previewInField}>
-              <Image
-                source={{ uri: selectedAttachment.uri }}
-                style={styles.previewImage}
-                resizeMode="cover"
-              />
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => setSelectedAttachment(null)}
-                style={styles.removeBadge}
-              >
-                <Icon name="close" size={rf(3.4)} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          ) : selectedAttachment ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: wp(2) }}>
-              <Text style={styles.uploadText} numberOfLines={1} ellipsizeMode="tail">{selectedAttachment?.name || 'Selected file'}</Text>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => setSelectedAttachment(null)}
-                style={styles.removeInline}
-              >
-                <Icon name="close" size={rf(3.6)} color="#ef4444" />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <Text style={styles.uploadText} numberOfLines={1} ellipsizeMode="tail">{'Upload Bill/Slip'}</Text>
-          )}
+        <TouchableOpacity activeOpacity={0.85} style={styles.uploadRow} onPress={handlePickDocument}>
 
-          {!selectedAttachment && (
-            <TouchableOpacity activeOpacity={0.8} style={styles.uploadButton} onPress={handlePickDocument}>
-              <Icon name="cloud-upload" size={rf(4)} color="#fff" />
-            </TouchableOpacity>
-          )}
-        </View>
+          <Text style={styles.uploadText} numberOfLines={1} ellipsizeMode="tail">{'Upload Bill/Slip'}</Text>
+          <TouchableOpacity activeOpacity={0.8} style={styles.uploadButton} onPress={handlePickDocument}>
+            <Icon name="cloud-upload" size={rf(4)} color="#fff" />
+          </TouchableOpacity>
+
+        </TouchableOpacity>
         <Text style={styles.uploadHint}>Allowed: PDF, PNG, JPG • Max size 10 MB</Text>
+
+        {/* Below-field file preview (image square or PDF card) */}
+        {selectedAttachment && (
+          <View style={styles.previewCard}>
+            {isImageFile(selectedAttachment) && !!selectedAttachment?.uri ? (
+              <View style={{ alignItems: 'flex-start' }}>
+                <Image
+                  source={{ uri: selectedAttachment.uri }}
+                  style={styles.previewThumb}
+                  resizeMode="cover"
+                />
+                {!!selectedAttachment?.name && (
+                  <Text style={styles.previewFileName} numberOfLines={1} ellipsizeMode="tail">{selectedAttachment.name}</Text>
+                )}
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => setSelectedAttachment(null)}
+                  style={styles.previewRemove}
+                >
+                  <Icon name="close" size={rf(3.6)} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.pdfRow}>
+                <View style={styles.pdfIconWrap}>
+                  <Icon name="picture-as-pdf" size={rf(6)} color="#ef4444" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.previewFileName} numberOfLines={2} ellipsizeMode="tail">{selectedAttachment?.name || 'Selected file'}</Text>
+                  <Text style={styles.previewMeta}>Tap Upload to replace or use X to remove</Text>
+                </View>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => setSelectedAttachment(null)}
+                  style={styles.removeInline}
+                >
+                  <Icon name="close" size={rf(3.8)} color="#ef4444" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
 
         <View style={styles.remarkBox}>
           <TextInput
+            ref={remarksRef}
             style={styles.remarkInput}
             placeholder="Purpose of Expense (Remarks)"
             placeholderTextColor="#8e8e93"
@@ -1419,7 +1475,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
             onChangeText={updateForm('purpose')}
             returnKeyType="done"
             blurOnSubmit={true}
-            onSubmitEditing={() => {}}
+            onSubmitEditing={() => { }}
           />
         </View>
 
@@ -1432,11 +1488,9 @@ const AddExpenseScreen = ({ navigation, route }) => {
           <TouchableOpacity
             activeOpacity={0.85}
             style={styles.addBtnSmall}
-            onPress={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
+            onPress={() => {
               if (adding || submitting) return;
-              if (isEditMode && activeCode) {
+              if (activeCode) {
                 handleUpdateLine();
               } else {
                 handleAdd();
@@ -1445,7 +1499,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
             disabled={adding || submitting}
           >
             <Text style={styles.addBtnSmallText}>
-              {adding ? 'Adding...' : (isEditMode && activeCode ? 'Update' : 'Add')}
+              {adding ? 'Adding...' : (activeCode ? 'Update' : 'Add')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -1490,6 +1544,22 @@ const AddExpenseScreen = ({ navigation, route }) => {
             onPress={(e) => {
               e.preventDefault();
               e.stopPropagation();
+              // Aggregate required-field validation into one message
+              const missing = [];
+              if (!selectedProject) missing.push('Project');
+              if (!selectedExpenseType) {
+                missing.push('Expense Type');
+              } else if ((selectedExpenseType?.Uuid === 'OTHER' || selectedExpenseType?.UUID === 'OTHER') && !otherExpenseType.trim()) {
+                missing.push('Expense name for "Other"');
+              }
+              if (items.length === 0) missing.push('At least one expense line');
+
+              if (missing.length > 0) {
+                const message = `Please complete the following before submitting:\n\n• ${missing.join('\n• ')}`;
+                setValidationMessage(message);
+                setValidationVisible(true);
+                return;
+              }
               setConfirmVisible(true);
             }}
             disabled={submitting}
@@ -1512,6 +1582,18 @@ const AddExpenseScreen = ({ navigation, route }) => {
         onCancel={() => setConfirmVisible(false)}
       />
 
+      {/* Validation message sheet (single action) */}
+      <BottomSheetConfirm
+        visible={validationVisible}
+        title={'Missing data'}
+        snapPoints={[hp(60)]}
+        message={'Please fill all the required fields before submitting.'}
+        confirmText={'OK'}
+        cancelText={''}
+        onConfirm={() => setValidationVisible(false)}
+        onCancel={() => setValidationVisible(false)}
+      />
+
       {/* Delete Confirmation Bottom Sheet (same component as TimesheetScreen) */}
       <BottomSheetConfirm
         visible={deleteConfirmVisible}
@@ -1532,6 +1614,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
           updateForm('fromDate')(formatDate(date));
         }}
         title="Select From Date"
+        maxDate={(function () { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); })()}
       />
 
       <DatePickerBottomSheet
@@ -1543,6 +1626,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
           updateForm('toDate')(formatDate(date));
         }}
         title="Select To Date"
+        maxDate={(function () { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); })()}
       />
 
       <DatePickerBottomSheet
@@ -1672,7 +1756,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bg,
     borderRadius: wp(2.5),
     paddingHorizontal: wp(4),
-    paddingVertical: hp(1.8),
+    paddingVertical: hp(1),
     marginTop: hp(1.2),
   },
   textInput: {
@@ -1713,6 +1797,14 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontFamilyRegular,
     fontStyle: 'italic',
   },
+  previewCard: {
+    marginTop: hp(1),
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: '#fff',
+    borderRadius: wp(2.5),
+    padding: wp(3),
+  },
   previewWrapper: {
     alignSelf: 'flex-start',
     marginTop: hp(1.2),
@@ -1721,6 +1813,53 @@ const styles = StyleSheet.create({
   previewInField: {
     marginLeft: wp(3),
     position: 'relative',
+  },
+  previewThumb: {
+    width: wp(20),
+    height: wp(20),
+    borderRadius: wp(2),
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: '#f9fafb',
+  },
+  previewRemove: {
+    position: 'absolute',
+    top: wp(1.5),
+    right: wp(1.5),
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: wp(7),
+    height: wp(7),
+    borderRadius: wp(3.5),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewFileName: {
+    marginTop: hp(0.8),
+    maxWidth: wp(70),
+    color: COLORS.text,
+    fontSize: rf(3.6),
+    fontFamily: TYPOGRAPHY.fontFamilyMedium,
+  },
+  previewMeta: {
+    marginTop: hp(0.2),
+    color: COLORS.textMuted,
+    fontSize: rf(2.8),
+    fontFamily: TYPOGRAPHY.fontFamilyRegular,
+  },
+  pdfRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(3),
+  },
+  pdfIconWrap: {
+    width: wp(12),
+    height: wp(12),
+    borderRadius: wp(2),
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   previewImage: {
     width: wp(22),
@@ -1750,7 +1889,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bg,
     borderRadius: wp(2.5),
     paddingHorizontal: wp(4),
-   // paddingVertical: hp(1.2),
+    // paddingVertical: hp(1.2),
     marginTop: hp(1.2),
     minHeight: hp(12),
   },

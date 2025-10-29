@@ -10,6 +10,7 @@ import AppHeader from '../../components/common/AppHeader';
 import CommonBottomSheet from '../../components/common/CommonBottomSheet';
 import Icon from '../../utils/CustomIcon';
 import { resetPassword } from '../../api/authServices';
+import Loader from '../../components/common/Loader';
 
 const NewPasswordScreen = ({ navigation, route }) => {
   const [newPassword, setNewPassword] = useState('');
@@ -18,7 +19,7 @@ const NewPasswordScreen = ({ navigation, route }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [showSuccessSheet, setShowSuccessSheet] = useState(false);
-  
+  const [isLoading, setIsLoading] = useState(false);
   // Animation refs for floating icons
   const randomIconsRef = useRef([]);
 
@@ -223,6 +224,7 @@ const NewPasswordScreen = ({ navigation, route }) => {
   }, []);
 
   const handleSubmit = async () => {
+    setIsLoading(true);
     if (!newPassword || !confirmPassword) return;
     if (newPassword !== confirmPassword) {
       Alert.alert('Error', 'Passwords do not match');
@@ -233,6 +235,7 @@ const NewPasswordScreen = ({ navigation, route }) => {
       console.log('Reset password API data:', resp);
       setShowSuccessSheet(true);
     } catch (e) { 
+      setIsLoading(false);
       let message = 'Unable to reset password.';
       if (e?.response?.data) {
         const data = e.response.data; 
@@ -246,11 +249,15 @@ const NewPasswordScreen = ({ navigation, route }) => {
       }
       
       Alert.alert('Reset failed', message);
+    }finally {
+      setIsLoading(false);
     }
   };
 
   const isFormValid = newPassword.length > 0 && confirmPassword.length > 0 && newPassword === confirmPassword;
-
+  if(isLoading) {
+    return <Loader />;
+  }
   return (
     <>
     <KeyboardAvoidingView
@@ -401,6 +408,7 @@ const NewPasswordScreen = ({ navigation, route }) => {
           activeOpacity={0.85}
           onPress={() => {
             setShowSuccessSheet(false);
+            setIsLoading(false);
             navigation.navigate('Login');
           }}
         >

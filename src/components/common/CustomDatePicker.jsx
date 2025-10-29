@@ -6,7 +6,7 @@ import { wp, hp, rf } from '../../utils/responsive';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../screens/styles/styles';
 
 // Custom Date Picker Component
-const CustomDatePicker = ({ selectedDate, onDateSelect, onClose, mondayOnly = false, minDate = null }) => {
+const CustomDatePicker = ({ selectedDate, onDateSelect, onClose, mondayOnly = false, minDate = null, maxDate = null }) => {
   const [currentMonth, setCurrentMonth] = useState(selectedDate.getMonth());
   const [currentYear, setCurrentYear] = useState(selectedDate.getFullYear());
 
@@ -73,6 +73,16 @@ const CustomDatePicker = ({ selectedDate, onDateSelect, onClose, mondayOnly = fa
         const date = new Date(currentYear, currentMonth, day);
         const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
         if (dateStart < baseStart) return true;
+      } catch (_) {}
+    }
+    // Disable dates after maxDate (end of day)
+    if (maxDate) {
+      try {
+        const cap = new Date(maxDate);
+        const capStart = new Date(cap.getFullYear(), cap.getMonth(), cap.getDate());
+        const date = new Date(currentYear, currentMonth, day);
+        const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        if (dateStart > capStart) return true;
       } catch (_) {}
     }
     return false;
@@ -171,7 +181,8 @@ const DatePickerBottomSheet = ({
   onDateSelect, 
   title = "Select Date",
   mondayOnly = false,
-  minDate = null
+  minDate = null,
+  maxDate = null
 }) => {
   const sheetRef = useRef(null);
   const snapPoints = useMemo(() => [hp(65)], []);
@@ -217,6 +228,7 @@ const DatePickerBottomSheet = ({
           onClose={onClose}
           mondayOnly={mondayOnly}
           minDate={minDate}
+          maxDate={maxDate}
         />
       </BottomSheetView>
     </BottomSheetModal>

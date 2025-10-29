@@ -63,7 +63,7 @@ function HomeScreen({ navigation }) {
     { 
       label: 'Running', 
       value: dashboardData.runningProjects || 0, 
-      color: '#FFEB3B' // Yellow
+      color: '#ff9800' // Yellow
     },
     { 
       label: 'Total', 
@@ -259,14 +259,14 @@ function HomeScreen({ navigation }) {
                 
                 <View style={styles.statItem}>
                   <View style={styles.statIconContainer}>
-                    <Icon name="play-circle-filled" size={rf(5)} color="#4CAF50" />
+                    <Icon name="play-circle-filled" size={rf(5)} color='#ff9800' />
                   </View>
                   <Text style={styles.statText}>Running: {dashboardData.runningProjects}</Text>
                 </View>
                 
                 <View style={styles.statItem}>
                   <View style={styles.statIconContainer}>
-                    <Icon name="pause-circle-filled" size={rf(5)} color="#FF9800" />
+                    <Icon name="pause-circle-filled" size={rf(5)} color='grey' />
                   </View>
                   <Text style={styles.statText}>On Hold: {dashboardData.onHoldProjects}</Text>
                 </View>

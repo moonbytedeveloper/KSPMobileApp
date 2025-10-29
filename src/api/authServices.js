@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { Alert } from 'react-native';
-import { getRefreshToken, setTokens, clearTokens, getUUID, getCMPUUID, getENVUUID, setMenuRights, setUUID, setENVUUID, setCMPUUID, setProfile, setDesignation, setRoles, setDisplayName, setSelectedEnvironmentUUID, setSelectedCompanyUUID, getSelectedCompanyUUID, getSelectedEnvironmentUUID, setReportingDesignation, getReportingDesignation, setRoleUUID, getRoleUUID, setAllowedCompanyUUIDs} from './tokenStorage';
+import { getRefreshToken, setTokens, clearTokens, getUUID, getCMPUUID, getENVUUID, setMenuRights, setUUID, setENVUUID, setCMPUUID, setProfile, setDesignation, setRoles, setDisplayName, setSelectedEnvironmentUUID, setSelectedCompanyUUID, getSelectedCompanyUUID, getSelectedEnvironmentUUID, setReportingDesignation, getReportingDesignation, setRoleUUID, getRoleUUID, setAllowedCompanyUUIDs } from './tokenStorage';
 import api from './axios';
 import Config from 'react-native-config';
 import uuid from 'react-native-uuid';
@@ -10,7 +10,7 @@ import DeviceInfo from 'react-native-device-info';
 const BASE_URL = Config.API_URL;
 const PATHS = {
     login: Config.API_LOGIN_PATH || '/api/CompanySetup/login',
-    refresh: Config.API_REFRESH_PATH || '/api/CompanySetup/auth/refresh' ,
+    refresh: Config.API_REFRESH_PATH || '/api/CompanySetup/auth/refresh',
     kspAuth: Config.API_KSP_PATH || '/api/CompanySetup/KSP',
     forgotPassword: Config.API_FORGOT_PASSWORD_PATH || '/api/CompanySetup/forgot-password',
     verifyCode: Config.API_VERIFY_CODE_PATH || '/api/CompanySetup/verify-code',
@@ -20,7 +20,7 @@ const PATHS = {
     holidays: Config.API_HOLIDAYS_PATH || '/api/DashBoard/holidays',
     leaves: Config.API_LEAVES_PATH || '/api/DashBoard/leaves',
     pendingTimesheets: Config.API_PENDING_TIMESHEETS_PATH || '/api/DashBoard/PendingTimesheets',
-    wonLeads: Config.API_GET_Manage_LEADS_PATH, 
+    wonLeads: Config.API_GET_Manage_LEADS_PATH,
     updateLeadStatus: Config.API_BUSINESS_UPDATE_LEAD_STATUS_PATH || '/api/BusinessDevelopment/UpdateLeadStatus',
     applyLeave: Config.API_APPLY_LEAVE_PATH,
     hraleaves: Config.API_HRA_LEAVES_PATH,
@@ -54,18 +54,19 @@ const PATHS = {
     currencies: Config.API_CURRENCIES_PATH || '/api/Expense/GetCurrency',
     expenseUnits: Config.API_EXPENSE_UNITS_PATH || '/api/Expense/GetExpenseUnits',
     expenseLines: Config.API_EXPENSE_LINES_PATH || '/api/Expense/lines',
-  expenseUpdateLines: Config.API_EXPENSE_UPDATE_LINES_PATH || '/api/Expense/Update-lines',
+    expenseUpdateLines: Config.API_EXPENSE_UPDATE_LINES_PATH || '/api/Expense/Update-lines',
     expenseHeaderLinesBase: Config.API_EXPENSE_HEADER_LINES_BASE || '/api/Expense/headers',
     expenseGetLinesByHeader: Config.API_EXPENSE_GET_LINES_BY_HEADER || '/api/Expense/GetLinesByHeader',
-  // Eligibility gate before navigating to Add Expense form
-  addExpenseEligibility: Config.API_EXPENSE_ADD_ELIGIBILITY_PATH || '/api/Expense/AddExpense',
+    // Eligibility gate before navigating to Add Expense form
+    addExpenseEligibility: Config.API_EXPENSE_ADD_ELIGIBILITY_PATH || '/api/Expense/AddExpense',
     addExpenseHeader: Config.API_ADD_EXPENSE_HEADER_PATH || '/api/Expense/add-header',
-  updateExpenseHeader: Config.API_UPDATE_EXPENSE_HEADER_PATH || '/api/Expense/update-header',
-      dashboardMyWorklistProjects: Config.API_DASHBOARD_MYWORKLIST_PROJECTS_PATH || '/api/DashBoard/myworklist/projects',   
+    updateExpenseHeader: Config.API_UPDATE_EXPENSE_HEADER_PATH || '/api/Expense/update-header',
+    dashboardMyWorklistProjects: Config.API_DASHBOARD_MYWORKLIST_PROJECTS_PATH || '/api/DashBoard/myworklist/projects',
     // Business Development - Proposals
     addLeadProposal: Config.API_ADD_LEAD_PROPOSAL_PATH || '/api/BusinessDevelopment/AddLeadproposal',
     updateLeadProposal: Config.API_UPDATE_LEAD_PROPOSAL_PATH || '/api/BusinessDevelopment/UpdateLeadproposal',
     addLeadFollowUp: Config.API_ADD_LEAD_FOLLOWUPS_PATH || '/api/BusinessDevelopment/followups',
+    addLeadUpdateFollowUp: Config.API_ADD_LEAD_UpdateFOLLOWUPS_PATH || '/api/BusinessDevelopment/Updatefollowups',
     getLeadFollowUps: Config.API_GET_LEAD_FOLLOWUPS_PATH || '/api/BusinessDevelopment/GetFollowUpsByLead',
     deleteLeadFollowUp: Config.API_DELETE_LEAD_FOLLOWUP_PATH || '/api/BusinessDevelopment/DeleteFollowUp',
     getLeadProposalsList: Config.API_GET_LEAD_PROPOSALS_LIST_PATH || '/api/BusinessDevelopment/GetLeadProposalsList',
@@ -95,22 +96,22 @@ const PATHS = {
     getDashboardLeadSummary: Config.API_GET_DASHBOARD_LEAD_SUMMARY_PATH || '/api/DashBoard/GetDashboardLeadSummary',
     adminDashboard: '/api/DashBoard/superadmin/dashboard',
     // admin dashboard APIs
-    totalHoursReported: '/api/DashBoard/myworklist/projects', 
-    totalEmployeeWorking: '/api/DashBoard/hr-dashboard/employees-status', 
+    totalHoursReported: '/api/DashBoard/myworklist/projects',
+    totalEmployeeWorking: '/api/DashBoard/hr-dashboard/employees-status',
 
 };
-console.log(PATHS,'PATHS');
- 
+console.log(PATHS, 'PATHS');
+
 async function getLocalIp() {
-  try {
-    const ip = await DeviceInfo.getIpAddress();
-    console.log(ip,'ip address');
-     // returns string like '192.168.x.x'
-    return ip;
-  } catch (e) {
-    console.warn('getIpAddress error', e);
-    return null;
-  }
+    try {
+        const ip = await DeviceInfo.getIpAddress();
+        console.log(ip, 'ip address');
+        // returns string like '192.168.x.x'
+        return ip;
+    } catch (e) {
+        console.warn('getIpAddress error', e);
+        return null;
+    }
 }
 
 
@@ -156,7 +157,7 @@ export async function logout({ onAfterClear } = {}) {
             console.error('❌ [LOGOUT] Error removing device token:', error);
             // Don't fail logout if device token removal fails
         }
-        
+
         await clearTokens();
     } finally {
         try { Alert.alert('Signed out', 'You have been signed out.'); } catch (e) { }
@@ -169,7 +170,7 @@ export async function kspAuth() {
     const newUUID = uuid.v4();
     const modifiedUUID = `${newUUID}+++000`;
     const encodedUUID = base64.encode(modifiedUUID);
-    console.log(modifiedUUID,'devicekey')
+    console.log(modifiedUUID, 'devicekey')
     console.log('Generated UUID for KSP Authentication:', encodedUUID);
     const resp = await api.post(PATHS.kspAuth, { 'DeviceKey': encodedUUID });
     console.log('KSP Authentication response:', JSON.stringify(resp.data, null, 2));
@@ -203,23 +204,23 @@ export async function login({ username, password }) {
         } else {
             console.log('🔍 [LOGIN] No UUID found in userData');
         }
-        
+
         // Check if there are other UUID fields that might be stored
         console.log('🔍 [LOGIN] All UUID fields in userData:');
         Object.keys(userData).forEach(key => {
             if (key.toLowerCase().includes('uuid') || key.toLowerCase().includes('id')) {
                 console.log(`  - ${key}:`, userData[key]);
             }
-        }); 
+        });
         if (userData.DisplayName) {
             await setDisplayName(userData.DisplayName);
         }
         // Determine active company/env UUIDs
         const role = Array.isArray(userData?.Roles) ? userData.Roles[0] : null;
         const roleCompany = role?.CompanyUUID || null;
-        const roleEnv = role?.EnvironmentUUID || null; 
+        const roleEnv = role?.EnvironmentUUID || null;
         const roleUUID = role?.UUID || null;
-        
+
         if (roleEnv) await setENVUUID(roleEnv);
         if (roleCompany) await setCMPUUID(roleCompany);
         if (roleUUID) await setRoleUUID(roleUUID);
@@ -255,7 +256,7 @@ export async function login({ username, password }) {
             await setReportingDesignation(String(userData.ReportingDesignation));
         }
 
-          // Store roles if available
+        // Store roles if available
         if (userData.Roles) {
             await setRoles(userData.Roles);
         }
@@ -269,7 +270,7 @@ export async function login({ username, password }) {
             null;
         if (nameFromLogin) {
             await setDisplayName(String(nameFromLogin));
-        } 
+        }
         if (userData.Token) {
             const { AccessToken, RefreshToken } = userData.Token;
             if (AccessToken && RefreshToken) {
@@ -386,14 +387,14 @@ export async function getHolidays({ cmpUuid, envUuid, userUuid, start = 0, lengt
     if (!envUuid) throw new Error('envUuid is required');
     if (!userUuid) throw new Error('userUuid is required');
     // Send multiple casings for compatibility
-    const params = { 
+    const params = {
         cmpUuid, envUuid, userUuid,
         start, Start: start,
         length, Length: length,
         searchValue, SearchValue: searchValue,
     };
     console.log(PATHS.holidays, { params });
-    
+
     const resp = await api.get(PATHS.holidays, { params });
     console.log('holidays response', resp);
     return resp.data;
@@ -413,7 +414,7 @@ export async function getLeaves({ cmpUuid, envUuid, userUuid, start = 0, length 
     if (!envUuid) throw new Error('envUuid is required');
     if (!userUuid) throw new Error('userUuid is required');
     // Send multiple casings for compatibility
-    const params = { 
+    const params = {
         cmpUuid, envUuid, userUuid,
         start, Start: start,
         length, Length: length,
@@ -441,7 +442,7 @@ export async function getHRALeaves({ cmpUuid, envUuid, userUuid, start = 0, leng
         searchValue, SearchValue: searchValue,
     };
     const resp = await api.get(PATHS.hraleaves, { params });
-    console.log(resp,'resp');
+    console.log(resp, 'resp');
     return resp.data;
 }
 export async function getHRAApproveLeaves({ approverDesignationUuid, cmpUuid, envUuid } = {}) {
@@ -458,8 +459,8 @@ export async function getHRAApproveLeaves({ approverDesignationUuid, cmpUuid, en
     if (!approverDesignationUuid) throw new Error('approverDesignationUuid is required');
     const params = { approverDesignationUuid, cmpUuid, envUuid };
     const resp = await api.get(PATHS.ApproveLeaves, { params });
-    console.log(resp,'resp');
-    
+    console.log(resp, 'resp');
+
     return resp.data;
 }
 
@@ -484,9 +485,9 @@ export async function approveOrRejectLeave({ headUuid, remark = '', action }, ov
         Remark: String(remark || ''),
         Action: String(action), // 'Approve' | 'Reject'
     };
-    console.log(payload,'payload');
+    console.log(payload, 'payload');
     const resp = await api.post(PATHS.approveOrRejectLeave, payload);
-    console.log(resp,'approveOrRejectLeave');
+    console.log(resp, 'approveOrRejectLeave');
     return resp.data;
 }
 
@@ -504,7 +505,7 @@ export async function getManageLeave({ cmpUuid, envUuid, userUuid, start = 0, le
     if (!envUuid) throw new Error('envUuid is required');
     if (!userUuid) throw new Error('userUuid is required');
     // Support multiple casings per backend conventions
-    const params = { 
+    const params = {
         cmpUuid, envUuid, userUuid,
         start, Start: start,
         length, Length: length,
@@ -538,17 +539,17 @@ export async function getWonLeads({ cmpUuid, envUuid, userUuid, start = 0, lengt
     if (!cmpUuid || !envUuid || !userUuid) {
         throw new Error('cmpUuid, envUuid and userUuid are required');
     }
-    const params = { 
-        cmpUuid, 
-        envUuid, 
-        userUuid, 
-        start, 
-        length, 
-        searchValue 
+    const params = {
+        cmpUuid,
+        envUuid,
+        userUuid,
+        start,
+        length,
+        searchValue
     };
     const resp = await api.get(PATHS.wonLeads, { params });
     console.log('Get won leads response:', resp);
-    return resp.data 
+    return resp.data
 }
 
 // Business Development: Update Lead Status
@@ -562,13 +563,13 @@ export async function updateLeadStatus({ leadUuid, status, nextAction, actionDue
             userUuid || getUUID(),
             cmpUuid || getCMPUUID(),
             envUuid || getENVUUID(),
-            
+
         ]);
         userUuid = u; cmpUuid = c; envUuid = e;
     }
 
     // Params must be passed as: { leadUuid, envuuid, cmpuuid, useruuid }
-    const params = { uuid:leadUuid, envuuid: envUuid, cmpuuid: cmpUuid, useruuid: userUuid };
+    const params = { uuid: leadUuid, envuuid: envUuid, cmpuuid: cmpUuid, useruuid: userUuid };
     console.log('Update Lead Status params:', params);
     const payload = {
         Status: status, // 'won' | 'lost'
@@ -576,9 +577,9 @@ export async function updateLeadStatus({ leadUuid, status, nextAction, actionDue
         ActionDueDate: "2025-09-30",
     };
     console.log('Update Lead Status payload:', payload);
-    
 
-    const resp = await api.put(PATHS.updateLeadStatus, payload, { params });
+
+    const resp = await api.post(PATHS.updateLeadStatus, payload, { params });
     return resp.data;
 }
 
@@ -626,7 +627,7 @@ export async function updateManageLeadOpportunity(payload, overrides = {}) {
     if (!envUuid) throw new Error('Missing environment UUID');
 
     const params = { uuid: payload.uuid, cmpUuid, envUuid, userUuid, userIp: userIp };
-    const resp = await api.put(PATHS.updateManageLeadOpportunity, 
+    const resp = await api.post(PATHS.updateManageLeadOpportunity,
         payload,
         { params }
     );
@@ -677,7 +678,7 @@ export async function addLeadProposal({ leadOppUuid, payload, overrides = {} }) 
     } else if (payload?.ProposalDocument) {
         appendIfDefined('ProposalDocument', payload?.ProposalDocument);
     }
-console.log(payload,'222');
+    console.log(payload, '222');
     const resp = await api.post(PATHS.addLeadProposal, form, { params, headers: { 'Content-Type': 'multipart/form-data' } });
     console.log('Add Lead Proposal response:', resp);
     return resp.data;
@@ -728,7 +729,7 @@ export async function updateLeadProposal({ proposalUuid, leadUuid, payload, over
         appendIfDefined('ProposalDocument', payload?.ProposalDocument);
     }
 
-    const resp = await api.put(PATHS.updateLeadProposal, form, { params, headers: { 'Content-Type': 'multipart/form-data' } });
+    const resp = await api.post(PATHS.updateLeadProposal, form, { params, headers: { 'Content-Type': 'multipart/form-data' } });
     console.log('Update Lead Proposal response:', resp);
     return resp.data;
 }
@@ -770,7 +771,7 @@ export async function updateLeadFollowUp({ followupUuid, payload, overrides = {}
     const params = { followupUuid, cmpUuid, envUuid, userUuid, userIp: userIp };
     console.log('Update Lead Follow-Up params:', params);
     console.log('Update Lead Follow-Up payload:', payload);
-    const resp = await api.put(PATHS.addLeadFollowUp, payload, { params });
+    const resp = await api.post(PATHS.addLeadUpdateFollowUp, payload, { params });
     console.log('Update Lead Follow-Up response:', resp);
     return resp.data;
 }
@@ -866,9 +867,9 @@ export async function getLeadProposalsList({ leadUuid, start = 0, length = 10, s
         cmpUuid = c; envUuid = e;
     }
     // Send multiple casings for compatibility
-    const params = { 
-        envUuid: envUuid, 
-        cmpUuid: cmpUuid, 
+    const params = {
+        envUuid: envUuid,
+        cmpUuid: cmpUuid,
         leadOppUuid: leadUuid,
         start, Start: start,
         length, Length: length,
@@ -927,11 +928,11 @@ export async function fetchExpenses({ start = 0, length = 10, searchValue = '' }
         getCMPUUID(),
         getENVUUID(),
     ]);
-    
+
     // Use selected UUIDs if available (admin), otherwise fallback to user's assigned UUIDs
     const cmpUuid = selectedCmpUuid || userCmpUuid;
     const envUuid = selectedEnvUuid || userEnvUuid;
-    
+
     const resp = await api.get(PATHS.expenses, {
         params: {
             empUuid: empUuid || '',
@@ -955,11 +956,11 @@ export async function fetchProjects() {
         getCMPUUID(),
         getENVUUID(),
     ]);
-    
+
     // Use selected UUIDs if available (admin), otherwise fallback to user's assigned UUIDs
     const cmpUuid = selectedCmpUuid || userCmpUuid;
     const envUuid = selectedEnvUuid || userEnvUuid;
-    
+
     const resp = await api.get(PATHS.projects, {
         params: {
             cmpUuid: cmpUuid || '',
@@ -976,11 +977,11 @@ export async function fetchProjectTasks({ projectUuid }) {
         getCMPUUID(),
         getENVUUID(),
     ]);
-    
+
     // Use selected UUIDs if available (admin), otherwise fallback to user's assigned UUIDs
     const cmpUuid = selectedCmpUuid || userCmpUuid;
     const envUuid = selectedEnvUuid || userEnvUuid;
-    
+
     const resp = await api.get(PATHS.projectTasks, {
         params: {
             cmpUuid: cmpUuid || '',
@@ -1007,18 +1008,18 @@ export async function fetchUserProjects({ cmpUuid, envUuid, userUuid } = {}) {
 
     const params = { cmpUuid, envUuid, userUuid };
     const fullUrl = `${api.defaults.baseURL}${PATHS.userProjects}`;
-    
+
     console.log('🌐 [fetchUserProjects] Request URL:', fullUrl);
     console.log('📋 [fetchUserProjects] Request Parameters:', params);
     console.log('🔗 [fetchUserProjects] Full Request URL:', `${fullUrl}?${new URLSearchParams(params).toString()}`);
-    
+
     const resp = await api.get(PATHS.userProjects, { params });
-    
+
     console.log('✅ [fetchUserProjects] Response Status:', resp.status);
     console.log('📥 [fetchUserProjects] Response Headers:', resp.headers);
     console.log('📊 [fetchUserProjects] Response Data:', JSON.stringify(resp.data, null, 2));
     console.log('📈 [fetchUserProjects] Response Data Type:', typeof resp.data);
-    
+
     return resp.data;
 }
 
@@ -1039,18 +1040,18 @@ export async function fetchUserProjectTasks({ cmpUuid, envUuid, userUuid, projec
 
     const params = { cmpUuid, envUuid, userUuid, projectUuid };
     const fullUrl = `${api.defaults.baseURL}${PATHS.userProjectTasks}`;
-    
+
     console.log('🌐 [fetchUserProjectTasks] Request URL:', fullUrl);
     console.log('📋 [fetchUserProjectTasks] Request Parameters:', params);
     console.log('🔗 [fetchUserProjectTasks] Full Request URL:', `${fullUrl}?${new URLSearchParams(params).toString()}`);
-    
+
     const resp = await api.get(PATHS.userProjectTasks, { params });
-    
+
     console.log('✅ [fetchUserProjectTasks] Response Status:', resp.status);
     console.log('📥 [fetchUserProjectTasks] Response Headers:', resp.headers);
     console.log('📊 [fetchUserProjectTasks] Response Data:', JSON.stringify(resp.data, null, 2));
     console.log('📈 [fetchUserProjectTasks] Response Data Type:', typeof resp.data);
-    
+
     return resp.data;
 }
 
@@ -1061,11 +1062,11 @@ export async function fetchExpenseTypes() {
         getCMPUUID(),
         getENVUUID(),
     ]);
-    
+
     // Use selected UUIDs if available (admin), otherwise fallback to user's assigned UUIDs
     const cmpUuid = selectedCmpUuid || userCmpUuid;
     const envUuid = selectedEnvUuid || userEnvUuid;
-    
+
     const resp = await api.get(PATHS.expenseTypes, {
         params: {
             cmpUuid: cmpUuid || '',
@@ -1160,9 +1161,9 @@ export async function addExpenseLine(payload, overrides = {}) {
     }
 
     const params = { userUuid: userUuid || '', cmpUuid: cmpUuid || '', envUuid: envUuid || '' };
-    try { console.log('[Expense] POST', PATHS.expenseLines, 'params:', params); } catch (_e) {}
+    try { console.log('[Expense] POST', PATHS.expenseLines, 'params:', params); } catch (_e) { }
     const resp = await api.post(PATHS.expenseLines, form, { params, headers: { 'Content-Type': 'multipart/form-data' } });
-    try { console.log('[Expense] POST resp for', PATHS.expenseLines, '->', resp?.data); } catch (_e) {}
+    try { console.log('[Expense] POST resp for', PATHS.expenseLines, '->', resp?.data); } catch (_e) { }
     return resp.data;
 }
 
@@ -1243,13 +1244,18 @@ export async function updateExpenseLine(payload, overrides = {}) {
             BillUrl: payload?.BillUrl ?? '',
             Expense_Remarks: payload?.Expense_Remarks ?? '',
             documentFile: fileObj?.uri ? { name: fileObj?.name, type: fileObj?.type, uri: fileObj?.uri } : undefined,
-            params,
+            // params
         };
         // Log a safe, readable snapshot of the PUT payload
         console.log('[Expense] PUT payload (update line):', JSON.stringify(debugPayload, null, 2));
-    } catch (_) {}
-
-    const resp = await api.put(PATHS.expenseUpdateLines, form, { params, headers: { 'Content-Type': 'multipart/form-data' } });
+    } catch (_) { }
+    console.log(form, '0091')
+    const resp = await api.post(
+        PATHS.expenseUpdateLines,
+        form,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    try { console.log('[Expense] Update-lines resp:', resp?.status, resp?.data); } catch (_) { }
     return resp.data;
 }
 
@@ -1266,9 +1272,9 @@ export async function fetchExpenseLinesByHeader({ headerUuid }, overrides = {}) 
     }
     const params = { headerUuid, cmpUuid: cmpUuid || '', envUuid: envUuid || '' };
     const url = PATHS.expenseGetLinesByHeader;
-    try { console.log('[Expense] GET', url, 'params:', params); } catch (_e) {}
+    try { console.log('[Expense] GET', url, 'params:', params); } catch (_e) { }
     const resp = await api.get(url, { params });
-    try { console.log('[Expense] GET resp for', url, '->', resp?.data); } catch (_e) {}
+    try { console.log('[Expense] GET resp for', url, '->', resp?.data); } catch (_e) { }
     return resp.data;
 }
 
@@ -1286,7 +1292,7 @@ export async function deleteExpenseLine({ lineUuid }, overrides = {}) {
     }
     const params = { cmpUuid: cmpUuid || '', envUuid: envUuid || '', userUuid: userUuid || '' };
     const url = `${PATHS.expenseLines}/${encodeURIComponent(lineUuid)}`;
-    try { console.log('[Expense] DELETE line', url, 'params:', params); } catch (_e) {}
+    try { console.log('[Expense] DELETE line', url, 'params:', params); } catch (_e) { }
     const resp = await api.delete(url, { params });
     return resp.data;
 }
@@ -1298,15 +1304,15 @@ export async function fetchCurrencies({ countryUuid } = {}) {
         getCMPUUID(),
         getENVUUID(),
     ]);
-    
+
     // Use selected UUIDs if available (admin), otherwise fallback to user's assigned UUIDs
     const cmpUuid = selectedCmpUuid || userCmpUuid;
     const envUuid = selectedEnvUuid || userEnvUuid;
-    
+
     if (!countryUuid) {
         throw new Error('countryUuid is required for fetching currencies');
     }
-    
+
     const resp = await api.get(PATHS.currencies, {
         params: {
             cmpUuid: cmpUuid || '',
@@ -1419,7 +1425,7 @@ export async function updateExpenseHeader(payload, overrides = {}) {
         UserUUID: payload?.UserUUID || userUuid || '',
     };
 
-    const resp = await api.put(PATHS.updateExpenseHeader, body);
+    const resp = await api.post(PATHS.updateExpenseHeader, body);
     return resp.data;
 }
 export async function fetchDashboardMyWorklistProjects() {
@@ -1430,12 +1436,12 @@ export async function fetchDashboardMyWorklistProjects() {
         getCMPUUID(),
         getENVUUID(),
     ]);
-    
+
     // Use selected UUIDs if available (admin), otherwise fallback to user's assigned UUIDs
     const cmpUuid = selectedCmpUuid || userCmpUuid;
     const envUuid = selectedEnvUuid || userEnvUuid;
-    
-    try { console.log('[Dashboard] fetch helper params -> cmpUuid:', cmpUuid, 'envUuid:', envUuid, 'superAdminUuid:', superAdminUuid); } catch (_e) {}
+
+    try { console.log('[Dashboard] fetch helper params -> cmpUuid:', cmpUuid, 'envUuid:', envUuid, 'superAdminUuid:', superAdminUuid); } catch (_e) { }
     const resp = await api.get(PATHS.dashboardMyWorklistProjects, {
         params: {
             cmpUuid: cmpUuid || '',
@@ -1521,7 +1527,7 @@ export async function getEmployees({ companyUuid, envUuid } = {}) {
 
     const resp = await api.get(PATHS.getEmployees, { params });
     console.log('Get Employees response:', resp);
-    
+
     return resp.data;
 }
 
@@ -1540,12 +1546,12 @@ export async function getAttendance({ cmpUuid, envUuid, userUuid, date } = {}) {
     if (!userUuid) throw new Error('Missing user UUID');
     if (!date) throw new Error('Missing date');
 
-    const params = { cmpUuid, envUuid,  date };
+    const params = { cmpUuid, envUuid, date };
     console.log(PATHS.getAttendance, { params }, params);
-    
+
     const resp = await api.get(PATHS.getAttendance, { params });
     console.log('Get Attendance response:', resp);
-    
+
     return resp.data;
 }
 
@@ -1564,19 +1570,19 @@ export async function getNotApprovedTimesheets({ cmpUuid, envUuid, userUuid, sta
     if (!userUuid) throw new Error('Missing user UUID');
 
     // Send multiple casings in case backend expects specific keys
-    const params = { 
-        cmpUuid, 
-        envUuid, 
+    const params = {
+        cmpUuid,
+        envUuid,
         userUuid,
         start, Start: start,
         length, Length: length,
         searchValue, SearchValue: searchValue,
     };
-    try { console.log('Getting not approved timesheets with params:', params); } catch (_) {}
-    
+    try { console.log('Getting not approved timesheets with params:', params); } catch (_) { }
+
     const resp = await api.get(PATHS.notApprovedTimesheets, { params });
-    try { console.log('Not approved timesheets response:', JSON.stringify(resp?.data, null, 2)); } catch (_) {}
-    
+    try { console.log('Not approved timesheets response:', JSON.stringify(resp?.data, null, 2)); } catch (_) { }
+
     return resp.data;
 }
 
@@ -1598,7 +1604,7 @@ export async function getEmployeeDashboard({ cmpUuid, envUuid, userUuid } = {}) 
     const params = { cmpUuid, envUuid, userUuid };
     console.log('🔍 [getEmployeeDashboard] Request params:', params);
     console.log('🔍 [getEmployeeDashboard] API endpoint:', PATHS.employeeDashboard);
-    
+
     // Debug: Check if we have access token
     try {
         const token = await getAccessToken();
@@ -1609,7 +1615,7 @@ export async function getEmployeeDashboard({ cmpUuid, envUuid, userUuid } = {}) 
     } catch (e) {
         //console.error('❌ [getEmployeeDashboard] Error getting access token:', e);
     }
-    
+
     // Debug: Check what company UUID will be added by interceptor
     try {
         const selectedCompanyUUID = await getSelectedCompanyUUID();
@@ -1622,11 +1628,11 @@ export async function getEmployeeDashboard({ cmpUuid, envUuid, userUuid } = {}) 
     } catch (e) {
         //console.error('❌ [getEmployeeDashboard] Error getting company UUID:', e);
     }
-    
+
     const resp = await api.get(PATHS.employeeDashboard, { params });
     console.log('✅ [getEmployeeDashboard] Response status:', resp.status);
     console.log('📥 [getEmployeeDashboard] Response data:', resp.data);
-    
+
     return resp.data;
 }
 
@@ -1651,7 +1657,7 @@ export async function getApprovedTimesheets({ cmpUuid, envUuid, userUuid, start 
         console.log('🌐 [getApprovedTimesheets] Request URL:', fullUrl);
         console.log('📋 [getApprovedTimesheets] Request Parameters:', params);
         console.log('🔗 [getApprovedTimesheets] Full Request URL:', `${fullUrl}?${new URLSearchParams(params).toString()}`);
-    } catch (_) {}
+    } catch (_) { }
 
     const resp = await api.get(PATHS.approvedTimesheets, { params });
     console.log('✅ [getApprovedTimesheets] Response Status:', resp.status);
@@ -1680,7 +1686,7 @@ export async function getSubmittedAndPendingTimesheets({ cmpUuid, envUuid, userU
         console.log('🌐 [getSubmittedAndPendingTimesheets] Request URL:', fullUrl);
         console.log('📋 [getSubmittedAndPendingTimesheets] Request Parameters:', params);
         console.log('🔗 [getSubmittedAndPendingTimesheets] Full Request URL:', `${fullUrl}?${new URLSearchParams(params).toString()}`);
-    } catch (_) {}
+    } catch (_) { }
 
     const resp = await api.get(PATHS.submittedAndPendingTimesheets, { params });
     console.log('✅ [getSubmittedAndPendingTimesheets] Response Status:', resp.status);
@@ -1691,7 +1697,7 @@ export async function getSubmittedAndPendingTimesheets({ cmpUuid, envUuid, userU
 // HRA: Submit Attendance
 export async function submitAttendance(payload, overrides = {}) {
     console.log('Submitting attendance with payload:', JSON.stringify(payload, null, 2));
-    
+
     try {
         let { userUuid, cmpUuid, envUuid } = overrides || {};
         if (!userUuid || !cmpUuid || !envUuid) {
@@ -1708,7 +1714,7 @@ export async function submitAttendance(payload, overrides = {}) {
 
         const params = { userUuid, cmpUuid, envUuid };
         console.log('API params:', params);
-        
+
         const resp = await api.post('/api/HRA/ManageAttendance', payload, { params });
         console.log('Submit attendance response:', resp);
         return resp.data;
@@ -1731,19 +1737,19 @@ export async function getManageTimesheet({ cmpUuid, envUuid, userUuid, frmD, toD
         if (!cmpUuidFinal) throw new Error('Missing company UUID');
         if (!envUuidFinal) throw new Error('Missing environment UUID');
 
-        const params = { 
-            userUuid: uuid, 
-            cmpUuid: cmpUuidFinal, 
+        const params = {
+            userUuid: uuid,
+            cmpUuid: cmpUuidFinal,
             envUuid: envUuidFinal,
             ...(frmD && { frmD }),
             ...(toD && { toD })
         };
-        
+
         // Log complete request URL and parameters
         const fullUrl = `${api.defaults.baseURL}${PATHS.manageTimesheet}`;
         console.log('🌐 [getManageTimesheet] Request URL:', fullUrl);
         console.log('📋 [getManageTimesheet] Request Parameters:', params);
-        
+
         const resp = await api.get(PATHS.manageTimesheet, { params });
         console.log('✅ [getManageTimesheet] Response Status:', resp.status);
         console.log('📥 [getManageTimesheet] Response Data:', resp.data);
@@ -1793,7 +1799,7 @@ export async function addTimesheetLine({ cmpUuid, envUuid, projectuuid, taskuuid
             console.log('🌐 [addTimesheetLine] Request URL:', fullUrl);
             console.log('📋 [addTimesheetLine] Request Parameters:', params);
             console.log('🔗 [addTimesheetLine] Full Request URL:', `${fullUrl}?${new URLSearchParams(params).toString()}`);
-        } catch (_) {}
+        } catch (_) { }
 
         // Backend expects query-only; send no body
         const resp = await api.post(PATHS.addTimesheetLine, null, { params });
@@ -1833,7 +1839,7 @@ export async function deleteTimesheetLine({ headerUuid, projectUuid, taskUuid, c
             console.log('🗑️ [deleteTimesheetLine] Request URL:', fullUrl);
             console.log('📋 [deleteTimesheetLine] Request Parameters:', params);
             console.log('🔗 [deleteTimesheetLine] Full Request URL:', `${fullUrl}?${new URLSearchParams(params).toString()}`);
-        } catch (_) {}
+        } catch (_) { }
 
         const resp = await api.delete(PATHS.deleteTimesheetLine, { params });
         console.log('✅ [deleteTimesheetLine] Response Status:', resp.status);
@@ -1869,7 +1875,7 @@ export async function submitTimesheetLine({ headerUuid, cmpUuid, envUuid, userUu
         };
         try {
             console.log('📝 [submitTimesheetLine] Body:', body);
-        } catch (_) {}
+        } catch (_) { }
         const resp = await api.post(PATHS.submitTimesheetLine, body);
         console.log('✅ [submitTimesheetLine] Response Status:', resp.status);
         console.log('📥 [submitTimesheetLine] Response Data:', resp.data);
@@ -1907,7 +1913,7 @@ export async function transferTimesheetTasks({ lineUuid, fromDate, toDate, heade
             console.log('🔄 [transferTimesheetTasks] Request URL:', fullUrl);
             console.log('📋 [transferTimesheetTasks] Request Parameters:', params);
             console.log('🔗 [transferTimesheetTasks] Full Request URL:', `${fullUrl}?${new URLSearchParams(params).toString()}`);
-        } catch (_) {}
+        } catch (_) { }
 
         const resp = await api.post(PATHS.transferTimesheetTasks, null, { params });
         console.log('✅ [transferTimesheetTasks] Response Status:', resp.status);
@@ -1924,7 +1930,7 @@ export async function transferTimesheetTasks({ lineUuid, fromDate, toDate, heade
 // Company Setup: Update Profile Image
 export async function updateProfileImage(payload, overrides = {}) {
     console.log('Updating profile image with payload:', JSON.stringify(payload, null, 2));
-    
+
     try {
         let { userUuid, cmpUuid, envUuid } = overrides || {};
         if (!userUuid || !cmpUuid || !envUuid) {
@@ -1941,7 +1947,7 @@ export async function updateProfileImage(payload, overrides = {}) {
 
         const params = { userUuid, cmpUuid, envUuid };
         console.log('API params:', params);
-        
+
         // Build multipart form body
         const form = new FormData();
         const appendIfDefined = (key, value) => {
@@ -1963,10 +1969,10 @@ export async function updateProfileImage(payload, overrides = {}) {
         } else if (payload?.profileImage) {
             appendIfDefined('profileImage', payload?.profileImage);
         }
-        
-        const resp = await api.post(PATHS.updateProfileImage, form, { 
-            params, 
-            headers: { 'Content-Type': 'multipart/form-data' } 
+
+        const resp = await api.post(PATHS.updateProfileImage, form, {
+            params,
+            headers: { 'Content-Type': 'multipart/form-data' }
         });
         console.log('Update profile image response:', resp);
         return resp.data;
@@ -1981,7 +1987,7 @@ export async function updateProfileImage(payload, overrides = {}) {
 // Company Setup: Get Profile Image
 export async function getProfileImage(overrides = {}) {
     console.log('Getting profile image...');
-    
+
     try {
         let { userUuid, cmpUuid, envUuid } = overrides || {};
         if (!userUuid || !cmpUuid || !envUuid) {
@@ -1998,7 +2004,7 @@ export async function getProfileImage(overrides = {}) {
 
         const params = { userUuid, cmpUuid, envUuid };
         console.log('API params:', params);
-        
+
         const resp = await api.get(PATHS.getProfileImage, { params });
         console.log('Get profile image response:', resp);
         return resp.data;
@@ -2013,7 +2019,7 @@ export async function getProfileImage(overrides = {}) {
 // Company Setup: Delete Profile Image
 export async function deleteProfileImage(overrides = {}) {
     console.log('Deleting profile image...');
-    
+
     try {
         let { userUuid, cmpUuid, envUuid } = overrides || {};
         if (!userUuid || !cmpUuid || !envUuid) {
@@ -2030,7 +2036,7 @@ export async function deleteProfileImage(overrides = {}) {
 
         const params = { userUuid, cmpUuid, envUuid };
         console.log('API params:', params);
-        
+
         const resp = await api.delete(PATHS.deleteProfileImage, { params });
         console.log('Delete profile image response:', resp);
         return resp.data;
@@ -2064,7 +2070,7 @@ export async function getTimesheetsForApproval({ cmpUuid, envUuid, userUuid, sta
             console.log('🌐 [getTimesheetsForApproval] Request URL:', fullUrl);
             console.log('📋 [getTimesheetsForApproval] Request Parameters:', params);
             console.log('🔗 [getTimesheetsForApproval] Full Request URL:', `${fullUrl}?${new URLSearchParams(params).toString()}`);
-        } catch (_) {}
+        } catch (_) { }
 
         const resp = await api.get(PATHS.timesheetsForApproval, { params });
         console.log('✅ [getTimesheetsForApproval] Response Status:', resp.status);
@@ -2095,18 +2101,18 @@ export async function approveTimesheet({ headerUuid, cmpUuid, envUuid, userUuid 
         if (!userUuid) throw new Error('userUuid is required');
         if (!headerUuid) throw new Error('headerUuid is required');
 
-        const payload = { 
+        const payload = {
             CmpUuid: cmpUuid,
             EnvUuid: envUuid,
             UserUuid: userUuid,
             HeaderUuid: headerUuid
         };
-        
+
         try {
             const fullUrl = `${api.defaults.baseURL}${PATHS.approveTimesheet}`;
             console.log('🌐 [approveTimesheet] Request URL:', fullUrl);
             console.log('📦 [approveTimesheet] Request Payload:', payload);
-        } catch (_) {}
+        } catch (_) { }
 
         const resp = await api.post(PATHS.approveTimesheet, payload);
         console.log('✅ [approveTimesheet] Response Status:', resp.status);
@@ -2137,19 +2143,19 @@ export async function rejectTimesheet({ headerUuid, cmpUuid, envUuid, userUuid, 
         if (!userUuid) throw new Error('userUuid is required');
         if (!headerUuid) throw new Error('headerUuid is required');
 
-        const payload = { 
+        const payload = {
             CmpUuid: cmpUuid,
             EnvUuid: envUuid,
             UserUuid: userUuid,
             HeaderUuid: headerUuid,
             Remark: remark || ''
         };
-        
+
         try {
             const fullUrl = `${api.defaults.baseURL}/api/TimeSheet/RejectTimesheet`;
             console.log('🌐 [rejectTimesheet] Request URL:', fullUrl);
             console.log('📦 [rejectTimesheet] Request Payload:', payload);
-        } catch (_) {}
+        } catch (_) { }
 
         const resp = await api.post('/api/TimeSheet/RejectTimesheet', payload);
         console.log('✅ [rejectTimesheet] Response Status:', resp.status);
@@ -2175,26 +2181,26 @@ export async function getDashboardLeadSummary({ cmpUuid, envUuid, superAdminUuid
                 getRoleUUID(),
             ]);
             cmpUuid = c; envUuid = e; superAdminUuid = u;
-            
+
             // Use role UUID if available, otherwise use user UUID
             if (r) {
                 superAdminUuid = r;
             }
         }
-        
+
         // TEMPORARY FIX: Force the correct superAdminUuid based on your login data
         // TODO: Fix the login process to store the correct UUID
         if (superAdminUuid === '97dcc757-b714-4b25-ac04-9bc7a988') {
             console.log('🔧 [TEMP FIX] Overriding incorrect UUID with correct one');
             superAdminUuid = '1afa6042-0bd6-4734-8e15-1dbe6b61';
         }
-        
+
         // Debug logging to check what UUIDs are being used
         console.log('🔍 [getDashboardLeadSummary] Retrieved UUIDs:');
         console.log('  - cmpUuid:', cmpUuid);
         console.log('  - envUuid:', envUuid);
         console.log('  - superAdminUuid:', superAdminUuid);
-        
+
         // Check what's actually stored in storage
         const [storedUUID, storedCMP, storedENV] = await Promise.all([
             getUUID(),
@@ -2214,12 +2220,12 @@ export async function getDashboardLeadSummary({ cmpUuid, envUuid, superAdminUuid
             envUuid: envUuid,
             superAdminUuid: superAdminUuid
         };
-        
+
         try {
             const fullUrl = `${api.defaults.baseURL}${PATHS.getDashboardLeadSummary}`;
             console.log('🌐 [getDashboardLeadSummary] Request URL:', fullUrl);
             console.log('📦 [getDashboardLeadSummary] Request Params:', params);
-        } catch (_) {}
+        } catch (_) { }
 
         const resp = await api.get(PATHS.getDashboardLeadSummary, { params });
         console.log('✅ [getDashboardLeadSummary] Response Status:', resp.status);
@@ -2243,11 +2249,11 @@ export async function getApprovedByMeExpenses(start = 0, length = 10) {
             getCMPUUID(),
             getENVUUID(),
         ]);
-        
+
         // Use selected UUIDs if available (admin), otherwise fallback to user's assigned UUIDs
         const cmpUUID = selectedCmpUUID || userCmpUUID;
         const envUUID = selectedEnvUUID || userEnvUUID;
-        
+
         const params = {
             userUUID: userUUID || '',
             cmpUUID: cmpUUID || '',
@@ -2255,7 +2261,7 @@ export async function getApprovedByMeExpenses(start = 0, length = 10) {
             Start: start,
             Length: length
         };
-        
+
         console.log('🚀 [getApprovedByMeExpenses] Request params:', params);
         const resp = await api.get(PATHS.approvedByMeExpenses, { params });
         console.log('✅ [getApprovedByMeExpenses] Response Status:', resp.status);
@@ -2281,7 +2287,7 @@ export async function getSoleApprovalData({ cmpUUID, envUUID, userUUID, start = 
             ]);
             cmpUUID = c; envUUID = e; userUUID = u;
         }
-        
+
         if (!cmpUUID) throw new Error('cmpUUID is required');
         if (!envUUID) throw new Error('envUUID is required');
         if (!userUUID) throw new Error('userUUID is required');
@@ -2293,7 +2299,7 @@ export async function getSoleApprovalData({ cmpUUID, envUUID, userUUID, start = 
             start,
             length
         };
-        
+
         console.log('🚀 [getSoleApprovalData] Request params:', params);
         const resp = await api.get(PATHS.soleApprovalData, { params });
         console.log('✅ [getSoleApprovalData] Response Status:', resp.status);
@@ -2318,7 +2324,7 @@ export async function getApprovalDetails({ headeruuid, cmpUUID, envUUID } = {}) 
             ]);
             cmpUUID = c; envUUID = e;
         }
-        
+
         if (!headeruuid) throw new Error('headeruuid is required');
         if (!cmpUUID) throw new Error('cmpUUID is required');
         if (!envUUID) throw new Error('envUUID is required');
@@ -2328,7 +2334,7 @@ export async function getApprovalDetails({ headeruuid, cmpUUID, envUUID } = {}) 
             cmpUUID,
             envUUID
         };
-        
+
         console.log('🚀 [getApprovalDetails] Request params:', params);
         const resp = await api.get(PATHS.approvedDetails, { params });
         console.log('✅ [getApprovalDetails] Response Status:', resp.status);
@@ -2351,7 +2357,7 @@ export async function getPendingApprovals({ start = 0, length = 10 } = {}) {
             getCMPUUID(),
             getENVUUID(),
         ]);
-        
+
         if (!userUUID) throw new Error('userUUID is required');
         if (!cmpUUID) throw new Error('cmpUUID is required');
         if (!envUUID) throw new Error('envUUID is required');
@@ -2363,7 +2369,7 @@ export async function getPendingApprovals({ start = 0, length = 10 } = {}) {
             Start: start,
             Length: length
         };
-        
+
         console.log('🚀 [getPendingApprovals] Request params:', params);
         const resp = await api.get(PATHS.pendingApprovals, { params });
         console.log('✅ [getPendingApprovals] Response Status:', resp.status);
@@ -2386,7 +2392,7 @@ export async function getMyApprovedExpenses({ start = 0, length = 10 } = {}) {
             getCMPUUID(),
             getENVUUID(),
         ]);
-        
+
         if (!userUUID) throw new Error('userUUID is required');
         if (!cmpUUID) throw new Error('cmpUUID is required');
         if (!envUUID) throw new Error('envUUID is required');
@@ -2398,7 +2404,7 @@ export async function getMyApprovedExpenses({ start = 0, length = 10 } = {}) {
             Start: start,
             Length: length
         };
-        
+
         console.log('🚀 [getMyApprovedExpenses] Request params:', params);
         const resp = await api.get(PATHS.myApprovedExpenses, { params });
         console.log('✅ [getMyApprovedExpenses] Response Status:', resp.status);
@@ -2421,7 +2427,7 @@ export async function getMyRejectedExpenses({ start = 0, length = 10 } = {}) {
             getCMPUUID(),
             getENVUUID(),
         ]);
-        
+
         if (!userUUID) throw new Error('userUUID is required');
         if (!cmpUUID) throw new Error('cmpUUID is required');
         if (!envUUID) throw new Error('envUUID is required');
@@ -2433,7 +2439,7 @@ export async function getMyRejectedExpenses({ start = 0, length = 10 } = {}) {
             Start: start,
             Length: length
         };
-        
+
         console.log('🚀 [getMyRejectedExpenses] Request params:', params);
         const resp = await api.get(PATHS.myRejectedExpenses, { params });
         console.log('✅ [getMyRejectedExpenses] Response Status:', resp.status);
@@ -2456,13 +2462,13 @@ export async function processApprovalOrRejection({ headerUuid, isApproved, remar
             getCMPUUID(),
             getENVUUID(),
         ]);
-        
+
         if (!headerUuid) throw new Error('headerUuid is required');
         if (!userUUID) throw new Error('userUUID is required');
         if (!cmpUUID) throw new Error('cmpUUID is required');
         if (!envUUID) throw new Error('envUUID is required');
         if (typeof isApproved !== 'boolean') throw new Error('isApproved must be a boolean');
-        
+
         // Validate remark for rejection
         if (!isApproved && (!remark || remark.trim() === '')) {
             throw new Error('Remark is required when rejecting an expense');
@@ -2477,7 +2483,7 @@ export async function processApprovalOrRejection({ headerUuid, isApproved, remar
             isApproved: isApproved.toString(), // Convert boolean to string
             remark: remark.trim()
         };
-        
+
         // Also try alternative field names that might be expected
         const altParams = {
             headeruuid: headerUuid,
@@ -2487,10 +2493,10 @@ export async function processApprovalOrRejection({ headerUuid, isApproved, remar
             isApproved: isApproved.toString(),
             remark: remark.trim()
         };
-        
+
         console.log('🚀 [processApprovalOrRejection] Primary params:', params);
         console.log('🚀 [processApprovalOrRejection] Alternative params:', altParams);
-        
+
         // Try with alternative parameter names first
         const resp = await api.post(PATHS.processApprovalOrRejection, null, { params: altParams });
         console.log('✅ [processApprovalOrRejection] Response Status:', resp.status);
@@ -2512,18 +2518,18 @@ export async function sendDeviceToken({ token, isLogin = true, userUuid } = {}) 
         if (!userUuid) {
             userUuid = await getUUID();
         }
-        
+
         if (!userUuid) {
             throw new Error('User UUID is required');
         }
-        
+
         // If token is not provided, try to get it from notification service
         if (!token) {
             try {
                 // Import notificationService dynamically to avoid circular dependencies
                 const notificationService = require('../services/notificationService').default;
                 token = await notificationService.getToken();
-                
+
                 if (!token) {
                     console.log('⚠️ [sendDeviceToken] No FCM token available, skipping device token registration');
                     return { success: false, message: 'No FCM token available' };
@@ -2533,19 +2539,19 @@ export async function sendDeviceToken({ token, isLogin = true, userUuid } = {}) 
                 return { success: false, message: 'Could not get FCM token' };
             }
         }
-        
+
         const payload = {
             IsLogin: isLogin,
             UserId: userUuid,
             Token: token
         };
-        
+
         console.log('📱 [sendDeviceToken] Sending device token:', {
             IsLogin: isLogin,
             UserId: userUuid,
             Token: token ? `${token.substring(0, 20)}...` : 'null' // Log partial token for debugging
         });
-        
+
         const resp = await api.post('/api/CompanySetup/DeviceToken', payload);
         console.log('✅ [sendDeviceToken] Response Status:', resp.status);
         console.log('📥 [sendDeviceToken] Response Data:', resp.data);
@@ -2569,8 +2575,8 @@ export async function getAdminDashboard({ cmpUuid, envUuid, superAdminUuid } = {
                 superAdminUuid || getUUID(),
                 getRoleUUID(),
             ]);
-            cmpUuid = c; envUuid = e; 
-            
+            cmpUuid = c; envUuid = e;
+
             // Use role UUID if available (Super Admin UUID), otherwise use user UUID
             if (r) {
                 superAdminUuid = r;
@@ -2578,7 +2584,7 @@ export async function getAdminDashboard({ cmpUuid, envUuid, superAdminUuid } = {
                 superAdminUuid = u;
             }
         }
-        
+
         if (!cmpUuid) throw new Error('cmpUuid is required');
         if (!envUuid) throw new Error('envUuid is required');
         if (!superAdminUuid) throw new Error('superAdminUuid is required');
@@ -2588,7 +2594,7 @@ export async function getAdminDashboard({ cmpUuid, envUuid, superAdminUuid } = {
             envUuid,
             superAdminUuid
         };
-        
+
         console.log('🚀 [getAdminDashboard] Request params:', params);
         console.log('🔍 [getAdminDashboard] Using Super Admin UUID:', superAdminUuid);
         const resp = await api.get(PATHS.adminDashboard, { params });
@@ -2613,8 +2619,8 @@ export async function getTotalHoursReported({ cmpUuid, envUuid, superAdminUuid }
                 superAdminUuid || getUUID(),
                 getRoleUUID(),
             ]);
-            cmpUuid = c; envUuid = e; 
-            
+            cmpUuid = c; envUuid = e;
+
             // Use role UUID if available (Super Admin UUID), otherwise use user UUID
             if (r) {
                 superAdminUuid = r;
@@ -2622,7 +2628,7 @@ export async function getTotalHoursReported({ cmpUuid, envUuid, superAdminUuid }
                 superAdminUuid = u;
             }
         }
-        
+
         if (!cmpUuid) throw new Error('cmpUuid is required');
         if (!envUuid) throw new Error('envUuid is required');
         if (!superAdminUuid) throw new Error('superAdminUuid is required');
@@ -2632,7 +2638,7 @@ export async function getTotalHoursReported({ cmpUuid, envUuid, superAdminUuid }
             envUuid,
             superAdminUuid
         };
-        
+
         console.log('🚀 [getTotalHoursReported] Request params:', params);
         console.log('🔍 [getTotalHoursReported] Using Super Admin UUID:', superAdminUuid);
         const resp = await api.get(PATHS.totalHoursReported, { params });
@@ -2657,8 +2663,8 @@ export async function getTotalEmployeeWorking({ cmpUuid, envUuid, superAdminUuid
                 superAdminUuid || getUUID(),
                 getRoleUUID(),
             ]);
-            cmpUuid = c; envUuid = e; 
-            
+            cmpUuid = c; envUuid = e;
+
             // Use role UUID if available (Super Admin UUID), otherwise use user UUID
             if (r) {
                 superAdminUuid = r;
@@ -2666,7 +2672,7 @@ export async function getTotalEmployeeWorking({ cmpUuid, envUuid, superAdminUuid
                 superAdminUuid = u;
             }
         }
-        
+
         if (!cmpUuid) throw new Error('cmpUuid is required');
         if (!envUuid) throw new Error('envUuid is required');
         if (!superAdminUuid) throw new Error('superAdminUuid is required');
@@ -2676,7 +2682,7 @@ export async function getTotalEmployeeWorking({ cmpUuid, envUuid, superAdminUuid
             envUuid,
             superAdminUuid
         };
-        
+
         console.log('🚀 [getTotalEmployeeWorking] Request params:', params);
         console.log('🔍 [getTotalEmployeeWorking] Using Super Admin UUID:', superAdminUuid);
         const resp = await api.get(PATHS.totalEmployeeWorking, { params });

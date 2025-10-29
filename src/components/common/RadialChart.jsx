@@ -140,7 +140,7 @@ const RadialChart = ({
       ))}
       
       {/* Center text showing total */}
-      {showLabels && (
+      {/* {showLabels && (
         <>
           <Text
             x={center}
@@ -162,7 +162,7 @@ const RadialChart = ({
             Total
           </Text>
         </>
-      )}
+      )} */}
     </Svg>
   );
 };

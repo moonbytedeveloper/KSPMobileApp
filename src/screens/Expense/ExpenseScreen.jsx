@@ -38,7 +38,7 @@ const ExpenseScreen = ({ navigation }) => {
   const [projects, setProjects] = useState([]);
   const [currentPage, setCurrentPage] = useState(0); // zero-based page index
   const [searchValue, setSearchValue] = useState('');
-
+  const [filterVisible, setFilterVisible] = useState(false);
   const [tasks, setTasks] = useState([]);
   const [eligibilityVisible, setEligibilityVisible] = useState(false);
   const [eligibilityMessage, setEligibilityMessage] = useState('');
@@ -328,16 +328,18 @@ const ExpenseScreen = ({ navigation }) => {
     handlePageChange(0);
   }, [handlePageChange]);
 
-
-  // Full-screen loader while data is loading
-  if (loading) {
-    return <Loader />;
-  }
+  const handleFilter = () => {
+    setFilterVisible(prev => !prev); 
+  };
+  // // Full-screen loader while data is loading
+  // if (loading) {
+  //   return <Loader />;
+  // }
 
   return (
     <View style={styles.container}>
       <AppHeader
-        title="Expense" 
+        title="Expense Reimbursement" 
         // onLeftPress={() =>  setActiveIndex(0)}
         onLeftPress={() => {
           if (navigation.canGoBack()) {
@@ -354,39 +356,54 @@ const ExpenseScreen = ({ navigation }) => {
 
       <View style={styles.content}>
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Expense Reimbursement</Text>
           <TouchableOpacity activeOpacity={0.8} style={styles.addButton} onPress={handleAddExpensePress}>
             <Text style={styles.addButtonText}>Add Expense</Text>
           </TouchableOpacity>
+          <TouchableOpacity 
+          onPress={handleFilter}
+          activeOpacity={0.7}
+          style={{
+            marginLeft: wp(2),
+            borderWidth: 1,
+            borderColor: 'grey',
+            backgroundColor: 'grey',
+            borderRadius: wp(2),
+            padding: wp(2)
+          }}
+        >
+            <Icon name="filter-list" size={rf(5)} color="#fff" /> 
+          </TouchableOpacity>
         </View>
-        <View style={{ flexDirection: 'row', gap: wp(3) }}>
-        <View style={{ flex: 1 }}>
-        <Dropdown
-          placeholder="Project Name"
-          value={selectedProject?.name}
-          options={projects.length ? projects : sampleProjects}
-          getLabel={(p) => p.name}
-          getKey={(p) => p.id}
-          hint="Project Name"
-          onSelect={handleSelectProject}
-        />
-        </View>
-        <View style={{ flex: 1 }}>
+        {filterVisible && (
+        <View style={{ gap: wp(3) }}>
+          <View>
+            <Dropdown
+              placeholder="Project Name"
+              value={selectedProject?.name}
+              options={projects.length ? projects : sampleProjects}
+              getLabel={(p) => p.name}
+              getKey={(p) => p.id}
+              hint="Project Name"
+              onSelect={handleSelectProject} 
+            />
+          </View>
 
-        <Dropdown
-          placeholder="Project Task"
-          value={selectedTask}
-          options={availableTasks}
-          getLabel={(t) => t}
-          getKey={(t, i) => `${t}-${i}`}
-          hint="Project Task"
-          disabled={!selectedProject}
-          onSelect={handleSelectTask}
-        />
+          <View>
+            <Dropdown
+              placeholder="Project Task"
+              value={selectedTask}
+              options={availableTasks}
+              getLabel={(t) => t}
+              getKey={(t, i) => `${t}-${i}`}
+              hint="Project Task"
+              disabled={!selectedProject}
+              onSelect={handleSelectTask}
+            />
+          </View>
         </View>
-        </View>
+      )}
 
-        <View style={styles.searchRow}>
+        <View style={[styles.searchRow]}>
           <Text style={styles.showText}>Show</Text>
           <Dropdown
             placeholder={String(pageSize)}
@@ -534,7 +551,7 @@ const styles = StyleSheet.create({
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     marginBottom: hp(1.5),
   },
   sectionTitle: {
