@@ -238,7 +238,7 @@ const TimesheetsApprovalScreen = ({ navigation }) => {
           
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent,timesheetSummaries.length === 0 && { flex: 1 }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh.current} />}
         >
           {timesheetSummaries.length === 0 && (
@@ -458,6 +458,8 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1.2),
   },
   emptyBox: {
+    flex:1,
+    justifyContent:'center',
     alignItems: 'center',
     paddingVertical: hp(4),
   },

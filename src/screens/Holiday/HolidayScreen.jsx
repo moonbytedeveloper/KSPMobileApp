@@ -147,7 +147,7 @@ const HolidayScreen = ({ navigation }) => {
             <Text style={styles.emptyText}>{errorMessage}</Text>
           </View>
         )}
-        {hasMore && (
+        {(hasMore && !(holidays.length === 0)) && (
           <TouchableOpacity onPress={handleLoadMore} style={styles.loadMoreButton}>
             <Text style={styles.loadMoreText}>Load more</Text>
           </TouchableOpacity>

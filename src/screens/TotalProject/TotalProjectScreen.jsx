@@ -328,9 +328,10 @@ const styles = StyleSheet.create({
     paddingBottom: hp(4),
   },
   paginationContainer: {
+    marginBottom:hp(1),
     backgroundColor: '#ffffff',
-    borderTopWidth: 0.5,
-    borderBottomWidth: 0.5,
+    borderTopWidth: 1,
+    borderBottomWidth: 1.5,
     borderTopColor: '#e5e7eb',
     borderBottomColor: '#e5e7eb',
     paddingHorizontal: wp(4),

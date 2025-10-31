@@ -143,7 +143,7 @@ const ManageLeadProposal = ({ navigation, route }) => {
 
         if (!followUpTaker && (initialUuid || initialName)) {
           let found = null;
-          if (initialUuid) {
+          if (initialUuid) {  
             const targetUuid = String(initialUuid).trim().toLowerCase();
             found = list.find((e) => String(resolveEmployeeKey(e)).trim().toLowerCase() === targetUuid) || null;
           }
@@ -621,9 +621,9 @@ const ManageLeadProposal = ({ navigation, route }) => {
       setIsEditMode(false);
       setEditingProposal(null);
 
-      // Reset form completely
+      // Reset form completely (including follow up taker and pending name)
       setFollowUpTaker(null);
-      setPendingFollowUpTakerName(''); // Clear pending name
+      setPendingFollowUpTakerName('');
       setSubmittedDate('');
       setFollowUpDate('');
       setAmount('');
@@ -633,6 +633,10 @@ const ManageLeadProposal = ({ navigation, route }) => {
       setIsFinal(false);
       setProposalDoc(null);
       setErrors({});
+      // Also clear route params that might restore follow up taker from navigation
+      if (navigation && navigation.setParams) {
+          navigation.setParams({ initialFollowUpTakerUuid: null, initialFollowUpTakerName: '' });
+      }
     } catch (e) {
       const msg = (e?.response?.data?.Message) || (e?.response?.data?.message) || (e?.message) || 'Something went wrong';
       setApiError(String(msg));

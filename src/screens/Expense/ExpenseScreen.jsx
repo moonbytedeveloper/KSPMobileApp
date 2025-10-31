@@ -42,6 +42,9 @@ const ExpenseScreen = ({ navigation }) => {
   const [tasks, setTasks] = useState([]);
   const [eligibilityVisible, setEligibilityVisible] = useState(false);
   const [eligibilityMessage, setEligibilityMessage] = useState('');
+  // Status info bottom sheet
+  const [statusSheet, setStatusSheet] = useState({ visible: false, title: '', message: '' });
+
   const availableTasks = useMemo(() => {
     if (!selectedProject) return [];
     return tasks;
@@ -117,18 +120,27 @@ const ExpenseScreen = ({ navigation }) => {
   const handleEdit = async (item) => {
     try {
       setLoading(true);
-      // Block editing when approval is applied
+      // Only block editing when approval is applied
       const rd = item?.rawData || {};
       const isApprovalApply = rd?.IsApprovalApply === true || rd?.isApprovalApply === true || rd?.IsApprovalApplied === true || item?.IsApprovalApply === true || item?.isApprovalApply === true;
+      const statusStr = String(item?.status || rd?.Status || '').trim().toLowerCase();
       if (isApprovalApply) {
-        Alert.alert('Not allowed', 'This expense is under approval and cannot be edited.');
+        const isApproved = statusStr === 'approved';
+        const isSubmitted = statusStr === 'submitted';
+        setStatusSheet({
+          visible: true,
+          title: isApproved ? 'Already Approved' : 'Not allowed',
+          message: isApproved
+            ? 'This expense has been approved and cannot be edited.'
+            : 'This expense is under approval and cannot be edited.'
+        });
         return;
       }
-      // Navigate to AddExpenseScreen with the expense data for editing
+      // Always allow edit if approval is not applied
       navigation.navigate('AddExpense', { 
         editMode: true, 
         expenseData: item,
-        headerUuid: item.headerUuid // Use the header UUID to fetch expense lines
+        headerUuid: item.headerUuid
       });
     } catch (error) {
       console.error('Error navigating to edit expense:', error);
@@ -529,6 +541,15 @@ const ExpenseScreen = ({ navigation }) => {
           cancelText={''}
           onConfirm={() => setEligibilityVisible(false)}
           onCancel={() => setEligibilityVisible(false)}
+        />
+        <BottomSheetConfirm
+          visible={statusSheet.visible}
+          title={statusSheet.title || 'Information'}
+          message={statusSheet.message || ''}
+          confirmText={'OK'}
+          cancelText={''}
+          onConfirm={() => setStatusSheet({ visible: false, title: '', message: '' })}
+          onCancel={() => setStatusSheet({ visible: false, title: '', message: '' })}
         />
       </View>
 

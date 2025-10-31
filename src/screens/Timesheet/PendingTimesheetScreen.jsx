@@ -36,7 +36,7 @@ const StatusBadge = ({ label = 'Pending' }) => {
   return (
     <View
       style={[
-        badge= {
+        badge = {
           borderWidth: 1,
           paddingVertical: hp(0.2),
           paddingHorizontal: SPACING.sm,
@@ -44,11 +44,11 @@ const StatusBadge = ({ label = 'Pending' }) => {
           borderColor: theme.border,
           backgroundColor: theme.bg,
         },
-        badgeText= {
+        badgeText = {
           fontSize: 10.5,
           fontWeight: '600',
-          padding: 1 
-        }, 
+          padding: 1
+        },
       ]}
     >
       <Text style={[styles.badgeText, { color: theme.color, fontWeight: '600' }]}>{label}</Text>
@@ -135,7 +135,7 @@ const PendingTimesheetScreen = ({ navigation }) => {
     };
   }, []);
 
-  const onRefresh = React.useRef(() => {});
+  const onRefresh = React.useRef(() => { });
 
   // Recompute current page slice whenever inputs change
   useEffect(() => {
@@ -182,7 +182,7 @@ const PendingTimesheetScreen = ({ navigation }) => {
 
   const handleView = (item) => {
     navigation.navigate('Main', { screen: 'Timesheet' });
-  };  
+  };
 
   const handleSubmitTimesheet = (item) => {
     console.log('Submit Timesheet for:', item);
@@ -192,16 +192,16 @@ const PendingTimesheetScreen = ({ navigation }) => {
     alert(`Submit timesheet for ${item.FullName} - Week: ${item.WeekStart} to ${item.WeekEnd}`);
   };
   if (loading && !refreshing) {
-    return( 
+    return (
       <View style={styles.containers}>
-      <AppHeader
-        title="Total Project"
-        onLeftPress={() => navigation.goBack()}
-        onRightPress={() => navigation.navigate('Notification')}
-      />
-      <Loader />
-    </View> 
-  );
+        <AppHeader
+          title="Total Project"
+          onLeftPress={() => navigation.goBack()}
+          onRightPress={() => navigation.navigate('Notification')}
+        />
+        <Loader />
+      </View>
+    );
   }
 
   return (
@@ -228,41 +228,41 @@ const PendingTimesheetScreen = ({ navigation }) => {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}
+      <ScrollView contentContainerStyle={[styles.scrollContent, data.length === 0 && { flex: 1 }]} showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh.current} />}
       >
-       
-          {data.length === 0 && (
+
+        {data.length === 0 && (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>{errorText || 'No overdue timesheets.'}</Text>
           </View>
         )}
         {pagedData.map((item) => (
-       <AccordionItem
-       key={item.uniqueKey || item.soleExpenseCode}
-       item={item}
-       isActive={activeCode === item.uniqueKey}
-       onToggle={() => handleToggle(item.uniqueKey)}
-       showViewButton={false}
-       showSubmitButton={item.Status === 'Pending' || item.Status === 'Draft'}
-       onSubmit={handleSubmitTimesheet}
-       navigation={navigation}
-       headerLeftLabel="WeeKRange"
-       headerRightLabel="Status"
-       customRows={[
-         { label: 'FullName', value: item.FullName },
-         { label: 'WeekStart', value: item.WeekStart },
-         { label: 'WeekEnd', value: item.WeekEnd },
-         {
-           label: 'Status',
-           value: <StatusBadge label={item.Status} />, // 👈 use your component here
-         },
-       ]}
-     />
-     
+          <AccordionItem
+            key={item.uniqueKey || item.soleExpenseCode}
+            item={item}
+            isActive={activeCode === item.uniqueKey}
+            onToggle={() => handleToggle(item.uniqueKey)}
+            showViewButton={false}
+            showSubmitButton={item.Status === 'Pending' || item.Status === 'Draft'}
+            onSubmit={handleSubmitTimesheet}
+            navigation={navigation}
+            headerLeftLabel="WeeKRange"
+            headerRightLabel="Status"
+            customRows={[
+              { label: 'FullName', value: item.FullName },
+              { label: 'WeekStart', value: item.WeekStart },
+              { label: 'WeekEnd', value: item.WeekEnd },
+              {
+                label: 'Status',
+                value: <StatusBadge label={item.Status} />, // 👈 use your component here
+              },
+            ]}
+          />
+
         ))}
 
-     
+
       </ScrollView>
 
       {/* Pagination controls footer */}
@@ -331,7 +331,7 @@ export default PendingTimesheetScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff', 
+    backgroundColor: '#ffffff',
   },
   containers: {
     flex: 1,
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingVertical:wp(3),
+    paddingVertical: wp(3),
     paddingHorizontal: wp(4),
     paddingBottom: hp(4),
     zIndex: 0,
@@ -436,10 +436,9 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flex: 1,
-    paddingHorizontal: wp(4),
-    paddingVertical: hp(8),
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: wp(4),
   },
   emptyText: {
     fontSize: rf(4),

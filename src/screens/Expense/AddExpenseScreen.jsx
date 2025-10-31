@@ -152,6 +152,10 @@ const AddExpenseScreen = ({ navigation, route }) => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
 
+  // Line add success bottom sheet
+  const [lineAddSheetVisible, setLineAddSheetVisible] = useState(false);
+  const [lineAddMessage, setLineAddMessage] = useState('');
+
   const availableTasks = useMemo(() => {
     if (!selectedProject) return [];
     return tasks;
@@ -1100,7 +1104,8 @@ const AddExpenseScreen = ({ navigation, route }) => {
       setAdding(true);
       const apiResp = await addExpenseLine(linePayload);
       await loadHeaderLines();
-      Alert.alert('Success', 'Expense line added successfully.');
+      setLineAddMessage('Expense line added successfully.');
+      setLineAddSheetVisible(true);
       // Reset form for next line entry
       resetLineForm();
     } catch (e) {
@@ -1603,6 +1608,17 @@ const AddExpenseScreen = ({ navigation, route }) => {
         cancelText={'Cancel'}
         onConfirm={confirmDeleteLine}
         onCancel={cancelDelete}
+      />
+
+      {/* Line add success sheet */}
+      <BottomSheetConfirm
+        visible={lineAddSheetVisible}
+        title={'Success'}
+        message={lineAddMessage || 'Expense line added successfully.'}
+        confirmText={'OK'}
+        cancelText={''}
+        onConfirm={() => setLineAddSheetVisible(false)}
+        onCancel={() => setLineAddSheetVisible(false)}
       />
 
       <DatePickerBottomSheet
