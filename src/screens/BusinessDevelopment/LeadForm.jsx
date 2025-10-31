@@ -10,7 +10,7 @@ import * as Yup from 'yup';
 import { saveManageLeadOpportunity, updateManageLeadOpportunity, getCountries, getStates, getCities, getEmployees } from '../../api/authServices';
 import { getUUID, getCMPUUID, getENVUUID } from '../../api/tokenStorage';
 
-const Input = ({ label, required, multiline, value, onChangeText, rightAccessory, style, inputBoxStyle,keyboardType = 'default', }) => {
+const Input = ({ label, required, multiline, value, onChangeText, rightAccessory, style, inputBoxStyle, keyboardType = 'default', }) => {
   return (
     <View style={[inputStyles.container, style]}>
       <View style={[inputStyles.box, styles.innerFieldBox, inputBoxStyle]}>
@@ -61,7 +61,7 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
     initialLeadOpportunityActionDueDate,
     isEditMode = false, // Parameter to determine if we're editing existing lead
   } = route.params || {}; // 👈 important
- 
+
 
   const [form, setForm] = useState({
     companyName: initialLeadCompanyName || '',
@@ -78,7 +78,7 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
     state: state || '',
     city: city || '',
   });
-  
+
 
   const update = (key) => (val) => setForm((f) => ({ ...f, [key]: val }));
 
@@ -126,7 +126,7 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
     const year = d.getFullYear();
     const month = d.getMonth();
     const day = d.getDate();
-    
+
     // Create date in local timezone to avoid timezone conversion issues
     const localDate = new Date(year, month, day, 12, 0, 0, 0); // Set to noon to avoid DST issues
     return localDate.toISOString();
@@ -223,7 +223,7 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
   };
   // Prefill dropdowns (Country, State, City) - using names only
   React.useEffect(() => {
-    
+
     if (country) {
       setSelectedCountry({
         CountryName: country,
@@ -247,8 +247,8 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
   // Prefill Opportunity Owner when in edit mode
   React.useEffect(() => {
     if (initialLeadOwner && employees.length > 0) {
-      const foundOwner = employees.find(emp => 
-        emp?.EmployeeName === initialLeadOwner || 
+      const foundOwner = employees.find(emp =>
+        emp?.EmployeeName === initialLeadOwner ||
         emp?.Name === initialLeadOwner ||
         emp?.DisplayName === initialLeadOwner ||
         emp?.FullName === initialLeadOwner
@@ -269,13 +269,13 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
   // Match pre-filled country with loaded countries list
   React.useEffect(() => {
     if (countries.length > 0 && country && selectedCountry?.CountryName === country && !selectedCountry?.Uuid) {
-      const foundCountry = countries.find(c => 
-        c.CountryName === country || 
+      const foundCountry = countries.find(c =>
+        c.CountryName === country ||
         c.CountryName?.toLowerCase() === country?.toLowerCase()
       );
       if (foundCountry) {
         setSelectedCountry(foundCountry);
-        
+
         // If we have state data, load states for this country
         if (state && foundCountry.Uuid) {
           loadStates(foundCountry.Uuid);
@@ -287,13 +287,13 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
   // Match pre-filled state with loaded states list
   React.useEffect(() => {
     if (states.length > 0 && state && selectedState?.StateName === state && !selectedState?.Uuid) {
-      const foundState = states.find(s => 
-        s.StateName === state || 
+      const foundState = states.find(s =>
+        s.StateName === state ||
         s.StateName?.toLowerCase() === state?.toLowerCase()
       );
       if (foundState) {
         setSelectedState(foundState);
-        
+
         // If we have city data, load cities for this state
         if (city && foundState.Uuid) {
           loadCities(foundState.Uuid);
@@ -305,8 +305,8 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
   // Match pre-filled city with loaded cities list
   React.useEffect(() => {
     if (cities.length > 0 && city && selectedCity?.CityName === city && !selectedCity?.Uuid) {
-      const foundCity = cities.find(c => 
-        c.CityName === city || 
+      const foundCity = cities.find(c =>
+        c.CityName === city ||
         c.CityName?.toLowerCase() === city?.toLowerCase()
       );
       if (foundCity) {
@@ -417,7 +417,7 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
           } else {
             resp = await saveManageLeadOpportunity(payload, { userUuid, cmpUuid, envUuid });
           }
-          
+
           // Call onSubmit with success flag to trigger page refresh
           onSubmit && onSubmit(values, resp, true); // true indicates success
         } catch (e) {
@@ -521,7 +521,11 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
                       )}
                     </View>
                     <View style={styles.col}>
-                      <Input keyboardType="phone-pad" label="Phone Number" style={formStyles.input} value={values.phone} onChangeText={(v) => setFieldValue('phone', v)} />
+                      <Input keyboardType="phone-pad" maxLength={10} label="Phone Number" style={formStyles.input} value={values.phone} onChangeText={(v) => {
+                        const numeric = v.replace(/\D/g, ''); // only digits
+                        if (numeric.length <= 10){ setFieldValue('phone', numeric);}
+                      
+                      }} />
                       {touched.phone && errors.phone && (
                         <Text style={styles.fieldError}>{errors.phone}</Text>
                       )}
@@ -567,7 +571,7 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
                 <View style={styles.sectionBody}>
                   <View style={styles.row}>
                     <View style={styles.col}>
-                      <Input label="Opportunity Brief" required style={formStyles.input} inputBoxStyle={(touched.brief && errors.brief) ? styles.inputError : null}  value={values.brief} onChangeText={(v) => { setStatus && setStatus(undefined); setFieldValue('brief', v); }} />
+                      <Input label="Opportunity Brief" required style={formStyles.input} inputBoxStyle={(touched.brief && errors.brief) ? styles.inputError : null} value={values.brief} onChangeText={(v) => { setStatus && setStatus(undefined); setFieldValue('brief', v); }} />
                       {touched.brief && errors.brief && (
                         <Text style={styles.fieldError}>{errors.brief}</Text>
                       )}
@@ -586,7 +590,7 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
                         onPress={openDatePicker}
                         style={[styles.datePickerContainer, { marginTop: hp(1) }]}
                       >
-                        <View style={[inputStyles.box,{marginBottom: hp(1.6)}, styles.innerFieldBox, styles.datePickerBox, (touched.actionDueDate && errors.actionDueDate) ? styles.inputError : null, { alignItems: 'center' }]}>
+                        <View style={[inputStyles.box, { marginBottom: hp(1.6) }, styles.innerFieldBox, styles.datePickerBox, (touched.actionDueDate && errors.actionDueDate) ? styles.inputError : null, { alignItems: 'center' }]}>
                           <Text style={[
                             inputStyles.input,
                             styles.datePickerText,

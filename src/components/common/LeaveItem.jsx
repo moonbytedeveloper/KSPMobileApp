@@ -50,8 +50,7 @@ const StatusIcon = ({ status }) => {
   const statusBgColor = getStatusBgColor(status);
 
   return (
-    <View style={[styles.statusIcon, { backgroundColor: statusBgColor }]}>
-      <Icon name={getStatusIcon(status)} size={rf(4)} color={statusColor} />
+    <View style={[styles.statusIcon, { backgroundColor: statusColor }]}>
     </View>
   );
 };
@@ -64,8 +63,8 @@ const StatusBadge = ({ label  }) => {
   const theme = palette[label] || palette.Pending;
 
   return (
-    <View style={[styles.badge, { backgroundColor: theme.bg, borderColor: theme.border }]}> 
-      <Text style={[styles.badgeText, { color: theme.color }]}>{label}</Text>
+    <View > 
+      <Text style={[styles.badgeText, ]}>{label}</Text>
     </View>
   );
 };
@@ -86,17 +85,14 @@ const LeaveItem = ({ item, isActive, onToggle, onView, onEdit, onDelete, showVie
       <TouchableOpacity onPress={onToggle} style={styles.leaveHeader} activeOpacity={0.8}>
         <View style={styles.headerSummaryContainer}>
           <StatusIcon status={item.status} />
-          <View>
-            <Text style={styles.summaryLabel}>S.No</Text>
-            <Text style={styles.summaryValue}>{item.srNo}</Text>
-          </View>
-        </View>
-        <View style={styles.rightSideContainer}>
           <View style={{ alignItems: 'flex-end' }}>
-            <Text style={styles.summaryLabel}>APPLY DATE</Text>
+            <Text style={styles.summaryLabel}>Apply Date</Text>
             <Text style={styles.summaryValue}>{item.applyDate}</Text>
           </View>
+        </View>
+        <View style={styles.rightSideContainer}> 
           <View style={styles.statusContainer}>
+          <Text style={styles.summaryLabel}>Status</Text>
           <StatusBadge  label={item.status} />
           </View>
         </View>
@@ -166,8 +162,8 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
   },
   badgeText: {
-    fontSize: 10.5,
-    fontWeight: '600',
+    fontSize: wp(3.5),
+    fontWeight: '400',
     padding: 1 
   }, 
   leaveItem: {
@@ -198,8 +194,8 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   statusIcon: {
-    width: wp(6),
-    height: wp(6),
+    width: wp(3.8),
+    height: wp(3.8),
     borderRadius: wp(3),
     alignItems: 'center',
     justifyContent: 'center',
@@ -207,7 +203,7 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: rf(3),
-    fontWeight: '500',
+    fontWeight: '800',
     color: COLORS.textLight,
     fontFamily: TYPOGRAPHY.fontFamilyMedium,
   },

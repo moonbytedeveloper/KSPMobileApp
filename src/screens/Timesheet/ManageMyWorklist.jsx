@@ -31,7 +31,11 @@ const TimesheetCard = ({ timesheet, onActionPress, getStatusColor, getStatusBgCo
       <TouchableOpacity activeOpacity={0.8} onPress={toggle}>
         <View style={styles.tsRowHeader}>
           <View style={styles.tsHeaderLeft}>
-            <View style={[styles.tsDot, { backgroundColor: statusColor }]} />
+            <View style={[styles.tsDot, { backgroundColor: timesheet.status === 'Approved'
+          ? COLORS.success
+          : timesheet.status === 'Pending'
+          ? COLORS.warning 
+          :timesheet.status === 'Submitted'?  COLORS.info :  COLORS.danger, }]} />
             <View style={styles.tsHeaderLeftContent}>
               <Text style={[text.caption, styles.tsCaption]}>TIMESHEET</Text>
               <Text style={[text.title, styles.tsTitle]} numberOfLines={1}>{timesheet.employeeName || `Timesheet #${timesheet.srNo}`}</Text>
@@ -278,7 +282,7 @@ const ManageMyWorklist = ({ navigation }) => {
       case 'approved':
         return COLORS.success;
       case 'submitted':
-        return COLORS.success;
+        return COLORS.info;
       case 'pending':
         return COLORS.warning;
       case 'rejected':
@@ -605,7 +609,7 @@ const ManageMyWorklist = ({ navigation }) => {
             {activeTab === 'approved' && <View style={styles.tabUnderline} />}
           </TouchableOpacity>
         </View>
-
+  
         {/* Filter and Search Section */}
         <View style={styles.filterSection}>
           <View style={styles.row}> 

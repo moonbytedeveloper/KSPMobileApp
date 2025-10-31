@@ -633,7 +633,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: wp(2),
     borderBottomRightRadius: wp(4),
     paddingVertical: hp(2.5),
-    paddingHorizontal: wp(3),
+    paddingHorizontal: wp(3.6),
     paddingTop: 20,
     marginBottom: hp(1),
     // Full-bleed to drawer edges

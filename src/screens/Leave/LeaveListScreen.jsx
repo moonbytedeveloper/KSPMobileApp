@@ -216,11 +216,11 @@ if(isLoading) {
                   alignItems: 'center',
                   flexDirection: 'row',
                   justifyContent: 'space-between',
-                }}
-              >
-                <View style={{ alignItems: 'flex-end', marginRight: wp(2) }}>
+                }}>
+
+                <View style={{  alignItems: 'flex-end', marginRight: wp(2) }}>
                   <Text style={styles.label}>Status</Text>
-                  <StatusBadge label={l.status} />
+                  <Text style={{fontSize:wp(3.5), color:'#000'}}>{l.status}</Text>
                 </View>
 
                 <Icon
@@ -357,9 +357,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: hp(2),
-    backgroundColor: COLORS.bg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    // backgroundColor: COLORS.bg,
+    // borderBottomWidth: 1,
+    // borderBottomColor: COLORS.border,
   },
   leftCol: {
     flexDirection: 'row',
@@ -375,9 +375,8 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: rf(3),
-    fontWeight: '500',
-    color: COLORS.textLight,
-    textTransform: 'uppercase',
+    fontWeight: '700',
+    color: COLORS.textLight, 
     fontFamily: TYPOGRAPHY.fontFamilyMedium,
   },
   value: {
@@ -400,7 +399,7 @@ const styles = StyleSheet.create({
   },
   expandedContent: {
     padding: hp(2),
-    backgroundColor: '#f8f9fa',
+    // backgroundColor: '#f8f9fa',
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
   },

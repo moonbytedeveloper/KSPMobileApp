@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect, useRef  } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, PermissionsAndroid, Platform } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { COLORS, formStyles, buttonStyles, TYPOGRAPHY, inputStyles, SPACING } from '../styles/styles';
@@ -109,6 +109,7 @@ const ManageLeadProposal = ({ navigation, route }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [apiError, setApiError] = useState('');
+  const [errorSheetVisible, setErrorSheetVisible] = useState(false);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
   const [proposalToDelete, setProposalToDelete] = useState(null);
   const scrollViewRef = useRef(null);
@@ -143,7 +144,7 @@ const ManageLeadProposal = ({ navigation, route }) => {
 
         if (!followUpTaker && (initialUuid || initialName)) {
           let found = null;
-          if (initialUuid) {  
+          if (initialUuid) {
             const targetUuid = String(initialUuid).trim().toLowerCase();
             found = list.find((e) => String(resolveEmployeeKey(e)).trim().toLowerCase() === targetUuid) || null;
           }
@@ -387,12 +388,12 @@ const ManageLeadProposal = ({ navigation, route }) => {
 
   const handleDeleteConfirmAction = async () => {
     if (!proposalToDelete) return;
-    
+
     try {
       const [userUuid, cmpUuid, envUuid] = await Promise.all([getUUID(), getCMPUUID(), getENVUUID()]);
-      await deleteLeadProposal({ 
-        leadOppUuid: proposalToDelete.id, 
-        overrides: { userUuid, cmpUuid, envUuid } 
+      await deleteLeadProposal({
+        leadOppUuid: proposalToDelete.id,
+        overrides: { userUuid, cmpUuid, envUuid }
       });
       await fetchProposals();
     } catch (e) {
@@ -415,6 +416,26 @@ const ManageLeadProposal = ({ navigation, route }) => {
     if (!proposalDoc?.name) next.proposalDoc = 'Proposal document is required';
     setErrors(next);
     return Object.keys(next).length === 0;
+  };
+
+  const getReadableError = (e, fallback = 'Something went wrong') => {
+    try {
+      const res = e?.response;
+      const data = res?.data ?? {};
+      const candidates = [
+        data?.Message,
+        data?.message,
+        Array.isArray(data?.errors) ? data.errors.map(err => err?.message || err).filter(Boolean).join(', ') : null,
+      ].filter(Boolean);
+      if (candidates.length) return String(candidates[0]);
+      if (res?.status === 409) return 'Final Proposal already submitted';
+      if (typeof e?.message === 'string') {
+        const m = e.message;
+        if (/request failed with status code/i.test(m)) return `HTTP ${res?.status || ''} Error`;
+        return m;
+      }
+    } catch (_) {}
+    return fallback;
   };
 
   const addProposal = async () => {
@@ -450,30 +471,32 @@ const ManageLeadProposal = ({ navigation, route }) => {
 
       const [userUuid, cmpUuid, envUuid] = await Promise.all([getUUID(), getCMPUUID(), getENVUUID()]);
       const leadUuid = route?.params?.leadUuid || next.id;
-      await addLeadProposal({ leadOppUuid: leadUuid, payload, overrides: { userUuid, cmpUuid, envUuid } });
+      const resp = await addLeadProposal({ leadOppUuid: leadUuid, payload, overrides: { userUuid, cmpUuid, envUuid } });
       // Refresh proposals list from API
+      console.log(resp, 'resp409')
+      setApiError('');
       await fetchProposals();
       setErrors({});
+      // Success-only cleanup: clear form fields
+      setProposalDoc(null);
+      setFollowUpTaker(null);
+      setPendingFollowUpTakerName('');
+      setSubmittedDate('');
+      setFollowUpDate('');
+      setAmount('');
+      setCustomerName('');
+      setTitle('');
+      setProposalNumber('');
+      setIsFinal(false);
     } catch (e) {
-      const msg = (e?.response?.data?.Message) || (e?.response?.data?.message) || (e?.message) || 'Something went wrong';
-      setApiError(String(msg));
+      const msg = getReadableError(e, 'Something went wrong');
+      console.log(msg, 'error409')
+      setApiError(msg);
+      setErrorSheetVisible(true);
     } finally {
       setIsAdding(false);
     }
-    await fetchProposals();
-    setIsAdding(false);
-    setErrors({});
-    // Clear all form fields including employee selection
-    setProposalDoc(null);
-    setFollowUpTaker(null);
-    setPendingFollowUpTakerName(''); // Clear pending name
-    setSubmittedDate('');
-    setFollowUpDate('');
-    setAmount('');
-    setCustomerName('');
-    setTitle('');
-    setProposalNumber('');
-    setIsFinal(false);
+    // No unconditional cleanup here; handled above on success
   };
 
   const pickProposalDocument = async () => {
@@ -567,7 +590,7 @@ const ManageLeadProposal = ({ navigation, route }) => {
 
     // Clear any existing errors
     setErrors({});
-    
+
     // Scroll to top when editing
     setTimeout(() => {
       if (scrollViewRef.current) {
@@ -635,7 +658,7 @@ const ManageLeadProposal = ({ navigation, route }) => {
       setErrors({});
       // Also clear route params that might restore follow up taker from navigation
       if (navigation && navigation.setParams) {
-          navigation.setParams({ initialFollowUpTakerUuid: null, initialFollowUpTakerName: '' });
+        navigation.setParams({ initialFollowUpTakerUuid: null, initialFollowUpTakerName: '' });
       }
     } catch (e) {
       const msg = (e?.response?.data?.Message) || (e?.response?.data?.message) || (e?.message) || 'Something went wrong';
@@ -673,218 +696,222 @@ const ManageLeadProposal = ({ navigation, route }) => {
       <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false}>
         <View style={formStyles.container}>
           <View style={{ ...styles.field, }} >
-          <Dropdown
-            placeholder="Follow Up Taker*"
-            value={followUpTaker ? resolveEmployeeName(followUpTaker) : (pendingFollowUpTakerName || '')}
-            options={employees}
-            getLabel={resolveEmployeeName}
-            getKey={resolveEmployeeKey}
-            hint="Follow Up Taker*"
-            onSelect={(v) => {
-              setFollowUpTaker(v);
-              setPendingFollowUpTakerName(''); // Clear pending name when manually selected
-              if (errors.followUpTaker) setErrors((e) => ({ ...e, followUpTaker: null }));
-            }}
-            inputBoxStyle={[inputStyles.box, errors.followUpTaker && styles.errorBorder]}
-            textStyle={{ fontSize: rf(4.2), marginLeft: 0, paddingLeft: 0 }}
-            loading={loadingEmployees}
-          />
-          {errors.followUpTaker ? <Text style={styles.errorText}>{errors.followUpTaker}</Text> : null}
-        </View>
-
-        {/* Submitted Date */}
-        <View style={{ ...styles.field, marginTop: 15 }} >
-          <TouchableOpacity activeOpacity={0.85} style={[inputStyles.box, { marginTop: 0 }, errors.submittedDate && styles.errorBorder]} onPress={() => setOpenSubmitted(true)}>
-            <Text style={[inputStyles.input, { fontSize: rf(4.2), marginLeft: SPACING.sm }, !submittedDate && { color: '#9ca3af', fontFamily: TYPOGRAPHY.fontFamilyRegular }]}>{submittedDate || 'Submitted Date*'}</Text>
-            <Icon name="calendar-today" size={rf(3.2)} color="#9ca3af" />
-          </TouchableOpacity>
-          {errors.submittedDate ? <Text style={styles.errorText}>{errors.submittedDate}</Text> : null}
-        </View>
-
-        {/* Amount */}
-        <View style={[inputStyles.box, styles.field, errors.amount && styles.errorBorder]}>
-          <TextInput
-            style={[inputStyles.input, { fontSize: rf(4.2) }]}
-            placeholder="Amount*"
-            placeholderTextColor="#9ca3af"
-            value={amount}
-            keyboardType="numeric"
-            onChangeText={(t) => { setAmount(t); if (errors.amount) setErrors((e) => ({ ...e, amount: null })); }}
-          />
-        </View>
-        {errors.amount ? <Text style={styles.errorText}>{errors.amount}</Text> : null}
-
-        {/* Follow Up Date */}
-        <View style={styles.field}>
-          <TouchableOpacity activeOpacity={0.85} style={[inputStyles.box, { marginTop: 0 }, errors.followUpDate && styles.errorBorder]} onPress={() => setOpenFollow(true)}>
-            <Text style={[inputStyles.input, { fontSize: rf(4.2), marginLeft: SPACING.sm }, !followUpDate && { color: '#9ca3af', fontFamily: TYPOGRAPHY.fontFamilyRegular }]}>{followUpDate || 'Follow Up Date*'}</Text>
-            <Icon name="calendar-today" size={rf(3.2)} color="#9ca3af" />
-          </TouchableOpacity>
-          {errors.followUpDate ? <Text style={styles.errorText}>{errors.followUpDate}</Text> : null}
-        </View>
-
-        {/* Customer Name */}
-        <View style={[inputStyles.box, styles.field, errors.customerName && styles.errorBorder]}>
-          <TextInput
-            style={[inputStyles.input, { fontSize: rf(4.2) }]}
-            placeholder="Customer Name*"
-            placeholderTextColor="#9ca3af"
-            value={customerName}
-            onChangeText={(t) => { setCustomerName(t); if (errors.customerName) setErrors((e) => ({ ...e, customerName: null })); }}
-          />
-        </View>
-        {errors.customerName ? <Text style={styles.errorText}>{errors.customerName}</Text> : null}
-
-        {/* Title */}
-        <View style={[inputStyles.box, styles.field, errors.title && styles.errorBorder]}>
-          <TextInput
-            style={[inputStyles.input, { fontSize: rf(4.2) }]}
-            placeholder="Title*"
-            placeholderTextColor="#9ca3af"
-            value={title}
-            onChangeText={(t) => { setTitle(t); if (errors.title) setErrors((e) => ({ ...e, title: null })); }}
-          />
-        </View>
-        {errors.title ? <Text style={styles.errorText}>{errors.title}</Text> : null}
-
-        {/* Proposal Number */}
-        <View style={[inputStyles.box, styles.field, errors.proposalNumber && styles.errorBorder]}>
-          <TextInput
-            style={[inputStyles.input, { fontSize: rf(4.2) }]}
-            placeholder="Proposal Number*"
-            placeholderTextColor="#9ca3af"
-            value={proposalNumber}
-            onChangeText={(t) => { setProposalNumber(t); if (errors.proposalNumber) setErrors((e) => ({ ...e, proposalNumber: null })); }}
-          />
-        </View>
-        {errors.proposalNumber ? <Text style={styles.errorText}>{errors.proposalNumber}</Text> : null}
-
-        {/* Proposal Document Upload */}
-        <View style={[inputStyles.box, styles.field, errors.proposalDoc && styles.errorBorder]}>
-          <TextInput
-            style={[inputStyles.input, { fontSize: rf(4.2) }]}
-            placeholder="Proposal Document*"
-            placeholderTextColor="#9ca3af"
-            value={proposalDoc?.name || ''}
-            editable={false}
-          />
-          {proposalDoc ? (
-            <TouchableOpacity activeOpacity={0.85} onPress={clearProposalDocument}>
-              <Icon name="close" size={rf(3.6)} color="#ef4444" style={{ marginRight: SPACING.sm }} />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity activeOpacity={0.8} style={[styles.uploadButton, { marginRight: SPACING.sm }]} onPress={pickProposalDocument}>
-              <Icon name="cloud-upload" size={rf(4)} color="#fff" />
-            </TouchableOpacity>
-          )}
-        </View>
-        {errors.proposalDoc ? <Text style={styles.errorText}>{errors.proposalDoc}</Text> : null}
-        <Text style={styles.uploadHint}>Allowed: PDF, PNG, JPG • Max size 10 MB</Text>
-
-        {/* Final Proposal Checkbox */}
-        <View style={styles.containerChechbox}>
-          <View style={styles.checkboxRow}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[styles.checkbox, isFinal && { backgroundColor: COLORS.primary, borderColor: COLORS.primary }]}
-              onPress={() => setIsFinal((s) => !s)}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: isFinal }}
-            >
-              {isFinal ? <Icon name="check" size={rf(4.5)} color="#fff" /> : null}
-            </TouchableOpacity>
-
-            <Text style={styles.checkboxLabel}>Is this Final proposal</Text>
+            <Dropdown
+              placeholder="Follow Up Taker*"
+              value={followUpTaker ? resolveEmployeeName(followUpTaker) : (pendingFollowUpTakerName || '')}
+              options={employees}
+              getLabel={resolveEmployeeName}
+              getKey={resolveEmployeeKey}
+              hint="Follow Up Taker*"
+              onSelect={(v) => {
+                setFollowUpTaker(v);
+                setPendingFollowUpTakerName(''); // Clear pending name when manually selected
+                if (errors.followUpTaker) setErrors((e) => ({ ...e, followUpTaker: null }));
+              }}
+              inputBoxStyle={[inputStyles.box, errors.followUpTaker && styles.errorBorder]}
+              textStyle={{ fontSize: rf(4.2), marginLeft: 0, paddingLeft: 0 }}
+              loading={loadingEmployees}
+            />
+            {errors.followUpTaker ? <Text style={styles.errorText}>{errors.followUpTaker}</Text> : null}
           </View>
 
-          {/* Add/Update Button */}
-          <View style={{ alignItems: 'flex-end' }}>
-            {isEditMode ? (
-              <TouchableOpacity activeOpacity={0.9} disabled={isUpdating} style={[formStyles.primaryBtn, styles.btn, isUpdating && { opacity: 0.6 }]} onPress={updateProposal}>
-                <Text style={formStyles.primaryBtnText}>{isUpdating ? 'Updating...' : 'Update'}</Text>
+          {/* Submitted Date */}
+          <View style={{ ...styles.field, marginTop: 15 }} >
+            <TouchableOpacity activeOpacity={0.85} style={[inputStyles.box, { marginTop: 0 }, errors.submittedDate && styles.errorBorder]} onPress={() => setOpenSubmitted(true)}>
+              <Text style={[inputStyles.input, { fontSize: rf(4.2), marginLeft: SPACING.sm }, !submittedDate && { color: '#9ca3af', fontFamily: TYPOGRAPHY.fontFamilyRegular }]}>{submittedDate || 'Submitted Date*'}</Text>
+              <Icon name="calendar-today" size={rf(3.2)} color="#9ca3af" />
+            </TouchableOpacity>
+            {errors.submittedDate ? <Text style={styles.errorText}>{errors.submittedDate}</Text> : null}
+          </View>
+
+          {/* Amount */}
+          <View style={[inputStyles.box, styles.field, errors.amount && styles.errorBorder]}>
+            <TextInput
+              style={[inputStyles.input, { fontSize: rf(4.2) }]}
+              placeholder="Amount*"
+              placeholderTextColor="#9ca3af"
+              value={amount}
+              keyboardType="numeric"
+              onChangeText={(t) => { setAmount(t); if (errors.amount) setErrors((e) => ({ ...e, amount: null })); }}
+            />
+          </View>
+          {errors.amount ? <Text style={styles.errorText}>{errors.amount}</Text> : null}
+
+          {/* Follow Up Date */}
+          <View style={styles.field}>
+            <TouchableOpacity activeOpacity={0.85} style={[inputStyles.box, { marginTop: 0 }, errors.followUpDate && styles.errorBorder]} onPress={() => setOpenFollow(true)}>
+              <Text style={[inputStyles.input, { fontSize: rf(4.2), marginLeft: SPACING.sm }, !followUpDate && { color: '#9ca3af', fontFamily: TYPOGRAPHY.fontFamilyRegular }]}>{followUpDate || 'Follow Up Date*'}</Text>
+              <Icon name="calendar-today" size={rf(3.2)} color="#9ca3af" />
+            </TouchableOpacity>
+            {errors.followUpDate ? <Text style={styles.errorText}>{errors.followUpDate}</Text> : null}
+          </View>
+
+          {/* Customer Name */}
+          <View style={[inputStyles.box, styles.field, errors.customerName && styles.errorBorder]}>
+            <TextInput
+              style={[inputStyles.input, { fontSize: rf(4.2) }]}
+              placeholder="Customer Name*"
+              placeholderTextColor="#9ca3af"
+              value={customerName}
+              onChangeText={(t) => { setCustomerName(t); if (errors.customerName) setErrors((e) => ({ ...e, customerName: null })); }}
+            />
+          </View>
+          {errors.customerName ? <Text style={styles.errorText}>{errors.customerName}</Text> : null}
+
+          {/* Title */}
+          <View style={[inputStyles.box, styles.field, errors.title && styles.errorBorder]}>
+            <TextInput
+              style={[inputStyles.input, { fontSize: rf(4.2) }]}
+              placeholder="Title*"
+              placeholderTextColor="#9ca3af"
+              value={title}
+              onChangeText={(t) => { setTitle(t); if (errors.title) setErrors((e) => ({ ...e, title: null })); }}
+            />
+          </View>
+          {errors.title ? <Text style={styles.errorText}>{errors.title}</Text> : null}
+
+          {/* Proposal Number */}
+          <View style={[inputStyles.box, styles.field, errors.proposalNumber && styles.errorBorder]}>
+            <TextInput
+              style={[inputStyles.input, { fontSize: rf(4.2) }]}
+              placeholder="Proposal Number*"
+              placeholderTextColor="#9ca3af"
+              value={proposalNumber}
+              onChangeText={(t) => { setProposalNumber(t); if (errors.proposalNumber) setErrors((e) => ({ ...e, proposalNumber: null })); }}
+            />
+          </View>
+          {errors.proposalNumber ? <Text style={styles.errorText}>{errors.proposalNumber}</Text> : null}
+
+          {/* Proposal Document Upload */}
+          <View style={[inputStyles.box, styles.field, errors.proposalDoc && styles.errorBorder]}>
+            <TextInput
+              style={[inputStyles.input, { fontSize: rf(4.2) }]}
+              placeholder="Proposal Document*"
+              placeholderTextColor="#9ca3af"
+              value={proposalDoc?.name || ''}
+              editable={false}
+            />
+            {proposalDoc ? (
+              <TouchableOpacity activeOpacity={0.85} onPress={clearProposalDocument}>
+                <Icon name="close" size={rf(3.6)} color="#ef4444" style={{ marginRight: SPACING.sm }} />
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity activeOpacity={0.9} disabled={isAdding} style={[formStyles.primaryBtn, styles.btn, isAdding && { opacity: 0.6 }]} onPress={addProposal}>
-                <Text style={formStyles.primaryBtnText}>{isAdding ? 'Adding...' : 'Add'}</Text>
+              <TouchableOpacity activeOpacity={0.8} style={[styles.uploadButton, { marginRight: SPACING.sm }]} onPress={pickProposalDocument}>
+                <Icon name="cloud-upload" size={rf(4)} color="#fff" />
               </TouchableOpacity>
             )}
           </View>
-        </View> 
+          {errors.proposalDoc ? <Text style={styles.errorText}>{errors.proposalDoc}</Text> : null}
+          <Text style={styles.uploadHint}>Allowed: PDF, PNG, JPG • Max size 10 MB</Text>
 
-        {/* Pagination Controls */}
-        <View style={styles.paginationContainer}>
-          <View style={styles.itemsPerPageContainer}>
-            <Text style={styles.paginationLabel}>Show:</Text>
-            <Dropdown
-              placeholder="10"
-              value={itemsPerPage}
-              options={itemsPerPageOptions}
-              onSelect={handleItemsPerPageChange}
-              hideSearch={true}
-              inputBoxStyle={styles.paginationDropdown}
-            />
-            <Text style={styles.paginationLabel}>entries</Text>
-          </View> 
-        </View>
+          {/* Final Proposal Checkbox */}
+          <View style={styles.containerChechbox}>
+            <View style={styles.checkboxRow}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.checkbox, isFinal && { backgroundColor: COLORS.primary, borderColor: COLORS.primary }]}
+                onPress={() => setIsFinal((s) => !s)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: isFinal }}
+              >
+                {isFinal ? <Icon name="check" size={rf(4.5)} color="#fff" /> : null}
+              </TouchableOpacity>
 
-        {/* Proposals (collapsible cards) */}
-        <View style={{ marginTop: hp(2), flex: 1 }}>
-          {loadingProposals ? (
-            <View style={styles.loadingContainer}>
-              <Text style={styles.loadingText}>Loading proposals...</Text>
+              <Text style={styles.checkboxLabel}>Is this Final proposal</Text>
             </View>
-          ) : proposals.length > 0 ? (
-            proposals.map((p) => (
-              <ProposalCard opportunityTitle={initialOpportunityTitle} key={p.id} data={p} onEdit={editProposal} onDelete={deleteProposal} />
-            ))
-          ) : (
-            <View style={[styles.emptyContainer, styles.apiErrorWrap]}>
-              <Text style={styles.emptyText}>{apiError || 'No proposals found'}</Text>
-            </View>
-          )}
-        </View>
 
-        {/* Bottom Pagination */}
-        {totalRecords > 0 && (
-          <View style={styles.paginationContainer}>
-            <Text style={styles.pageInfo}>
-              Showing {totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1} to {Math.min((currentPage + 1) * itemsPerPage, totalRecords)} of {totalRecords} entries
-            </Text>
-
-            <View style={styles.pageNavigation}>
-              {pageItems.map((it, idx) => {
-                if (it === 'prev') {
-                  const disabled = currentPage === 0;
-                  return (
-                    <TouchableOpacity key={`prev-${idx}`} style={[styles.pageButtonTextual, disabled && styles.pageButtonDisabled]} disabled={disabled} onPress={() => handlePageChange(currentPage - 1)}>
-                      <Text style={[styles.pageText, disabled && styles.pageTextDisabled]}>Previous</Text>
-                    </TouchableOpacity>
-                  );
-                }
-                if (it === 'next') {
-                  const disabled = currentPage >= totalPages - 1;
-                  return (
-                    <TouchableOpacity key={`next-${idx}`} style={[styles.pageButtonTextual, disabled && styles.pageButtonDisabled]} disabled={disabled} onPress={() => handlePageChange(currentPage + 1)}>
-                      <Text style={[styles.pageText, disabled && styles.pageTextDisabled]}>Next</Text>
-                    </TouchableOpacity>
-                  );
-                }
-                if (it === 'left-ellipsis' || it === 'right-ellipsis') {
-                  return (
-                    <View key={`dots-${idx}`} style={styles.pageDots}><Text style={styles.pageText}>...</Text></View>
-                  );
-                }
-                const pageNum = it;
-                const active = pageNum === currentPage + 1;
-                return (
-                  <TouchableOpacity key={`p-${pageNum}`} style={[styles.pageNumberBtn, active && styles.pageNumberBtnActive]} onPress={() => handlePageChange(pageNum - 1)}>
-                    <Text style={[styles.pageNumberText, active && styles.pageNumberTextActive]}>{pageNum}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+            {/* Add/Update Button */}
+            <View style={{ alignItems: 'flex-end' }}>
+              {isEditMode ? (
+                <TouchableOpacity activeOpacity={0.9} disabled={isUpdating} style={[formStyles.primaryBtn, styles.btn, isUpdating && { opacity: 0.6 }]} onPress={updateProposal}>
+                  <Text style={formStyles.primaryBtnText}>{isUpdating ? 'Updating...' : 'Update'}</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity activeOpacity={0.9} disabled={isAdding} style={[formStyles.primaryBtn, styles.btn, isAdding && { opacity: 0.6 }]} onPress={addProposal}>
+                  <Text style={formStyles.primaryBtnText}>{isAdding ? 'Adding...' : 'Add'}</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
-        )}
+
+          {/* Inline API error removed; using bottom sheet below */}
+
+          {/* Pagination Controls */}
+          <View style={styles.paginationContainer}>
+            <View style={styles.itemsPerPageContainer}>
+              <Text style={styles.paginationLabel}>Show:</Text>
+              <Dropdown
+                placeholder="10"
+                value={itemsPerPage}
+                options={itemsPerPageOptions}
+                onSelect={handleItemsPerPageChange}
+                hideSearch={true}
+                inputBoxStyle={styles.paginationDropdown}
+              />
+              <Text style={styles.paginationLabel}>entries</Text>
+            </View>
+          </View>
+
+          {/* Proposals (collapsible cards) */}
+          <View style={{ marginTop: hp(2), flex: 1 }}>
+            {loadingProposals ? (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>Loading proposals...</Text>
+              </View>
+            ) : proposals.length > 0 ? (
+              proposals.map((p) => (
+                <>
+                  <ProposalCard opportunityTitle={initialOpportunityTitle} key={p.id} data={p} onEdit={editProposal} onDelete={deleteProposal} />
+                </>
+              ))
+            ) : (
+              <View style={[styles.emptyContainer, styles.apiErrorWrap]}>
+                <Text style={styles.emptyText}>{apiError || 'No proposals found'}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Bottom Pagination */}
+          {totalRecords > 0 && (
+            <View style={styles.paginationContainer}>
+              <Text style={styles.pageInfo}>
+                Showing {totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1} to {Math.min((currentPage + 1) * itemsPerPage, totalRecords)} of {totalRecords} entries
+              </Text>
+
+              <View style={styles.pageNavigation}>
+                {pageItems.map((it, idx) => {
+                  if (it === 'prev') {
+                    const disabled = currentPage === 0;
+                    return (
+                      <TouchableOpacity key={`prev-${idx}`} style={[styles.pageButtonTextual, disabled && styles.pageButtonDisabled]} disabled={disabled} onPress={() => handlePageChange(currentPage - 1)}>
+                        <Text style={[styles.pageText, disabled && styles.pageTextDisabled]}>Previous</Text>
+                      </TouchableOpacity>
+                    );
+                  }
+                  if (it === 'next') {
+                    const disabled = currentPage >= totalPages - 1;
+                    return (
+                      <TouchableOpacity key={`next-${idx}`} style={[styles.pageButtonTextual, disabled && styles.pageButtonDisabled]} disabled={disabled} onPress={() => handlePageChange(currentPage + 1)}>
+                        <Text style={[styles.pageText, disabled && styles.pageTextDisabled]}>Next</Text>
+                      </TouchableOpacity>
+                    );
+                  }
+                  if (it === 'left-ellipsis' || it === 'right-ellipsis') {
+                    return (
+                      <View key={`dots-${idx}`} style={styles.pageDots}><Text style={styles.pageText}>...</Text></View>
+                    );
+                  }
+                  const pageNum = it;
+                  const active = pageNum === currentPage + 1;
+                  return (
+                    <TouchableOpacity key={`p-${pageNum}`} style={[styles.pageNumberBtn, active && styles.pageNumberBtnActive]} onPress={() => handlePageChange(pageNum - 1)}>
+                      <Text style={[styles.pageNumberText, active && styles.pageNumberTextActive]}>{pageNum}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -915,7 +942,7 @@ const ManageLeadProposal = ({ navigation, route }) => {
       {/* Delete Confirmation Bottom Sheet */}
       <BottomSheetConfirm
         visible={deleteConfirmVisible}
-        onCancel={() => { 
+        onCancel={() => {
           setDeleteConfirmVisible(false);
           setProposalToDelete(null);
         }}
@@ -926,6 +953,17 @@ const ManageLeadProposal = ({ navigation, route }) => {
         message="Are you sure you want to delete this proposal?"
         confirmText="Delete"
         cancelText="Cancel"
+      />
+
+      {/* Error Bottom Sheet for Add Proposal failures */}
+      <BottomSheetConfirm
+        visible={errorSheetVisible}
+        onCancel={() => setErrorSheetVisible(false)}
+        onConfirm={() => setErrorSheetVisible(false)}
+        title="Add Proposal Failed"
+        message={apiError || 'Something went wrong'}
+        confirmText="OK"
+        cancelText=""
       />
     </View>
   );

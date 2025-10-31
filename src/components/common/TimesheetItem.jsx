@@ -92,7 +92,7 @@ const sumHhMm = (records) => {
 const TimesheetItem = ({ item, isActive, onToggle, onSave, onDelete, onDayHoursFilled, isSelectionMode, isSelected, onLongPress, onSelect, leaveData = [], timesheetStatus }) => {
   const statusStyles = statusStyleMap[item.status] || statusStyleMap.Pending;
   const [isEditing, setIsEditing] = useState(false);
-  
+   console.log(item.taskName);
   // Check if editing is allowed based on timesheet status
   const isEditAllowed = timesheetStatus === 'Rejected' || timesheetStatus === 'Pending';
   
@@ -196,8 +196,8 @@ const TimesheetItem = ({ item, isActive, onToggle, onSave, onDelete, onDayHoursF
           )}
           {!isSelectionMode && <Dot color={statusStyles.fg} />}
           <View style={{ maxWidth: wp(52) }}>
-            <Text style={styles.headerLabel}>Project Task</Text>
-            <Text style={styles.headerValue} numberOfLines={isActive ? undefined : 1}>{item.taskName}</Text>
+            <Text style={styles.headerLabel}>Project</Text>
+            <Text style={styles.headerValue} numberOfLines={isActive ? undefined : 1}>{item.projectName}</Text> 
           </View>
         </View>
         <View style={styles.headerRight}>
@@ -212,6 +212,9 @@ const TimesheetItem = ({ item, isActive, onToggle, onSave, onDelete, onDayHoursF
       {isActive && (
         <View style={styles.body}>
           <View style={styles.row}> 
+            <Text style={styles.rowLabel}>Project Task</Text>
+            <Text style={styles.rowValue}>{item.projectTask}</Text>
+          </View><View style={styles.row}> 
             <Text style={styles.rowLabel}>From</Text>
             <Text style={styles.rowValue}>{item.fromDate}</Text>
           </View>
@@ -421,8 +424,7 @@ const styles = StyleSheet.create({
   headerLabel: {
     fontSize: rf(3),
     fontWeight: '500',
-    color: '#94a3b8',
-    textTransform: 'uppercase',
+    color: '#94a3b8', 
   },
   headerValue: {
     fontSize: rf(3.5),
@@ -486,7 +488,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#334155',
     textAlign: 'right',
-    maxWidth: '70%'
+    maxWidth: '50%'
   },
   statusPill: {
     paddingVertical: hp(0.5),

@@ -224,8 +224,7 @@ const ManageLeaves = ({ navigation }) => {
         }}
         onRightPress={() => navigation.navigate('Notification')}
       />
-
-      <View style={{ paddingHorizontal: wp(4) }}>
+ 
         <View style={styles.paginationContainer}>
           <View style={styles.itemsPerPageContainer}>
             <Text style={styles.paginationLabel}>Show:</Text>
@@ -240,7 +239,7 @@ const ManageLeaves = ({ navigation }) => {
             <Text style={styles.paginationLabel}>entries</Text>
           </View>
         </View>
-      </View>
+   
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh.current} />}>
         {data.map((item) => (
@@ -382,9 +381,8 @@ const styles = StyleSheet.create({
   },
   paginationContainer: {
     backgroundColor: '#ffffff',
-    paddingHorizontal: wp(3),
-    paddingVertical: hp(1),
-    borderRadius: wp(3),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1), 
     borderWidth: 1,
     borderColor: '#e5e7eb',
     marginTop: hp(1),

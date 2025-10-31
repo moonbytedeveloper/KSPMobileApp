@@ -52,7 +52,7 @@ const CommonBottomSheet = ({
         />
       )}
     >
-      <BottomSheetView style={[styles.content, contentContainerStyle]}>
+      <BottomSheetView style={[styles.content,{ minHeight: snapPointsProp?.[0] || hp(30) },  contentContainerStyle]}>
         {children}
       </BottomSheetView>
     </BottomSheetModal>
@@ -62,7 +62,7 @@ const CommonBottomSheet = ({
 export default CommonBottomSheet;
 
 const styles = StyleSheet.create({
-  handle: {
+  handle: { 
     alignSelf: 'center',
     width: wp(18),
     height: hp(0.7),

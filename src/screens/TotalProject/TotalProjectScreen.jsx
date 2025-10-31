@@ -154,14 +154,14 @@ const TotalProjectScreen = ({ navigation }) => {
   if (loading && !refreshing) {
     return (
       <View style={styles.containers}>
-      <AppHeader
-        title="Total Project"
-        onLeftPress={() => navigation.goBack()}
-        onRightPress={() => navigation.navigate('Notification')}
-      />
-      <Loader />
-    </View> 
-      
+        <AppHeader
+          title="Total Project"
+          onLeftPress={() => navigation.goBack()}
+          onRightPress={() => navigation.navigate('Notification')}
+        />
+        <Loader />
+      </View>
+
     );
   }
   return (
@@ -193,13 +193,17 @@ const TotalProjectScreen = ({ navigation }) => {
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh.current} />}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            projects.length === 0 && styles.emptyContentCenter,
+          ]}
         >
           {projects.length === 0 && (
             <View style={styles.emptyBox}>
               <Text style={styles.emptyText}>{errorText || 'No projects found.'}</Text>
             </View>
           )}
+
           {projects.map((project, index) => {
             const name = project.ProjectName ?? project.projectName ?? project.Name ?? project.name ?? '—';
             const dueDate = project.DueDate ?? project.dueDate ?? project.Due ?? project.due ?? '—';
@@ -209,12 +213,12 @@ const TotalProjectScreen = ({ navigation }) => {
             ) || 0;
             const statusColor = status === 'Completed' ? '#10b981' : status === 'On Hold' ? '#f59e0b' : '#3b82f6';
             const isExpanded = expandedProject === index;
-            
+
             return (
               <View key={`${name}-${dueDate}-${index}`} style={styles.accordionCard}>
                 {/* Accordion Header */}
-                <TouchableOpacity 
-                  activeOpacity={0.8} 
+                <TouchableOpacity
+                  activeOpacity={0.8}
                   style={styles.accordionHeader}
                   onPress={() => toggleProjectExpansion(index)}
                 >
@@ -227,10 +231,10 @@ const TotalProjectScreen = ({ navigation }) => {
                   </View>
                   <View style={styles.headerRight}>
                     {/* <StatusBadge label={status} /> */}
-                    <Icon 
-                      name={isExpanded ? 'expand-less' : 'expand-more'} 
-                      size={rf(4.2)} 
-                      color={COLORS.textMuted} 
+                    <Icon
+                      name={isExpanded ? 'expand-less' : 'expand-more'}
+                      size={rf(4.2)}
+                      color={COLORS.textMuted}
                     />
                   </View>
                 </TouchableOpacity>
@@ -328,7 +332,7 @@ const styles = StyleSheet.create({
     paddingBottom: hp(4),
   },
   paginationContainer: {
-    marginBottom:hp(1),
+    marginBottom: hp(1),
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderBottomWidth: 1.5,
@@ -410,16 +414,25 @@ const styles = StyleSheet.create({
   pageNumberTextActive: {
     color: '#fff',
   },
-  emptyBox: {
+  emptyContentCenter: {
+    flexGrow: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: hp(4),
+    minHeight: hp(80), // covers almost full screen height
   },
+  
+  emptyBox: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: hp(2),
+  },
+  
   emptyText: {
     color: '#6b7280',
     fontSize: rf(3.2),
     fontFamily: TYPOGRAPHY.fontFamilyRegular,
+    textAlign: 'center',
   },
-
   // Accordion Card Styles
   accordionCard: {
     backgroundColor: COLORS.bg,

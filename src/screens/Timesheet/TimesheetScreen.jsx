@@ -90,7 +90,7 @@ const TimesheetScreen = ({ navigation }) => {
   const isMonday = (date) => {
     return date.getDay() === 1; // 1 = Monday
   };
-
+  
   // Helper function to get Sunday of the same week
   const getSundayOfWeek = (mondayDate) => {
     const sunday = new Date(mondayDate);
@@ -109,7 +109,9 @@ const TimesheetScreen = ({ navigation }) => {
       if (!groupedData[key]) {
         groupedData[key] = {
           id: key,
-          taskName: `${line.ProjectTitle} • ${line.TaskTitle}`,
+          // taskName: `${line.ProjectTitle} • ${line.TaskTitle}`,
+          projectName:line.ProjectTitle,
+          projectTask:line.TaskTitle,
           fromDate: apiData.From_Date,
           toDate: apiData.To_Date,
           status: apiData.Timesheet_Status,
@@ -246,7 +248,7 @@ const TimesheetScreen = ({ navigation }) => {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null); // { id, name, tasks }
   const [selectedTask, setSelectedTask] = useState(null); // string
-  const snapPoints = useMemo(() => [hp(55), hp(75)], []);
+  const snapPoints = useMemo(() => [hp(40), hp(75)], []);
   const [currentSnapIndex, setCurrentSnapIndex] = useState(0);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 

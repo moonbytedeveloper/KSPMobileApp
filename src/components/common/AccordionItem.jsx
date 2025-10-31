@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { rf, wp, hp } from '../../utils/responsive';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { buttonStyles, COLORS, TYPOGRAPHY } from '../../screens/styles/styles';
+import { buttonStyles, COLORS, TYPOGRAPHY,RADIUS } from '../../screens/styles/styles';
 
 // AccordionItem Component
 const AccordionItem = ({
@@ -21,13 +21,30 @@ const AccordionItem = ({
   headerRightLabel = 'Amount',
   customRows,
   editLabel = 'Edit',
+  status,
 }) => {
+ console.log('status122', status, 'item',item.status);
   // Defer delete confirmation to the screen-level bottom sheet
 
   return (
     <View style={styles.accordionItem}>
       <TouchableOpacity onPress={onToggle} style={styles.accordionHeader} activeOpacity={0.8}>
         <View style={styles.headerSummaryContainer}>
+        {!!item?.status && (
+            <View
+              style={[
+                styles.dot,
+                {
+                  backgroundColor:
+                    String(item.status).trim() === 'Approved'
+                      ? (COLORS.success)
+                      : String(item.status).trim() === 'Submitted'
+                        ? (COLORS.info || '#fef3c7')
+                        : (COLORS.danger || '#fee2e2'),
+                },
+              ]}
+            />
+          )}
           <View style={{ flex: 1 }}>
             <Text style={styles.summaryLabel}>{headerLeftLabel}</Text>
             <Text style={styles.summaryValue} numberOfLines={1} ellipsizeMode="tail">{item.expenseName}</Text>
@@ -56,7 +73,7 @@ const AccordionItem = ({
             <>
               {customRows.map((row, idx) => (
                 <View key={idx} style={styles.cardRow}>
-                  <Text style={styles.cardLabel}>{String(row.label).toUpperCase()}</Text>
+                  <Text style={styles.cardLabel}>{String(row.label)}</Text>
                   <Text style={styles.cardValue}>{row.value}</Text>
                 </View>
               ))}
@@ -143,12 +160,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexShrink: 1,
+    marginLeft: wp(-1), 
+
   },
   summaryLabel: {
     fontSize: rf(3),
-    fontWeight: '500',
-    color: COLORS.textLight,
-    textTransform: 'uppercase',
+    fontWeight: '700',
+    color: COLORS.textLight, 
     fontFamily: TYPOGRAPHY.fontFamilyMedium,
   },
   summaryValue: {
@@ -178,8 +196,7 @@ const styles = StyleSheet.create({
   cardLabel: {
     fontSize: rf(3),
     fontWeight: '500',
-    color: COLORS.textLight,
-    textTransform: 'uppercase',
+    color: COLORS.textLight, 
     fontFamily: TYPOGRAPHY.fontFamilyMedium,
   },
   cardValue: {
@@ -254,6 +271,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: TYPOGRAPHY.fontFamilyBold,
   },
+  dot:{ 
+      width: wp(3.5),
+      height: wp(3.5),
+      borderRadius: RADIUS.md,
+      marginRight: wp(2),
+  },
+
   submitButtonContainer: {
     marginTop: hp(1.5),
     marginHorizontal: -wp(1.2),

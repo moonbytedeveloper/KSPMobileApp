@@ -42,6 +42,10 @@ const ExpenseScreen = ({ navigation }) => {
   const [tasks, setTasks] = useState([]);
   const [eligibilityVisible, setEligibilityVisible] = useState(false);
   const [eligibilityMessage, setEligibilityMessage] = useState('');
+  // Dropdown open states to avoid overlap
+  const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
+  const [isTaskDropdownOpen, setIsTaskDropdownOpen] = useState(false);
+  const [isPageSizeDropdownOpen, setIsPageSizeDropdownOpen] = useState(false);
   // Status info bottom sheet
   const [statusSheet, setStatusSheet] = useState({ visible: false, title: '', message: '' });
 
@@ -388,7 +392,7 @@ const ExpenseScreen = ({ navigation }) => {
         </View>
         {filterVisible && (
         <View style={{ gap: wp(3) }}>
-          <View>
+          <View style={{ zIndex: isProjectDropdownOpen ? 4 : 1 }}>
             <Dropdown
               placeholder="Project Name"
               value={selectedProject?.name}
@@ -396,11 +400,19 @@ const ExpenseScreen = ({ navigation }) => {
               getLabel={(p) => p.name}
               getKey={(p) => p.id}
               hint="Project Name"
-              onSelect={handleSelectProject} 
+              onSelect={handleSelectProject}
+              isOpen={isProjectDropdownOpen}
+              onOpenChange={(next) => {
+                setIsProjectDropdownOpen(next);
+                if (next) {
+                  setIsTaskDropdownOpen(false);
+                  setIsPageSizeDropdownOpen(false);
+                }
+              }} 
             />
           </View>
 
-          <View>
+          <View style={{ zIndex: isTaskDropdownOpen ? 4 : 1 }}>
             <Dropdown
               placeholder="Project Task"
               value={selectedTask}
@@ -410,6 +422,14 @@ const ExpenseScreen = ({ navigation }) => {
               hint="Project Task"
               disabled={!selectedProject}
               onSelect={handleSelectTask}
+              isOpen={isTaskDropdownOpen}
+              onOpenChange={(next) => {
+                setIsTaskDropdownOpen(next);
+                if (next) {
+                  setIsProjectDropdownOpen(false);
+                  setIsPageSizeDropdownOpen(false);
+                }
+              }}
             />
           </View>
         </View>
@@ -417,17 +437,27 @@ const ExpenseScreen = ({ navigation }) => {
 
         <View style={[styles.searchRow]}>
           <Text style={styles.showText}>Show</Text>
-          <Dropdown
-            placeholder={String(pageSize)}
-            value={pageSize}
-            options={pageSizes}
-            getLabel={(n) => String(n)}
-            getKey={(n) => String(n)}
-            hideSearch
-            style={{ width: wp(22) }}
-            inputBoxStyle={{ marginTop: 0, paddingVertical: hp(0.8) }}
-            onSelect={handleItemsPerPageChange}
-          />
+          <View style={{ zIndex: isPageSizeDropdownOpen ? 3 : 0 }}>
+            <Dropdown
+              placeholder={String(pageSize)}
+              value={pageSize}
+              options={pageSizes}
+              getLabel={(n) => String(n)}
+              getKey={(n) => String(n)}
+              hideSearch
+              style={{ width: wp(22) }}
+              inputBoxStyle={{ marginTop: 0, paddingVertical: hp(0.8) }}
+              onSelect={handleItemsPerPageChange}
+              isOpen={isPageSizeDropdownOpen}
+              onOpenChange={(next) => {
+                setIsPageSizeDropdownOpen(next);
+                if (next) {
+                  setIsProjectDropdownOpen(false);
+                  setIsTaskDropdownOpen(false);
+                }
+              }}
+            />
+          </View>
 
           <View style={styles.searchInputContainer}>
             <Icon name="search" size={rf(4.2)} color="#8e8e93" />
@@ -447,8 +477,29 @@ const ExpenseScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
+
+        <ScrollView 
+          contentContainerStyle={{ paddingVertical: hp(1.5), paddingHorizontal: wp(0.5), }} 
+          showsVerticalScrollIndicator={false}
+        >
+        {filteredExpenses.map((item) => (
+            <AccordionItem
+              key={item.soleExpenseCode}
+              item={item}
+              isActive={activeCode === item.soleExpenseCode}
+              onToggle={() => handleToggle(item.soleExpenseCode)}
+              onView={null}
+              onEdit={handleEdit}
+              onDelete={null}
+              showViewButton={false}
+              headerLeftLabel="Expense"
+              headerRightLabel="Amount"
+              status={item.status}
+            />
+          ))}
+          
         {totalRecords > pageSize && (
-          <View style={styles.paginationContainerTop}>
+          <View style={{}}>
             <Text style={styles.pageInfo}>
               Showing {currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, totalRecords)} of {totalRecords} entries
             </Text>
@@ -503,25 +554,6 @@ const ExpenseScreen = ({ navigation }) => {
             </View>
           </View>
         )}
-
-        <ScrollView 
-          contentContainerStyle={{ paddingVertical: hp(1.5), paddingHorizontal: wp(0.5), paddingBottom: hp(13) }} 
-          showsVerticalScrollIndicator={false}
-        >
-        {filteredExpenses.map((item) => (
-            <AccordionItem
-              key={item.soleExpenseCode}
-              item={item}
-              isActive={activeCode === item.soleExpenseCode}
-              onToggle={() => handleToggle(item.soleExpenseCode)}
-              onView={null}
-              onEdit={handleEdit}
-              onDelete={null}
-              showViewButton={false}
-              headerLeftLabel="Expense"
-              headerRightLabel="Amount"
-            />
-          ))}
         </ScrollView>
         {/* Pagination footer moved to top to avoid overlap with bottom tabs */}
         <BottomSheetConfirm
@@ -657,7 +689,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: wp(2.5),
-    marginBottom: hp(1),
   },
   pageButtonTextual: {
     paddingVertical: hp(0.8),

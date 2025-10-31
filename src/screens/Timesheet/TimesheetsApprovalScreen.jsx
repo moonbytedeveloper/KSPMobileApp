@@ -14,6 +14,7 @@ import Dropdown from '../../components/common/Dropdown';
 import { COLORS, TYPOGRAPHY,SPACING,RADIUS } from '../styles/styles';
 import Loader from '../../components/common/Loader';
 import { getNotApprovedTimesheets } from '../../api/authServices';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 const StatusBadge = ({ label  }) => {
   const palette = {
     Pending: { bg: COLORS.warningBg, color: COLORS.warning, border: COLORS.warning },
@@ -29,45 +30,63 @@ const StatusBadge = ({ label  }) => {
   );
 };
 
-const SummaryCard = ({ employeeName, totalHoursWorked, fromDate, toDate, status }) => {
+const TimesheetAccordion = ({ item, onManagePress }) => {
+  const [expanded, setExpanded] = useState(false);
+  const toggle = () => setExpanded(s => !s);
   return (
-    <View style={styles.summaryCard}>
-      <Text style={styles.sectionTitle}>Summary</Text>
+    <View style={styles.tsCard}>
+      <TouchableOpacity activeOpacity={0.85} onPress={toggle}>
+        <View style={styles.tsRowHeader}>
+          <View style={styles.tsHeaderLeft}>
+            <View style={styles.tsDot} />
+            <View style={styles.tsHeaderLeftContent}>
+              <Text style={styles.tsCaption}>EMPLOYEE</Text>
+              <Text style={styles.tsTitle} numberOfLines={1}>{item.employeeName}</Text>
+            </View>
+          </View>
+          <View style={styles.tsHeaderRight}>
+            <View>
+              <Text style={[styles.tsCaption, { textAlign: 'right' }]}>TOTAL HOURS</Text>
+              <Text style={styles.tsHours}>{item.totalHoursWorked}</Text>
+            </View>
+            <Icon name={expanded ? 'expand-less' : 'expand-more'} size={rf(4.2)} color={COLORS.textMuted} />
+          </View>
+        </View>
+      </TouchableOpacity>
 
-      <View style={styles.fieldRow}>
-        <Text style={styles.fieldLabel}>Employee</Text>
-        <Text style={styles.fieldValue}>{employeeName}</Text>
-      </View>
-
-      <View style={styles.divider} />
-
-      {!!status && (
-        <>
+      {expanded && (
+        <View>
+        <View style={styles.tsDetailArea}>
           <View style={styles.fieldRow}>
             <Text style={styles.fieldLabel}>Status</Text>
-            <StatusBadge label={status} />
+            <StatusBadge label={item.status} />
           </View>
           <View style={styles.divider} />
-        </>
+          <View style={styles.dateRow}>
+            <View style={styles.dateCol}>
+              <Text style={styles.fieldLabel}>From</Text>
+              <Text style={styles.fieldValue}>{item.fromDate}</Text>
+            </View>
+            <View style={styles.dateCol}>
+              <Text style={styles.fieldLabel}>To</Text>
+              <Text style={styles.fieldValue}>{item.toDate}</Text>
+            </View>
+          </View>
+          
+        </View>
+        <View style={styles.tsActionsRowPrimary}>
+            <TouchableOpacity
+              onPress={onManagePress}
+              activeOpacity={0.9}
+              style={styles.manageBtn}
+            >
+              <Icon name="open-in-new" size={rf(4.2)} color="#fff" />
+              <Text style={styles.manageBtnText}>Action</Text>
+            </TouchableOpacity>
+          </View>
+          
+        </View>
       )}
-
-      <View style={styles.fieldRow}>
-        <Text style={styles.fieldLabel}>Total Hours Worked</Text>
-        <Text style={styles.fieldValue}>{totalHoursWorked}</Text>
-      </View>
-
-      <View style={styles.divider} />
-
-      <View style={styles.dateRow}>
-        <View style={styles.dateCol}>
-          <Text style={styles.fieldLabel}>From</Text>
-          <Text style={styles.fieldValue}>{fromDate}</Text>
-        </View>
-        <View style={styles.dateCol}>
-          <Text style={styles.fieldLabel}>To</Text>
-          <Text style={styles.fieldValue}>{toDate}</Text>
-        </View>
-      </View>
     </View>
   );
 };
@@ -248,13 +267,16 @@ const TimesheetsApprovalScreen = ({ navigation }) => {
           )}
          
           {timesheetSummaries.map(item => (
-            <SummaryCard
+            <TimesheetAccordion
               key={item.id}
-              employeeName={item.employeeName}
-              totalHoursWorked={item.Total_Hours}
-              fromDate={item.fromDate}
-              toDate={item.toDate}
-              status={item.status}
+              item={{
+                employeeName: item.employeeName,
+                totalHoursWorked: item.Total_Hours,
+                fromDate: item.fromDate,
+                toDate: item.toDate,
+                status: item.status,
+              }}
+              onManagePress={() => navigation.navigate('ManageTimeSheetApproval')}
             />
           ))}
 
@@ -418,6 +440,84 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
+  },
+  // Accordion (match other pages)
+  tsCard: {
+    backgroundColor: COLORS.bg,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: SPACING.md,
+    marginTop: hp(0.5),
+    marginBottom: hp(1.6),
+  },
+  tsRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  tsHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    flex: 1,
+  },
+  tsHeaderLeftContent: {
+    maxWidth: wp(60),
+  },
+  tsHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  tsDot: {
+    width: wp(3.5),
+    height: wp(3.5),
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.primary,
+  },
+  tsCaption: {
+    fontSize: 10.5,
+    color: COLORS.textLight,
+    fontWeight: '700',
+    marginBottom: hp(0.3),
+  },
+  tsTitle: {
+    fontSize: rf(4.0),
+    color: COLORS.text,
+    fontWeight: '700',
+  },
+  tsHours: {
+    fontSize: rf(4.0),
+    color: COLORS.text,
+    fontWeight: '700',
+  },
+  tsDetailArea: {
+    marginTop: hp(1.2),
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    paddingTop: hp(1.2),
+  },
+  tsActionsRowPrimary: {  
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: hp(1.2),
+  },
+  manageBtn: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(2),
+    backgroundColor: COLORS.primary,
+    paddingVertical: hp(1.8),
+    paddingHorizontal: wp(4),
+    borderRadius: wp(2),
+  },
+  manageBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: rf(3.4),
   },
   sectionTitle: {
     fontSize: rf(4.2),

@@ -81,15 +81,15 @@ const ApplyLeaveScreen = ({ navigation }) => {
     if (!fromDate || !toDate || fromDate === 'From Date' || toDate === 'To Date') {
       return false;
     }
-    
+
     const newFrom = new Date(fromDate);
     const newTo = new Date(toDate);
-    
+
     return leaves.some(leave => {
       if (leave.status === 'Pending' || leave.status === 'Approved') {
         const existingFrom = new Date(leave.from);
         const existingTo = new Date(leave.to);
-        
+
         // Check if dates overlap
         return (newFrom <= existingTo && newTo >= existingFrom);
       }
@@ -125,8 +125,8 @@ const ApplyLeaveScreen = ({ navigation }) => {
           getENVUUID(),
         ]);
         if (!userUuid || !cmpUuid || !envUuid) return;
-        const start = currentPage * (parseInt(pageSize,10)||10);
-        const length = parseInt(pageSize,10)||10;
+        const start = currentPage * (parseInt(pageSize, 10) || 10);
+        const length = parseInt(pageSize, 10) || 10;
         console.log('🔍 [ApplyLeaveScreen] Search query:', debouncedQuery);
         const resp = await getHRALeaves({ userUuid, cmpUuid, envUuid, start, length, searchValue: debouncedQuery || '' });
         console.log('🔍 [ApplyLeaveScreen] API response:', resp);
@@ -134,10 +134,10 @@ const ApplyLeaveScreen = ({ navigation }) => {
         const list = Array.isArray(container?.data)
           ? container.data
           : Array.isArray(container?.Leaves)
-          ? container.Leaves
-          : Array.isArray(container)
-          ? container
-          : [];
+            ? container.Leaves
+            : Array.isArray(container)
+              ? container
+              : [];
         const mapped = list.map((it, idx) => ({
           id: it.UUID || String(idx),
           appliedBy: it.AppliedBy || '-',
@@ -181,9 +181,9 @@ const ApplyLeaveScreen = ({ navigation }) => {
   }, [query]);
 
   const pageLimit = parseInt(pageSize || '10', 10) || 10;
-  
+
   // Client-side filtering as fallback if API search doesn't work
-  const visibleLeaves = debouncedQuery ? leaves.filter(leave => 
+  const visibleLeaves = debouncedQuery ? leaves.filter(leave =>
     leave.leaveType?.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
     leave.status?.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
     leave.appliedBy?.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
@@ -217,7 +217,14 @@ const ApplyLeaveScreen = ({ navigation }) => {
         <TouchableOpacity activeOpacity={0.8} onPress={onToggle}>
           <View style={styles.leaveHeaderRow}>
             <View style={styles.leaveHeaderLeft}>
-              <View style={[styles.statusIcon, { backgroundColor: isPaid ? '#10B981' : '#ef4444' }]} />
+              <View style={[styles.statusIcon, {
+                backgroundColor:
+                  data.status === 'Approved'
+                    ? COLORS.success
+                    : data.status === 'Pending'
+                      ? COLORS.warning
+                      : COLORS.danger,
+              }]} />
               <View style={{ maxWidth: wp(60) }}>
                 <Text style={styles.headerLabel}>LEAVE TYPE</Text>
                 <Text style={styles.headerTitle} numberOfLines={1}>{data.leaveType || 'Leave'}</Text>
@@ -418,7 +425,7 @@ const ApplyLeaveScreen = ({ navigation }) => {
               </View>
 
               <View style={styles.formFieldContainer}>
-                <View style={[styles.row,{marginBottom:(touched.fromDate && errors.fromDate) || (touched.toDate && errors.toDate) ? 0 :hp(1.2) }]}>
+                <View style={[styles.row, { marginBottom: (touched.fromDate && errors.fromDate) || (touched.toDate && errors.toDate) ? 0 : hp(1.2) }]}>
                   <TouchableOpacity
                     activeOpacity={0.8}
                     onPress={() => { setOpenFrom(true); }}
@@ -444,7 +451,7 @@ const ApplyLeaveScreen = ({ navigation }) => {
               </View>
 
               <View style={[styles.formFieldContainer, { marginBottom: hp(1.2) }]}>
-                 <View style={[styles.input, (touched.contact && errors.contact) && styles.inputError]}>
+                <View style={[styles.input, (touched.contact && errors.contact) && styles.inputError]}>
                   <TextInput
                     placeholder="Contact No."
                     placeholderTextColor="#9ca3af"
@@ -505,7 +512,7 @@ const ApplyLeaveScreen = ({ navigation }) => {
                   }
                 }}
                 title="Select From Date"
-                minDate={(function(){ const t=new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); })()}
+                minDate={(function () { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); })()}
               />
 
               <DatePickerBottomSheet
