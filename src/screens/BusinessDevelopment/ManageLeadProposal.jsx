@@ -276,6 +276,9 @@ const ManageLeadProposal = ({ navigation, route }) => {
   // Store all proposals and paginate on client side
   const [allProposals, setAllProposals] = useState([]);
 
+  // Track which proposal card is currently open (only one at a time)
+  const [openCardId, setOpenCardId] = useState(null);
+
   // Fetch all proposals from API (no pagination)
   const fetchProposals = useCallback(async () => {
     try {
@@ -434,7 +437,7 @@ const ManageLeadProposal = ({ navigation, route }) => {
         if (/request failed with status code/i.test(m)) return `HTTP ${res?.status || ''} Error`;
         return m;
       }
-    } catch (_) {}
+    } catch (_) { }
     return fallback;
   };
 
@@ -689,6 +692,11 @@ const ManageLeadProposal = ({ navigation, route }) => {
     setErrors({});
   };
 
+  // Handle card toggle - close previously open card if another is opened
+  const handleCardToggle = (cardId) => {
+    setOpenCardId((prevId) => (prevId === cardId ? null : cardId));
+  };
+
   return (
     <View style={styles.safeArea}>
       <AppHeader title="Manage Lead Proposal" onLeftPress={() => navigation.goBack()} />
@@ -837,6 +845,7 @@ const ManageLeadProposal = ({ navigation, route }) => {
           {/* Inline API error removed; using bottom sheet below */}
 
           {/* Pagination Controls */}
+          {!(proposals.length === 0) && 
           <View style={styles.paginationContainer}>
             <View style={styles.itemsPerPageContainer}>
               <Text style={styles.paginationLabel}>Show:</Text>
@@ -850,7 +859,7 @@ const ManageLeadProposal = ({ navigation, route }) => {
               />
               <Text style={styles.paginationLabel}>entries</Text>
             </View>
-          </View>
+          </View>}
 
           {/* Proposals (collapsible cards) */}
           <View style={{ marginTop: hp(2), flex: 1 }}>
@@ -860,9 +869,15 @@ const ManageLeadProposal = ({ navigation, route }) => {
               </View>
             ) : proposals.length > 0 ? (
               proposals.map((p) => (
-                <>
-                  <ProposalCard opportunityTitle={initialOpportunityTitle} key={p.id} data={p} onEdit={editProposal} onDelete={deleteProposal} />
-                </>
+                <ProposalCard
+                  key={p.id}
+                  opportunityTitle={initialOpportunityTitle}
+                  data={p}
+                  onEdit={editProposal}
+                  onDelete={deleteProposal}
+                  isOpen={openCardId === p.id}
+                  onToggle={() => handleCardToggle(p.id)}
+                />
               ))
             ) : (
               <View style={[styles.emptyContainer, styles.apiErrorWrap]}>
@@ -873,7 +888,7 @@ const ManageLeadProposal = ({ navigation, route }) => {
 
           {/* Bottom Pagination */}
           {totalRecords > 0 && (
-            <View style={styles.paginationContainer}>
+            <View style={[styles.paginationContainer, { marginTop: hp(1) }]}>
               <Text style={styles.pageInfo}>
                 Showing {totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1} to {Math.min((currentPage + 1) * itemsPerPage, totalRecords)} of {totalRecords} entries
               </Text>
@@ -1218,22 +1233,30 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e5e7eb',
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.2),
+    position: 'relative',
     zIndex: 1000,
+    elevation: 2,
+    marginHorizontal: wp(-3.4),
   },
   itemsPerPageContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: hp(1),
+    position: 'relative',
+    zIndex: 1000,
   },
   paginationLabel: {
     fontSize: rf(3.5),
-    color: '#374151',
+    color: '#111827',
     marginRight: wp(2),
   },
   paginationDropdown: {
     width: wp(18),
     height: hp(5),
     marginHorizontal: wp(1),
+    zIndex: 1000,
+    position: 'relative',
+    elevation: 4,
   },
   pageInfo: {
     fontSize: rf(3.5),
@@ -1303,9 +1326,8 @@ const styles = StyleSheet.create({
 // Collapsible Proposal Card (default closed)
 const statusOptions = ['Won', 'Lost', 'Cancelled', 'On Hold'];
 
-const ProposalCard = ({ data, onEdit, onDelete, opportunityTitle }) => {
+const ProposalCard = ({ data, onEdit, onDelete, opportunityTitle, isOpen = false, onToggle }) => {
   const navigation = useNavigation();
-  const [open, setOpen] = useState(false);
   const [local, setLocal] = useState(data);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const handleFileViewer = () => {
@@ -1332,7 +1354,7 @@ const ProposalCard = ({ data, onEdit, onDelete, opportunityTitle }) => {
 
   return (
     <View style={[styles.card, isDropdownOpen && styles.cardRaised]}>
-      <TouchableOpacity activeOpacity={0.85} onPress={() => setOpen((s) => !s)}>
+      <TouchableOpacity activeOpacity={0.85} onPress={() => onToggle && onToggle()}>
         <View style={styles.cardHeader}>
           <View style={styles.cardHeaderLeft}>
             <View style={{ width: wp(3.5), height: wp(3.5), borderRadius: wp(2), backgroundColor: '#3b82f6' }} />
@@ -1341,11 +1363,11 @@ const ProposalCard = ({ data, onEdit, onDelete, opportunityTitle }) => {
               <Text style={styles.cardTitle} numberOfLines={1}>{data.title || data.proposalNumber}</Text>
             </View>
           </View>
-          <Icon name={open ? 'expand-less' : 'expand-more'} size={rf(4.2)} color="#64748B" />
+          <Icon name={isOpen ? 'expand-less' : 'expand-more'} size={rf(4.2)} color="#64748B" />
         </View>
       </TouchableOpacity>
 
-      {open && (
+      {isOpen && (
         <View style={styles.detailGroup}>
           <View style={styles.cardDetailRow}>
             <Text style={styles.cardLabel}>Customer Name</Text>

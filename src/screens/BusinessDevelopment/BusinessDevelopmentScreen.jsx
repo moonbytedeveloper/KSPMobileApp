@@ -232,18 +232,21 @@ const BusinessDevelopmentScreen = () => {
           rightButtonLabel="Add New Lead"
           onRightPress={() => navigation.navigate('ManageLead', { isEditMode: false })}
         />
-        <View style={styles.itemsPerPageContainer}>
-          <Text style={styles.paginationLabel}>Show:</Text>
-          <Dropdown
-            placeholder="10"
-            value={itemsPerPage}
-            options={itemsPerPageOptions}
-            onSelect={handleItemsPerPageChange}
-            hideSearch={true}
-            inputBoxStyle={styles.paginationDropdown}
-          />
-          <Text style={styles.paginationLabel}>entries</Text>
-        </View>
+        {!(data.length === 0) && 
+        <View style={styles.paginationContainer}>
+          <View style={styles.itemsPerPageContainer}>
+            <Text style={styles.paginationLabel}>Show:</Text>
+            <Dropdown
+              placeholder="10"
+              value={itemsPerPage}
+              options={itemsPerPageOptions}
+              onSelect={handleItemsPerPageChange}
+              hideSearch={true}
+              inputBoxStyle={styles.paginationDropdown}
+            />
+            <Text style={styles.paginationLabel}>entries</Text>
+          </View>
+        </View>}
         {/* Cards (scrollable) */}
         <View style={{ paddingHorizontal: SPACING.lg, flex: 1 }}>
 
@@ -264,8 +267,8 @@ const BusinessDevelopmentScreen = () => {
                 expanded={expandedId === item.id}
                 onToggle={() => toggleRow(item.id)}
                 onView={() => navigation.navigate('ManageLeadProposal', { initialFollowUpTakerName: item.OppOwner, leadUuid: item.uuid, initialCustomerName: item.company?.client, initialOpportunityTitle: item.OpportunityTitle })}
-                onEdit={() => navigation.navigate('ManageLeadFollowUp',{initialFollowUpTakerName: item.OppOwner, leadUuid: item.uuid, initialCustomerName: item.company?.client})}
-                onEditLead={() => navigation.navigate('ManageLead', { 
+                onEdit={() => navigation.navigate('ManageLeadFollowUp', { initialFollowUpTakerName: item.OppOwner, leadUuid: item.uuid, initialCustomerName: item.company?.client })}
+                onEditLead={() => navigation.navigate('ManageLead', {
                   isEditMode: true, // This will show "Update" button and call PUT API
                   initialLead: item.company,
                   initialLeadUuid: item.uuid,
@@ -319,9 +322,9 @@ const BusinessDevelopmentScreen = () => {
             refreshing={loading}
             onRefresh={() => fetchWonLeads(currentPage, itemsPerPage, searchValue)}
           />
-            {(!loading && data.length === 0 && !!apiError) ? (
-              <View style={styles.apiErrorWrap}><Text style={styles.apiErrorText}>{apiError}</Text></View>
-            ) : null}
+          {(!loading && data.length === 0 && !!apiError) ? (
+            <View style={styles.apiErrorWrap}><Text style={styles.apiErrorText}>{apiError}</Text></View>
+          ) : null}
         </View>
 
         {/* Pagination Controls */}
@@ -478,35 +481,36 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
   },
   paginationContainer: {
-    backgroundColor: COLORS.bg,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: hp(1.5),
+    backgroundColor: '#ffffff',
+    borderTopWidth: 0.5,
+    borderBottomWidth: 0.5,
+    borderTopColor: '#e5e7eb',
+    borderBottomColor: '#e5e7eb',
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.2),
+    position: 'relative',
+    zIndex: 1000,
+    elevation: 2,
   },
   itemsPerPageContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: hp(1),
-    paddingLeft: SPACING.xl,
-    justifyContent: 'flex-start',
-    backgroundColor: COLORS.bg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border, 
-    paddingVertical: hp(1.2),
-    paddingHorizontal: SPACING.lg,
-    zIndex: 100,
-    elevation: 3,
+    position: 'relative',
+    zIndex: 1000,
   },
   paginationLabel: {
     fontSize: rf(3.5),
-    color: COLORS.text,
+    color: '#111827',
     marginRight: wp(2),
   },
   paginationDropdown: {
     width: wp(18),
     height: hp(5),
     marginHorizontal: wp(1),
+    zIndex: 1000,
+    position: 'relative',
+    elevation: 4,
   },
   pageInfo: {
     fontSize: rf(3.5),

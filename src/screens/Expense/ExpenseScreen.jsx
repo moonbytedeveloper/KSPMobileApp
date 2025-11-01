@@ -446,7 +446,7 @@ const ExpenseScreen = ({ navigation }) => {
               getKey={(n) => String(n)}
               hideSearch
               style={{ width: wp(22) }}
-              inputBoxStyle={{ marginTop: 0, paddingVertical: hp(0.8) }}
+              inputBoxStyle={styles.paginationDropdown}
               onSelect={handleItemsPerPageChange}
               isOpen={isPageSizeDropdownOpen}
               onOpenChange={(next) => {
@@ -629,12 +629,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: hp(2),
+     backgroundColor: '#ffffff',
+    borderTopWidth: 0.5,
+    borderBottomWidth: 0.5,
+    borderTopColor: '#e5e7eb',
+    borderBottomColor: '#e5e7eb',
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.2),
+    position: 'relative',
+    zIndex: 1000,
+    elevation: 2,
+    marginHorizontal: wp(-3.5),
   },
   showText: {
-    fontSize: rf(3.2),
-    color: COLORS.text,
+   fontSize: rf(3.5),
+    color: '#111827',
     marginRight: wp(2),
     fontFamily: TYPOGRAPHY.fontFamilyRegular,
+  },
+  paginationDropdown: {
+    width: wp(18),
+    height: hp(5),
+    marginHorizontal: wp(1),
+    zIndex: 1000,
+    position: 'relative',
+    elevation: 4,
   },
   showSelector: {
     flexDirection: 'row',

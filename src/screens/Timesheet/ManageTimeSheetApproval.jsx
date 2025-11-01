@@ -396,16 +396,16 @@ const ManageTimeSheetApproval = ({ navigation }) => {
         {/* Pagination Controls (top) */}
         <View style={styles.paginationContainerTop}>
           <View style={styles.itemsPerPageContainer}>
-            <Text style={styles.pageInfo}>Show:</Text>
+            <Text style={styles.paginationLabel}>Show:</Text>
             <Dropdown
               placeholder={String(pageSize)}
               value={pageSize}
               options={pageSizes}
               onSelect={handleItemsPerPageChange}
               hideSearch={true}
-              inputBoxStyle={{ width: wp(18), height: hp(5), marginHorizontal: wp(1) }}
+              inputBoxStyle={styles.paginationDropdown}
             />
-            <Text style={styles.pageInfo}>entries</Text>
+            <Text style={styles.paginationLabel}>entries</Text>
           </View>
         </View>
         <ScrollView
@@ -1188,19 +1188,38 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1.5),
   },
   paginationContainerTop: {
-    backgroundColor: COLORS.bg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    paddingHorizontal: SPACING.lg,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 0.5,
+    borderBottomWidth: 0.5,
+    borderTopColor: '#e5e7eb',
+    borderBottomColor: '#e5e7eb',
+    paddingHorizontal: wp(4),
     paddingVertical: hp(1.2),
-    zIndex: 1000,
-    elevation: 6,
+    position: 'relative',
+    zIndex: 1000, 
+    marginHorizontal: wp(-3.4),
+    elevation: 2,
+    marginBottom: hp(1.5)
   },
   itemsPerPageContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: wp(2),
+    marginBottom: hp(1),
+    position: 'relative',
+    zIndex: 1000,
+  },
+  paginationLabel: {
+    fontSize: rf(3.5),
+    color: '#111827',
+    marginRight: wp(2),
+  },
+  paginationDropdown: {
+    width: wp(18),
+    height: hp(5),
+    marginHorizontal: wp(1),
+    zIndex: 1000,
+    position: 'relative',
+    elevation: 4,
   },
   pageInfo: {
     fontSize: rf(3.5),

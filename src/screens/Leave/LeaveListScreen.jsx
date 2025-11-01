@@ -166,12 +166,17 @@ if(isLoading) {
       />
 
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { flexGrow: 1 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh.current} />
         }
       >
+         {visibleLeaves.length === 0 && (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyText}>{errorMessage || 'No leaves'}</Text>
+          </View>
+        )}
         {visibleLeaves.map((l) => (
           <View key={l.id} style={styles.card}>
             <TouchableOpacity
@@ -276,16 +281,12 @@ if(isLoading) {
           </View>
         ))}
 
-        {visibleLeaves.length === 0 && (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>{errorMessage || 'No leaves'}</Text>
-          </View>
-        )}
-        {hasMore && (
+       
+        {/* {hasMore && (
           <TouchableOpacity onPress={handleLoadMore} style={styles.loadMoreButton}>
             <Text style={styles.loadMoreText}>Load more</Text>
           </TouchableOpacity>
-        )}
+        )} */}
       </ScrollView>
     </View>
   );
@@ -427,8 +428,10 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   emptyBox: {
+    flex: 1,
     alignItems: 'center',
     paddingVertical: hp(4),
+    justifyContent: 'center',
   },
   emptyText: {
     color: COLORS.textLight,

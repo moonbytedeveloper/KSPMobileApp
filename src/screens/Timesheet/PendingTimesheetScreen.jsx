@@ -213,7 +213,7 @@ const PendingTimesheetScreen = ({ navigation }) => {
       />
 
       {/* Pagination controls header */}
-      <View style={styles.paginationContainer}>
+     {!(data.length === 0) && <View style={styles.paginationContainer}>
         <View style={styles.itemsPerPageContainer}>
           <Text style={styles.paginationLabel}>Show:</Text>
           <Dropdown
@@ -226,7 +226,7 @@ const PendingTimesheetScreen = ({ navigation }) => {
           />
           <Text style={styles.paginationLabel}>entries</Text>
         </View>
-      </View>
+      </View>}
 
       <ScrollView contentContainerStyle={[styles.scrollContent, data.length === 0 && { flex: 1 }]} showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh.current} />}
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1.2),
     position: 'relative',
     zIndex: 1000,
-    elevation: 3,
+    elevation: 2,
   },
   itemsPerPageContainer: {
     flexDirection: 'row',

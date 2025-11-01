@@ -215,7 +215,7 @@ export const layout = StyleSheet.create({
 export const formStyles = StyleSheet.create({
   container: {
     paddingHorizontal: SPACING.lg,
-    paddingBottom: hp(3),
+    paddingBottom: wp(1),
   }, 
   title: {
     fontSize: TYPOGRAPHY.h1,

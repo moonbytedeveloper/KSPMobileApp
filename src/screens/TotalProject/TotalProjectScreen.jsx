@@ -173,7 +173,7 @@ const TotalProjectScreen = ({ navigation }) => {
       />
 
       {/* Pagination Controls */}
-      <View style={styles.paginationContainer}>
+     {!(projects.length === 0) && <View style={styles.paginationContainer}>
         <View style={styles.itemsPerPageContainer}>
           <Text style={styles.paginationLabel}>Show:</Text>
           <Dropdown
@@ -186,7 +186,7 @@ const TotalProjectScreen = ({ navigation }) => {
           />
           <Text style={styles.paginationLabel}>entries</Text>
         </View>
-      </View>
+      </View>}
 
       <View style={styles.container}>
         <ScrollView
@@ -225,6 +225,7 @@ const TotalProjectScreen = ({ navigation }) => {
                   <View style={styles.headerLeft}>
                     <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
                     <View style={styles.headerContent}>
+                      <Text style={styles.projectSubtitle}>Project Name</Text>
                       <Text style={styles.projectTitle}>{name}</Text>
                       {/* <Text style={styles.projectSubtitle}>Due: {dueDate}</Text> */}
                     </View>
@@ -320,6 +321,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: wp(4),
+    paddingVertical: wp(3),
   },
   containers: {
     flex: 1,
@@ -332,30 +334,36 @@ const styles = StyleSheet.create({
     paddingBottom: hp(4),
   },
   paginationContainer: {
-    marginBottom: hp(1),
     backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderBottomWidth: 1.5,
+    borderTopWidth: 0.5,
+    borderBottomWidth: 0.5,
     borderTopColor: '#e5e7eb',
     borderBottomColor: '#e5e7eb',
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.2),
+    position: 'relative',
     zIndex: 1000,
+    elevation: 2,
   },
   itemsPerPageContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: hp(1),
+    position: 'relative',
+    zIndex: 1000,
   },
   paginationLabel: {
     fontSize: rf(3.5),
-    color: '#374151',
+    color: '#111827',
     marginRight: wp(2),
   },
   paginationDropdown: {
     width: wp(18),
     height: hp(5),
     marginHorizontal: wp(1),
+    zIndex: 1000,
+    position: 'relative',
+    elevation: 4,
   },
   pageInfo: {
     fontSize: rf(3.5),
@@ -479,7 +487,8 @@ const styles = StyleSheet.create({
   projectSubtitle: {
     fontSize: rf(3.2),
     color: COLORS.textLight,
-    fontFamily: TYPOGRAPHY.fontFamilyRegular,
+    fontWeight: '700',
+    fontFamily: TYPOGRAPHY.fontFamilyMedium,
   },
   headerRight: {
     flexDirection: 'row',

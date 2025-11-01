@@ -239,7 +239,7 @@ const TimesheetsApprovalScreen = ({ navigation }) => {
           onRightPress={handleNotificationPress}
         />
         {/* Pagination Controls (same UX as BusinessDevelopmentScreen) */}
-        <View style={styles.paginationContainer}>
+       {!(timesheetSummaries.length === 0) && <View style={styles.paginationContainer}>
           <View style={styles.itemsPerPageContainer}>
             <Text style={styles.paginationLabel}>Show:</Text>
             <Dropdown
@@ -252,7 +252,7 @@ const TimesheetsApprovalScreen = ({ navigation }) => {
             />
             <Text style={styles.paginationLabel}>entries</Text>
           </View> 
-        </View>
+        </View>}
       <View style={styles.container}>
           
         <ScrollView
@@ -341,34 +341,41 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: wp(4),
+    paddingVertical: wp(3),
   },
   listContent: {
     paddingBottom: hp(4),
   },
   paginationContainer: {
-    backgroundColor: COLORS.bg,
+    backgroundColor: '#ffffff',
     borderTopWidth: 0.5,
     borderBottomWidth: 0.5,
-    borderTopColor: COLORS.border,
-    borderBottomColor: COLORS.border,
+    borderTopColor: '#e5e7eb',
+    borderBottomColor: '#e5e7eb',
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.2),
+    position: 'relative',
     zIndex: 1000,
+    elevation: 2,
   },
   itemsPerPageContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: hp(1),
+    alignItems: 'center', 
+    position: 'relative',
+    zIndex: 1000,
   },
   paginationLabel: {
     fontSize: rf(3.5),
-    color: COLORS.text,
+    color: '#111827',
     marginRight: wp(2),
   },
   paginationDropdown: {
     width: wp(18),
     height: hp(5),
     marginHorizontal: wp(1),
+    zIndex: 1000,
+    position: 'relative',
+    elevation: 4,
   },
   pageInfo: {
     fontSize: rf(3.5),

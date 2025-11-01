@@ -180,6 +180,9 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalRecords, setTotalRecords] = useState(0);
 
+  // Track which follow-up card is currently open (only one at a time)
+  const [openCardId, setOpenCardId] = useState(null);
+
   // Load existing follow-ups from API (shared)
   const fetchFollowUps = useCallback(async () => {
     setIsRefreshing(true);
@@ -191,15 +194,15 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
       const mapped = list.map((r, idx) => {
         // Find employee name by UUID
         const takerUuid = r?.FollowUpTaker || '';
-        
+
         const foundEmployee = employees.find((emp) => {
           const empUuid = emp?.UUID || emp?.Uuid || emp?.EmployeeUUID || emp?.EmpUuid || '';
           const match = String(empUuid).trim().toLowerCase() === String(takerUuid).trim().toLowerCase();
           return match;
         });
         const takerName = foundEmployee ? resolveEmployeeName(foundEmployee) : takerUuid;
-        
-        
+
+
         return {
           id: String(r?.uuid || r?.Uuid || r?.UUID || idx + 1),
           uuid: String(r?.uuid || r?.Uuid || r?.UUID || ''),
@@ -275,6 +278,11 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
     setCurrentPage(0);
   };
 
+  // Handle card toggle - close previously open card if another is opened
+  const handleCardToggle = (cardId) => {
+    setOpenCardId((prevId) => (prevId === cardId ? null : cardId));
+  };
+
   const handleDeleteConfirm = (followUp) => {
     setFollowUpToDelete(followUp);
     setDeleteConfirmVisible(true);
@@ -282,16 +290,16 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
 
   const handleDeleteConfirmAction = async () => {
     if (!followUpToDelete) return;
-    
+
     try {
       const [cmpUuid, envUuid] = await Promise.all([getCMPUUID(), getENVUUID()]);
-      await deleteLeadFollowUp({ 
-        followupUuid: followUpToDelete.uuid, 
-        overrides: { 
-          userUuid: takerUuid || (await getUUID()), 
-          cmpUuid, 
-          envUuid 
-        } 
+      await deleteLeadFollowUp({
+        followupUuid: followUpToDelete.uuid,
+        overrides: {
+          userUuid: takerUuid || (await getUUID()),
+          cmpUuid,
+          envUuid
+        }
       });
       // Refresh from API instead of local state update
       await fetchFollowUps();
@@ -338,17 +346,17 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
     // refresh from API to show real data
     await fetchFollowUps();
     // Clear all form fields including employee selection
-    setTaker(''); 
-    setTakerUuid(''); 
+    setTaker('');
+    setTakerUuid('');
     setTakerEmp(null); // Clear the selected employee object
-    setDate(''); 
-    setType(''); 
+    setDate('');
+    setType('');
     setDesc('');
-    setIsRequired(false); 
-    setNextDate(''); 
+    setIsRequired(false);
+    setNextDate('');
     setErrors({});
     setEditingFollowup(null);
-    setIsAdding(false); 
+    setIsAdding(false);
     setIsUpdating(false);
   };
 
@@ -359,239 +367,242 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
       <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false}>
         <View style={styles.container}>
           <View style={styles.field}>
-          <Dropdown
-            placeholder="Follow Up Taker*"
-            value={resolveEmployeeName(takerEmp)}
-            options={employees}
-            getLabel={resolveEmployeeName}
-            getKey={resolveEmployeeKey}
-            hint="Follow Up Taker*"
-            onSelect={(emp) => {
-              setTakerEmp(emp);
-              setTaker(resolveEmployeeName(emp));
-              const empUuid = emp?.UUID || emp?.Uuid || emp?.EmployeeUUID || emp?.EmpUuid || '';
-              setTakerUuid(String(empUuid || ''));
-              if (errors.taker) setErrors((e) => ({ ...e, taker: null }));
-            }}
-            inputBoxStyle={[inputStyles.box, errors.taker && styles.errorBorder]}
-            textStyle={{ fontSize: rf(4.2), marginLeft:5}}
-            loading={loadingEmployees}
-          />
+            <Dropdown
+              placeholder="Follow Up Taker*"
+              value={resolveEmployeeName(takerEmp)}
+              options={employees}
+              getLabel={resolveEmployeeName}
+              getKey={resolveEmployeeKey}
+              hint="Follow Up Taker*"
+              onSelect={(emp) => {
+                setTakerEmp(emp);
+                setTaker(resolveEmployeeName(emp));
+                const empUuid = emp?.UUID || emp?.Uuid || emp?.EmployeeUUID || emp?.EmpUuid || '';
+                setTakerUuid(String(empUuid || ''));
+                if (errors.taker) setErrors((e) => ({ ...e, taker: null }));
+              }}
+              inputBoxStyle={[inputStyles.box, errors.taker && styles.errorBorder]}
+              textStyle={{ fontSize: rf(4.2), marginLeft: 5 }}
+              loading={loadingEmployees}
+            />
+            {errors.taker ? <Text style={styles.errorText}>{errors.taker}</Text> : null}
+          </View>
           {errors.taker ? <Text style={styles.errorText}>{errors.taker}</Text> : null}
-        </View>
-        {errors.taker ? <Text style={styles.errorText}>{errors.taker}</Text> : null}
 
-        <View style={{...styles.field,marginTop:15.5}}>
-        <TouchableOpacity activeOpacity={0.85} style={[inputStyles.box, { marginTop: 0 }, errors.date && styles.errorBorder]} onPress={() => setOpenPicker(true)}>
-          <Text style={[inputStyles.input, { fontSize: rf(4.2)}, !date && { color: '#9ca3af', fontFamily: TYPOGRAPHY.fontFamilyRegular }]}>{date ? formatDisplayDate(date) : 'Follow Up Date*'}</Text>
-          <Icon name="calendar-today" size={rf(3.2)} color="#9ca3af"  />
-        </TouchableOpacity>
-        </View>
-        {errors.date ? <Text style={styles.errorText}>{errors.date}</Text> : null}
-
-        <View style={[inputStyles.box, styles.field, errors.type && styles.errorBorder]}>
-          <TextInput
-            style={[inputStyles.input, { fontSize: rf(4.2) },{marginLeft:0}]}
-            placeholder="Follow Up Type*"
-            placeholderTextColor="#9ca3af"
-            value={type}
-            onChangeText={(v) => { setType(v); if (errors.type) setErrors((e) => ({ ...e, type: null })); }}
-          />
-        </View>
-        {errors.type ? <Text style={styles.errorText}>{errors.type}</Text> : null}
-
-        <TouchableOpacity
-      activeOpacity={1}
-      onPress={() => inputRef.current?.focus()}
-      style={[
-        inputStyles.box,
-        { minHeight: hp(14), alignItems: 'flex-start', paddingVertical: hp(1.2) },
-        styles.field,
-        errors.desc && styles.errorBorder,
-      ]}
-    >
-      <TextInput
-        ref={inputRef}
-        style={[
-          inputStyles.input,
-          { textAlignVertical: 'top', fontSize: rf(4.2) ,marginLeft:0,},
-        ]}
-        placeholder="Description *"
-        placeholderTextColor="#9ca3af"
-        value={desc}
-        onChangeText={(v) => {
-          setDesc(v);
-          if (errors.desc) setErrors((e) => ({ ...e, desc: null }));
-        }}
-        multiline
-      />
-    </TouchableOpacity>
-        {errors.desc ? <Text style={styles.errorText}>{errors.desc}</Text> : null}
-<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-  
-<View style={styles.checkboxRow}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={[styles.checkbox, isRequired && { backgroundColor: COLORS.primary, borderColor: COLORS.primary }]}
-            onPress={() => { setIsRequired((s) => { const next = !s; if (!next) { setNextDate(''); setErrors((e) => ({ ...e, nextDate: null })); } return next; }); }}
-          >
-            {isRequired ? <Icon name="check" size={rf(4.5)} color="#fff" /> : null}
-          </TouchableOpacity>
-          <Text style={styles.checkboxLabel}>Is Next Follow up is Required ?</Text>
-        </View>
-        {/* Conditional Next Follow-up Date will render below this row */}
-
-        <View style={{ alignItems: 'flex-end' }}>
-          <TouchableOpacity activeOpacity={0.9} style={[styles.addBtn, (isAdding || isUpdating) && { opacity: 0.6 }]} onPress={addRow} disabled={isAdding || isUpdating}>
-            <Text style={styles.addBtnText}>{editingFollowup ? (isUpdating ? 'Updating...' : 'Update') : (isAdding ? 'Adding...' : 'Add')}</Text>
-          </TouchableOpacity>
-        </View>
-</View>
-
-        {isRequired && (
-          <View style={{ marginTop: hp(0.6) }}>
-            <Text style={styles.inputLabel}>Next Follow-Up Date</Text>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={[inputStyles.box, { marginTop: 0 }, errors.nextDate && styles.errorBorder]}
-              onPress={() => setOpenNextPicker(true)}
-            >
-              <Text style={[inputStyles.input, { fontSize: rf(4.2), marginLeft: SPACING.sm }, !nextDate && { color: '#9ca3af', fontFamily: TYPOGRAPHY.fontFamilyRegular }]}>
-                {nextDate ? formatDisplayDate(nextDate) : 'Select Next Follow-Up Date*'}
-              </Text>
+          <View style={{ ...styles.field, marginTop: 15.5 }}>
+            <TouchableOpacity activeOpacity={0.85} style={[inputStyles.box, { marginTop: 0 }, errors.date && styles.errorBorder]} onPress={() => setOpenPicker(true)}>
+              <Text style={[inputStyles.input, { fontSize: rf(4.2) }, !date && { color: '#9ca3af', fontFamily: TYPOGRAPHY.fontFamilyRegular }]}>{date ? formatDisplayDate(date) : 'Follow Up Date*'}</Text>
               <Icon name="calendar-today" size={rf(3.2)} color="#9ca3af" />
             </TouchableOpacity>
-            {errors.nextDate ? <Text style={styles.errorText}>{errors.nextDate}</Text> : null}
           </View>
-        )}
+          {errors.date ? <Text style={styles.errorText}>{errors.date}</Text> : null}
 
-        {/* Pagination Controls */}
-        <View style={styles.paginationContainer}>
-          <View style={styles.itemsPerPageContainer}>
-            <Text style={styles.paginationLabel}>Show:</Text>
-            <Dropdown
-              placeholder="10"
-              value={itemsPerPage}
-              options={itemsPerPageOptions}
-              onSelect={handleItemsPerPageChange}
-              hideSearch={true}
-              inputBoxStyle={styles.paginationDropdown}
+          <View style={[inputStyles.box, styles.field, errors.type && styles.errorBorder]}>
+            <TextInput
+              style={[inputStyles.input, { fontSize: rf(4.2) }, { marginLeft: 0 }]}
+              placeholder="Follow Up Type*"
+              placeholderTextColor="#9ca3af"
+              value={type}
+              onChangeText={(v) => { setType(v); if (errors.type) setErrors((e) => ({ ...e, type: null })); }}
             />
-            <Text style={styles.paginationLabel}>entries</Text>
-          </View> 
-        </View>
+          </View>
+          {errors.type ? <Text style={styles.errorText}>{errors.type}</Text> : null}
 
-        {/* Follow-up Cards (collapsible like ManageLeadProposal) */}
-        <View style={{flex: 1, marginTop: hp(2) }}>
-          {rows.length === 0 && !!apiError ? (
-            <View style={styles.apiErrorWrap}>
-              <Text style={styles.apiErrorText}>{apiError}</Text>
-            </View>
-          ) : null}
-          {rows.map((r) => (
-            <FollowUpCard
-              key={r.id}
-              data={r}
-              onEdit={() => {
-                setEditingFollowup(r);
-                setTaker(r.taker);
-                setType(r.type);
-                const ui = r.uiDate || toUiDate(r.displayDate);
-                setDate(ui);
-                setPickerVal(fromUiToDate(ui));
-                // description from API
-                const apiDesc = r?.raw?.Description || r?.raw?.description || '';
-                setDesc(String(apiDesc));
-                // try to resolve employee by UUID (preferred) or by name (fallback)
-                let found = null;
-                if (r.takerUuid) {
-                  // First try to find by UUID
-                  found = employees.find((e) => {
-                    const empUuid = e?.UUID || e?.Uuid || e?.EmployeeUUID || e?.EmpUuid || '';
-                    return String(empUuid).trim().toLowerCase() === String(r.takerUuid).trim().toLowerCase();
-                  });
-                }
-                if (!found) {
-                  // Fallback to finding by name
-                  found = employees.find((e) => (e?.EmployeeName || e?.Name || e?.DisplayName || e?.FullName || '').trim().toLowerCase() === String(r.taker || '').trim().toLowerCase());
-                }
-                if (found) {
-                  setTakerEmp(found);
-                  const empUuid = found?.UUID || found?.Uuid || found?.EmployeeUUID || found?.EmpUuid || '';
-                  setTakerUuid(String(empUuid || ''));
-                }
-                // next follow-up fields if present in raw
-                const nextApi = r?.raw?.Next_FollowUp_Date;
-                const isNextReq = Boolean(r?.raw?.Is_Next_FollowUp_Req);
-                setIsRequired(isNextReq);
-                if (isNextReq && nextApi) {
-                  const nextUi = toUiDate(nextApi);
-                  setNextDate(nextUi);
-                  setNextPickerVal(fromUiToDate(nextUi));
-                } else {
-                  setNextDate('');
-                }
-                // Scroll to top when editing
-                setTimeout(() => {
-                  if (scrollViewRef.current) {
-                    try {
-                      scrollViewRef.current.scrollTo({ y: 0, animated: true });
-                    } catch (e) {
-                      try {
-                        scrollViewRef.current.scrollToOffset({ y: 0, animated: true });
-                      } catch (e2) {
-                      }
-                    }
-                  } else {
-                  }
-                }, 100);
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => inputRef.current?.focus()}
+            style={[
+              inputStyles.box,
+              { minHeight: hp(14), alignItems: 'flex-start', paddingVertical: hp(1.2) },
+              styles.field,
+              errors.desc && styles.errorBorder,
+            ]}
+          >
+            <TextInput
+              ref={inputRef}
+              style={[
+                inputStyles.input,
+                { textAlignVertical: 'top', fontSize: rf(4.2), marginLeft: 0, },
+              ]}
+              placeholder="Description *"
+              placeholderTextColor="#9ca3af"
+              value={desc}
+              onChangeText={(v) => {
+                setDesc(v);
+                if (errors.desc) setErrors((e) => ({ ...e, desc: null }));
               }}
-              onDelete={() => handleDeleteConfirm(r)}
+              multiline
             />
-          ))}
-        </View>
+          </TouchableOpacity>
+          {errors.desc ? <Text style={styles.errorText}>{errors.desc}</Text> : null}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
 
-        {/* Bottom Pagination */}
-        {totalRecords > 0 && (
-          <View style={styles.paginationContainer}>
-            <Text style={styles.pageInfo}>
-              Showing {totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1} to {Math.min((currentPage + 1) * itemsPerPage, totalRecords)} of {totalRecords} entries
-            </Text>
+            <View style={styles.checkboxRow}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.checkbox, isRequired && { backgroundColor: COLORS.primary, borderColor: COLORS.primary }]}
+                onPress={() => { setIsRequired((s) => { const next = !s; if (!next) { setNextDate(''); setErrors((e) => ({ ...e, nextDate: null })); } return next; }); }}
+              >
+                {isRequired ? <Icon name="check" size={rf(4.5)} color="#fff" /> : null}
+              </TouchableOpacity>
+              <Text style={styles.checkboxLabel}>Is Next Follow up is Required ?</Text>
+            </View>
+            {/* Conditional Next Follow-up Date will render below this row */}
 
-            <View style={styles.pageNavigation}>
-              {pageItems.map((it, idx) => {
-                if (it === 'prev') {
-                  const disabled = currentPage === 0;
-                  return (
-                    <TouchableOpacity key={`prev-${idx}`} style={[styles.pageButtonTextual, disabled && styles.pageButtonDisabled]} disabled={disabled} onPress={() => handlePageChange(currentPage - 1)}>
-                      <Text style={[styles.pageText, disabled && styles.pageTextDisabled]}>Previous</Text>
-                    </TouchableOpacity>
-                  );
-                }
-                if (it === 'next') {
-                  const disabled = currentPage >= totalPages - 1;
-                  return (
-                    <TouchableOpacity key={`next-${idx}`} style={[styles.pageButtonTextual, disabled && styles.pageButtonDisabled]} disabled={disabled} onPress={() => handlePageChange(currentPage + 1)}>
-                      <Text style={[styles.pageText, disabled && styles.pageTextDisabled]}>Next</Text>
-                    </TouchableOpacity>
-                  );
-                }
-                if (it === 'left-ellipsis' || it === 'right-ellipsis') {
-                  return (
-                    <View key={`dots-${idx}`} style={styles.pageDots}><Text style={styles.pageText}>...</Text></View>
-                  );
-                }
-                const pageNum = it;
-                const active = pageNum === currentPage + 1;
-                return (
-                  <TouchableOpacity key={`p-${pageNum}`} style={[styles.pageNumberBtn, active && styles.pageNumberBtnActive]} onPress={() => handlePageChange(pageNum - 1)}>
-                    <Text style={[styles.pageNumberText, active && styles.pageNumberTextActive]}>{pageNum}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+            <View style={{ alignItems: 'flex-end' }}>
+              <TouchableOpacity activeOpacity={0.9} style={[styles.addBtn, (isAdding || isUpdating) && { opacity: 0.6 }]} onPress={addRow} disabled={isAdding || isUpdating}>
+                <Text style={styles.addBtnText}>{editingFollowup ? (isUpdating ? 'Updating...' : 'Update') : (isAdding ? 'Adding...' : 'Add')}</Text>
+              </TouchableOpacity>
             </View>
           </View>
-        )}
+
+          {isRequired && (
+            <View style={{ marginTop: hp(0.6) }}>
+              <Text style={styles.inputLabel}>Next Follow-Up Date</Text>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={[inputStyles.box, { marginTop: 0 }, errors.nextDate && styles.errorBorder]}
+                onPress={() => setOpenNextPicker(true)}
+              >
+                <Text style={[inputStyles.input, { fontSize: rf(4.2), marginLeft: SPACING.sm }, !nextDate && { color: '#9ca3af', fontFamily: TYPOGRAPHY.fontFamilyRegular }]}>
+                  {nextDate ? formatDisplayDate(nextDate) : 'Select Next Follow-Up Date*'}
+                </Text>
+                <Icon name="calendar-today" size={rf(3.2)} color="#9ca3af" />
+              </TouchableOpacity>
+              {errors.nextDate ? <Text style={styles.errorText}>{errors.nextDate}</Text> : null}
+            </View>
+          )}
+
+          {/* Pagination Controls */}
+          {!(rows.length === 0) &&
+            <View style={styles.paginationContainer}>
+              <View style={styles.itemsPerPageContainer}>
+                <Text style={styles.paginationLabel}>Show:</Text>
+                <Dropdown
+                  placeholder="10"
+                  value={itemsPerPage}
+                  options={itemsPerPageOptions}
+                  onSelect={handleItemsPerPageChange}
+                  hideSearch={true}
+                  inputBoxStyle={styles.paginationDropdown}
+                />
+                <Text style={styles.paginationLabel}>entries</Text>
+              </View>
+            </View>}
+
+          {/* Follow-up Cards (collapsible like ManageLeadProposal) */}
+          <View style={{ flex: 1, marginTop: hp(2) }}>
+            {rows.length === 0 && !!apiError ? (
+              <View style={styles.apiErrorWrap}>
+                <Text style={styles.apiErrorText}>{apiError}</Text>
+              </View>
+            ) : null}
+            {rows.map((r) => (
+              <FollowUpCard
+                key={r.id}
+                data={r}
+                isOpen={openCardId === r.id}
+                onToggle={() => handleCardToggle(r.id)}
+                onEdit={() => {
+                  setEditingFollowup(r);
+                  setTaker(r.taker);
+                  setType(r.type);
+                  const ui = r.uiDate || toUiDate(r.displayDate);
+                  setDate(ui);
+                  setPickerVal(fromUiToDate(ui));
+                  // description from API
+                  const apiDesc = r?.raw?.Description || r?.raw?.description || '';
+                  setDesc(String(apiDesc));
+                  // try to resolve employee by UUID (preferred) or by name (fallback)
+                  let found = null;
+                  if (r.takerUuid) {
+                    // First try to find by UUID
+                    found = employees.find((e) => {
+                      const empUuid = e?.UUID || e?.Uuid || e?.EmployeeUUID || e?.EmpUuid || '';
+                      return String(empUuid).trim().toLowerCase() === String(r.takerUuid).trim().toLowerCase();
+                    });
+                  }
+                  if (!found) {
+                    // Fallback to finding by name
+                    found = employees.find((e) => (e?.EmployeeName || e?.Name || e?.DisplayName || e?.FullName || '').trim().toLowerCase() === String(r.taker || '').trim().toLowerCase());
+                  }
+                  if (found) {
+                    setTakerEmp(found);
+                    const empUuid = found?.UUID || found?.Uuid || found?.EmployeeUUID || found?.EmpUuid || '';
+                    setTakerUuid(String(empUuid || ''));
+                  }
+                  // next follow-up fields if present in raw
+                  const nextApi = r?.raw?.Next_FollowUp_Date;
+                  const isNextReq = Boolean(r?.raw?.Is_Next_FollowUp_Req);
+                  setIsRequired(isNextReq);
+                  if (isNextReq && nextApi) {
+                    const nextUi = toUiDate(nextApi);
+                    setNextDate(nextUi);
+                    setNextPickerVal(fromUiToDate(nextUi));
+                  } else {
+                    setNextDate('');
+                  }
+                  // Scroll to top when editing
+                  setTimeout(() => {
+                    if (scrollViewRef.current) {
+                      try {
+                        scrollViewRef.current.scrollTo({ y: 0, animated: true });
+                      } catch (e) {
+                        try {
+                          scrollViewRef.current.scrollToOffset({ y: 0, animated: true });
+                        } catch (e2) {
+                        }
+                      }
+                    } else {
+                    }
+                  }, 100);
+                }}
+                onDelete={() => handleDeleteConfirm(r)}
+              />
+            ))}
+          </View>
+
+          {/* Bottom Pagination */}
+          {totalRecords > 0 && (
+            <View style={[styles.paginationContainer, { marginTop: hp(1) }]}>
+              <Text style={styles.pageInfo}>
+                Showing {totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1} to {Math.min((currentPage + 1) * itemsPerPage, totalRecords)} of {totalRecords} entries
+              </Text>
+
+              <View style={styles.pageNavigation}>
+                {pageItems.map((it, idx) => {
+                  if (it === 'prev') {
+                    const disabled = currentPage === 0;
+                    return (
+                      <TouchableOpacity key={`prev-${idx}`} style={[styles.pageButtonTextual, disabled && styles.pageButtonDisabled]} disabled={disabled} onPress={() => handlePageChange(currentPage - 1)}>
+                        <Text style={[styles.pageText, disabled && styles.pageTextDisabled]}>Previous</Text>
+                      </TouchableOpacity>
+                    );
+                  }
+                  if (it === 'next') {
+                    const disabled = currentPage >= totalPages - 1;
+                    return (
+                      <TouchableOpacity key={`next-${idx}`} style={[styles.pageButtonTextual, disabled && styles.pageButtonDisabled]} disabled={disabled} onPress={() => handlePageChange(currentPage + 1)}>
+                        <Text style={[styles.pageText, disabled && styles.pageTextDisabled]}>Next</Text>
+                      </TouchableOpacity>
+                    );
+                  }
+                  if (it === 'left-ellipsis' || it === 'right-ellipsis') {
+                    return (
+                      <View key={`dots-${idx}`} style={styles.pageDots}><Text style={styles.pageText}>...</Text></View>
+                    );
+                  }
+                  const pageNum = it;
+                  const active = pageNum === currentPage + 1;
+                  return (
+                    <TouchableOpacity key={`p-${pageNum}`} style={[styles.pageNumberBtn, active && styles.pageNumberBtnActive]} onPress={() => handlePageChange(pageNum - 1)}>
+                      <Text style={[styles.pageNumberText, active && styles.pageNumberTextActive]}>{pageNum}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -647,7 +658,7 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingHorizontal: wp(4),
-    paddingBottom: hp(3),
+    paddingBottom: wp(1),
   },
   field: {
     marginTop: hp(1.2),
@@ -712,7 +723,7 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1.2),
     paddingHorizontal: wp(6),
     borderRadius: wp(2),
-    marginTop:hp(1),
+    marginTop: hp(1),
   },
   addBtnText: {
     color: '#fff',
@@ -767,22 +778,30 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e5e7eb',
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.2),
+    position: 'relative',
     zIndex: 1000,
+    elevation: 2,
+    marginHorizontal: wp(-3.4),
   },
   itemsPerPageContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: hp(1),
+    position: 'relative',
+    zIndex: 1000,
   },
   paginationLabel: {
     fontSize: rf(3.5),
-    color: '#374151',
+    color: '#111827',
     marginRight: wp(2),
   },
   paginationDropdown: {
     width: wp(18),
     height: hp(5),
     marginHorizontal: wp(1),
+    zIndex: 1000,
+    position: 'relative',
+    elevation: 4,
   },
   pageInfo: {
     fontSize: rf(3.5),
@@ -844,11 +863,10 @@ const styles = StyleSheet.create({
 });
 
 // Collapsible FollowUpCard copied in spirit from proposal card
-const FollowUpCard = ({ data, onEdit, onDelete }) => {
-  const [open, setOpen] = useState(false);
+const FollowUpCard = ({ data, onEdit, onDelete, isOpen = false, onToggle }) => {
   return (
     <View style={cardStyles.card}>
-      <TouchableOpacity activeOpacity={0.85} onPress={() => setOpen((s) => !s)}>
+      <TouchableOpacity activeOpacity={0.85} onPress={() => onToggle && onToggle()}>
         <View style={cardStyles.header}>
           <View style={cardStyles.headerLeft}>
             <View style={{ width: wp(3.5), height: wp(3.5), borderRadius: wp(2), backgroundColor: '#3b82f6' }} />
@@ -857,10 +875,10 @@ const FollowUpCard = ({ data, onEdit, onDelete }) => {
               <Text style={cardStyles.title} numberOfLines={1}>{data.taker}</Text>
             </View>
           </View>
-          <Icon name={open ? 'expand-less' : 'expand-more'} size={rf(4.2)} color="#64748B" />
+          <Icon name={isOpen ? 'expand-less' : 'expand-more'} size={rf(4.2)} color="#64748B" />
         </View>
       </TouchableOpacity>
-      {open && (
+      {isOpen && (
         <View style={cardStyles.body}>
           <View style={cardStyles.row}><Text style={cardStyles.label}>Follow Up Taker</Text><Text style={cardStyles.value}>{data.taker}</Text></View>
           <View style={cardStyles.row}><Text style={cardStyles.label}>Follow Date</Text><Text style={cardStyles.value}>{data.displayDate}</Text></View>
