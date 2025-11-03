@@ -208,8 +208,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: rf(3),
     fontWeight: '500',
-    color: COLORS.textLight,
-    textTransform: 'uppercase',
+    color: COLORS.textLight, 
     fontFamily: TYPOGRAPHY.fontFamilyMedium,
   },
   value: {

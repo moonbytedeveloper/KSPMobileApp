@@ -845,8 +845,7 @@ const styles = StyleSheet.create({
   },
   tsBadgeText: {
     fontSize: TYPOGRAPHY.body,
-    fontWeight: '800',
-    textTransform: 'uppercase',
+    fontWeight: '800', 
   },
   tsActionsRowPrimary: {
     ...layout.rowCenter,

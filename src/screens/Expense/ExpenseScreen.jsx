@@ -390,54 +390,68 @@ const ExpenseScreen = ({ navigation }) => {
             <Icon name="filter-list" size={rf(5)} color="#fff" /> 
           </TouchableOpacity>
         </View>
+
         {filterVisible && (
-        <View style={{ gap: wp(3) }}>
-          <View style={{ zIndex: isProjectDropdownOpen ? 4 : 1 }}>
-            <Dropdown
-              placeholder="Project Name"
-              value={selectedProject?.name}
-              options={projects.length ? projects : sampleProjects}
-              getLabel={(p) => p.name}
-              getKey={(p) => p.id}
-              hint="Project Name"
-              onSelect={handleSelectProject}
-              isOpen={isProjectDropdownOpen}
-              onOpenChange={(next) => {
-                setIsProjectDropdownOpen(next);
-                if (next) {
-                  setIsTaskDropdownOpen(false);
-                  setIsPageSizeDropdownOpen(false);
-                }
-              }} 
-            />
-          </View>
+          <View style={{ gap: wp(3), position: 'relative' }}>
+            <View style={{
+              zIndex: isProjectDropdownOpen ? 100 : 1,
+              position: isProjectDropdownOpen ? 'absolute' : 'relative',
+              width: '100%',
+            }}>
+              <Dropdown
+                placeholder="Project Name"
+                value={selectedProject?.name}
+                options={projects.length ? projects : sampleProjects}
+                getLabel={(p) => p.name}
+                getKey={(p) => p.id}
+                hint="Project Name"
+                onSelect={handleSelectProject}
+                isOpen={isProjectDropdownOpen}
+                onOpenChange={(next) => {
+                  setIsProjectDropdownOpen(next);
+                  if (next) {
+                    setIsTaskDropdownOpen(false);
+                    setIsPageSizeDropdownOpen(false);
+                  }
+                }}
+              />
+            </View>
 
-          <View style={{ zIndex: isTaskDropdownOpen ? 4 : 1 }}>
-            <Dropdown
-              placeholder="Project Task"
-              value={selectedTask}
-              options={availableTasks}
-              getLabel={(t) => t}
-              getKey={(t, i) => `${t}-${i}`}
-              hint="Project Task"
-              disabled={!selectedProject}
-              onSelect={handleSelectTask}
-              isOpen={isTaskDropdownOpen}
-              onOpenChange={(next) => {
-                setIsTaskDropdownOpen(next);
-                if (next) {
-                  setIsProjectDropdownOpen(false);
-                  setIsPageSizeDropdownOpen(false);
-                }
-              }}
-            />
+            <View style={{
+              zIndex: isTaskDropdownOpen ? 100 : 1,
+              position: isTaskDropdownOpen ? 'absolute' : 'relative',
+              width: '100%',
+            }}>
+              <Dropdown
+                placeholder="Project Task"
+                value={selectedTask}
+                options={availableTasks}
+                getLabel={(t) => t}
+                getKey={(t, i) => `${t}-${i}`}
+                hint="Project Task"
+                disabled={!selectedProject}
+                onSelect={handleSelectTask}
+                isOpen={isTaskDropdownOpen}
+                onOpenChange={(next) => {
+                  setIsTaskDropdownOpen(next);
+                  if (next) {
+                    setIsProjectDropdownOpen(false);
+                    setIsPageSizeDropdownOpen(false);
+                  }
+                }}
+              />
+            </View>
           </View>
-        </View>
-      )}
+        )}
 
-        <View style={[styles.searchRow]}>
+
+        <View style={[styles.searchRow, { zIndex: 10, position: 'relative' }]}> 
           <Text style={styles.showText}>Show</Text>
-          <View style={{ zIndex: isPageSizeDropdownOpen ? 3 : 0 }}>
+          <View style={{
+            zIndex: isPageSizeDropdownOpen ? 100 : 1,
+            position: isPageSizeDropdownOpen ? 'absolute' : 'relative',
+            width: wp(22),
+          }}>
             <Dropdown
               placeholder={String(pageSize)}
               value={pageSize}

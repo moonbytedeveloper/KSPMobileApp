@@ -11,7 +11,7 @@ import CommonBottomSheet from '../../components/common/CommonBottomSheet';
 import Dropdown from '../../components/common/Dropdown';
 import DatePickerBottomSheet from '../../components/common/CustomDatePicker';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop, BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
-import { COLORS, RADIUS, TYPOGRAPHY } from '../styles/styles';
+import { COLORS, RADIUS, TYPOGRAPHY,SPACING } from '../styles/styles';
 import { ScrollView } from 'react-native-gesture-handler';
 import { getManageTimesheet, fetchUserProjects, fetchUserProjectTasks, addTimesheetLine, deleteTimesheetLine, submitTimesheetLine, transferTimesheetTasks, checkAddTimesheetEligibility } from '../../api/authServices';
 import { useUser } from '../../contexts/UserContext';
@@ -627,6 +627,22 @@ const TimesheetScreen = ({ navigation }) => {
     return <Loader />;
   }
 
+  const StatusBadge = ({ label = 'Pending' }) => {
+    const palette = {
+      Pending: { bg: COLORS.warningBg, color: COLORS.warning, border: COLORS.warning },
+      Submitted: { bg: COLORS.infoBg, color: COLORS.info, border: COLORS.info },
+      Approved: { bg: COLORS.successBg, color: COLORS.success, border: COLORS.success },
+      Rejected: { bg: COLORS.successBg, color: COLORS.success, border: COLORS.success },
+    };
+    const theme = palette[label] || palette.Pending;
+  
+    return (
+      <View style={[styles.badge, { backgroundColor: theme.bg, borderColor: theme.border }]}> 
+        <Text style={[styles.badgeText, { color: theme.color }]}>{label}</Text>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <AppHeader
@@ -696,7 +712,7 @@ const TimesheetScreen = ({ navigation }) => {
               <Text style={styles.infoLabel}>Timesheet Status</Text>
             </View>
             <View style={styles.statusPill}>
-              <Text style={styles.statusPillText}>{status}</Text>
+            <StatusBadge  label={status} />
             </View>
           </View>
         </View>
@@ -1138,6 +1154,17 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bg,
     // paddingTop: safeAreaTop,
   },
+  badge: {
+    borderWidth: 1,
+    paddingVertical: hp(0.2),
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.md,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    padding: 1 
+  }, 
   scrollContent: {
     paddingHorizontal: wp(4),
     paddingBottom: hp(12), // Extra padding to avoid bottom navigation
@@ -1261,8 +1288,7 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontFamilyBold,
   },
   statusPill: {
-    alignSelf: 'flex-start',
-    backgroundColor: COLORS.warningBg,
+    alignSelf: 'flex-start', 
     paddingVertical: hp(0.6),
     paddingHorizontal: wp(3),
     borderRadius: wp(5),

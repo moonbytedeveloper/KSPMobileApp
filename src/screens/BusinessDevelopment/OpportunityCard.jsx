@@ -50,10 +50,12 @@ const formatDMY = (dateInput) => {
 const StatusBadge = ({ label = 'Pending' }) => {
   const palette = {
     Pending: { bg: COLORS.warningBg, color: COLORS.warning, border: COLORS.warning },
-    Open: { bg: COLORS.infoBg, color: COLORS.info, border: COLORS.info },
+    'Not Updated': { bg: COLORS.divider, color: 'gray', border: 'gray' },
+    NotUpdate: { bg: COLORS.infoBg, color: COLORS.info, border: COLORS.info },
     Won: { bg: COLORS.successBg, color: COLORS.success, border: COLORS.success },
-    Closed: { bg: COLORS.successBg, color: COLORS.success, border: COLORS.success },
+    Closed: { bg: COLORS.dangerBg, color: COLORS.danger, border: COLORS.danger },
   };
+  
   const theme = palette[label] || palette.Pending;
 
   return (

@@ -480,8 +480,7 @@ const styles = StyleSheet.create({
   rowLabel: {
     fontSize: rf(3),
     fontWeight: '500',
-    color: '#94a3b8',
-    textTransform: 'uppercase',
+    color: '#94a3b8', 
   },
   rowValue: {
     fontSize: rf(3.5),

@@ -211,7 +211,14 @@ const TotalProjectScreen = ({ navigation }) => {
             const progressValue = Number(
               project.Progress ?? project.progress ?? 0
             ) || 0;
-            const statusColor = status === 'Completed' ? '#10b981' : status === 'On Hold' ? '#f59e0b' : '#3b82f6';
+            const statusColor = String(status).trim() === 'Completed' ? (COLORS.success || '#10b981') :
+            String(status).trim() === 'On Hold' ? (COLORS.warning || '#f59e0b') :
+            String(status).trim() === 'Approved' ? (COLORS.success || '#10b981') :
+            String(status).trim() === 'Pending' ? (COLORS.warning || '#f59e0b') :
+            String(status).trim() === 'Draft' ? 'grey' :
+            String(status).trim() === 'Submitted' ? (COLORS.info || '#3b82f6') :
+            String(status).trim() === 'Rejected' ? (COLORS.danger || '#ef4444') :
+            (COLORS.info || '#3b82f6');
             const isExpanded = expandedProject === index;
 
             return (

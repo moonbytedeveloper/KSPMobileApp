@@ -18,13 +18,7 @@ const sampleProjects = [
   { id: 'p5', name: 'Moonbyte001', tasks: ['Module A', 'Module B', 'Module C'] },
 ];
 
-const sampleEmployees = [
-  { id: 'e1', name: 'Abhinav Kumar' },
-  { id: 'e2', name: 'Riya Sharma' },
-  { id: 'e3', name: 'Aman Verma' },
-  { id: 'e4', name: 'John Doe' },
-  { id: 'e5', name: 'Jane Smith' },
-];
+// Employees are loaded from API via getEmployees()
 
 const pageSizes = [10, 25, 50, 100];
 
@@ -537,13 +531,13 @@ const ExpenseApproval = ({ navigation }) => {
       
       setApprovalDetailsData(transformedData);
     } catch (err) {
-      console.error('Error fetching approval details:', err);
-      setApprovalDetailsError(err.message || 'Failed to fetch approval details');
+      try { console.log(err?.response?.status, '4001'); } catch (_) {}
+      setApprovalDetailsError(getReadableError(err, 'Failed to fetch approval details'));
     } finally {
       setApprovalDetailsLoading(false);
     }
   };
-
+   // console.log(approvalDetailsError,'approvalDetailsError')
   // Frontend search filter function
   const filterDataBySearch = (data, searchTerm) => {
     // Ensure data is an array
@@ -755,11 +749,16 @@ const ExpenseApproval = ({ navigation }) => {
         .map(p => ({ id: p.UUID || p.Uuid || p.id, name: String(p.Project_Title) }));
       setProjects(projectOptions);
       
-      // Transform employees data
-      const employeesRaw = Array.isArray(employeesResp?.Data) ? employeesResp.Data : [];
+      // Transform employees data (API returns [{ Uuid, FullName }, ...])
+      const employeesRawCandidates = [
+        Array.isArray(employeesResp?.Data) ? employeesResp.Data : null,
+        Array.isArray(employeesResp?.data) ? employeesResp.data : null,
+        Array.isArray(employeesResp) ? employeesResp : null,
+      ].filter(Boolean);
+      const employeesRaw = employeesRawCandidates.length ? employeesRawCandidates[0] : [];
       const employeeOptions = employeesRaw
-        .filter(e => e && e.Name)
-        .map(e => ({ id: e.UUID || e.Uuid || e.id, name: String(e.Name) }));
+        .filter(e => e && (e.FullName || e.Name))
+        .map(e => ({ id: e.Uuid || e.UUID || e.uuid || e.Id || e.id, name: String(e.FullName || e.Name) }));
       setEmployees(employeeOptions);
       
       console.log('[ExpenseApproval] mapped projects:', projectOptions);
@@ -1281,7 +1280,7 @@ const ExpenseApproval = ({ navigation }) => {
           <Dropdown
             placeholder={employeesLoading ? "Loading employees..." : "Employee"}
             value={selectedEmployee?.name}
-            options={employees.length ? employees : sampleEmployees}
+            options={employees}
             getLabel={(e) => e.name}
             getKey={(e) => e.id}
             hint="Employee"
@@ -1358,8 +1357,8 @@ const ExpenseApproval = ({ navigation }) => {
           >
             {error && (activeTab === 'approvedByMe' || activeTab === 'expenseToApprove' || activeTab === 'myApprovalExpense' || activeTab === 'myRejectedExpense' || activeTab === 'pendingApproval') ? (
               <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>Error: {error}</Text>
-                <TouchableOpacity 
+                <Text style={styles.errorText}>{error}</Text>
+                {/* <TouchableOpacity 
                   style={styles.retryButton} 
                   onPress={activeTab === 'approvedByMe' ? fetchApprovedByMeExpenses : 
                            activeTab === 'expenseToApprove' ? fetchExpenseToApproveData :
@@ -1368,7 +1367,7 @@ const ExpenseApproval = ({ navigation }) => {
                            fetchPendingApprovals}
                 >
                   <Text style={styles.retryButtonText}>Retry</Text>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
               </View>
             ) : (
               <>
@@ -1497,7 +1496,7 @@ const ExpenseApproval = ({ navigation }) => {
                 </View>
               ) : expenseDetailsError ? (
                 <View style={styles.errorContainer}>
-                  <Text style={styles.errorText}>Error: {expenseDetailsError}</Text>
+                  <Text style={styles.errorText}>{expenseDetailsError}</Text>
                   <TouchableOpacity 
                     style={styles.retryButton} 
                     onPress={() => selectedExpense?.headerUuid && fetchExpenseDetails(selectedExpense.headerUuid)}
@@ -1523,12 +1522,12 @@ const ExpenseApproval = ({ navigation }) => {
                       
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>From Date:</Text>
-                        <Text style={styles.detailValue}>{expenseDetailsData.header.DocDateFrom || expenseDetailsData.header.Doc_Date_From || 'N/A'}</Text>
+                        <Text style={styles.detailValue}>{expenseDetailsData.header.DocumentDateFrom || expenseDetailsData.header.Doc_Date_From || 'N/A'}</Text>
                       </View>
                       
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>To Date:</Text>
-                        <Text style={styles.detailValue}>{expenseDetailsData.header.DocDateTo || expenseDetailsData.header.Doc_Date_To || 'N/A'}</Text>
+                        <Text style={styles.detailValue}>{expenseDetailsData.header.DocumentDateTo || expenseDetailsData.header.Doc_Date_To || 'N/A'}</Text>
                       </View>
                       
                       <View style={styles.detailRow}>
@@ -1667,13 +1666,13 @@ const ExpenseApproval = ({ navigation }) => {
               </View>
             ) : approvalDetailsError ? (
               <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>Error: {approvalDetailsError}</Text>
-                <TouchableOpacity 
+                <Text style={styles.errorText}>{approvalDetailsError}</Text>
+                {/* <TouchableOpacity 
                   style={styles.retryButton} 
                   onPress={() => selectedExpense?.headerUuid && fetchApprovalDetails(selectedExpense.headerUuid)}
                 >
                   <Text style={styles.retryButtonText}>Retry</Text>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
               </View>
             ) : approvalDetailsData ? (
               <ScrollView style={styles.approvalDetailsList} showsVerticalScrollIndicator={false}>
@@ -2100,8 +2099,7 @@ const styles = StyleSheet.create({
   },
   tsBadgeText: {
     fontSize: TYPOGRAPHY.body,
-    fontWeight: '800',
-    textTransform: 'uppercase',
+    fontWeight: '800', 
     fontFamily: TYPOGRAPHY.fontFamilyBold,
   },
   tsActionsRowPrimary: {
@@ -2362,8 +2360,7 @@ const styles = StyleSheet.create({
     paddingVertical: hp(4),
   },
   errorText: {
-    fontSize: rf(3.2),
-    color: '#ef4444',
+    fontSize: rf(3.2), 
     textAlign: 'center',
     marginBottom: hp(2),
     fontFamily: TYPOGRAPHY.fontFamilyRegular,

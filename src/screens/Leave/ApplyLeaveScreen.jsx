@@ -242,7 +242,7 @@ const ApplyLeaveScreen = ({ navigation }) => {
 
         {isExpanded && (
           <View style={styles.leaveDetailArea}>
-            <Text style={[styles.detailLabelMuted, { marginBottom: hp(0.8) }]}>LEAVE INFORMATION</Text>
+            <Text style={[styles.detailLabelMuted, { marginBottom: hp(0.8) }]}>Leave Information</Text>
             <View style={styles.leaveDetailRow}>
               <Text style={styles.detailLabelMuted}>APPLIED BY</Text>
               <Text style={styles.detailValueStrong}>{data.appliedBy || '-'}</Text>

@@ -16,7 +16,7 @@ const BottomSheetConfirm = ({
   autoCloseOnConfirm = true,
 }) => {
   const sheetRef = useRef(null);
-  const snapPoints = useMemo(() => [hp(28)], []);
+  const snapPoints = useMemo(() => [hp(30)], []);
 
   useEffect(() => {
     if (visible) {

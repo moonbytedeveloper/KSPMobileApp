@@ -18,7 +18,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 const StatusBadge = ({ label  }) => {
   const palette = {
     Pending: { bg: COLORS.warningBg, color: COLORS.warning, border: COLORS.warning },
-    Submitted: { bg: COLORS.successBg, color: COLORS.success, border: COLORS.success },
+    Submitted: { bg: COLORS.infoBg, color: COLORS.info, border: COLORS.info },
     Rejected: { bg: COLORS.dangerBg, color: COLORS.danger, border: COLORS.danger },
   };
   const theme = palette[label] || palette.Pending;
@@ -38,15 +38,16 @@ const TimesheetAccordion = ({ item, onManagePress }) => {
       <TouchableOpacity activeOpacity={0.85} onPress={toggle}>
         <View style={styles.tsRowHeader}>
           <View style={styles.tsHeaderLeft}>
-            <View style={styles.tsDot} />
+            <View style={[styles.tsDot, { backgroundColor: (item.status === 'Approved' ? COLORS.success : 
+              item.status === 'Pending' ? COLORS.warning : item.status === 'Not Updated' ?   'grey' : COLORS.info) }]} />
             <View style={styles.tsHeaderLeftContent}>
-              <Text style={styles.tsCaption}>EMPLOYEE</Text>
+              <Text style={styles.tsCaption}>Employee</Text>
               <Text style={styles.tsTitle} numberOfLines={1}>{item.employeeName}</Text>
             </View>
           </View>
           <View style={styles.tsHeaderRight}>
             <View>
-              <Text style={[styles.tsCaption, { textAlign: 'right' }]}>TOTAL HOURS</Text>
+              <Text style={[styles.tsCaption, { textAlign: 'right' }]}>Total Hours</Text>
               <Text style={styles.tsHours}>{item.totalHoursWorked}</Text>
             </View>
             <Icon name={expanded ? 'expand-less' : 'expand-more'} size={rf(4.2)} color={COLORS.textMuted} />
@@ -480,8 +481,7 @@ const styles = StyleSheet.create({
   tsDot: {
     width: wp(3.5),
     height: wp(3.5),
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.md, 
   },
   tsCaption: {
     fontSize: 10.5,

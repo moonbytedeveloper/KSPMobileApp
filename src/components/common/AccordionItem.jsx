@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { rf, wp, hp } from '../../utils/responsive';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { buttonStyles, COLORS, TYPOGRAPHY,RADIUS } from '../../screens/styles/styles';
+import { buttonStyles, COLORS, TYPOGRAPHY, RADIUS } from '../../screens/styles/styles';
 
 // AccordionItem Component
 const AccordionItem = ({
@@ -23,24 +23,29 @@ const AccordionItem = ({
   editLabel = 'Edit',
   status,
 }) => {
- console.log('status122', status, 'item',item.status);
+  console.log('status122', status, 'item', item.status);
   // Defer delete confirmation to the screen-level bottom sheet
 
   return (
     <View style={styles.accordionItem}>
       <TouchableOpacity onPress={onToggle} style={styles.accordionHeader} activeOpacity={0.8}>
         <View style={styles.headerSummaryContainer}>
-        {!!item?.status && (
+          {!!item?.status && (
+
             <View
               style={[
                 styles.dot,
                 {
                   backgroundColor:
                     String(item.status).trim() === 'Approved'
-                      ? (COLORS.success)
-                      : String(item.status).trim() === 'Submitted'
-                        ? (COLORS.info || '#fef3c7')
-                        : (COLORS.danger || '#fee2e2'),
+                      ? COLORS.success
+                      : String(item.status).trim() === 'Pending'
+                        ? COLORS.warning
+                        : String(item.status).trim() === 'Draft'
+                          ? 'grey'
+                          : String(item.status).trim() === 'Submitted'
+                            ? COLORS.info
+                            : COLORS.danger,
                 },
               ]}
             />
@@ -145,7 +150,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: COLORS.border,
-    zIndex: -1 
+    zIndex: -1
   },
   accordionHeader: {
     flexDirection: 'row',
@@ -160,13 +165,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexShrink: 1,
-    marginLeft: wp(-1), 
+    marginLeft: wp(-1),
 
   },
   summaryLabel: {
     fontSize: rf(3),
     fontWeight: '700',
-    color: COLORS.textLight, 
+    color: COLORS.textLight,
     fontFamily: TYPOGRAPHY.fontFamilyMedium,
   },
   summaryValue: {
@@ -196,7 +201,7 @@ const styles = StyleSheet.create({
   cardLabel: {
     fontSize: rf(3),
     fontWeight: '500',
-    color: COLORS.textLight, 
+    color: COLORS.textLight,
     fontFamily: TYPOGRAPHY.fontFamilyMedium,
   },
   cardValue: {
@@ -271,11 +276,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: TYPOGRAPHY.fontFamilyBold,
   },
-  dot:{ 
-      width: wp(3.5),
-      height: wp(3.5),
-      borderRadius: RADIUS.md,
-      marginRight: wp(2),
+  dot: {
+    width: wp(3.5),
+    height: wp(3.5),
+    borderRadius: RADIUS.md,
+    marginRight: wp(2),
   },
 
   submitButtonContainer: {
