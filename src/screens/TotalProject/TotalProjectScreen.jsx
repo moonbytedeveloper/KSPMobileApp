@@ -155,7 +155,7 @@ const TotalProjectScreen = ({ navigation }) => {
     return (
       <View style={styles.containers}>
         <AppHeader
-          title="Total Project"
+          title="Total Projects"
           onLeftPress={() => navigation.goBack()}
           onRightPress={() => navigation.navigate('Notification')}
         />
@@ -365,12 +365,11 @@ const styles = StyleSheet.create({
     marginRight: wp(2),
   },
   paginationDropdown: {
-    width: wp(18),
-    height: hp(5),
+    width: wp(16),
+    height: hp(4),
     marginHorizontal: wp(1),
     zIndex: 1000,
     position: 'relative',
-    elevation: 4,
   },
   pageInfo: {
     fontSize: rf(3.5),
@@ -537,7 +536,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
   },
   badgeText: {
-    fontSize: 10.5,
+    fontSize: 9,
     fontWeight: '600',
     padding: 1
   },
@@ -554,14 +553,17 @@ const styles = StyleSheet.create({
     borderRadius: wp(2),
     overflow: 'hidden',
     marginHorizontal: wp(2),
+    
   },
   progressFill: {
     height: '100%',
+    
     backgroundColor: '#10b981',
   },
   progressPercent: {
     fontSize: rf(3.8),
     fontWeight: '700',
+    
     color: '#111827',
     fontFamily: TYPOGRAPHY.fontFamilyBold,
   },

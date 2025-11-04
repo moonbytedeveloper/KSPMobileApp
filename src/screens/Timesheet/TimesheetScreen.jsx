@@ -11,7 +11,7 @@ import CommonBottomSheet from '../../components/common/CommonBottomSheet';
 import Dropdown from '../../components/common/Dropdown';
 import DatePickerBottomSheet from '../../components/common/CustomDatePicker';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop, BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
-import { COLORS, RADIUS, TYPOGRAPHY,SPACING } from '../styles/styles';
+import { COLORS, RADIUS, TYPOGRAPHY, SPACING } from '../styles/styles';
 import { ScrollView } from 'react-native-gesture-handler';
 import { getManageTimesheet, fetchUserProjects, fetchUserProjectTasks, addTimesheetLine, deleteTimesheetLine, submitTimesheetLine, transferTimesheetTasks, checkAddTimesheetEligibility } from '../../api/authServices';
 import { useUser } from '../../contexts/UserContext';
@@ -90,7 +90,7 @@ const TimesheetScreen = ({ navigation }) => {
   const isMonday = (date) => {
     return date.getDay() === 1; // 1 = Monday
   };
-  
+
   // Helper function to get Sunday of the same week
   const getSundayOfWeek = (mondayDate) => {
     const sunday = new Date(mondayDate);
@@ -101,17 +101,18 @@ const TimesheetScreen = ({ navigation }) => {
   // Transform API data to match UI structure
   const transformTimesheetData = (apiData) => {
     if (!apiData || !apiData.Lines) return [];
-    
+
     // Group lines by project and task
     const groupedData = {};
     apiData.Lines.forEach(line => {
+      console.log(line,'line')
       const key = `${line.Project_UUID}-${line.Task_UUID}`;
       if (!groupedData[key]) {
         groupedData[key] = {
           id: key,
           // taskName: `${line.ProjectTitle} • ${line.TaskTitle}`,
-          projectName:line.ProjectTitle,
-          projectTask:line.TaskTitle,
+          projectName: line.ProjectTitle,
+          projectTask: line.TaskTitle,
           fromDate: apiData.From_Date,
           toDate: apiData.To_Date,
           status: apiData.Timesheet_Status,
@@ -132,7 +133,7 @@ const TimesheetScreen = ({ navigation }) => {
         return acc + hh * 60 + mm;
       }, 0);
       group.totalHours = formatHhMm(totalMinutes);
-      
+
       // Log line data with hours for debugging
       console.log('📊 [TimesheetScreen] Line Data for Task:', group.taskName, {
         totalLines: group.lines.length,
@@ -158,7 +159,7 @@ const TimesheetScreen = ({ navigation }) => {
       console.log('🔧 [TimesheetScreen] Already fetching data, skipping...');
       return;
     }
-    
+
     try {
       console.log('🔧 [TimesheetScreen] Starting fetchTimesheetData:', { fromDateParam, toDateParam, isLoading });
       isFetchingRef.current = true;
@@ -166,7 +167,7 @@ const TimesheetScreen = ({ navigation }) => {
       // Don't clear data immediately to prevent flickering
       // setData([]);
       // setTimesheetData(null);
-      
+
       // Log the request parameters including dates
       console.log('🚀 [TimesheetScreen] API Request Parameters:', {
         frmD: fromDateParam,
@@ -174,14 +175,14 @@ const TimesheetScreen = ({ navigation }) => {
         fromDateType: typeof fromDateParam,
         toDateType: typeof toDateParam
       });
-      
+
       console.log('🔧 [TimesheetScreen] Making API call to getManageTimesheet');
       const response = await getManageTimesheet({
         frmD: fromDateParam,
         toD: toDateParam
       });
       console.log('🔧 [TimesheetScreen] API response received:', { success: response.Success, hasData: !!response.Data });
-      
+
       // Log raw line data structure
       if (response.Data?.Lines && response.Data.Lines.length > 0) {
         console.log('📋 [TimesheetScreen] Raw Line Data Structure:', {
@@ -197,12 +198,13 @@ const TimesheetScreen = ({ navigation }) => {
           }))
         });
       }
-      
+
       if (response.Success && response.Data) {
+        console.log(response, '85258')
         setTimesheetData(response.Data);
         setName(response.Data.EmpName || '');
         setStatus(response.Data.Timesheet_Status || 'Pending');
-        
+
         // Log leave data for debugging
         if (response.Data.LeaveData && response.Data.LeaveData.length > 0) {
           console.log('🏖️ [TimesheetScreen] Leave data received:', {
@@ -213,7 +215,7 @@ const TimesheetScreen = ({ navigation }) => {
             }))
           });
         }
-        
+
         // Set dates if provided (only if they're different to prevent infinite loops)
         if (response.Data.From_Date && response.Data.From_Date !== fromDate) {
           setFromDate(response.Data.From_Date);
@@ -223,7 +225,7 @@ const TimesheetScreen = ({ navigation }) => {
           setToDate(response.Data.To_Date);
           setToDateValue(new Date(response.Data.To_Date));
         }
-        
+
         // Transform and set data
         const transformedData = transformTimesheetData(response.Data);
         setData(transformedData);
@@ -303,7 +305,7 @@ const TimesheetScreen = ({ navigation }) => {
           fetchTimesheetData();
         }
       }
-      return () => {};
+      return () => { };
     }, [data.length, fromDate, toDate])
   );
 
@@ -311,12 +313,12 @@ const TimesheetScreen = ({ navigation }) => {
   useEffect(() => {
     if (fromDate !== 'From Date' && toDate !== 'To Date' && !isLoading) {
       console.log('🔧 [TimesheetScreen] Date changed, fetching data:', { fromDate, toDate });
-      
+
       // Add a small delay to prevent rapid successive calls when both dates are set simultaneously
       const timeoutId = setTimeout(() => {
         fetchTimesheetData(fromDate, toDate);
       }, 100);
-      
+
       return () => clearTimeout(timeoutId);
     }
   }, [fromDate, toDate]);
@@ -326,11 +328,11 @@ const TimesheetScreen = ({ navigation }) => {
     if (timesheetData && timesheetData.Total_Hours) {
       return timesheetData.Total_Hours;
     }
-    
+
     if (!data || data.length === 0) {
       return '00:00';
     }
-    
+
     const minutes = data.reduce((acc, item) => {
       const { hh, mm } = parseHhMm(item.totalHours);
       return acc + hh * 60 + mm;
@@ -363,7 +365,7 @@ const TimesheetScreen = ({ navigation }) => {
         setPendingDeleteId(null);
         return;
       }
-      
+
       console.log('🔧 [TimesheetScreen] Starting delete operation for ID:', pendingDeleteId);
       const currentItem = data.find((t) => t.id === pendingDeleteId);
       if (!currentItem) {
@@ -372,30 +374,30 @@ const TimesheetScreen = ({ navigation }) => {
         setPendingDeleteId(null);
         return;
       }
-      
+
       const headerUuid = timesheetData?.HeaderUUID || timesheetData?.UUID || '';
       const projectUuid = currentItem?.projectUuid || currentItem?.lines?.[0]?.Project_UUID || '';
       const taskUuid = currentItem?.taskUuid || currentItem?.lines?.[0]?.Task_UUID || '';
-      
+
       if (!headerUuid || !projectUuid || !taskUuid) {
         Alert.alert('Missing data', 'Unable to find required identifiers to delete.');
         setConfirmVisible(false);
         setPendingDeleteId(null);
         return;
       }
-      
+
       console.log('🔧 [TimesheetScreen] Calling delete API');
       await deleteTimesheetLine({ headerUuid, projectUuid, taskUuid });
-      
+
       console.log('🔧 [TimesheetScreen] Delete successful, updating local state');
       // Remove locally and collapse
       setData((prev) => prev.filter((t) => t.id !== pendingDeleteId));
       setActiveId((prev) => (prev === pendingDeleteId ? null : prev));
-      
+
       console.log('🔧 [TimesheetScreen] Closing confirmation sheet');
       setConfirmVisible(false);
       setPendingDeleteId(null);
-      
+
       // Refetch fresh data in background without blocking UI
       setTimeout(async () => {
         try {
@@ -405,7 +407,7 @@ const TimesheetScreen = ({ navigation }) => {
           console.error('🔧 [TimesheetScreen] Error refreshing data:', error);
         }
       }, 100);
-      
+
     } catch (e) {
       console.error('🔧 [TimesheetScreen] Delete error:', e);
       const msg = e?.response?.data?.Message || e?.message || 'Failed to delete timesheet entry.';
@@ -459,7 +461,7 @@ const TimesheetScreen = ({ navigation }) => {
     try {
       setIsLoading(true);
       const headerUuid = timesheetData?.HeaderUUID || timesheetData?.UUID || '';
-      
+
       if (!headerUuid) {
         Alert.alert('Missing data', 'Timesheet header is missing. Please reload the screen.');
         return;
@@ -483,11 +485,11 @@ const TimesheetScreen = ({ navigation }) => {
       selectedItemsData.forEach((item) => {
         const projectUuid = item?.projectUuid || item?.lines?.[0]?.Project_UUID || item?.lines?.[0]?.ProjectUuid || item?.lines?.[0]?.ProjectUUID;
         const taskUuid = item?.taskUuid || item?.lines?.[0]?.Task_UUID || item?.lines?.[0]?.TaskUuid || item?.lines?.[0]?.TaskUUID;
-        
+
         if (!projectUuid || !taskUuid) {
-          throw new Error(`Project or Task UUID not found for item: ${item.taskName}`);
+          throw new Error(`Project or Task UUID not found for item: `);
         }
-        
+
         projectTaskUuids.push(`${projectUuid}:${taskUuid}`);
       });
 
@@ -510,13 +512,13 @@ const TimesheetScreen = ({ navigation }) => {
         toDate: toDateStr,
         headerUuid
       });
-      
+
       Alert.alert('Success', `Successfully transferred ${selectedItems.length} timesheet line(s) to the week of ${fromDateStr}.`);
-      
+
       // Clear selection and refresh data
       clearSelection();
       await fetchTimesheetData(fromDate !== 'From Date' ? fromDate : undefined, toDate !== 'To Date' ? toDate : undefined);
-      
+
     } catch (error) {
       console.error('Bulk transfer error:', error);
       const msg = error?.response?.data?.Message || error?.message || `Failed to transfer ${selectedItems.length} timesheet line(s).`;
@@ -538,7 +540,7 @@ const TimesheetScreen = ({ navigation }) => {
 
   // Check if add time item is allowed based on timesheet status
   const isAddTimeItemAllowed = status === 'Pending' || status === 'Rejected';
-  
+
   // Check if submit is allowed based on timesheet status and data
   const isSubmitAllowed = (status === 'Pending' || status === 'Rejected') && data.length > 0 && totalHours !== '00:00';
 
@@ -546,14 +548,14 @@ const TimesheetScreen = ({ navigation }) => {
     try {
       console.log('🔧 [TimesheetScreen] Add Time Item button pressed');
       console.log('🔧 [TimesheetScreen] Current status:', status, 'isAddTimeItemAllowed:', isAddTimeItemAllowed);
-      
+
       if (!isAddTimeItemAllowed) {
         Alert.alert('Not Allowed', 'Cannot add time items when timesheet is submitted.');
         return;
       }
-      
+
       setIsLoading(true);
-      
+
       const resp = await checkAddTimesheetEligibility();
       console.log('🔧 [TimesheetScreen] Eligibility check response:', resp);
       const success = resp?.Success === true || resp?.success === true;
@@ -594,15 +596,17 @@ const TimesheetScreen = ({ navigation }) => {
     console.log('🔧 [TimesheetScreen] handleSaveProjectTask called');
     console.log('🔧 [TimesheetScreen] selectedProject:', selectedProject);
     console.log('🔧 [TimesheetScreen] selectedTask:', selectedTask);
-    
+
     if (!selectedProject || !selectedTask) {
       console.log('🔧 [TimesheetScreen] Missing project or task, cannot save');
       return; // simple guard
     }
-    
+
     const next = {
       id: `ts-${Date.now()}`,
       taskName: `${selectedProject.name} • ${selectedTask.name}`,
+      projectName: selectedProject.name,
+      projectTask: selectedTask.name,
       fromDate: fromDate === 'From Date' ? formatUiDate(fromDateValue) : fromDate,
       toDate: toDate === 'To Date' ? formatUiDate(toDateValue) : toDate,
       status: 'Pending',
@@ -612,7 +616,7 @@ const TimesheetScreen = ({ navigation }) => {
       taskUuid: selectedTask.id,
       lines: [],
     };
-    
+
     console.log('🔧 [TimesheetScreen] Creating new timesheet item:', next);
     setData((prev) => [next, ...prev]);
     setActiveId(next.id);
@@ -635,9 +639,9 @@ const TimesheetScreen = ({ navigation }) => {
       Rejected: { bg: COLORS.successBg, color: COLORS.success, border: COLORS.success },
     };
     const theme = palette[label] || palette.Pending;
-  
+
     return (
-      <View style={[styles.badge, { backgroundColor: theme.bg, borderColor: theme.border }]}> 
+      <View style={[styles.badge, { backgroundColor: theme.bg, borderColor: theme.border }]}>
         <Text style={[styles.badgeText, { color: theme.color }]}>{label}</Text>
       </View>
     );
@@ -652,7 +656,7 @@ const TimesheetScreen = ({ navigation }) => {
             navigation.goBack();
             setActiveIndex(0)
           } else {
-            setActiveIndex(0) 
+            setActiveIndex(0)
             // fallback → for BottomTabs (no goBack)
             // or do nothing
           }
@@ -660,8 +664,8 @@ const TimesheetScreen = ({ navigation }) => {
         onRightPress={() => navigation.navigate('Notification')}
       />
 
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent} 
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -696,7 +700,7 @@ const TimesheetScreen = ({ navigation }) => {
         <View style={styles.row2}>
           <View style={styles.infoCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={styles.iconBadge}> 
+              <View style={styles.iconBadge}>
                 <Icon name="access-time" size={rf(3)} color="#ef4444" />
               </View>
               <Text style={styles.infoLabel}>Total Hours</Text>
@@ -706,13 +710,13 @@ const TimesheetScreen = ({ navigation }) => {
 
           <View style={styles.infoCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={[styles.iconBadge, { backgroundColor: '#dbeafe' }]}> 
+              <View style={[styles.iconBadge, { backgroundColor: '#dbeafe' }]}>
                 <Icon name="assignment" size={rf(3)} color="#1e40af" />
               </View>
               <Text style={styles.infoLabel}>Timesheet Status</Text>
             </View>
             <View style={styles.statusPill}>
-            <StatusBadge  label={status} />
+              <StatusBadge label={status} />
             </View>
           </View>
         </View>
@@ -722,9 +726,9 @@ const TimesheetScreen = ({ navigation }) => {
           <View style={styles.headerActions}>
             {!isSelectionMode ? (
               <>
-                <TouchableOpacity 
-                  activeOpacity={0.85} 
-                  style={[styles.addRowButton, !isAddTimeItemAllowed && styles.buttonDisabled]} 
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={[styles.addRowButton, !isAddTimeItemAllowed && styles.buttonDisabled]}
                   onPress={() => {
                     console.log('🔧 [TimesheetScreen] Add Time Item button onPress triggered');
                     addRow();
@@ -751,7 +755,7 @@ const TimesheetScreen = ({ navigation }) => {
                       }
                       return;
                     }
-                    
+
                     try {
                       const headerUuid = timesheetData?.HeaderUUID || timesheetData?.UUID || '';
                       if (!headerUuid) {
@@ -767,7 +771,7 @@ const TimesheetScreen = ({ navigation }) => {
                       } else {
                         // Show success message and refresh data to update status
                         Alert.alert(
-                          'Success', 
+                          'Success',
                           'Timesheet submitted successfully!',
                           [
                             {
@@ -849,7 +853,7 @@ const TimesheetScreen = ({ navigation }) => {
                 const dateStr = lineDate.includes('T') ? lineDate.split('T')[0] : lineDate;
                 return dateStr === dateKey;
               })?.Remark || '';
-              
+
               setDescContext({ itemId, dateKey, timeText });
               setDescText(existingRemark);
               setDescVisible(true);
@@ -861,7 +865,7 @@ const TimesheetScreen = ({ navigation }) => {
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No timesheets found.</Text>
           </View>
-        )} 
+        )}
       </ScrollView>
 
       {/* Project/Task Picker Bottom Sheet */}
@@ -888,73 +892,73 @@ const TimesheetScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-          <Dropdown
-            placeholder="Select Project"
-            value={selectedProject?.name}
-            options={projects}
-            getLabel={(p) => p.name}
-            getKey={(p) => p.id}
-            hint="Select Project"
-            onSelect={(p) => {
-              setSelectedProject(p);
-              setSelectedTask(null);
-              (async () => {
-                try {
-                  const resp = await fetchUserProjectTasks({ projectUuid: p?.id });
-                  const raw = Array.isArray(resp?.Data) ? resp.Data : [];
-                  const taskOptions = raw
-                    .filter((t) => t && t.Task_Title)
-                    .map((t) => ({ id: t.Task_UUID || t.TaskUuid || t.UUID || t.id, name: String(t.Task_Title) }));
-                  setTasks(taskOptions);
-                } catch (_e) {
-                  setTasks([]);
-                } finally {
-                  // Snap to index handled by CommonBottomSheet
-                }
-              })();
-            }}
-            onOpenChange={(open) => {
-              console.log('🔧 [TimesheetScreen] Project dropdown open change:', open);
-              setIsDropdownOpen(open);
-              if (open) {
-                setCurrentSnapIndex(1);
-              } else {
-                setCurrentSnapIndex(0);
+        <Dropdown
+          placeholder="Select Project"
+          value={selectedProject?.name}
+          options={projects}
+          getLabel={(p) => p.name}
+          getKey={(p) => p.id}
+          hint="Select Project"
+          onSelect={(p) => {
+            setSelectedProject(p);
+            setSelectedTask(null);
+            (async () => {
+              try {
+                const resp = await fetchUserProjectTasks({ projectUuid: p?.id });
+                const raw = Array.isArray(resp?.Data) ? resp.Data : [];
+                const taskOptions = raw
+                  .filter((t) => t && t.Task_Title)
+                  .map((t) => ({ id: t.Task_UUID || t.TaskUuid || t.UUID || t.id, name: String(t.Task_Title) }));
+                setTasks(taskOptions);
+              } catch (_e) {
+                setTasks([]);
+              } finally {
+                // Snap to index handled by CommonBottomSheet
               }
-            }}
-          />
+            })();
+          }}
+          onOpenChange={(open) => {
+            console.log('🔧 [TimesheetScreen] Project dropdown open change:', open);
+            setIsDropdownOpen(open);
+            if (open) {
+              setCurrentSnapIndex(1);
+            } else {
+              setCurrentSnapIndex(0);
+            }
+          }}
+        />
 
-          <Dropdown
-            placeholder="Select Task"
-            value={selectedTask?.name}
-            options={availableTasks}
-            getLabel={(t) => t.name}
-            getKey={(t) => t.id}
-            hint="Select Task"
-            disabled={!selectedProject}
-            onSelect={(t) => {
-              setSelectedTask(t);
-            }}
-            onOpenChange={(open) => {
-              console.log('🔧 [TimesheetScreen] Task dropdown open change:', open);
-              setIsDropdownOpen(open);
-              if (open) {
-                setCurrentSnapIndex(1);
-              } else {
-                setCurrentSnapIndex(0);
-              }
-            }}
-          />
+        <Dropdown
+          placeholder="Select Task"
+          value={selectedTask?.name}
+          options={availableTasks}
+          getLabel={(t) => t.name}
+          getKey={(t) => t.id}
+          hint="Select Task"
+          disabled={!selectedProject}
+          onSelect={(t) => {
+            setSelectedTask(t);
+          }}
+          onOpenChange={(open) => {
+            console.log('🔧 [TimesheetScreen] Task dropdown open change:', open);
+            setIsDropdownOpen(open);
+            if (open) {
+              setCurrentSnapIndex(1);
+            } else {
+              setCurrentSnapIndex(0);
+            }
+          }}
+        />
 
-          <View style={{ alignItems: 'flex-end', marginTop: hp(1.2) }}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={styles.bsSaveBtn}
-              onPress={handleSaveProjectTask}
-            >
-              <Text style={styles.bsSaveText}>Save</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={{ alignItems: 'flex-end', marginTop: hp(1.2) }}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.bsSaveBtn}
+            onPress={handleSaveProjectTask}
+          >
+            <Text style={styles.bsSaveText}>Save</Text>
+          </TouchableOpacity>
+        </View>
       </CommonBottomSheet>
 
       {/* Description Bottom Sheet */}
@@ -1041,7 +1045,7 @@ const TimesheetScreen = ({ navigation }) => {
                     } else if (!headeruuid) {
                       Alert.alert('Missing data', 'Timesheet header is missing. Please reload the screen.');
                     } else {
-                      try { console.log('🕒 [Timesheet] Posting line', { projectuuid, taskuuid, headeruuid, timeSlots, description, specificDate }); } catch (_) {}
+                      try { console.log('🕒 [Timesheet] Posting line', { projectuuid, taskuuid, headeruuid, timeSlots, description, specificDate }); } catch (_) { }
                       const resp = await addTimesheetLine({ projectuuid, taskuuid, headeruuid, timeSlots, description, specificDate });
                       const ok = resp?.Success === true || resp?.success === true;
                       if (!ok) {
@@ -1081,15 +1085,15 @@ const TimesheetScreen = ({ navigation }) => {
           console.log('🔧 [TimesheetScreen] Date selected:', date);
           setFromDateValue(date);
           setFromDate(formatUiDate(date));
-          
+
           // Automatically set to date as Sunday of the same week
           const sundayDate = getSundayOfWeek(date);
           setToDateValue(sundayDate);
           setToDate(formatUiDate(sundayDate));
-          
-          console.log('🔧 [TimesheetScreen] Dates set:', { 
-            fromDate: formatUiDate(date), 
-            toDate: formatUiDate(sundayDate) 
+
+          console.log('🔧 [TimesheetScreen] Dates set:', {
+            fromDate: formatUiDate(date),
+            toDate: formatUiDate(sundayDate)
           });
         }}
         title="Select Monday (From Date)"
@@ -1104,7 +1108,7 @@ const TimesheetScreen = ({ navigation }) => {
           setTransferDateValue(date);
           setTransferDate(formatUiDate(date));
           setOpenTransferDate(false);
-          
+
           // Show confirmation dialog
           Alert.alert(
             'Confirm Transfer',
@@ -1161,10 +1165,10 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
   },
   badgeText: {
-    fontSize: 12,
+    fontSize: 9,
     fontWeight: '600',
-    padding: 1 
-  }, 
+    padding: 1,
+  },
   scrollContent: {
     paddingHorizontal: wp(4),
     paddingBottom: hp(12), // Extra padding to avoid bottom navigation
@@ -1190,7 +1194,7 @@ const styles = StyleSheet.create({
   },
   leaveButton: {
     backgroundColor: COLORS.primary,
-    paddingVertical: hp(1),
+    paddingVertical: wp(1.5),
     paddingHorizontal: wp(3),
     borderRadius: RADIUS.md,
   },
@@ -1207,13 +1211,12 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: COLORS.border,
-    paddingHorizontal: wp(3),
+    paddingHorizontal: wp(2.2),
     marginBottom: hp(1.2),
     height: hp(6.2),
     justifyContent: 'center',
   },
   inputField: {
-    marginLeft: wp(2),
     fontSize: TYPOGRAPHY.input,
     color: COLORS.text,
     flex: 1,
@@ -1288,9 +1291,9 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontFamilyBold,
   },
   statusPill: {
-    alignSelf: 'flex-start', 
+    alignSelf: 'flex-start',
     paddingVertical: hp(0.6),
-    paddingHorizontal: wp(3),
+    // paddingHorizontal: wp(3),
     borderRadius: wp(5),
     marginTop: hp(1),
   },
@@ -1363,7 +1366,7 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontFamily: TYPOGRAPHY.fontFamilyRegular,
   },
-  
+
   // Bottom sheet styles
   bsHandle: {
     alignSelf: 'center',

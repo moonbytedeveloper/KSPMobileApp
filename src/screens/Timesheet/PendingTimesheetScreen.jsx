@@ -9,7 +9,7 @@ import Dropdown from '../../components/common/Dropdown';
 import { getPendingTimesheets } from '../../api/authServices';
 import Loader from '../../components/common/Loader';
 import CommonBottomSheet from '../../components/common/CommonBottomSheet';
-import { COLORS, SPACING, RADIUS } from '../styles/styles';
+import { COLORS, SPACING, RADIUS ,theme, border } from '../styles/styles';
 
 const formatDate = (iso) => {
   try {
@@ -27,31 +27,17 @@ const formatDate = (iso) => {
 const StatusBadge = ({ label = 'Pending' }) => {
   const palette = {
     Pending: { bg: COLORS.warningBg, color: COLORS.warning, border: COLORS.warning },
+    'Not Updated': { bg: COLORS.divider, color: 'gray', border: 'gray' },
+    Submitted: { bg: COLORS.infoBg, color: COLORS.info, border: COLORS.info },
     Approved: { bg: COLORS.successBg, color: COLORS.success, border: COLORS.success },
-    Rejected: { bg: COLORS.dangerBg, color: COLORS.danger, border: COLORS.danger },
+    Closed: { bg: COLORS.dangerBg, color: COLORS.danger, border: COLORS.danger },
   };
-
+  
   const theme = palette[label] || palette.Pending;
 
   return (
-    <View
-      style={[
-        badge = {
-          borderWidth: 1,
-          paddingVertical: hp(0.2),
-          paddingHorizontal: SPACING.sm,
-          borderRadius: RADIUS.md,
-          borderColor: theme.border,
-          backgroundColor: theme.bg,
-        },
-        badgeText = {
-          fontSize: 10.5,
-          fontWeight: '600',
-          padding: 1
-        },
-      ]}
-    >
-      <Text style={[styles.badgeText, { color: theme.color, fontWeight: '600' }]}>{label}</Text>
+    <View style={[styles.badge, { backgroundColor: theme.bg, borderColor: theme.border }]}> 
+      <Text style={[styles.badgeText, { color: theme.color }]}>{label}</Text>
     </View>
   );
 };
@@ -247,7 +233,7 @@ const PendingTimesheetScreen = ({ navigation }) => {
             showSubmitButton={item.Status === 'Pending' || item.Status === 'Draft'}
             onSubmit={handleSubmitTimesheet}
             navigation={navigation}
-            headerLeftLabel="WeeKRange"
+            headerLeftLabel="WeekRange"
             headerRightLabel="Status"
             customRows={[
               { label: 'FullName', value: item.FullName },
@@ -362,12 +348,11 @@ const styles = StyleSheet.create({
     marginRight: wp(2),
   },
   paginationDropdown: {
-    width: wp(18),
-    height: hp(5),
+    width: wp(16),
+    height: hp(4),
     marginHorizontal: wp(1),
     zIndex: 1000,
     position: 'relative',
-    elevation: 4,
   },
   scrollContent: {
     flexGrow: 1,
@@ -395,7 +380,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#ffffff',
     marginHorizontal: wp(1),
+  }, 
+  badge: {
+    borderWidth: 1,
+    paddingVertical: hp(0.2),
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.md,
   },
+  badgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    padding: 1 
+  }, 
   pageText: {
     fontSize: rf(3.5),
     color: '#2563eb',

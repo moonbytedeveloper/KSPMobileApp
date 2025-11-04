@@ -796,12 +796,11 @@ const styles = StyleSheet.create({
     marginRight: wp(2),
   },
   paginationDropdown: {
-    width: wp(18),
-    height: hp(5),
+    width: wp(16),
+    height: hp(4),
     marginHorizontal: wp(1),
     zIndex: 1000,
     position: 'relative',
-    elevation: 4,
   },
   pageInfo: {
     fontSize: rf(3.5),

@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { rf, wp, hp } from '../../utils/responsive';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { buttonStyles, COLORS, TYPOGRAPHY, RADIUS } from '../../screens/styles/styles';
+import { buttonStyles, COLORS, TYPOGRAPHY, RADIUS,SPACING } from '../../screens/styles/styles';
 
 // AccordionItem Component
 const AccordionItem = ({
@@ -25,7 +25,20 @@ const AccordionItem = ({
 }) => {
   console.log('status122', status, 'item', item.status);
   // Defer delete confirmation to the screen-level bottom sheet
-
+  const StatusBadge = ({ label }) => {
+    const palette = {
+      Pending: { bg: COLORS.warningBg, color: COLORS.warning, border: COLORS.warning },
+      Approved: { bg: COLORS.successBg, color: COLORS.success, border: COLORS.success },
+      Rejected: { bg: COLORS.dangerBg, color: COLORS.danger, border: COLORS.danger },
+    };
+    const theme = palette[label] || palette.Pending;
+  
+    return (
+      <View style={[styles.badge, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+        <Text style={[styles.badgeText, { color: theme.color }]}>{label}</Text>
+      </View>
+    );
+  };
   return (
     <View style={styles.accordionItem}>
       <TouchableOpacity onPress={onToggle} style={styles.accordionHeader} activeOpacity={0.8}>
@@ -86,16 +99,20 @@ const AccordionItem = ({
           ) : (
             <>
               <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>SOLE EXPENSE CODE</Text>
+                <Text style={styles.cardLabel}>Sole Expense Code</Text>
                 <Text style={styles.cardValue}>{item.soleExpenseCode}</Text>
               </View>
               <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>DOCUMENT FROM DATE</Text>
+                <Text style={styles.cardLabel}>Document From Date</Text>
                 <Text style={styles.cardValue}>{item.documentFromDate}</Text>
               </View>
               <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>DOCUMENT TO DATE</Text>
+                <Text style={styles.cardLabel}>Document To Date</Text>
                 <Text style={styles.cardValue}>{item.documentToDate}</Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardLabel}>Status</Text>
+                <StatusBadge label={item.status} />
               </View>
             </>
           )}
@@ -138,6 +155,17 @@ const AccordionItem = ({
 export default AccordionItem;
 
 const styles = StyleSheet.create({
+  badge: {
+    borderWidth: 1,
+    paddingVertical: hp(0.2),
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.md,
+  },
+  badgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    padding: 1
+  },
   accordionItem: {
     backgroundColor: COLORS.bg,
     borderRadius: wp(3),

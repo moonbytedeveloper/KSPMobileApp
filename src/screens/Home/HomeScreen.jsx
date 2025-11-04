@@ -209,7 +209,7 @@ function HomeScreen({ navigation }) {
             <View style={styles.summaryTitleRow}>
               <Text style={styles.summaryTitle}>Summary</Text>
               {/* Company Selection Flags */}
-              {allowedCompanies && allowedCompanies.length > 1 && (
+              {/* {allowedCompanies && allowedCompanies.length > 0 && (
                 <View style={styles.flagRow}>
                   {allowedCompanies.map((companyUUID, index) => {
                     const isActive = selectedCompanyUUID === companyUUID;
@@ -245,7 +245,7 @@ function HomeScreen({ navigation }) {
                     );
                   })}
                 </View>
-              )}
+              )} */}
             </View>
             
             <View style={styles.summaryContent}>

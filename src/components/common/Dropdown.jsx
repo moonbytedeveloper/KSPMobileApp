@@ -64,7 +64,7 @@ const Dropdown = ({
         <Text style={[
           styles.inputPlaceholder,
           displayValue ? styles.inputValue : null,
-          { fontSize: TYPOGRAPHY.input, fontFamily: TYPOGRAPHY.fontFamilyRegular },
+          { fontSize: 12.5, fontFamily: TYPOGRAPHY.fontFamilyRegular },
           textStyle,
         ]}>
           {displayValue || placeholder}
@@ -148,9 +148,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     height: hp(5.4),
     marginTop: hp(1.0),
+    
   },
   inputFocused: {
     borderColor: COLORS.primary,
+    
   },
   inputPlaceholder: {
     color: COLORS.textLight,

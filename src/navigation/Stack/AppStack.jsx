@@ -389,7 +389,7 @@ const AdminDrawerNavigator = () => {
  const CustomDrawerContent = ({ navigation }) => {
   const [showLogout, setShowLogout] = useState(false);
   const insets = useSafeAreaInsets();
-  const { logout, userData } = useUser();
+  const { logout, userData, allowedCompanies, selectedCompanyUUID, updateSelectedCompany  } = useUser();
   const [displayName, setDisplayName] = useState('');
 
   // Build a fast lookup for menu rights from the first role (primary role)
@@ -471,9 +471,48 @@ const AdminDrawerNavigator = () => {
             </View>
             <Text style={styles.headerName}>{displayName || 'Profile'}</Text>
           </TouchableOpacity>
+          <View style={styles.headerRow}>
+          {allowedCompanies && allowedCompanies.length > 0 && (
+                <View style={styles.flagRow}>
+                  {allowedCompanies.map((companyUUID, index) => {
+                    const isActive = selectedCompanyUUID === companyUUID;
+                    const isUSACompany = (uuid) => uuid === 'B4A0A90C-FF73-4956-B2F5-E44D4D0046E0';
+                    const isIndiaCompany = (uuid) => uuid === '49537615-532c-4c8c-b451-0f094ccb';
+                    
+                    return (
+                      <TouchableOpacity
+                        key={companyUUID}
+                        activeOpacity={0.85}
+                        onPress={() => updateSelectedCompany(companyUUID)}
+                        style={[
+                          styles.flagBadge, 
+                          { 
+                            borderWidth: isActive ? 1.5 : 3, 
+                            borderColor: isActive ? COLORS.bg :COLORS.primary,
+                            marginLeft: index > 0 ? wp(1) : 0
+                          }
+                        ]}
+                      >
+                        <Image
+                          source={{ 
+                            uri: isUSACompany(companyUUID) 
+                              ? 'https://img.icons8.com/color/96/usa-circular.png'
+                              : isIndiaCompany(companyUUID)
+                              ? 'https://img.icons8.com/color/96/india-circular.png'
+                              : 'https://img.icons8.com/color/96/globe-circular.png'
+                          }}
+                          style={styles.flagImage}
+                          resizeMode="cover"
+                        />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
           <TouchableOpacity onPress={() => navigation.closeDrawer()} style={styles.headerCloseBtn}>
             <Icon name="close" size={rf(5)} color="#fff" />
           </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -618,6 +657,25 @@ const AdminDrawerNavigator = () => {
 };
 
 const styles = StyleSheet.create({
+    
+  // Flag styles
+  flagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  flagBadge: {
+    width: wp(6.5),
+    height: wp(6.5),
+    borderRadius: wp(3.25),
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  flagImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: wp(3.25),
+  },
   drawerContainer: {
     paddingTop: 0,
     paddingHorizontal: wp(2),

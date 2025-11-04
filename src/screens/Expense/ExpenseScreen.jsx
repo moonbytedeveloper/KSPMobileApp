@@ -662,12 +662,11 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontFamilyRegular,
   },
   paginationDropdown: {
-    width: wp(18),
-    height: hp(5),
+    width: wp(16),
+    height: hp(4),
     marginHorizontal: wp(1),
     zIndex: 1000,
     position: 'relative',
-    elevation: 4,
   },
   showSelector: {
     flexDirection: 'row',
@@ -693,9 +692,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bg,
     borderRadius: wp(2),
     paddingHorizontal: wp(3),
-    marginHorizontal: wp(2),
-    //paddingVertical: hp(0.8),
-    height: hp(6.2),
+    // marginHorizontal: wp(2),
+    // paddingVertical: hp(0.8),
+    height: hp(4.8),
   },
   searchInput: {
     flex: 1,

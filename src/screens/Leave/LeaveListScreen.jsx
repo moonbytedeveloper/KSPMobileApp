@@ -225,7 +225,7 @@ if(isLoading) {
 
                 <View style={{  alignItems: 'flex-end', marginRight: wp(2) }}>
                   <Text style={styles.label}>Status</Text>
-                  <Text style={{fontSize:wp(3.5), color:'#000'}}>{l.status}</Text>
+                  <StatusBadge label={l.status} />
                 </View>
 
                 <Icon
@@ -254,7 +254,7 @@ if(isLoading) {
                   <Text style={styles.detailLabel}>Applied By:</Text>
                   <Text style={styles.detailValue}>{l.appliedBy}</Text>
                 </View>
-                <View style={styles.detailRow}>
+                {/* <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Active:</Text>
                   <Text
                     style={[
@@ -275,7 +275,7 @@ if(isLoading) {
                   >
                     {l.isDisplay ? 'Yes' : 'No'}
                   </Text>
-                </View>
+                </View> */}
               </View>
             )}
           </View>
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     marginTop: hp(0.5),
   },
   badgeText: {
-    fontSize: 10.5,
+    fontSize: 9,
     fontWeight: '600',
     padding: 1,
   },

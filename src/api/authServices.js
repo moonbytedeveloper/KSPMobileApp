@@ -20,7 +20,7 @@ const PATHS = {
     holidays: Config.API_HOLIDAYS_PATH || '/api/DashBoard/holidays',
     leaves: Config.API_LEAVES_PATH || '/api/DashBoard/leaves',
     pendingTimesheets: Config.API_PENDING_TIMESHEETS_PATH || '/api/DashBoard/PendingTimesheets',
-    wonLeads: Config.API_GET_Manage_LEADS_PATH,
+    wonLeads: Config.API_GET_Manage_LEADS_PATH || '/api/BusinessDevelopment/GetManageLeadList',
     updateLeadStatus: Config.API_BUSINESS_UPDATE_LEAD_STATUS_PATH || '/api/BusinessDevelopment/UpdateLeadStatus',
     applyLeave: Config.API_APPLY_LEAVE_PATH,
     hraleaves: Config.API_HRA_LEAVES_PATH,

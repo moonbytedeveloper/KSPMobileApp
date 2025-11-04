@@ -25,7 +25,23 @@ const TimesheetCard = ({ timesheet, onActionPress, getStatusColor, getStatusBgCo
 
   const statusColor = getStatusColor(timesheet.status);
   const statusBg = getStatusBgColor(timesheet.status);
-
+  const StatusBadge = ({ label = 'Pending' }) => {
+    const palette = {
+      Pending: { bg: COLORS.warningBg, color: COLORS.warning, border: COLORS.warning },
+      'Not Updated': { bg: COLORS.divider, color: 'gray', border: 'gray' },
+      Submitted: { bg: COLORS.infoBg, color: COLORS.info, border: COLORS.info },
+      Approved: { bg: COLORS.successBg, color: COLORS.success, border: COLORS.success },
+      Closed: { bg: COLORS.dangerBg, color: COLORS.danger, border: COLORS.danger },
+    };
+    
+    const theme = palette[label] || palette.Pending;
+  
+    return (
+      <View style={[styles.badge, { backgroundColor: theme.bg, borderColor: theme.border }]}> 
+        <Text style={[styles.badgeText, { color: theme.color }]}>{label}</Text>
+      </View>
+    );
+  };
   return (
     <View style={styles.tsCard}>
       <TouchableOpacity activeOpacity={0.8} onPress={toggle}>
@@ -37,13 +53,13 @@ const TimesheetCard = ({ timesheet, onActionPress, getStatusColor, getStatusBgCo
           ? COLORS.warning 
           :timesheet.status === 'Submitted'?  COLORS.info :  COLORS.danger, }]} />
             <View style={styles.tsHeaderLeftContent}>
-              <Text style={[text.caption, styles.tsCaption]}>TIMESHEET</Text>
+              <Text style={[text.caption, styles.tsCaption]}>Timesheet</Text>
               <Text style={[text.title, styles.tsTitle]} numberOfLines={1}>{timesheet.employeeName || `Timesheet #${timesheet.srNo}`}</Text>
             </View>
           </View>
           <View style={styles.tsHeaderRight}>
             <View>
-              <Text style={[text.caption, styles.tsCaption, { textAlign: 'right' }]}>TOTAL HOURS</Text>
+              <Text style={[text.caption, styles.tsCaption, { textAlign: 'right' }]}>Total Hours</Text>
               <Text style={[text.title, styles.tsHours]}>{timesheet.totalHoursWorked}</Text>
             </View>
             <Icon name={expanded ? 'expand-less' : 'expand-more'} size={rf(4.2)} color={COLORS.textMuted} />
@@ -54,24 +70,22 @@ const TimesheetCard = ({ timesheet, onActionPress, getStatusColor, getStatusBgCo
       {expanded && (
         <View style={styles.tsDetailArea}>
           <View style={styles.detailRow}>
-            <Text style={[text.caption, styles.detailLabel]}>SR NO</Text>
+            <Text style={[text.caption, styles.detailLabel]}>Sr No</Text>
             <Text style={[text.body, styles.detailValue]}>{timesheet.srNo}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={[text.caption, styles.detailLabel]}>PERIOD</Text>
+            <Text style={[text.caption, styles.detailLabel]}>Period</Text>
             <Text style={[text.body, styles.detailValue]}>{timesheet.fromDate} - {timesheet.toDate}</Text>
           </View>
           {!isApprovedTab && (
             <View style={styles.detailRow}>
-              <Text style={[text.caption, styles.detailLabel]}>NEXT APPROVAL (HR)</Text>
+              <Text style={[text.caption, styles.detailLabel]}>Next Approval (Hr)</Text>
               <Text style={[text.body, styles.detailValue]}>{timesheet.nextApproval}</Text>
             </View>
           )}
           <View style={styles.detailRow}>
-            <Text style={[text.caption, styles.detailLabel]}>STATUS</Text>
-            <View style={[styles.tsBadge, { backgroundColor: statusBg, borderColor: statusColor }]}>
-              <Text style={[styles.tsBadgeText, { color: statusColor }]}>{timesheet.status}</Text>
-            </View>
+            <Text style={[text.caption, styles.detailLabel]}>Status</Text>
+            <StatusBadge  label={timesheet.status} />
           </View>
 
           <View style={styles.tsActionsRowPrimary}>
@@ -110,6 +124,14 @@ const ManageMyWorklist = ({ navigation }) => {
   const viewSheetRef = useRef(null);
   const approvalDetailsSheetRef = useRef(null);
   
+  const handleTabSwitch = (tab) => {
+    setSelectedProject(null);
+    setSelectedTask(null);
+    setSearchTerm('');
+    setCurrentPage(0);
+    setActiveTab(tab);
+  };
+
   const snapPoints = useMemo(() => [hp(60)], []);
 
   // Build dynamic project options from current tab's data
@@ -591,7 +613,7 @@ const ManageMyWorklist = ({ navigation }) => {
         <View style={styles.tabContainer}>
           <TouchableOpacity 
             style={[styles.tab, activeTab === 'submitted' && styles.activeTab]} 
-            onPress={() => { setCurrentPage(0); setActiveTab('submitted'); }}
+            onPress={() => handleTabSwitch('submitted')}
           >
             <Text style={[styles.tabText, activeTab === 'submitted' && styles.activeTabText]}>
               Submitted & Pending Timesheet
@@ -601,7 +623,7 @@ const ManageMyWorklist = ({ navigation }) => {
           
           <TouchableOpacity 
             style={[styles.tab, activeTab === 'approved' && styles.activeTab]} 
-            onPress={() => { setCurrentPage(0); setActiveTab('approved'); }}
+            onPress={() => handleTabSwitch('approved')}
           >
             <Text style={[styles.tabText, activeTab === 'approved' && styles.activeTabText]}>
               Approved Timesheet
@@ -1206,6 +1228,17 @@ const styles = StyleSheet.create({
     fontSize: rf(3.2),
     fontFamily: TYPOGRAPHY.fontFamilyRegular,
   },
+  badge: {
+    borderWidth: 1,
+    paddingVertical: hp(0.2),
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.md,
+  },
+  badgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    padding: 1 
+  }, 
   paginationContainerTop: {
     alignItems: 'center',
     justifyContent: 'center',

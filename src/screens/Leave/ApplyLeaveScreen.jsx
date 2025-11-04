@@ -226,12 +226,12 @@ const ApplyLeaveScreen = ({ navigation }) => {
                       : COLORS.danger,
               }]} />
               <View style={{ maxWidth: wp(60) }}>
-                <Text style={styles.headerLabel}>LEAVE TYPE</Text>
+                <Text style={styles.headerLabel}>Leave Type</Text>
                 <Text style={styles.headerTitle} numberOfLines={1}>{data.leaveType || 'Leave'}</Text>
               </View>
             </View>
             <View style={styles.leaveHeaderRightMeta}>
-              <Text style={styles.headerLabelRight}>APPLY DATE</Text>
+              <Text style={styles.headerLabelRight}>Apply Date</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(1.2) }}>
                 <Text style={styles.headerValueRight}>{data.applyDate}</Text>
                 <Icon name={isExpanded ? 'expand-less' : 'expand-more'} size={rf(4.2)} color="#6b7280" />
@@ -244,50 +244,50 @@ const ApplyLeaveScreen = ({ navigation }) => {
           <View style={styles.leaveDetailArea}>
             <Text style={[styles.detailLabelMuted, { marginBottom: hp(0.8) }]}>Leave Information</Text>
             <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>APPLIED BY</Text>
+              <Text style={styles.detailLabelMuted}>Applied By</Text>
               <Text style={styles.detailValueStrong}>{data.appliedBy || '-'}</Text>
             </View>
             <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>APPLIED DATE</Text>
+              <Text style={styles.detailLabelMuted}>Applied Date</Text>
               <Text style={styles.detailValueStrong}>{data.applyDate}</Text>
             </View>
             <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>LEAVE START DATE</Text>
+              <Text style={styles.detailLabelMuted}>Leave Start Date</Text>
               <Text style={styles.detailValueStrong}>{data.from}</Text>
             </View>
             <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>LEAVE END DATE</Text>
+              <Text style={styles.detailLabelMuted}>Leave End Date</Text>
               <Text style={styles.detailValueStrong}>{data.to}</Text>
             </View>
             <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>LEAVE TYPE</Text>
+              <Text style={styles.detailLabelMuted}>Leave Type</Text>
               <Text style={styles.detailValueStrong}>{data.leaveType}</Text>
             </View>
             <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>LEAVE PARAMETER</Text>
+              <Text style={styles.detailLabelMuted}>Leave Parameter</Text>
               <Text style={styles.detailValueStrong}>{data.parameter}</Text>
             </View>
             <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>REASON</Text>
+              <Text style={styles.detailLabelMuted}>Reason</Text>
               <Text style={styles.detailValueStrong}>{data.reason || '-'}</Text>
             </View>
             <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>CONTACT NO</Text>
+              <Text style={styles.detailLabelMuted}>Contact No</Text>
               <Text style={styles.detailValueStrong}>{data.contactNo || '-'}</Text>
             </View>
             <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>STATUS</Text>
+              <Text style={styles.detailLabelMuted}>Status</Text>
               <StatusBadge label={data.status} />
               {/* <View style={[styles.statusPill, { backgroundColor: statusBg }]}>
                 <Text style={[styles.statusPillText, { color: statusColor }]}>{data.status}</Text>
               </View> */}
             </View>
             <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>ACTION TAKEN BY</Text>
+              <Text style={styles.detailLabelMuted}>Action Taken By</Text>
               <Text style={styles.detailValueStrong}>{data.actionTakenBy || '-'}</Text>
             </View>
             <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>REMARK</Text>
+              <Text style={styles.detailLabelMuted}>Remark</Text>
               <Text style={styles.detailValueStrong}>{data.remark || '-'}</Text>
             </View>
             {/* <View style={styles.detailDivider} />
@@ -814,7 +814,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
   },
   badgeText: {
-    fontSize: 10.5,
+    fontSize: 9,
     fontWeight: '600',
     padding: 1
   },

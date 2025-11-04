@@ -722,7 +722,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
   },
   badgeText: {
-    fontSize: 10.5,
+    fontSize: 9,
     fontWeight: '600',
     padding: 1 
   }, 

@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
   },
   badgeText: {
-    fontSize: 10.5,
+    fontSize: 9,
     fontWeight: '600',
     padding: 1 
   }, 
@@ -405,12 +405,11 @@ const styles = StyleSheet.create({
     marginRight: wp(2),
   },
   paginationDropdown: {
-    width: wp(18),
-    height: hp(5),
+    width: wp(16),
+    height: hp(4),
     marginHorizontal: wp(1),
     zIndex: 1000,
     position: 'relative',
-    elevation: 4,
   },
   pageInfo: {
     fontSize: rf(3.5),
