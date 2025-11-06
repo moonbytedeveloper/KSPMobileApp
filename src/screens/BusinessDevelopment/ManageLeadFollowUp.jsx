@@ -7,6 +7,7 @@ import { TYPOGRAPHY } from '../styles/styles';
 import AppHeader from '../../components/common/AppHeader';
 import DatePickerBottomSheet from '../../components/common/CustomDatePicker';
 import BottomSheetConfirm from '../../components/common/BottomSheetConfirm';
+import Loader from '../../components/common/Loader';
 import { addLeadFollowUp, updateLeadFollowUp, deleteLeadFollowUp, getEmployees, getFollowUpsByLead } from '../../api/authServices';
 import Dropdown from '../../components/common/Dropdown';
 import { getUUID, getCMPUUID, getENVUUID } from '../../api/tokenStorage';
@@ -20,11 +21,13 @@ const people = [
 const followTypes = ['Call', 'Email', 'Meeting', 'Demo'];
 
 const formatUiDate = (date) => {
-  const d = new Date(date);
-  const yyyy = String(d.getFullYear());
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const d = (date instanceof Date) ? date : new Date(date);
+  if (isNaN(d.getTime())) return '';
   const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+  const mmm = months[d.getMonth()];
+  const yyyy = String(d.getFullYear());
+  return `${dd}-${mmm}-${yyyy}`;
 };
 // For showing in inputs: dd-MM-yy
 const formatDisplayDate = (ui) => {
@@ -78,12 +81,37 @@ const fromUiToDate = (ui) => {
   return new Date(y, m - 1, d);
 };
 
+// Parse dd-MMM-yyyy into y,m,d
+const parseDdMmmYyyy = (value) => {
+  const s = String(value || '').trim();
+  const m = s.match(/^(\d{2})-([A-Za-z]{3})-(\d{4})$/);
+  if (!m) return null;
+  const dd = Number(m[1]);
+  const mon = m[2].toLowerCase();
+  const yyyy = Number(m[3]);
+  const months = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+  if (!(mon in months)) return null;
+  return { y: yyyy, m: months[mon] + 1, d: dd };
+};
+
 // Safe ISO (UTC noon) to avoid previous-day shift across timezones
 const uiDateToNoonISO = (ui) => {
-  if (!ui || !/^\d{4}-\d{2}-\d{2}$/.test(ui)) return new Date().toISOString();
-  const [y, m, d] = ui.split('-').map((n) => Number(n));
-  const dt = new Date(Date.UTC(y, (m - 1), d, 12, 0, 0)); // UTC noon
-  return dt.toISOString();
+  if (!ui) return new Date().toISOString();
+  // support dd-MMM-yyyy
+  const ddMmm = parseDdMmmYyyy(ui);
+  if (ddMmm) {
+    const dt = new Date(Date.UTC(ddMmm.y, ddMmm.m - 1, ddMmm.d, 12, 0, 0));
+    return dt.toISOString();
+  }
+  // support yyyy-mm-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(ui)) {
+    const [y, m, d] = ui.split('-').map((n) => Number(n));
+    const dt = new Date(Date.UTC(y, (m - 1), d, 12, 0, 0));
+    return dt.toISOString();
+  }
+  // fallback
+  const p = Date.parse(ui);
+  return isNaN(p) ? new Date().toISOString() : new Date(p).toISOString();
 };
 
 const resolveEmployeeName = (emp) => emp?.EmployeeName || emp?.Name || emp?.DisplayName || emp?.FullName || '';
@@ -337,6 +365,7 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
       const leadUuid = route?.params?.leadUuid || '';
       if (editingFollowup?.uuid) {
         await updateLeadFollowUp({ followupUuid: editingFollowup.uuid, payload, overrides: { userUuid: takerUuid, cmpUuid, envUuid } });
+      console.log(payload,'999')
       } else {
         await addLeadFollowUp({ leadOppUuid: leadUuid, payload, overrides: { userUuid: takerUuid, cmpUuid, envUuid } });
       }
@@ -508,8 +537,9 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
                   setTaker(r.taker);
                   setType(r.type);
                   const ui = r.uiDate || toUiDate(r.displayDate);
-                  setDate(ui);
-                  setPickerVal(fromUiToDate(ui));
+                  const uiAsDate = fromUiToDate(ui);
+                  setDate(formatUiDate(uiAsDate));
+                  setPickerVal(uiAsDate);
                   // description from API
                   const apiDesc = r?.raw?.Description || r?.raw?.description || '';
                   setDesc(String(apiDesc));
@@ -537,8 +567,9 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
                   setIsRequired(isNextReq);
                   if (isNextReq && nextApi) {
                     const nextUi = toUiDate(nextApi);
-                    setNextDate(nextUi);
-                    setNextPickerVal(fromUiToDate(nextUi));
+                    const nextDateObj = fromUiToDate(nextUi);
+                    setNextDate(formatUiDate(nextDateObj));
+                    setNextPickerVal(nextDateObj);
                   } else {
                     setNextDate('');
                   }
@@ -644,6 +675,12 @@ const ManageLeadFollowUp = ({ navigation, route }) => {
         confirmText="Delete"
         cancelText="Cancel"
       />
+
+      {(isAdding || isUpdating) && (
+        <View style={styles.loadingOverlay}>
+          <Loader size="small" />
+        </View>
+      )}
     </View>
   );
 };
@@ -655,6 +692,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
     // paddingTop: safeAreaTop,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   container: {
     paddingHorizontal: wp(4),

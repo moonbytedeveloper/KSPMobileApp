@@ -9,9 +9,17 @@ import { COLORS, SPACING, RADIUS, TYPOGRAPHY, text, layout, SHADOW, buttonStyles
 import { getTimesheetsForApproval, approveTimesheet, rejectTimesheet } from '../../api/authServices';
 import Loader from '../../components/common/Loader';
 
-const TimesheetCard = ({ timesheet, onActionPress, getStatusColor, getStatusBgColor }) => {
-  const [expanded, setExpanded] = useState(false);
-  const toggle = () => setExpanded((s) => !s);
+const TimesheetCard = ({ timesheet, onActionPress, getStatusColor, getStatusBgColor, expanded, onToggle }) => {
+  const isControlled = typeof expanded === 'boolean';
+  const [expandedUncontrolled, setExpandedUncontrolled] = useState(false);
+  const expandedState = isControlled ? expanded : expandedUncontrolled;
+  const toggle = () => {
+    if (isControlled) {
+      onToggle && onToggle();
+    } else {
+      setExpandedUncontrolled((s) => !s);
+    }
+  };
 
   const statusColor = getStatusColor(timesheet.status);
   const statusBg = getStatusBgColor(timesheet.status);
@@ -41,33 +49,33 @@ const TimesheetCard = ({ timesheet, onActionPress, getStatusColor, getStatusBgCo
           <View style={styles.tsHeaderLeft}>
             <View style={[styles.tsDot, { backgroundColor: getFlagColor(timesheet.flagColor) }]} />
             <View style={styles.tsHeaderLeftContent}>
-              <Text style={[text.caption, styles.tsCaption]}>EMPLOYEE NAME</Text>
+              <Text style={[text.caption, styles.tsCaption]}>Employee Name</Text>
               <Text style={[text.title, styles.tsTitle]} numberOfLines={1}>{timesheet.employeeName || `Timesheet #${timesheet.srNo}`}</Text>
             </View>
           </View>
           <View style={styles.tsHeaderRight}>
             <View>
-              <Text style={[text.caption, styles.tsCaption, { textAlign: 'right' }]}>TOTAL HOURS</Text>
+              <Text style={[text.caption, styles.tsCaption, { textAlign: 'right' }]}>Total Hours</Text>
               <Text style={[text.title, styles.tsHours]}>{timesheet.totalHoursWorked}</Text>
             </View>
-            <Icon name={expanded ? 'expand-less' : 'expand-more'} size={rf(4.2)} color={COLORS.textMuted} />
+            <Icon name={expandedState ? 'expand-less' : 'expand-more'} size={rf(4.2)} color={COLORS.textMuted} />
           </View>
         </View>
       </TouchableOpacity>
 
-      {expanded && (
+      {expandedState && (
         <View style={styles.tsDetailArea}>
           <View style={styles.detailRow}>
-            <Text style={[text.caption, styles.detailLabel]}>SR NO</Text>
+            <Text style={[text.caption, styles.detailLabel]}>Sr No</Text>
             <Text style={[text.body, styles.detailValue]}>{timesheet.srNo}</Text>
           </View>
           {/* <View style={styles.detailRow}>
-            <Text style={[text.caption, styles.detailLabel]}>ELIGIBILITY</Text>
+            <Text style={[text.caption, styles.detailLabel]}>Eligibility</Text>
             <Text style={[text.body, styles.detailValue]}>{timesheet.eligibility}</Text>
           </View> */}
           <View style={styles.detailRow}>
-            <Text style={[text.caption, styles.detailLabel]}>PERIOD</Text>
-            <Text style={[text.body, styles.detailValue]}>{timesheet.applyFromDate} - {timesheet.applyToDate}</Text>
+            <Text style={[text.caption, styles.detailLabel]}>Period</Text>
+            <Text style={[text.body, styles.periodValue]} numberOfLines={1}>{timesheet.applyFromDate} - {timesheet.applyToDate}</Text>
           </View>
 
           <View style={styles.tsActionsRowPrimary}>
@@ -103,13 +111,14 @@ const ManageTimeSheetApproval = ({ navigation }) => {
   const [totalRecords, setTotalRecords] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [expandedCardId, setExpandedCardId] = useState(null);
   
   const approveSheetRef = useRef(null);
   const rejectSheetRef = useRef(null);
   const viewSheetRef = useRef(null);
   const approvalDetailsSheetRef = useRef(null);
   
-  const snapPoints = useMemo(() => [hp(90)], []);
+  const snapPoints = useMemo(() => [hp(60), hp(90)], []);
 
   // Fetch timesheets for approval
   useEffect(() => {
@@ -428,6 +437,10 @@ const ManageTimeSheetApproval = ({ navigation }) => {
                   onActionPress={handleActionPress}
                   getStatusColor={getStatusColor}
                   getStatusBgColor={getStatusBgColor}
+                  expanded={expandedCardId === timesheet.id}
+                  onToggle={() => {
+                    setExpandedCardId(expandedCardId === timesheet.id ? null : timesheet.id);
+                  }}
                 />
               ))}
 
@@ -520,7 +533,7 @@ const ManageTimeSheetApproval = ({ navigation }) => {
             <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.45} pressBehavior="close" />
           )}
         >
-          <BottomSheetView style={styles.sheetContent}>
+          <BottomSheetView style={[styles.sheetContent, { paddingBottom: hp(1) }]}>
             {approveMode === 'form' ? (
               <>
                 <View style={styles.modalHeader}>
@@ -605,7 +618,7 @@ const ManageTimeSheetApproval = ({ navigation }) => {
             <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.45} pressBehavior="close" />
           )}
         >
-          <BottomSheetView style={styles.sheetContent}>
+          <BottomSheetView style={[styles.sheetContent, { paddingBottom: hp(1) }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Reason</Text>
               <TouchableOpacity onPress={() => closeSheet(rejectSheetRef)} style={styles.closeButton}>
@@ -645,7 +658,7 @@ const ManageTimeSheetApproval = ({ navigation }) => {
             <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.45} pressBehavior="close" />
           )}
         >
-          <BottomSheetView style={styles.sheetContent}>
+          <BottomSheetView style={[styles.sheetContent, { paddingBottom: hp(1) }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Timesheet</Text>
               <TouchableOpacity onPress={() => closeSheet(viewSheetRef)} style={styles.closeButton}>
@@ -712,7 +725,7 @@ const ManageTimeSheetApproval = ({ navigation }) => {
             <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.45} pressBehavior="close" />
           )}
         >
-          <BottomSheetView style={styles.sheetContent}>
+          <BottomSheetView style={[styles.sheetContent, { paddingBottom: hp(1) }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Approval Details</Text>
               <TouchableOpacity onPress={() => closeSheet(approvalDetailsSheetRef)} style={styles.closeButton}>
@@ -946,7 +959,7 @@ const styles = StyleSheet.create({
   sheetContent: {
     backgroundColor: COLORS.bg,
     paddingHorizontal: wp(6),
-    paddingBottom: hp(2.5),
+    paddingTop: hp(1),
     borderTopLeftRadius: wp(6),
     borderTopRightRadius: wp(6),
   },
@@ -1038,6 +1051,15 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
     fontFamily: TYPOGRAPHY.fontFamilyMedium,
+  },
+  periodValue: {
+    fontSize: rf(3.0),
+    fontWeight: '600',
+    color: COLORS.text,
+    flex: 1,
+    textAlign: 'right',
+    fontFamily: TYPOGRAPHY.fontFamilyMedium,
+    flexShrink: 1,
   },
   remarkSection: {
     marginTop: hp(2),

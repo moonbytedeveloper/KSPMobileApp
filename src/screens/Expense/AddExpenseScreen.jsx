@@ -44,13 +44,85 @@ const LabeledInput = ({ placeholder, rightIcon, value, onPress, onChangeText, ed
   </TouchableOpacity>
 );
 
-const formatDate = (d) => {
-  if (!d) return '';
-  const yy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
+// ---- dd-MMM-yyyy date helpers ----
+const formatUiDate = (date) => {
+  if (!date) return '';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const d = (date instanceof Date) ? date : new Date(date);
+  if (isNaN(d.getTime())) return '';
   const dd = String(d.getDate()).padStart(2, '0');
-  return `${yy}-${mm}-${dd}`;
+  const mmm = months[d.getMonth()];
+  const yyyy = String(d.getFullYear());
+  return `${dd}-${mmm}-${yyyy}`;
 };
+
+const formatAnyToDdMmmYyyy = (value) => {
+  if (!value) return '';
+  if (value instanceof Date) return formatUiDate(value);
+  const s = String(value).trim();
+  if (!s) return '';
+  // dd-MMM-yyyy
+  const m1 = s.match(/^(\d{2})-([A-Za-z]{3})-(\d{4})$/);
+  if (m1) {
+    const map = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+    const dd = Number(m1[1]);
+    const mon = map[m1[2].toLowerCase()];
+    const yyyy = Number(m1[3]);
+    return formatUiDate(new Date(yyyy, mon, dd));
+  }
+  // yyyy-mm-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split('-').map((n) => Number(n));
+    return formatUiDate(new Date(y, m - 1, d));
+  }
+  // dd-mm-yy
+  if (/^\d{2}-\d{2}-\d{2}$/.test(s)) {
+    const [d, m, yy] = s.split('-').map((n) => Number(n));
+    return formatUiDate(new Date(2000 + yy, m - 1, d));
+  }
+  // dd-mm-yyyy
+  if (/^\d{2}-\d{2}-\d{4}$/.test(s)) {
+    const [d, m, y] = s.split('-').map((n) => Number(n));
+    return formatUiDate(new Date(y, m - 1, d));
+  }
+  const dflt = new Date(s);
+  return isNaN(dflt.getTime()) ? '' : formatUiDate(dflt);
+};
+
+const parseToDate = (value) => {
+  if (!value) return null;
+  if (value instanceof Date && !isNaN(value.getTime())) return value;
+  const s = String(value).trim();
+  if (!s) return null;
+  const m1 = s.match(/^(\d{2})-([A-Za-z]{3})-(\d{4})$/);
+  if (m1) {
+    const map = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+    const dd = Number(m1[1]);
+    const mon = map[m1[2].toLowerCase()];
+    const yyyy = Number(m1[3]);
+    const d = new Date(yyyy, mon, dd);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split('-').map((n) => Number(n));
+    const dt = new Date(y, m - 1, d);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  if (/^\d{2}-\d{2}-\d{2}$/.test(s)) {
+    const [d, m, yy] = s.split('-').map((n) => Number(n));
+    const dt = new Date(2000 + yy, m - 1, d);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  if (/^\d{2}-\d{2}-\d{4}$/.test(s)) {
+    const [d, m, y] = s.split('-').map((n) => Number(n));
+    const dt = new Date(y, m - 1, d);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  const dt = new Date(s);
+  return isNaN(dt.getTime()) ? null : dt;
+};
+
+const toApiDdMmmYyyy = (value) => formatAnyToDdMmmYyyy(value);
 
 const AddExpenseScreen = ({ navigation, route }) => {
   // Check if we're in edit mode
@@ -377,9 +449,17 @@ const AddExpenseScreen = ({ navigation, route }) => {
     updateForm('billAmount')(lineItem.billAmount != null ? String(lineItem.billAmount) : '');
     // Document date
     if (lineItem.documentDate) {
-      const d = new Date(lineItem.documentDate);
-      setDocumentDate(d);
-      updateForm('documentDate')(formatDate(d));
+      const d = parseToDate(lineItem.documentDate);
+      if (d) {
+        setDocumentDate(d);
+        updateForm('documentDate')(formatAnyToDdMmmYyyy(lineItem.documentDate));
+      } else {
+        setDocumentDate(null);
+        updateForm('documentDate')('');
+      }
+    } else {
+      setDocumentDate(null);
+      updateForm('documentDate')('');
     }
     // Remarks
     if (lineItem.expenseRemarks != null) {
@@ -782,15 +862,17 @@ const AddExpenseScreen = ({ navigation, route }) => {
 
         // Auto-fill dates
         if (headerData.DocDateFrom || headerData.Doc_Date_From || headerData.DocumentDateFrom) {
-          const fromDate = new Date(headerData.DocDateFrom || headerData.Doc_Date_From || headerData.DocumentDateFrom);
-          setFromDate(fromDate);
-          updateForm('fromDate')(formatDate(fromDate));
+          const raw = headerData.DocDateFrom || headerData.Doc_Date_From || headerData.DocumentDateFrom;
+          const fd = parseToDate(raw);
+          if (fd) setFromDate(fd);
+          updateForm('fromDate')(formatAnyToDdMmmYyyy(raw));
         }
 
         if (headerData.DocDateTo || headerData.Doc_Date_To || headerData.DocumentDateTo) {
-          const toDate = new Date(headerData.DocDateTo || headerData.Doc_Date_To || headerData.DocumentDateTo);
-          setToDate(toDate);
-          updateForm('toDate')(formatDate(toDate));
+          const raw = headerData.DocDateTo || headerData.Doc_Date_To || headerData.DocumentDateTo;
+          const td = parseToDate(raw);
+          if (td) setToDate(td);
+          updateForm('toDate')(formatAnyToDdMmmYyyy(raw));
         }
 
         // Auto-fill expense type with robust logic
@@ -958,8 +1040,8 @@ const AddExpenseScreen = ({ navigation, route }) => {
       Master_Environment_UUID: (await getENVUUID()) || '',
       Project_UUID: getUuidLike(selectedProject),
       ProjectTask_UUID: getUuidLike(selectedTask, ['id']) || '',
-      Doc_Date_From: toIsoString(fromDate || form.fromDate),
-      Doc_Date_To: toIsoString(toDate || form.toDate),
+      Doc_Date_From: toApiDdMmmYyyy(fromDate || form.fromDate),
+      Doc_Date_To: toApiDdMmmYyyy(toDate || form.toDate),
       ExpenseType_UUID: ((selectedExpenseType?.Uuid === 'OTHER' || selectedExpenseType?.UUID === 'OTHER') ? 'Other' : getUuidLike(selectedExpenseType)),
       Country_UUID: getUuidLike(selectedCountry),
       State_UUID: getUuidLike(selectedState),
@@ -1055,8 +1137,8 @@ const AddExpenseScreen = ({ navigation, route }) => {
         Master_Environment_UUID: (await getENVUUID()) || '',
         Project_UUID: getUuidLike(selectedProject),
         ProjectTask_UUID: getUuidLike(selectedTask, ['id']) || '',
-        Doc_Date_From: toIsoString(fromDate || form.fromDate),
-        Doc_Date_To: toIsoString(toDate || form.toDate),
+        Doc_Date_From: toApiDdMmmYyyy(fromDate || form.fromDate),
+        Doc_Date_To: toApiDdMmmYyyy(toDate || form.toDate),
         ExpenseType_UUID: ((selectedExpenseType?.Uuid === 'OTHER' || selectedExpenseType?.UUID === 'OTHER') ? 'Other' : getUuidLike(selectedExpenseType)),
         Country_UUID: getUuidLike(selectedCountry),
         State_UUID: getUuidLike(selectedState),
@@ -1094,7 +1176,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
       UnitCost: form.unitCost,
       Quantity: form.quantity,
       TaxAmount: form.taxAmount,
-      Document_Date: dateOnly(documentDate || form.documentDate),
+      Document_Date: toApiDdMmmYyyy(documentDate || form.documentDate),
       BillUrl: '',
       Expense_Remarks: form.purpose,
       documentFile: selectedAttachment ? { uri: selectedAttachment.uri, name: selectedAttachment.name || 'bill', type: selectedAttachment.type || 'application/octet-stream' } : undefined,
@@ -1136,7 +1218,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
       UnitCost: form.unitCost,
       Quantity: form.quantity,
       TaxAmount: form.taxAmount,
-      Document_Date: dateOnly(documentDate || form.documentDate),
+      Document_Date: toApiDdMmmYyyy(documentDate || form.documentDate),
       BillUrl: '',
       Expense_Remarks: form.purpose,
       documentFile: selectedAttachment ? { uri: selectedAttachment.uri, name: selectedAttachment.name || 'bill', type: selectedAttachment.type || 'application/octet-stream' } : undefined,
@@ -1261,10 +1343,10 @@ const AddExpenseScreen = ({ navigation, route }) => {
 
         <View style={styles.row}>
           <View style={styles.half}>
-            <LabeledInput placeholder="From Date" rightIcon="calendar-today" value={form.fromDate || formatDate(fromDate)} onPress={() => setOpenFrom(true)} />
+            <LabeledInput placeholder="From Date" rightIcon="calendar-today" value={form.fromDate || formatUiDate(fromDate)} onPress={() => setOpenFrom(true)} />
           </View>
           <View style={styles.half}>
-            <LabeledInput placeholder="To Date" rightIcon="calendar-today" value={form.toDate || formatDate(toDate)} onPress={() => setOpenTo(true)} />
+            <LabeledInput placeholder="To Date" rightIcon="calendar-today" value={form.toDate || formatUiDate(toDate)} onPress={() => setOpenTo(true)} />
           </View>
         </View>
 
@@ -1413,7 +1495,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
           editable={false}
           onChangeText={() => { }}
         />
-        <LabeledInput placeholder="Document Date" rightIcon="calendar-today" value={form.documentDate || formatDate(documentDate)} onPress={() => setOpenDoc(true)} />
+        <LabeledInput placeholder="Document Date" rightIcon="calendar-today" value={form.documentDate || formatUiDate(documentDate)} onPress={() => setOpenDoc(true)} />
 
         <HeaderLabel title="General Info" />
 
@@ -1624,10 +1706,10 @@ const AddExpenseScreen = ({ navigation, route }) => {
       <DatePickerBottomSheet
         isVisible={openFrom}
         onClose={() => setOpenFrom(false)}
-        selectedDate={fromDate || new Date()}
+        selectedDate={(fromDate instanceof Date && !isNaN(fromDate?.getTime())) ? fromDate : new Date()}
         onDateSelect={(date) => {
           setFromDate(date);
-          updateForm('fromDate')(formatDate(date));
+          updateForm('fromDate')(formatUiDate(date));
         }}
         title="Select From Date"
         maxDate={(function () { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); })()}
@@ -1636,10 +1718,10 @@ const AddExpenseScreen = ({ navigation, route }) => {
       <DatePickerBottomSheet
         isVisible={openTo}
         onClose={() => setOpenTo(false)}
-        selectedDate={toDate || new Date()}
+        selectedDate={(toDate instanceof Date && !isNaN(toDate?.getTime())) ? toDate : new Date()}
         onDateSelect={(date) => {
           setToDate(date);
-          updateForm('toDate')(formatDate(date));
+          updateForm('toDate')(formatUiDate(date));
         }}
         title="Select To Date"
         maxDate={(function () { const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); })()}
@@ -1648,10 +1730,10 @@ const AddExpenseScreen = ({ navigation, route }) => {
       <DatePickerBottomSheet
         isVisible={openDoc}
         onClose={() => setOpenDoc(false)}
-        selectedDate={documentDate || new Date()}
+        selectedDate={(documentDate instanceof Date && !isNaN(documentDate?.getTime())) ? documentDate : new Date()}
         onDateSelect={(date) => {
           setDocumentDate(date);
-          updateForm('documentDate')(formatDate(date));
+          updateForm('documentDate')(formatUiDate(date));
         }}
         title="Select Document Date"
       />

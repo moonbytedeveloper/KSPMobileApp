@@ -5,7 +5,7 @@ import { wp, hp, rf, safeAreaTop } from '../../utils/responsive';
 import Dropdown from '../../components/common/Dropdown';
 import AppHeader from '../../components/common/AppHeader';
 import DatePickerBottomSheet from '../../components/common/CustomDatePicker';
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY, text, layout, SHADOW, buttonStyles } from '../styles/styles';
+import { COLORS, SPACING, RADIUS, TYPOGRAPHY, inputStyles, text, layout, SHADOW, buttonStyles } from '../styles/styles';
 import { applyLeave, getHRALeaves } from '../../api/authServices';
 import { getUUID, getCMPUUID, getENVUUID } from '../../api/tokenStorage';
 import { Formik } from 'formik';
@@ -243,53 +243,85 @@ const ApplyLeaveScreen = ({ navigation }) => {
         {isExpanded && (
           <View style={styles.leaveDetailArea}>
             <Text style={[styles.detailLabelMuted, { marginBottom: hp(0.8) }]}>Leave Information</Text>
-            <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>Applied By</Text>
-              <Text style={styles.detailValueStrong}>{data.appliedBy || '-'}</Text>
+            <View>
+              <View style={styles.leaveDetailRow}>
+                <Text style={styles.detailLabelMuted}>Applied By</Text>
+                <Text style={styles.detailValueStrong}>{data.appliedBy || '-'}</Text>
+              </View>
+              <View style={styles.detailDivider} />
             </View>
-            <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>Applied Date</Text>
-              <Text style={styles.detailValueStrong}>{data.applyDate}</Text>
+            <View>
+              <View style={styles.leaveDetailRow}>
+                <Text style={styles.detailLabelMuted}>Applied Date</Text>
+                <Text style={styles.detailValueStrong}>{data.applyDate}</Text>
+              </View>
+              <View style={styles.detailDivider} />
             </View>
-            <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>Leave Start Date</Text>
-              <Text style={styles.detailValueStrong}>{data.from}</Text>
+            <View>
+              <View style={styles.leaveDetailRow}>
+                <Text style={styles.detailLabelMuted}>Leave Start Date</Text>
+                <Text style={styles.detailValueStrong}>{data.from}</Text>
+              </View>
+              <View style={styles.detailDivider} />
             </View>
-            <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>Leave End Date</Text>
-              <Text style={styles.detailValueStrong}>{data.to}</Text>
+            <View>
+              <View style={styles.leaveDetailRow}>
+                <Text style={styles.detailLabelMuted}>Leave End Date</Text>
+                <Text style={styles.detailValueStrong}>{data.to}</Text>
+              </View>
+              <View style={styles.detailDivider} />
             </View>
-            <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>Leave Type</Text>
-              <Text style={styles.detailValueStrong}>{data.leaveType}</Text>
+            <View>
+              <View style={styles.leaveDetailRow}>
+                <Text style={styles.detailLabelMuted}>Leave Type</Text>
+                <Text style={styles.detailValueStrong}>{data.leaveType}</Text>
+              </View>
+              <View style={styles.detailDivider} />
             </View>
-            <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>Leave Parameter</Text>
-              <Text style={styles.detailValueStrong}>{data.parameter}</Text>
+            <View>
+              <View style={styles.leaveDetailRow}>
+                <Text style={styles.detailLabelMuted}>Leave Parameter</Text>
+                <Text style={styles.detailValueStrong}>{data.parameter}</Text>
+              </View>
+              <View style={styles.detailDivider} />
             </View>
-            <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>Reason</Text>
-              <Text style={styles.detailValueStrong}>{data.reason || '-'}</Text>
+            <View>
+              <View style={styles.leaveDetailRow}>
+                <Text style={styles.detailLabelMuted}>Reason</Text>
+                <Text style={styles.detailValueStrong}>{data.reason || '-'}</Text>
+              </View>
+              <View style={styles.detailDivider} />
             </View>
-            <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>Contact No</Text>
-              <Text style={styles.detailValueStrong}>{data.contactNo || '-'}</Text>
+            <View>
+              <View style={styles.leaveDetailRow}>
+                <Text style={styles.detailLabelMuted}>Contact No</Text>
+                <Text style={styles.detailValueStrong}>{data.contactNo || '-'}</Text>
+              </View>
+              <View style={styles.detailDivider} />
             </View>
-            <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>Status</Text>
-              <StatusBadge label={data.status} />
-              {/* <View style={[styles.statusPill, { backgroundColor: statusBg }]}>
-                <Text style={[styles.statusPillText, { color: statusColor }]}>{data.status}</Text>
-              </View> */}
+            <View>
+              <View style={styles.leaveDetailRow}>
+                <Text style={styles.detailLabelMuted}>Status</Text>
+                <StatusBadge label={data.status || '-'} />
+              </View>
+              <View style={styles.detailDivider} />
             </View>
-            <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>Action Taken By</Text>
-              <Text style={styles.detailValueStrong}>{data.actionTakenBy || '-'}</Text>
+
+            {/* <View>
+              <View style={styles.leaveDetailRow}>
+                <Text style={styles.detailLabelMuted}>Action Taken By</Text>
+                <Text style={styles.detailValueStrong}>{data.actionTakenBy || '-'}</Text>
+              </View>
+              <View style={styles.detailDivider} />
             </View>
-            <View style={styles.leaveDetailRow}>
-              <Text style={styles.detailLabelMuted}>Remark</Text>
-              <Text style={styles.detailValueStrong}>{data.remark || '-'}</Text>
-            </View>
+
+            <View>
+              <View style={styles.leaveDetailRow}>
+                <Text style={styles.detailLabelMuted}>Remark</Text>
+                <Text style={styles.detailValueStrong}>{data.remark || '-'}</Text>
+              </View>
+              <View style={styles.detailDivider} />
+            </View> */}
             {/* <View style={styles.detailDivider} />
             <View style={styles.actionButtonsRow}>
               <TouchableOpacity activeOpacity={0.85} style={[styles.actionBtn, styles.actionBtnApprove]}>
@@ -403,6 +435,7 @@ const ApplyLeaveScreen = ({ navigation }) => {
                   style={{ zIndex: 20 }}
                   inputBoxStyle={[(touched.leaveType && errors.leaveType) && styles.inputError]}
                   hideSearch={true}
+                  textStyle={{ fontSize: rf(4.2), marginLeft: 0 }}
                 />
                 {touched.leaveType && errors.leaveType ? (
                   <Text style={styles.helperError}>{errors.leaveType}</Text>
@@ -416,8 +449,9 @@ const ApplyLeaveScreen = ({ navigation }) => {
                   options={parameterOptions}
                   onSelect={(val) => setFieldValue('parameter', typeof val === 'string' ? val : String(val))}
                   style={{ zIndex: 10 }}
-                  inputBoxStyle={[(touched.parameter && errors.parameter) && styles.inputError]}
+                  inputBoxStyle={[(inputStyles.box, touched.parameter && errors.parameter) && styles.inputError]}
                   hideSearch={true}
+                  textStyle={{ fontSize: rf(4.2), marginLeft: 0 }}
                 />
                 {touched.parameter && errors.parameter ? (
                   <Text style={styles.helperError}>{errors.parameter}</Text>
@@ -546,7 +580,7 @@ const ApplyLeaveScreen = ({ navigation }) => {
           )}
         </View>
 
-        <View style={styles.controlsRow}>
+        <View style={styles.paginationContainer}>
           <Text style={styles.showLabel}>Show</Text>
           <Dropdown
             placeholder="10"
@@ -558,6 +592,8 @@ const ApplyLeaveScreen = ({ navigation }) => {
             inputBoxStyle={{ paddingHorizontal: wp(2.2) }}
             style={{ width: wp(20), marginBottom: hp(1.1) }}
           />
+          {/* <Text style={styles.paginationLabel}>entries</Text> */}
+
           <View style={styles.searchBox}>
             <Icon name="search" size={rf(3.8)} color="#9ca3af" />
             <TextInput
@@ -660,7 +696,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     paddingHorizontal: wp(3),
-    height: hp(6.2),
+    height: hp(5),
     marginTop: hp(1),
   },
   pickerText: {
@@ -674,7 +710,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     paddingHorizontal: wp(3),
-    height: hp(6.2),
+    height: hp(5),
   },
   inputField: {
     fontSize: TYPOGRAPHY.input,
@@ -685,7 +721,7 @@ const styles = StyleSheet.create({
   submitButton: {
     alignSelf: 'flex-end',
     backgroundColor: COLORS.primary,
-    paddingVertical: hp(1.3),
+    paddingVertical: hp(0.8),
     paddingHorizontal: wp(5),
     borderRadius: RADIUS.md,
     marginTop: hp(1),
@@ -735,11 +771,32 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontFamilyMedium,
     fontStyle: 'italic',
   },
-  controlsRow: {
+  paginationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(2),
     marginBottom: hp(1),
+  },
+  itemsPerPageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+    zIndex: 1000,
+  },
+  paginationDropdown: {
+    width: wp(16),
+    height: hp(4),
+    marginHorizontal: wp(1),
+    zIndex: 1000,
+    position: 'relative',
+  },
+  paginationLabel: {
+    fontSize: rf(3.5),
+    color: '#111827',
+    marginRight: wp(2),
+  },
+  controlsRow: {
+    display: 'flex'
   },
   showLabel: {
     fontSize: rf(3.8),
@@ -839,11 +896,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statusIcon: { width: wp(3.5), height: wp(3.5), borderRadius: wp(2) },
-  headerLabel: { fontSize: rf(2.8), color: COLORS.textMuted, fontWeight: '700', fontFamily: TYPOGRAPHY.fontFamilyBold, marginBottom: hp(0.3) },
-  headerTitle: { fontSize: rf(3.8), color: COLORS.text, fontWeight: '700', fontFamily: TYPOGRAPHY.fontFamilyBold },
+  headerLabel: { fontSize: rf(3), color: COLORS.textLight, fontWeight: '700', fontFamily: TYPOGRAPHY.fontFamilyMedium, marginBottom: hp(0.3) },
+  headerTitle: { fontSize: rf(3.5), color: COLORS.text, fontWeight: '600', fontFamily: TYPOGRAPHY.fontFamilyMedium },
   leaveHeaderRightMeta: { alignItems: 'flex-end' },
-  headerLabelRight: { fontSize: rf(2.8), color: COLORS.textMuted, fontWeight: '700', fontFamily: TYPOGRAPHY.fontFamilyBold },
-  headerValueRight: { fontSize: rf(3.8), color: COLORS.text, fontWeight: '700', fontFamily: TYPOGRAPHY.fontFamilyBold },
+  headerLabelRight: { fontSize: rf(3), color: COLORS.textLight, fontWeight: '700', fontFamily: TYPOGRAPHY.fontFamilyMedium },
+  headerValueRight: { fontSize: rf(3.5), color: COLORS.text, fontWeight: '600', fontFamily: TYPOGRAPHY.fontFamilyMedium },
   leaveHeaderRight: {
     alignItems: 'flex-end',
   },
@@ -869,11 +926,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: hp(0.6),
   },
-  detailLabelMuted: { fontSize: rf(3.2), color: COLORS.textMuted, fontWeight: '700', fontFamily: TYPOGRAPHY.fontFamilyMedium },
-  detailValueStrong: { fontSize: rf(3.6), color: COLORS.text, fontWeight: '700', fontFamily: TYPOGRAPHY.fontFamilyBold },
-  detailDivider: { height: 1, backgroundColor: COLORS.border, marginVertical: hp(1) },
+  detailLabelMuted: { fontSize: rf(3.2), color: COLORS.textLight, fontWeight: '500', fontFamily: TYPOGRAPHY.fontFamilyMedium },
+  detailValueStrong: { fontSize: rf(3.2), color: COLORS.text, fontWeight: '500', fontFamily: TYPOGRAPHY.fontFamilyBold },
+  detailDivider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginVertical: hp(0.8),
+    opacity: 0.5
+  },
   actionButtonsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: wp(3) },
   actionBtn: { flex: 1, paddingVertical: hp(1.4), borderRadius: wp(3), borderWidth: 1.5, alignItems: 'center' },
   actionBtnApprove: { borderColor: '#16a34a' },
   actionBtnDelete: { borderColor: '#ef4444' },
-}); 
+});
+
+//     color: COLORS.textLight,
+//   fontSize: TYPOGRAPHY.subtitle, color: COLORS.text,fontWeight: '500',    

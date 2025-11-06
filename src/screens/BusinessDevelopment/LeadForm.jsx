@@ -114,22 +114,16 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
 
   const formatUiDate = (date) => {
     const d = new Date(date);
-    const yyyy = String(d.getFullYear());
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
+    const mmm = months[d.getMonth()];
+    const yyyy = String(d.getFullYear());
+    return `${dd}-${mmm}-${yyyy}`;
   };
 
   const formatDateForAPI = (date) => {
-    // Create a new date object to avoid timezone issues
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = d.getMonth();
-    const day = d.getDate();
-
-    // Create date in local timezone to avoid timezone conversion issues
-    const localDate = new Date(year, month, day, 12, 0, 0, 0); // Set to noon to avoid DST issues
-    return localDate.toISOString();
+    // Return in dd-MMM-yyyy format, e.g., 01-Feb-2025
+    return formatUiDate(date);
   };
 
   // Load countries on component mount

@@ -23,13 +23,13 @@ const AccordionItem = ({
   editLabel = 'Edit',
   status,
 }) => {
-  console.log('status122', status, 'item', item.status);
   // Defer delete confirmation to the screen-level bottom sheet
   const StatusBadge = ({ label }) => {
     const palette = {
       Pending: { bg: COLORS.warningBg, color: COLORS.warning, border: COLORS.warning },
       Approved: { bg: COLORS.successBg, color: COLORS.success, border: COLORS.success },
       Rejected: { bg: COLORS.dangerBg, color: COLORS.danger, border: COLORS.danger },
+      Submitted: { bg: COLORS.infoBg, color: COLORS.info, border: COLORS.info },
     };
     const theme = palette[label] || palette.Pending;
   

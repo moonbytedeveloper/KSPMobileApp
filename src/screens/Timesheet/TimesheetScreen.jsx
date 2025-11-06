@@ -883,7 +883,7 @@ const TimesheetScreen = ({ navigation }) => {
         backdropPressBehavior="close"
         handleIndicatorStyle={styles.bsHandle}
         backgroundStyle={styles.bsBackground}
-        contentContainerStyle={styles.bsContent}
+        contentContainerStyle={[styles.bsContent, isDropdownOpen && { paddingBottom: hp(1) }]}
       >
         <View style={styles.bsHeaderRow}>
           <Text style={styles.bsTitle}>Select Project and Task Detail</Text>
@@ -1385,7 +1385,8 @@ const styles = StyleSheet.create({
   bsContent: {
     backgroundColor: COLORS.bg,
     paddingHorizontal: wp(6),
-    paddingBottom: hp(2.5),
+    paddingTop: hp(1),
+    paddingBottom: hp(1),
     borderTopLeftRadius: wp(6),
     borderTopRightRadius: wp(6),
   },

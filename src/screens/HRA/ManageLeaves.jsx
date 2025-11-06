@@ -309,7 +309,7 @@ const ManageLeaves = ({ navigation }) => {
       <CommonBottomSheet
         visible={sheetVisible}
         onDismiss={() => setSheetVisible(false)}
-        snapPoints={[hp(70)]}
+        snapPoints={[hp(50)]}
       >
         <View style={styles.sheetHeader}>
           <Text style={styles.sheetTitle}>Leave Information</Text>

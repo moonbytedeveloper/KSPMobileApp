@@ -18,6 +18,7 @@ const LeaveListScreen = ({ navigation }) => {
   const PAGE_SIZE = 10;
   const [searchValue, setSearchValue] = useState('');
   const [hasMore, setHasMore] = useState(true);
+  const [expandedId, setExpandedId] = useState(null); // added for expanded card
 
   useEffect(() => {
     const load = async (isRefresh) => {
@@ -69,13 +70,12 @@ const LeaveListScreen = ({ navigation }) => {
     };
   }, []);
 
-  const toggleExpanded = (leaveId) => {
-    setLeaves((prevLeaves) =>
-      prevLeaves.map((leave) =>
-        leave.id === leaveId ? { ...leave, isExpanded: !leave.isExpanded } : leave
-      )
-    );
-  };
+ 
+
+const toggleExpanded = (leaveId) => { // add toggle function
+  setExpandedId(expandedId === leaveId ? null : leaveId);
+};
+
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -236,7 +236,7 @@ if(isLoading) {
               </View>
             </TouchableOpacity>
 
-            {l.isExpanded && (
+            {expandedId === l.id && (
               <View style={styles.expandedContent}>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Start Date:</Text>

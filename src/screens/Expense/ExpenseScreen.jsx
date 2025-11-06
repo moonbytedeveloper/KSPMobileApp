@@ -89,6 +89,51 @@ const ExpenseScreen = ({ navigation }) => {
     });
   }, [expenses, selectedProject, selectedTask, searchValue]);
 
+  // ---- Date formatting helpers: dd-MMM-yyyy ----
+  const formatUiDate = (date) => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const d = (date instanceof Date) ? date : new Date(date);
+    if (isNaN(d.getTime())) return '';
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mmm = months[d.getMonth()];
+    const yyyy = String(d.getFullYear());
+    return `${dd}-${mmm}-${yyyy}`;
+  };
+
+  const formatAnyToDdMmmYyyy = (value) => {
+    if (!value) return '';
+    if (value instanceof Date) return formatUiDate(value);
+    const s = String(value).trim();
+    if (!s) return '';
+    // dd-MMM-yyyy
+    const m1 = s.match(/^(\d{2})-([A-Za-z]{3})-(\d{4})$/);
+    if (m1) {
+      const map = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+      const dd = Number(m1[1]);
+      const mon = map[m1[2].toLowerCase()];
+      const yyyy = Number(m1[3]);
+      return formatUiDate(new Date(yyyy, mon, dd));
+    }
+    // yyyy-mm-dd
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const [y, m, d] = s.split('-').map((n) => Number(n));
+      return formatUiDate(new Date(y, m - 1, d));
+    }
+    // dd-mm-yy
+    if (/^\d{2}-\d{2}-\d{2}$/.test(s)) {
+      const [d, m, yy] = s.split('-').map((n) => Number(n));
+      return formatUiDate(new Date(2000 + yy, m - 1, d));
+    }
+    // dd-mm-yyyy
+    if (/^\d{2}-\d{2}-\d{4}$/.test(s)) {
+      const [d, m, y] = s.split('-').map((n) => Number(n));
+      return formatUiDate(new Date(y, m - 1, d));
+    }
+    // Fallback: ISO or parseable
+    const dflt = new Date(s);
+    return isNaN(dflt.getTime()) ? '' : formatUiDate(dflt);
+  };
+
   // (moved loader return below hooks to avoid hook-order issues)
 
   const handleSelectProject = (project) => {
@@ -226,8 +271,8 @@ const ExpenseScreen = ({ navigation }) => {
           const expenseName = r.ExpenseName || r.expenseName || 'Expense';
           const documentFromDateRaw = r.DocDateFrom || r.documentFromDate || '';
           const documentToDateRaw = r.DocDateTo || r.documentToDate || '';
-          const documentFromDate = typeof documentFromDateRaw === 'string' ? documentFromDateRaw.substring(0, 10) : '';
-          const documentToDate = typeof documentToDateRaw === 'string' ? documentToDateRaw.substring(0, 10) : '';
+          const documentFromDate = formatAnyToDdMmmYyyy(documentFromDateRaw);
+          const documentToDate = formatAnyToDdMmmYyyy(documentToDateRaw);
           const amountStr = r.Amount || r.amount || '0.00';
           const amount = amountStr ? `₹ ${String(amountStr)}` : '₹ 0.00';
           const status = r.Status || r.status || 'Unpaid';
@@ -695,6 +740,7 @@ const styles = StyleSheet.create({
     // marginHorizontal: wp(2),
     // paddingVertical: hp(0.8),
     height: hp(4.8),
+    marginRight: wp(2)
   },
   searchInput: {
     flex: 1,

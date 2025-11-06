@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { SafeAreaView, View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -19,9 +19,20 @@ const sampleProjects = [
 
 const pageSizes = [10, 25, 50, 100];
 
-const TimesheetCard = ({ timesheet, onActionPress, getStatusColor, getStatusBgColor, isApprovedTab = false }) => {
-  const [expanded, setExpanded] = useState(false);
-  const toggle = () => setExpanded((s) => !s);
+const TimesheetCard = ({ timesheet, onActionPress, getStatusColor, getStatusBgColor, expanded: expandedProp, onToggle, isApprovedTab = false }) => {
+  const [expandedUncontrolled, setExpandedUncontrolled] = useState(false);
+  const isControlled = typeof expandedProp === 'boolean';
+  const expanded = isControlled ? expandedProp : expandedUncontrolled;
+
+
+  const toggle = useCallback(() => {
+    if (isControlled) {
+      onToggle && onToggle(); // parent handles state
+    } else {
+      setExpandedUncontrolled(prev => !prev); // local toggle
+    }
+  }, [isControlled, onToggle]);
+
 
   const statusColor = getStatusColor(timesheet.status);
   const statusBg = getStatusBgColor(timesheet.status);
@@ -33,11 +44,11 @@ const TimesheetCard = ({ timesheet, onActionPress, getStatusColor, getStatusBgCo
       Approved: { bg: COLORS.successBg, color: COLORS.success, border: COLORS.success },
       Closed: { bg: COLORS.dangerBg, color: COLORS.danger, border: COLORS.danger },
     };
-    
+
     const theme = palette[label] || palette.Pending;
-  
+
     return (
-      <View style={[styles.badge, { backgroundColor: theme.bg, borderColor: theme.border }]}> 
+      <View style={[styles.badge, { backgroundColor: theme.bg, borderColor: theme.border }]}>
         <Text style={[styles.badgeText, { color: theme.color }]}>{label}</Text>
       </View>
     );
@@ -47,11 +58,13 @@ const TimesheetCard = ({ timesheet, onActionPress, getStatusColor, getStatusBgCo
       <TouchableOpacity activeOpacity={0.8} onPress={toggle}>
         <View style={styles.tsRowHeader}>
           <View style={styles.tsHeaderLeft}>
-            <View style={[styles.tsDot, { backgroundColor: timesheet.status === 'Approved'
-          ? COLORS.success
-          : timesheet.status === 'Pending'
-          ? COLORS.warning 
-          :timesheet.status === 'Submitted'?  COLORS.info :  COLORS.danger, }]} />
+            <View style={[styles.tsDot, {
+              backgroundColor: timesheet.status === 'Approved'
+                ? COLORS.success
+                : timesheet.status === 'Pending'
+                  ? COLORS.warning
+                  : timesheet.status === 'Submitted' ? COLORS.info : COLORS.danger,
+            }]} />
             <View style={styles.tsHeaderLeftContent}>
               <Text style={[text.caption, styles.tsCaption]}>Timesheet</Text>
               <Text style={[text.title, styles.tsTitle]} numberOfLines={1}>{timesheet.employeeName || `Timesheet #${timesheet.srNo}`}</Text>
@@ -85,7 +98,7 @@ const TimesheetCard = ({ timesheet, onActionPress, getStatusColor, getStatusBgCo
           )}
           <View style={styles.detailRow}>
             <Text style={[text.caption, styles.detailLabel]}>Status</Text>
-            <StatusBadge  label={timesheet.status} />
+            <StatusBadge label={timesheet.status} />
           </View>
 
           <View style={styles.tsActionsRowPrimary}>
@@ -93,7 +106,7 @@ const TimesheetCard = ({ timesheet, onActionPress, getStatusColor, getStatusBgCo
               <Icon name="description" size={rf(5)} style={buttonStyles.iconView} />
             </TouchableOpacity>
             {isApprovedTab && (
-              <TouchableOpacity onPress={() => onActionPress(timesheet, 'approvalDetails')} activeOpacity={0.85} style={[buttonStyles.buttonNeutralFill, buttonStyles.scheduleBtn ]}>
+              <TouchableOpacity onPress={() => onActionPress(timesheet, 'approvalDetails')} activeOpacity={0.85} style={[buttonStyles.buttonNeutralFill, buttonStyles.scheduleBtn]}>
                 <Icon name="schedule" size={rf(5)} style={buttonStyles.iconSchedule} />
               </TouchableOpacity>
             )}
@@ -120,10 +133,12 @@ const ManageMyWorklist = ({ navigation }) => {
   const [totalApprovedRecords, setTotalApprovedRecords] = useState(0);
   const [currentPage, setCurrentPage] = useState(0); // zero-based
   const [isLoadingSubmitted, setIsLoadingSubmitted] = useState(false);
-  
+  const [expandedId, setExpandedId] = useState(null); // New state for expanded card
+
+
   const viewSheetRef = useRef(null);
   const approvalDetailsSheetRef = useRef(null);
-  
+
   const handleTabSwitch = (tab) => {
     setSelectedProject(null);
     setSelectedTask(null);
@@ -332,7 +347,7 @@ const ManageMyWorklist = ({ navigation }) => {
   const handleActionPress = (timesheet, action) => {
     setSelectedTimesheet(timesheet);
     setSelectedAction(action);
-    
+
     switch (action) {
       case 'view':
         viewSheetRef.current?.present();
@@ -367,10 +382,10 @@ const ManageMyWorklist = ({ navigation }) => {
       const container = resp?.Data ?? resp?.data ?? resp;
       const rows = Array.isArray(container?.data) ? container.data
         : Array.isArray(container?.Rows) ? container.Rows
-        : Array.isArray(container?.rows) ? container.rows
-        : Array.isArray(container?.Items) ? container.Items
-        : Array.isArray(container?.items) ? container.items
-        : Array.isArray(container) ? container : [];
+          : Array.isArray(container?.rows) ? container.rows
+            : Array.isArray(container?.Items) ? container.Items
+              : Array.isArray(container?.items) ? container.items
+                : Array.isArray(container) ? container : [];
       return rows.map((row, idx) => {
         const fromDate = row.FromDate || row.fromDate || '';
         const toDate = row.ToDate || row.toDate || '';
@@ -409,12 +424,12 @@ const ManageMyWorklist = ({ navigation }) => {
       const resp = await getApprovedTimesheets({ start, length, searchValue, sortColumn: 'FromDate' });
       try {
         console.log('🔵 [ManageMyWorklist] Approved API raw response:', JSON.stringify(resp, null, 2));
-      } catch (_) {}
+      } catch (_) { }
       const mapped = mapApprovedRows(resp);
       try {
         console.log('🟢 [ManageMyWorklist] Approved mapped items (count):', mapped.length);
         console.log('🟢 [ManageMyWorklist] First mapped item:', mapped[0]);
-      } catch (_) {}
+      } catch (_) { }
       setApprovedData(mapped);
       const total = (typeof resp?.Data?.recordsTotal === 'number' && resp.Data.recordsTotal)
         || (typeof resp?.Data?.recordsFiltered === 'number' && resp.Data.recordsFiltered)
@@ -439,16 +454,16 @@ const ManageMyWorklist = ({ navigation }) => {
       const resp = await getSubmittedAndPendingTimesheets({ start, length });
       try {
         console.log('🔵 [ManageMyWorklist] Submitted&Pending API raw response:', JSON.stringify(resp, null, 2));
-      } catch (_) {}
+      } catch (_) { }
 
       // Map response to UI-friendly structure
       const container = resp?.Data ?? resp?.data ?? resp;
       const rows = Array.isArray(container?.data) ? container.data
         : Array.isArray(container?.Rows) ? container.Rows
-        : Array.isArray(container?.rows) ? container.rows
-        : Array.isArray(container?.Items) ? container.Items
-        : Array.isArray(container?.items) ? container.items
-        : Array.isArray(container) ? container : [];
+          : Array.isArray(container?.rows) ? container.rows
+            : Array.isArray(container?.Items) ? container.Items
+              : Array.isArray(container?.items) ? container.items
+                : Array.isArray(container) ? container : [];
 
       const mapped = rows.map((row, idx) => {
         const fromDate = row.FromDate || row.fromDate || '';
@@ -604,15 +619,15 @@ const ManageMyWorklist = ({ navigation }) => {
   return (
     <View style={styles.safeArea}>
       <AppHeader
-          title="Manage My Worklist"
-          onLeftPress={() => navigation.goBack()}
-          onRightPress={() => navigation.navigate('Notification')}
-        />
+        title="Manage My Worklist"
+        onLeftPress={() => navigation.goBack()}
+        onRightPress={() => navigation.navigate('Notification')}
+      />
       <View style={styles.container}>
         {/* Tab Navigation */}
         <View style={styles.tabContainer}>
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'submitted' && styles.activeTab]} 
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'submitted' && styles.activeTab]}
             onPress={() => handleTabSwitch('submitted')}
           >
             <Text style={[styles.tabText, activeTab === 'submitted' && styles.activeTabText]}>
@@ -620,9 +635,9 @@ const ManageMyWorklist = ({ navigation }) => {
             </Text>
             {activeTab === 'submitted' && <View style={styles.tabUnderline} />}
           </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'approved' && styles.activeTab]} 
+
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'approved' && styles.activeTab]}
             onPress={() => handleTabSwitch('approved')}
           >
             <Text style={[styles.tabText, activeTab === 'approved' && styles.activeTabText]}>
@@ -631,10 +646,10 @@ const ManageMyWorklist = ({ navigation }) => {
             {activeTab === 'approved' && <View style={styles.tabUnderline} />}
           </TouchableOpacity>
         </View>
-  
+
         {/* Filter and Search Section */}
         <View style={styles.filterSection}>
-          <View style={styles.row}> 
+          <View style={styles.row}>
             <View style={styles.half}>
               <Dropdown
                 placeholder="Project Name"
@@ -717,6 +732,8 @@ const ManageMyWorklist = ({ navigation }) => {
               getStatusColor={getStatusColor}
               getStatusBgColor={getStatusBgColor}
               isApprovedTab={activeTab === 'approved'}
+              expanded={expandedId === timesheet.id}
+              onToggle={() => setExpandedId(expandedId === timesheet.id ? null : timesheet.id)}
             />
           ))}
 
@@ -900,32 +917,32 @@ const ManageMyWorklist = ({ navigation }) => {
               {(selectedTimesheet?.approvalDetails || []).map((detail, idx) => (
                 <View key={`${idx}-${detail?.ActionDate || detail?.actionDate || 'row'}`} style={styles.timesheetItem}>
                   <Text style={styles.timesheetTitle}>Approval #{idx + 1}</Text>
-                  
+
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Action Date:</Text>
                     <Text style={styles.detailValue}>{detail.ActionDate || detail.actionDate || '-'}</Text>
                   </View>
-                  
+
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Entered By:</Text>
                     <Text style={styles.detailValue}>{detail.EnteredBy || detail.enteredBy || '-'}</Text>
                   </View>
-                  
+
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Status:</Text>
-                    <Text style={[styles.statusBadge, { 
+                    <Text style={[styles.statusBadge, {
                       color: '#fff',
                       backgroundColor: '#10B981'
                     }]}>
                       {detail.Status || detail.status || 'Approved'}
                     </Text>
                   </View>
-                  
+
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Action Taken By:</Text>
                     <Text style={styles.detailValue}>{detail.ActionTakenBy || detail.actionTakenBy || '-'}</Text>
                   </View>
-                  
+
                   <View style={styles.itemDivider} />
                 </View>
               ))}
@@ -975,7 +992,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.textMuted,
     fontFamily: TYPOGRAPHY.fontFamilyMedium,
-    textAlign:'center',
+    textAlign: 'center',
   },
   activeTabText: {
     color: COLORS.primary,
@@ -1039,7 +1056,7 @@ const styles = StyleSheet.create({
     marginLeft: wp(1.5),
     fontSize: rf(4),
     color: COLORS.text,
-    height:hp(6),
+    height: hp(6),
     fontFamily: TYPOGRAPHY.fontFamilyRegular,
   },
   searchButton: {
@@ -1237,8 +1254,8 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 9,
     fontWeight: '600',
-    padding: 1 
-  }, 
+    padding: 1
+  },
   paginationContainerTop: {
     alignItems: 'center',
     justifyContent: 'center',

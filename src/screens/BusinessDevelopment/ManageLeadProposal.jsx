@@ -15,11 +15,65 @@ import { useNavigation } from '@react-navigation/native';
 import ImageViewerScreen from '../../components/common/ImageViewerScreen.jsx';
 
 const formatUiDate = (date) => {
-  const d = new Date(date);
-  const yyyy = String(d.getFullYear());
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const d = (date instanceof Date) ? date : new Date(date);
+  if (isNaN(d.getTime())) return '';
   const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+  const mmm = months[d.getMonth()];
+  const yyyy = String(d.getFullYear());
+  return `${dd}-${mmm}-${yyyy}`;
+};
+
+// Robust formatter: accepts Date | ISO | yyyy-mm-dd | dd-mm-yy | dd-mm-yyyy | dd-MMM-yyyy
+const formatAnyToDdMmmYyyy = (value) => {
+  if (!value) return '';
+  // If Date instance
+  if (value instanceof Date) return formatUiDate(value);
+  const s = String(value).trim();
+  if (!s) return '';
+  // dd-MMM-yyyy (already desired) -> normalize via parse
+  const m1 = s.match(/^(\d{2})-([A-Za-z]{3})-(\d{4})$/);
+  if (m1) {
+    const map = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+    const dd = Number(m1[1]);
+    const mon = map[m1[2].toLowerCase()];
+    const yyyy = Number(m1[3]);
+    const dt = new Date(yyyy, mon, dd);
+    return formatUiDate(dt);
+  }
+  // yyyy-mm-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split('-').map((n) => Number(n));
+    return formatUiDate(new Date(y, m - 1, d));
+  }
+  // dd-mm-yy
+  if (/^\d{2}-\d{2}-\d{2}$/.test(s)) {
+    const [d, m, yy] = s.split('-').map((n) => Number(n));
+    const y = 2000 + yy;
+    return formatUiDate(new Date(y, m - 1, d));
+  }
+  // dd-mm-yyyy
+  if (/^\d{2}-\d{2}-\d{4}$/.test(s)) {
+    const [d, m, y] = s.split('-').map((n) => Number(n));
+    return formatUiDate(new Date(y, m - 1, d));
+  }
+  // Fallback: ISO or parseable by Date
+  const dflt = new Date(s);
+  return isNaN(dflt.getTime()) ? '' : formatUiDate(dflt);
+};
+
+// Parse dd-MMM-yyyy into components { y, m, d }
+const parseDdMmmYyyy = (value) => {
+  const s = String(value || '').trim();
+  const m = s.match(/^(\d{2})-([A-Za-z]{3})-(\d{4})$/);
+  if (!m) return null;
+  const dd = Number(m[1]);
+  const mon = m[2].toLowerCase();
+  const yyyy = Number(m[3]);
+  const months = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+  if (!(mon in months)) return null;
+  const mm = months[mon] + 1; // 1-based month for formatting
+  return { y: yyyy, m: mm, d: dd };
 };
 
 // Convert various input formats to yy-mm-dd for API
@@ -28,6 +82,14 @@ const toApiDateYY = (value) => {
   try {
     const s = String(value || '').trim();
     if (!s) return '';
+    // dd-MMM-yyyy -> yy-mm-dd
+    const ddMmm = parseDdMmmYyyy(s);
+    if (ddMmm) {
+      const yy = String(ddMmm.y).slice(-2);
+      const mm = String(ddMmm.m).padStart(2, '0');
+      const dd = String(ddMmm.d).padStart(2, '0');
+      return `${yy}-${mm}-${dd}`;
+    }
     // yyyy-mm-dd -> yy-mm-dd
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
       const [yyyy, mm, dd] = s.split('-');
@@ -52,13 +114,17 @@ const toApiDateYY = (value) => {
   }
 };
 
-// Convert yyyy-mm-dd | dd-mm-yy | dd-mm-yyyy -> ISO string (UTC noon) "YYYY-MM-DDTHH:mm:ss.sssZ"
+// Convert yyyy-mm-dd | dd-mm-yy | dd-mm-yyyy | dd-MMM-yyyy -> ISO string (UTC noon) "YYYY-MM-DDTHH:mm:ss.sssZ"
 const toApiDateISO = (value) => {
   try {
     const s = String(value || '').trim();
     if (!s) return '';
     let y, m, d;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    // dd-MMM-yyyy
+    const ddMmm = parseDdMmmYyyy(s);
+    if (ddMmm) {
+      y = ddMmm.y; m = ddMmm.m; d = ddMmm.d;
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
       // yyyy-mm-dd
       const [yyyy, mm, dd] = s.split('-');
       y = Number(yyyy); m = Number(mm); d = Number(dd);
@@ -310,8 +376,8 @@ const ManageLeadProposal = ({ navigation, route }) => {
           followUpTakerName: proposal?.FollowUpTakerName || proposal?.Followup_Taker_Name || '',
           followUpTakerUuid: proposal?.Followup_Taker_UUID || proposal?.Followup_Taker_Uuid || proposal?.FollowupTakerUuid || '', // include UUID if provided by API
           amount: Number(proposal?.Amount || 0),
-          submittedDate: proposal?.Submitted_Date || '',
-          followUpDate: proposal?.Followup_Date || '',
+          submittedDate: formatAnyToDdMmmYyyy(proposal?.Submitted_Date),
+          followUpDate: formatAnyToDdMmmYyyy(proposal?.Followup_Date),
           isFinal: Boolean(proposal?.Final_Proposal),
           status: 'Submitted', // Default status since not in API response
           documentName: proposal?.ProposalDocument || '',

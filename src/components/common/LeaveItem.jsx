@@ -63,9 +63,9 @@ const StatusBadge = ({ label  }) => {
   const theme = palette[label] || palette.Pending;
 
   return (
-    <View > 
-      <Text style={[styles.badgeText, ]}>{label}</Text>
-    </View>
+    <View style={[styles.badge, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+    <Text style={[styles.badgeText, { color: theme.color }]}>{label}</Text>
+  </View>
   );
 };
 
@@ -85,7 +85,7 @@ const LeaveItem = ({ item, isActive, onToggle, onView, onEdit, onDelete, showVie
       <TouchableOpacity onPress={onToggle} style={styles.leaveHeader} activeOpacity={0.8}>
         <View style={styles.headerSummaryContainer}>
           <StatusIcon status={item.status} />
-          <View style={{ alignItems: 'flex-end' }}>
+          <View style={{  }}>
             <Text style={styles.summaryLabel}>Apply Date</Text>
             <Text style={styles.summaryValue}>{item.applyDate}</Text>
           </View>
@@ -162,10 +162,10 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
   },
   badgeText: {
-    fontSize: wp(3.5),
-    fontWeight: '400',
-    padding: 1 
-  }, 
+    fontSize: 9,
+    fontWeight: '600',
+    padding: 1
+  },
   leaveItem: {
     backgroundColor: COLORS.bg,
     borderRadius: wp(3),
@@ -218,9 +218,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: wp(2.5),
   },
-  statusContainer: {
-    alignItems: 'center',
-  },
+  
   statusText: {
     paddingVertical: hp(0.5),
     paddingHorizontal: wp(2.5),
