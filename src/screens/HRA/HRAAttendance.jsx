@@ -17,11 +17,54 @@ import { COLORS, TYPOGRAPHY } from '../styles/styles';
 import { getEmployees, getAttendance, submitAttendance } from '../../api/authServices';
 import { getUUID, getCMPUUID, getENVUUID, getDisplayName } from '../../api/tokenStorage';
 
+// Date helpers: UI shows dd-MMM-yyyy, API payloads remain unchanged
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const parseDateFlexible = (val) => {
+  if (!val) return null;
+  if (val instanceof Date && !isNaN(val.getTime())) return val;
+  try {
+    if (typeof val === 'string') {
+      const s = val.trim();
+      // dd-MMM-yyyy (e.g., 01-Nov-2025)
+      const m1 = s.match(/^([0-3]?\d)-([A-Za-z]{3})-(\d{4})$/);
+      if (m1) {
+        const day = parseInt(m1[1], 10);
+        const monIdx = MONTHS_SHORT.map(x => x.toLowerCase()).indexOf(m1[2].toLowerCase());
+        const year = parseInt(m1[3], 10);
+        if (monIdx >= 0) return new Date(year, monIdx, day);
+      }
+      // yyyy-mm-dd
+      const m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m2) {
+        const year = parseInt(m2[1], 10);
+        const monIdx = parseInt(m2[2], 10) - 1;
+        const day = parseInt(m2[3], 10);
+        return new Date(year, monIdx, day);
+      }
+    }
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  } catch (_) { return null; }
+};
+
+// UI display format (dd-MMM-yyyy)
 const formatDate = (d) => {
-  if (!d) return '';
-  const yy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
+  const date = parseDateFlexible(d);
+  if (!date) return '';
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mon = MONTHS_SHORT[date.getMonth()];
+  const yy = date.getFullYear();
+  return `${dd}-${mon}-${yy}`;
+};
+
+// API format helper if needed elsewhere (not used here; API sends ISO as before)
+const formatDateApi = (d) => {
+  const date = parseDateFlexible(d);
+  if (!date) return '';
+  const yy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
   return `${yy}-${mm}-${dd}`;
 };
 

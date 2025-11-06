@@ -78,41 +78,41 @@ const parseDdMmmYyyy = (value) => {
 
 // Convert various input formats to yy-mm-dd for API
 // Supports: yyyy-mm-dd, dd-mm-yy, dd-mm-yyyy
-const toApiDateYY = (value) => {
-  try {
-    const s = String(value || '').trim();
-    if (!s) return '';
-    // dd-MMM-yyyy -> yy-mm-dd
-    const ddMmm = parseDdMmmYyyy(s);
-    if (ddMmm) {
-      const yy = String(ddMmm.y).slice(-2);
-      const mm = String(ddMmm.m).padStart(2, '0');
-      const dd = String(ddMmm.d).padStart(2, '0');
-      return `${yy}-${mm}-${dd}`;
-    }
-    // yyyy-mm-dd -> yy-mm-dd
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-      const [yyyy, mm, dd] = s.split('-');
-      const yy = yyyy.slice(-2);
-      return `${yy}-${mm}-${dd}`;
-    }
-    // dd-mm-yy -> yy-mm-dd
-    if (/^\d{2}-\d{2}-\d{2}$/.test(s)) {
-      const [dd, mm, yy] = s.split('-');
-      return `${yy}-${mm}-${dd}`;
-    }
-    // dd-mm-yyyy -> yy-mm-dd
-    if (/^\d{2}-\d{2}-\d{4}$/.test(s)) {
-      const [dd, mm, yyyy] = s.split('-');
-      const yy = String(yyyy).slice(-2);
-      return `${yy}-${mm}-${dd}`;
-    }
-    // fallback: return as-is
-    return s;
-  } catch (_e) {
-    return String(value || '');
-  }
-};
+// const toApiDateYY = (value) => {
+//   try {
+//     const s = String(value || '').trim();
+//     if (!s) return '';
+//     // dd-MMM-yyyy -> yy-mm-dd
+//     const ddMmm = parseDdMmmYyyy(s);
+//     if (ddMmm) {
+//       const yy = String(ddMmm.y).slice(-2);
+//       const mm = String(ddMmm.m).padStart(2, '0');
+//       const dd = String(ddMmm.d).padStart(2, '0');
+//       return `${yy}-${mm}-${dd}`;
+//     }
+//     // yyyy-mm-dd -> yy-mm-dd
+//     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+//       const [yyyy, mm, dd] = s.split('-');
+//       const yy = yyyy.slice(-2);
+//       return `${yy}-${mm}-${dd}`;
+//     }
+//     // dd-mm-yy -> yy-mm-dd
+//     if (/^\d{2}-\d{2}-\d{2}$/.test(s)) {
+//       const [dd, mm, yy] = s.split('-');
+//       return `${yy}-${mm}-${dd}`;
+//     }
+//     // dd-mm-yyyy -> yy-mm-dd
+//     if (/^\d{2}-\d{2}-\d{4}$/.test(s)) {
+//       const [dd, mm, yyyy] = s.split('-');
+//       const yy = String(yyyy).slice(-2);
+//       return `${yy}-${mm}-${dd}`;
+//     }
+//     // fallback: return as-is
+//     return s;
+//   } catch (_e) {
+//     return String(value || '');
+//   }
+// };
 
 // Convert yyyy-mm-dd | dd-mm-yy | dd-mm-yyyy | dd-MMM-yyyy -> ISO string (UTC noon) "YYYY-MM-DDTHH:mm:ss.sssZ"
 const toApiDateISO = (value) => {
@@ -914,14 +914,17 @@ const ManageLeadProposal = ({ navigation, route }) => {
           {!(proposals.length === 0) && 
           <View style={styles.paginationContainer}>
             <View style={styles.itemsPerPageContainer}>
-              <Text style={styles.paginationLabel}>Show:</Text>
+              <Text style={styles.paginationLabel}>Show</Text>
               <Dropdown
                 placeholder="10"
                 value={itemsPerPage}
                 options={itemsPerPageOptions}
                 onSelect={handleItemsPerPageChange}
-                hideSearch={true}
-                inputBoxStyle={styles.paginationDropdown}
+                hideSearch
+                maxPanelHeightPercent={15}
+                inputBoxStyle={{ paddingHorizontal: wp(3.2) }}
+                style={{ width: wp(14), marginEnd: hp(1.1) }}
+                
               />
               <Text style={styles.paginationLabel}>entries</Text>
             </View>

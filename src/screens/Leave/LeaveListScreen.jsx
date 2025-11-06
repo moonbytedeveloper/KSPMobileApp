@@ -194,22 +194,10 @@ if(isLoading) {
                           ? '#4CAF50'
                           : l.status === 'Pending'
                           ? '#FF9800'
-                          : COLORS.dangerBg,
+                          : COLORS.danger,
                     },
                   ]}
-                >
-                  <Icon
-                    name="event-busy"
-                    size={rf(3.6)}
-                    color={
-                      l.status === 'Approved'
-                        ? '#fff'
-                        : l.status === 'Pending'
-                        ? '#fff'
-                        : COLORS.danger
-                    }
-                  />
-                </View>
+               />
                 <View>
                   <Text style={styles.label}>Leave Type</Text>
                   <Text style={styles.value}>{l.leaveType}</Text>
@@ -367,8 +355,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   badgeIcon: {
-    width: wp(6),
-    height: wp(6),
+    width: wp(3.6),
+    height: wp(3.6),
     borderRadius: wp(3),
     alignItems: 'center',
     justifyContent: 'center',

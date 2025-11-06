@@ -405,14 +405,16 @@ const ManageTimeSheetApproval = ({ navigation }) => {
         {/* Pagination Controls (top) */}
         <View style={styles.paginationContainerTop}>
           <View style={styles.itemsPerPageContainer}>
-            <Text style={styles.paginationLabel}>Show:</Text>
+            <Text style={styles.paginationLabel}>Show</Text>
             <Dropdown
               placeholder={String(pageSize)}
               value={pageSize}
               options={pageSizes}
               onSelect={handleItemsPerPageChange}
-              hideSearch={true}
-              inputBoxStyle={styles.paginationDropdown}
+              hideSearch
+              maxPanelHeightPercent={15}
+              inputBoxStyle={{ paddingHorizontal: wp(3.2) }}
+              style={{ width: wp(14), marginEnd: hp(1.1) }}
             />
             <Text style={styles.paginationLabel}>entries</Text>
           </View>

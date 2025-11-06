@@ -241,8 +241,11 @@ const BusinessDevelopmentScreen = () => {
               value={itemsPerPage}
               options={itemsPerPageOptions}
               onSelect={handleItemsPerPageChange}
-              hideSearch={true}
-              inputBoxStyle={styles.paginationDropdown}
+              hideSearch
+              maxPanelHeightPercent={15}
+              inputBoxStyle={{ paddingHorizontal: wp(3.2) }}
+              style={{ width: wp(14), marginBottom: hp(1.1),marginEnd: wp(2) }}
+             
             />
             <Text style={styles.paginationLabel}>entries</Text>
           </View>
@@ -504,12 +507,11 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginRight: wp(2),
   },
-  paginationDropdown: {
-    width: wp(16),
-    height: hp(4),
+  paginationDropdown: { 
     marginHorizontal: wp(1),
     zIndex: 1000,
     position: 'relative',
+    paddingHorizontal: wp(3.2)
   },
   pageInfo: {
     fontSize: rf(3.5),

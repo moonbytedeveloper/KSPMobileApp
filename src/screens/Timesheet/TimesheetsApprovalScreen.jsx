@@ -242,14 +242,16 @@ const TimesheetsApprovalScreen = ({ navigation }) => {
         {/* Pagination Controls (same UX as BusinessDevelopmentScreen) */}
        {!(timesheetSummaries.length === 0) && <View style={styles.paginationContainer}>
           <View style={styles.itemsPerPageContainer}>
-            <Text style={styles.paginationLabel}>Show:</Text>
+            <Text style={styles.paginationLabel}>Show</Text>
             <Dropdown
               placeholder="10"
               value={itemsPerPage}
               options={itemsPerPageOptions}
               onSelect={handleItemsPerPageChange}
-              hideSearch={true}
-              inputBoxStyle={styles.paginationDropdown}
+              hideSearch
+              maxPanelHeightPercent={15}
+              inputBoxStyle={{ paddingHorizontal: wp(3.2) }}
+              style={{ width: wp(14), marginBottom: hp(1.1),marginEnd: wp(1.1) }}
             />
             <Text style={styles.paginationLabel}>entries</Text>
           </View> 

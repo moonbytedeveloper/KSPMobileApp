@@ -9,7 +9,7 @@ import BottomSheetConfirm from '../../components/common/BottomSheetConfirm';
 import AppHeader from '../../components/common/AppHeader';
 import { useNavigation, DrawerActions, useFocusEffect } from '@react-navigation/native';
 import { useUser } from '../../contexts/UserContext';
-import { COLORS, TYPOGRAPHY } from '../styles/styles';
+import { COLORS, TYPOGRAPHY, RADIUS } from '../styles/styles';
 import Loader from '../../components/common/Loader';
 import { fetchExpenses, fetchUserProjects, fetchUserProjectTasks, checkAddExpenseEligibility } from '../../api/authServices';
 
@@ -108,7 +108,7 @@ const ExpenseScreen = ({ navigation }) => {
     // dd-MMM-yyyy
     const m1 = s.match(/^(\d{2})-([A-Za-z]{3})-(\d{4})$/);
     if (m1) {
-      const map = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+      const map = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
       const dd = Number(m1[1]);
       const mon = map[m1[2].toLowerCase()];
       const yyyy = Number(m1[3]);
@@ -165,7 +165,7 @@ const ExpenseScreen = ({ navigation }) => {
     setActiveCode(prev => (prev === code ? null : code));
   };
 
-  const handleView = (item) => {};
+  const handleView = (item) => { };
   const handleEdit = async (item) => {
     try {
       setLoading(true);
@@ -186,8 +186,8 @@ const ExpenseScreen = ({ navigation }) => {
         return;
       }
       // Always allow edit if approval is not applied
-      navigation.navigate('AddExpense', { 
-        editMode: true, 
+      navigation.navigate('AddExpense', {
+        editMode: true,
         expenseData: item,
         headerUuid: item.headerUuid
       });
@@ -267,7 +267,7 @@ const ExpenseScreen = ({ navigation }) => {
         .filter(it => it.IsDisplay !== false)
         .map((r, idx) => {
           // Backend fields per sample
-          const soleExpenseCode = r.ExpenseCode || r.soleExpenseCode || `EXP-${idx+1}`;
+          const soleExpenseCode = r.ExpenseCode || r.soleExpenseCode || `EXP-${idx + 1}`;
           const expenseName = r.ExpenseName || r.expenseName || 'Expense';
           const documentFromDateRaw = r.DocDateFrom || r.documentFromDate || '';
           const documentToDateRaw = r.DocDateTo || r.documentToDate || '';
@@ -278,14 +278,14 @@ const ExpenseScreen = ({ navigation }) => {
           const status = r.Status || r.status || 'Unpaid';
           const projectName = r.ProjectName || r.projectName || '';
           const projectTask = r.ProjectTask || r.projectTask || '';
-          return { 
-            soleExpenseCode, 
-            expenseName, 
-            documentFromDate, 
-            documentToDate, 
-            amount, 
-            status, 
-            projectName, 
+          return {
+            soleExpenseCode,
+            expenseName,
+            documentFromDate,
+            documentToDate,
+            amount,
+            status,
+            projectName,
             projectTask,
             // Include header UUID for editing
             headerUuid: r.UUID || r.Uuid || r.ERExpenseHeader_UUID || r.ERExpenseHeaderUuid || r.headerUuid,
@@ -390,7 +390,7 @@ const ExpenseScreen = ({ navigation }) => {
   }, [handlePageChange]);
 
   const handleFilter = () => {
-    setFilterVisible(prev => !prev); 
+    setFilterVisible(prev => !prev);
   };
   // // Full-screen loader while data is loading
   // if (loading) {
@@ -400,14 +400,14 @@ const ExpenseScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <AppHeader
-        title="Expense Reimbursement" 
+        title="Expense Reimbursement"
         // onLeftPress={() =>  setActiveIndex(0)}
         onLeftPress={() => {
           if (navigation.canGoBack()) {
             navigation.goBack()
             setActiveIndex(0)
           } else {
-            setActiveIndex(0) 
+            setActiveIndex(0)
             // fallback → for BottomTabs (no goBack)
             // or do nothing
           }
@@ -420,19 +420,19 @@ const ExpenseScreen = ({ navigation }) => {
           <TouchableOpacity activeOpacity={0.8} style={styles.addButton} onPress={handleAddExpensePress}>
             <Text style={styles.addButtonText}>Add Expense</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-          onPress={handleFilter}
-          activeOpacity={0.7}
-          style={{
-            marginLeft: wp(2),
-            borderWidth: 1,
-            borderColor: 'grey',
-            backgroundColor: 'grey',
-            borderRadius: wp(2),
-            padding: wp(2)
-          }}
-        >
-            <Icon name="filter-list" size={rf(5)} color="#fff" /> 
+          <TouchableOpacity
+            onPress={handleFilter}
+            activeOpacity={0.7}
+            style={{
+              marginLeft: wp(2),
+              borderWidth: 1,
+              borderColor: 'grey',
+              backgroundColor: 'grey',
+              borderRadius: wp(2),
+              padding: wp(2)
+            }}
+          >
+            <Icon name="filter-list" size={rf(5)} color="#fff" />
           </TouchableOpacity>
         </View>
 
@@ -490,19 +490,28 @@ const ExpenseScreen = ({ navigation }) => {
         )}
 
 
-        <View style={[styles.searchRow, { zIndex: 10, position: 'relative' }]}> 
+        <View style={[styles.searchRow, { zIndex: 10, position: 'relative' }]}>
           <Text style={styles.showText}>Show</Text>
           <View style={{
             zIndex: isPageSizeDropdownOpen ? 100 : 1,
             position: isPageSizeDropdownOpen ? 'absolute' : 'relative',
-            width: wp(22),
+            width: wp(15),
+
           }}>
             <Dropdown
-              placeholder={String(pageSize)}
+              placeholder="10"
               value={pageSize}
               options={pageSizes}
-              getLabel={(n) => String(n)}
-              getKey={(n) => String(n)}
+              hideSearch
+              maxPanelHeightPercent={15}
+              onSelect={(val) => { setPageSize(String(val)); setCurrentPage(0); }}
+              inputBoxStyle={{ paddingHorizontal: wp(3.2) }}
+              style={{ width: wp(14), marginBottom: hp(1.1) }}
+            />
+            {/* <Dropdown
+              placeholder={String(pageSize)}
+              value={pageSize}
+              options={pageSizes} 
               hideSearch
               style={{ width: wp(22) }}
               inputBoxStyle={styles.paginationDropdown}
@@ -515,7 +524,7 @@ const ExpenseScreen = ({ navigation }) => {
                   setIsTaskDropdownOpen(false);
                 }
               }}
-            />
+            /> */}
           </View>
 
           <View style={styles.searchInputContainer}>
@@ -537,11 +546,11 @@ const ExpenseScreen = ({ navigation }) => {
         </View>
 
 
-        <ScrollView 
-          contentContainerStyle={{ paddingVertical: hp(1.5), paddingHorizontal: wp(0.5), }} 
+        <ScrollView
+          contentContainerStyle={{ paddingVertical: hp(1.5), paddingHorizontal: wp(0.5), }}
           showsVerticalScrollIndicator={false}
         >
-        {filteredExpenses.map((item) => (
+          {filteredExpenses.map((item) => (
             <AccordionItem
               key={item.soleExpenseCode}
               item={item}
@@ -556,63 +565,63 @@ const ExpenseScreen = ({ navigation }) => {
               status={item.status}
             />
           ))}
-          
-        {totalRecords > pageSize && (
-          <View style={{}}>
-            <Text style={styles.pageInfo}>
-              Showing {currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, totalRecords)} of {totalRecords} entries
-            </Text>
-            <View style={styles.pageNavigation}>
-              {pageItems.map((it, idx) => {
-                if (it === 'prev') {
-                  const disabled = currentPage === 0;
+
+          {totalRecords > pageSize && (
+            <View style={{}}>
+              <Text style={styles.pageInfo}>
+                Showing {currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, totalRecords)} of {totalRecords} entries
+              </Text>
+              <View style={styles.pageNavigation}>
+                {pageItems.map((it, idx) => {
+                  if (it === 'prev') {
+                    const disabled = currentPage === 0;
+                    return (
+                      <TouchableOpacity
+                        key={`prev-${idx}`}
+                        style={[styles.pageButtonTextual, disabled && styles.pageButtonDisabled]}
+                        disabled={disabled}
+                        onPress={() => handlePageChange(currentPage - 1)}
+                      >
+                        <Text style={[styles.pageText, disabled && styles.pageTextDisabled]}>Previous</Text>
+                      </TouchableOpacity>
+                    );
+                  }
+                  if (it === 'next') {
+                    const disabled = currentPage >= totalPages - 1;
+                    return (
+                      <TouchableOpacity
+                        key={`next-${idx}`}
+                        style={[styles.pageButtonTextual, disabled && styles.pageButtonDisabled]}
+                        disabled={disabled}
+                        onPress={() => handlePageChange(currentPage + 1)}
+                      >
+                        <Text style={[styles.pageText, disabled && styles.pageTextDisabled]}>Next</Text>
+                      </TouchableOpacity>
+                    );
+                  }
+                  if (it === 'left-ellipsis' || it === 'right-ellipsis') {
+                    return (
+                      <View key={`dots-${idx}`} style={styles.pageDots}><Text style={styles.pageNumberText}>...</Text></View>
+                    );
+                  }
+                  if (typeof it !== 'number') {
+                    return null;
+                  }
+                  const pageNum = it;
+                  const active = pageNum === currentPage + 1;
                   return (
                     <TouchableOpacity
-                      key={`prev-${idx}`}
-                      style={[styles.pageButtonTextual, disabled && styles.pageButtonDisabled]}
-                      disabled={disabled}
-                      onPress={() => handlePageChange(currentPage - 1)}
+                      key={`p-${pageNum}`}
+                      style={[styles.pageNumberBtn, active && styles.pageNumberBtnActive]}
+                      onPress={() => handlePageChange(pageNum - 1)}
                     >
-                      <Text style={[styles.pageText, disabled && styles.pageTextDisabled]}>Previous</Text>
+                      <Text style={[styles.pageNumberText, active && styles.pageNumberTextActive]}>{pageNum}</Text>
                     </TouchableOpacity>
                   );
-                }
-                if (it === 'next') {
-                  const disabled = currentPage >= totalPages - 1;
-                  return (
-                    <TouchableOpacity
-                      key={`next-${idx}`}
-                      style={[styles.pageButtonTextual, disabled && styles.pageButtonDisabled]}
-                      disabled={disabled}
-                      onPress={() => handlePageChange(currentPage + 1)}
-                    >
-                      <Text style={[styles.pageText, disabled && styles.pageTextDisabled]}>Next</Text>
-                    </TouchableOpacity>
-                  );
-                }
-                if (it === 'left-ellipsis' || it === 'right-ellipsis') {
-                  return (
-                    <View key={`dots-${idx}`} style={styles.pageDots}><Text style={styles.pageNumberText}>...</Text></View>
-                  );
-                }
-                if (typeof it !== 'number') {
-                  return null;
-                }
-                const pageNum = it;
-                const active = pageNum === currentPage + 1;
-                return (
-                  <TouchableOpacity
-                    key={`p-${pageNum}`}
-                    style={[styles.pageNumberBtn, active && styles.pageNumberBtnActive]}
-                    onPress={() => handlePageChange(pageNum - 1)}
-                  >
-                    <Text style={[styles.pageNumberText, active && styles.pageNumberTextActive]}>{pageNum}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+                })}
+              </View>
             </View>
-          </View>
-        )}
+          )}
         </ScrollView>
         {/* Pagination footer moved to top to avoid overlap with bottom tabs */}
         <BottomSheetConfirm
@@ -688,7 +697,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: hp(2),
-     backgroundColor: '#ffffff',
+    backgroundColor: '#ffffff',
     borderTopWidth: 0.5,
     borderBottomWidth: 0.5,
     borderTopColor: '#e5e7eb',
@@ -701,7 +710,7 @@ const styles = StyleSheet.create({
     marginHorizontal: wp(-3.5),
   },
   showText: {
-   fontSize: rf(3.5),
+    fontSize: rf(3.5),
     color: '#111827',
     marginRight: wp(2),
     fontFamily: TYPOGRAPHY.fontFamilyRegular,
@@ -729,25 +738,23 @@ const styles = StyleSheet.create({
     marginRight: wp(0.5),
   },
   searchInputContainer: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: COLORS.bg,
     borderWidth: 1,
     borderColor: COLORS.border,
-    backgroundColor: COLORS.bg,
-    borderRadius: wp(2),
-    paddingHorizontal: wp(3),
-    // marginHorizontal: wp(2),
-    // paddingVertical: hp(0.8),
-    height: hp(4.8),
-    marginRight: wp(2)
+    borderRadius: RADIUS.md,
+    paddingHorizontal: wp(2),
+    height: hp(5.3), // added
+    flex: 1,
+    marginEnd: wp(2),
   },
   searchInput: {
     flex: 1,
     marginLeft: wp(1.5),
     fontSize: rf(4),
     color: COLORS.text,
-    height:hp(6),
+    height: hp(6),
     fontFamily: TYPOGRAPHY.fontFamilyRegular,
   },
   searchButton: {

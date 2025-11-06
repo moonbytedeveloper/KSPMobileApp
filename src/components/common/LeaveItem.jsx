@@ -114,7 +114,9 @@ const LeaveItem = ({ item, isActive, onToggle, onView, onEdit, onDelete, showVie
           </View>
           <View style={styles.cardRow}>
             <Text style={styles.cardLabel}>Action Taken Date</Text>
-            <Text style={styles.cardValue}>{item.actionTakenDate} </Text>
+            {item.actionTakenDate && (
+              <Text style={styles.cardValue}>{item.actionTakenDate}</Text>
+            )}
           </View>
           <View style={styles.cardRow}>
             <Text style={styles.cardLabel}>Reason</Text>

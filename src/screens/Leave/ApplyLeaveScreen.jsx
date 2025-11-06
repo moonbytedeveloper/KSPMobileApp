@@ -42,36 +42,97 @@ const ApplyLeaveScreen = ({ navigation }) => {
   const parameterOptions = ['Full Day', 'Half Day (First Half)', 'Half Day (Second Half)', 'Short Leave'];
 
   const formatUiDate = (date) => {
-    const d = new Date(date);
-    const yyyy = String(d.getFullYear());
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const d = (date instanceof Date) ? date : new Date(date);
+    if (isNaN(d.getTime())) return '';
     const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
+    const mmm = months[d.getMonth()];
+    const yyyy = String(d.getFullYear());
+    return `${dd}-${mmm}-${yyyy}`;
   };
+  // Robust formatter: accepts Date | ISO | yyyy-mm-dd | dd-mm-yy | dd-mm-yyyy | dd-MMM-yyyy
+const formatAnyToDdMmmYyyy = (value) => {
+  if (!value) return '';
+  // If Date instance
+  if (value instanceof Date) return formatUiDate(value);
+  const s = String(value).trim();
+  if (!s) return '';
+  // dd-MMM-yyyy (already desired) -> normalize via parse
+  const m1 = s.match(/^(\d{2})-([A-Za-z]{3})-(\d{4})$/);
+  if (m1) {
+    const map = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+    const dd = Number(m1[1]);
+    const mon = map[m1[2].toLowerCase()];
+    const yyyy = Number(m1[3]);
+    const dt = new Date(yyyy, mon, dd);
+    return formatUiDate(dt);
+  }
+  // yyyy-mm-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split('-').map((n) => Number(n));
+    return formatUiDate(new Date(y, m - 1, d));
+  }
+  // dd-mm-yy
+  if (/^\d{2}-\d{2}-\d{2}$/.test(s)) {
+    const [d, m, yy] = s.split('-').map((n) => Number(n));
+    const y = 2000 + yy;
+    return formatUiDate(new Date(y, m - 1, d));
+  }
+  // dd-mm-yyyy
+  if (/^\d{2}-\d{2}-\d{4}$/.test(s)) {
+    const [d, m, y] = s.split('-').map((n) => Number(n));
+    return formatUiDate(new Date(y, m - 1, d));
+  }
+  // Fallback: ISO or parseable by Date
+  const dflt = new Date(s);
+  return isNaN(dflt.getTime()) ? '' : formatUiDate(dflt);
+};
+
+// Parse dd-MMM-yyyy into components { y, m, d }
+const parseDdMmmYyyy = (value) => {
+  const s = String(value || '').trim();
+  const m = s.match(/^(\d{2})-([A-Za-z]{3})-(\d{4})$/);
+  if (!m) return null;
+  const dd = Number(m[1]);
+  const mon = m[2].toLowerCase();
+  const yyyy = Number(m[3]);
+  const months = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+  if (!(mon in months)) return null;
+  const mm = months[mon] + 1; // 1-based month for formatting
+  return { y: yyyy, m: mm, d: dd };
+};
+
 
   // Display formatter: dd-mm-yyyy (accepts common inputs)
   const formatDMY = (value) => {
     if (!value) return '-';
     const s = String(value).trim();
     // Already dd-mm-yyyy
-    if (/^\d{2}-\d{2}-\d{4}$/.test(s)) return s;
-    // yyyy-mm-dd or yyyy/mm/dd
-    let m = s.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})/);
-    if (m) {
-      return `${m[3]}-${m[2]}-${m[1]}`;
+    // dd-MMM-yyyy -> yy-mm-dd
+    const ddMmm = parseDdMmmYyyy(s);
+    if (ddMmm) {
+      const yy = String(ddMmm.y).slice(-2);
+      const mm = String(ddMmm.m).padStart(2, '0');
+      const dd = String(ddMmm.d).padStart(2, '0');
+      return `${yy}-${mm}-${dd}`;
     }
-    // dd/mm/yyyy or dd-mm-yyyy variants
-    m = s.match(/^(\d{2})[-\/]?(\d{2})[-\/]?(\d{2,4})$/);
-    if (m) {
-      const yy = m[3].length === 2 ? `20${m[3]}` : m[3];
-      return `${m[1]}-${m[2]}-${yy}`;
+    // yyyy-mm-dd -> yy-mm-dd
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const [yyyy, mm, dd] = s.split('-').map((n) => Number(n));
+      const yy = String(yyyy).slice(-2);
+      return `${yy}-${mm}-${dd}`;
     }
-    const d = new Date(s);
-    if (!isNaN(d)) {
-      const dd = String(d.getDate()).padStart(2, '0');
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const yyyy = d.getFullYear();
-      return `${dd}-${mm}-${yyyy}`;
+    // dd-mm-yy -> yy-mm-dd
+    if (/^\d{2}-\d{2}-\d{2}$/.test(s)) {
+      const [dd, mm, yy] = s.split('-').map((n) => Number(n));
+      const y = 2000 + yy;
+      return `${y}-${mm}-${dd}`;
+    }
+    // dd-mm-yyyy -> yy-mm-dd
+    if (/^\d{2}-\d{2}-\d{4}$/.test(s)) {
+      const [dd, mm, yyyy] = s.split('-').map((n) => Number(n));
+      const y = 2000 + yyyy;
+      return `${y}-${mm}-${dd}`;
     }
     return s;
   };
@@ -138,20 +199,22 @@ const ApplyLeaveScreen = ({ navigation }) => {
             : Array.isArray(container)
               ? container
               : [];
-        const mapped = list.map((it, idx) => ({
-          id: it.UUID || String(idx),
-          appliedBy: it.AppliedBy || '-',
-          applyDate: it.AppliedDate || '-',
-          status: it.Status || '-',
-          leaveType: it.LeaveType || '-',
-          parameter: it.LeaveParameter || '-',
-          from: formatDMY(it.LeaveStartDate) || '-',
-          to: formatDMY(it.LeaveEndDate) || '-',
-          reason: it.Reason || '-',
-          contactNo: it.ContactNo ? String(it.ContactNo) : '-',
-          actionTakenBy: it.ActionTakenBy || '-',
-          remark: it.Remark || '-',
-        }));
+const mapped = list.map((it, idx) => ({
+  id: it.UUID || String(idx),
+  appliedBy: it.AppliedBy || '-',
+  applyDate: it.AppliedDate || '-',
+  status: it.Status || '-',
+  leaveType: it.LeaveType || '-',
+  parameter: it.LeaveParameter || '-',
+from: formatAnyToDdMmmYyyy(it.LeaveStartDate) || '-',
+to: formatAnyToDdMmmYyyy(it.LeaveEndDate) || '-',
+
+  reason: it.Reason || '-',
+  contactNo: it.ContactNo ? String(it.ContactNo) : '-',
+  actionTakenBy: it.ActionTakenBy || '-',
+  remark: it.Remark || '-',
+}));
+
         if (isMounted) {
           setLeaves(mapped);
           const total = Number(
@@ -403,12 +466,34 @@ const ApplyLeaveScreen = ({ navigation }) => {
                 reason: vals.reason.trim(),
                 contactNo: (vals.contact || '').replace(/\D/g, ''),
               };
-              try {
-                const resp = await applyLeave(payload);
-                console.log('ApplyLeave response:', resp);
-              } catch (e) {
-                console.log('ApplyLeave API error:', e?.response?.data || e?.message || e);
-              }
+              // add New Line
+try {
+  const resp = await applyLeave(payload);
+  console.log('ApplyLeave response:', resp);
+
+  // ✅ update optimistic record after API success
+  if (resp?.data) {
+    setLeaves((prev) =>
+      prev.map((lv) =>
+        lv.id === newLeave.id
+          ? {
+              ...lv,
+              id: resp.data.UUID || lv.id,
+              leaveType: resp.data.LeaveType || lv.leaveType,
+              from: formatAnyToDdMmmYyyy(resp.data.LeaveStartDate),
+              to: formatAnyToDdMmmYyyy(resp.data.LeaveEndDate),
+              status: resp.data.Status || lv.status,
+            }
+          : lv
+      )
+    );
+  }
+} catch (e) {
+  console.log('ApplyLeave API error:', e?.response?.data || e?.message || e);
+}
+
+
+
             } finally {
               setFSubmitting(false);
             }
@@ -589,8 +674,8 @@ const ApplyLeaveScreen = ({ navigation }) => {
             hideSearch
             maxPanelHeightPercent={15}
             onSelect={(val) => { setPageSize(String(val)); setCurrentPage(0); }}
-            inputBoxStyle={{ paddingHorizontal: wp(2.2) }}
-            style={{ width: wp(20), marginBottom: hp(1.1) }}
+            inputBoxStyle={{ paddingHorizontal: wp(3.2) }}
+            style={{ width: wp(14), marginBottom: hp(1.1) }}
           />
           {/* <Text style={styles.paginationLabel}>entries</Text> */}
 
@@ -710,7 +795,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     paddingHorizontal: wp(3),
-    height: hp(5),
+    height: hp(5.5),
   },
   inputField: {
     fontSize: TYPOGRAPHY.input,
@@ -812,8 +897,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: RADIUS.md,
     paddingHorizontal: wp(2),
-    height: hp(6.2),
-    flex: 1,
+    height: hp(5.3), // added
+    flex: 1, 
   },
   searchInput: {
     flex: 1,

@@ -684,8 +684,8 @@ const ManageMyWorklist = ({ navigation }) => {
               getLabel={(n) => String(n)}
               getKey={(n) => String(n)}
               hideSearch
-              style={{ width: wp(22) }}
-              inputBoxStyle={{ marginTop: 0, paddingVertical: hp(0.8) }}
+              inputBoxStyle={{ paddingHorizontal: wp(3.2) }}
+              style={{ width: wp(14), marginBottom: hp(1.1) }}
               onSelect={handleItemsPerPageChange}
             />
 
@@ -1049,7 +1049,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(3),
     marginHorizontal: wp(2),
     //paddingVertical: hp(0.8),
-    height: hp(6.2),
+    height: hp(5.3),
   },
   searchInput: {
     flex: 1,

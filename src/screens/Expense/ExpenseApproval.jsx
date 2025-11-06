@@ -1315,12 +1315,11 @@ const ExpenseApproval = ({ navigation }) => {
             <Dropdown
               placeholder={String(pageSize)}
               value={String(pageSize)}
-              options={pageSizes}
-              getLabel={(n) => String(n)}
-              getKey={(n) => String(n)}
+              options={pageSizes} 
               hideSearch
-              style={{ width: wp(22) }}
-              inputBoxStyle={{ marginTop: 0, paddingVertical: hp(0.8) }}
+              maxPanelHeightPercent={15}
+              inputBoxStyle={{ paddingHorizontal: wp(3.2) }}
+              style={{ width: wp(14), marginBottom: hp(1.1),marginEnd: wp(1.1) }}
               onSelect={handleItemsPerPageChange}
             />
 
@@ -1883,7 +1882,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tabDropdownContainer: {
-    marginBottom: hp(2),
+    // marginBottom: hp(2),
     marginTop: hp(1),
   },
   filterSection: {
@@ -1901,17 +1900,16 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontFamilyRegular,
   },
   searchInputContainer: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: COLORS.bg,
     borderWidth: 1,
     borderColor: COLORS.border,
-    backgroundColor: COLORS.bg,
-    borderRadius: wp(2),
-    paddingHorizontal: wp(3),
-    marginHorizontal: wp(2),
-    //paddingVertical: hp(0.8),
-    height: hp(6.2),
+    borderRadius: RADIUS.md,
+    paddingHorizontal: wp(2),
+    height: hp(5.3), // added
+    flex: 1, 
+    marginEnd: wp(2),
   },
   searchInput: {
     flex: 1,

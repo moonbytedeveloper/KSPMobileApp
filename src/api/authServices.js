@@ -507,9 +507,9 @@ export async function getManageLeave({ cmpUuid, envUuid, userUuid, start = 0, le
     // Support multiple casings per backend conventions
     const params = {
         cmpUuid, envUuid, userUuid,
-        start, Start: start,
-        length, Length: length,
-        searchValue, SearchValue: searchValue,
+        Start: start,
+        Length: length,
+        SearchValue: searchValue,
     };
     console.log('GetManageLeave params ->', params);
     const resp = await api.get(PATHS.getManageLeave, { params })

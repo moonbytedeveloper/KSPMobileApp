@@ -227,14 +227,16 @@ const ManageLeaves = ({ navigation }) => {
  
         <View style={styles.paginationContainer}>
           <View style={styles.itemsPerPageContainer}>
-            <Text style={styles.paginationLabel}>Show:</Text>
+            <Text style={styles.paginationLabel}>Show</Text>
             <Dropdown
               placeholder={String(itemsPerPage)}
               value={itemsPerPage}
               options={itemsPerPageOptions}
               onSelect={handleItemsPerPageChange}
-              hideSearch={true}
-              inputBoxStyle={styles.paginationDropdown}
+              hideSearch
+              maxPanelHeightPercent={15}
+              inputBoxStyle={{ paddingHorizontal: wp(3.2) }}
+              style={{ width: wp(14), marginEnd: hp(1.1) }}
             />
             <Text style={styles.paginationLabel}>entries</Text>
           </View>
