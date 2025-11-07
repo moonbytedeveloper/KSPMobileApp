@@ -265,7 +265,7 @@ export const formStyles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     // paddingVertical: hp(1.8),
     paddingHorizontal: SPACING.xl,
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.md,
     flex: 1,
     marginRight: wp(3),
     alignItems: 'center',
@@ -277,7 +277,7 @@ export const formStyles = StyleSheet.create({
   },
   cancelBtn: {
     backgroundColor: '#374151',
-    paddingVertical: hp(1.8),
+    paddingVertical: wp(3),
     paddingHorizontal: SPACING.xl,
     borderRadius: RADIUS.lg,
     flex: 1,

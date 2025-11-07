@@ -24,6 +24,8 @@ const TimesheetCard = ({ timesheet, onActionPress, getStatusColor, getStatusBgCo
   const statusColor = getStatusColor(timesheet.status);
   const statusBg = getStatusBgColor(timesheet.status);
 
+
+
   // Get flag color from API response
   const getFlagColor = (flagColor) => {
     switch (flagColor?.toLowerCase()) {
@@ -41,6 +43,8 @@ const TimesheetCard = ({ timesheet, onActionPress, getStatusColor, getStatusBgCo
         return COLORS.primary; // fallback to primary color
     }
   };
+
+
 
   return (
     <View style={styles.tsCard}>
@@ -112,12 +116,12 @@ const ManageTimeSheetApproval = ({ navigation }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [expandedCardId, setExpandedCardId] = useState(null);
-  
+
   const approveSheetRef = useRef(null);
   const rejectSheetRef = useRef(null);
   const viewSheetRef = useRef(null);
   const approvalDetailsSheetRef = useRef(null);
-  
+
   const snapPoints = useMemo(() => [hp(60), hp(90)], []);
 
   // Fetch timesheets for approval
@@ -131,12 +135,12 @@ const ManageTimeSheetApproval = ({ navigation }) => {
       setError(null);
       const start = page * size;
       const response = await getTimesheetsForApproval({ start, length: size });
-      
+
       console.log('Full API Response:', JSON.stringify(response, null, 2));
-      
+
       // The data is nested under response.Data.data
       const apiData = response?.Data?.data || [];
-      
+
       // Map API response to component format
       const mappedData = apiData.map((item, index) => ({
         id: item.HeaderUuid || index + 1,
@@ -161,10 +165,10 @@ const ManageTimeSheetApproval = ({ navigation }) => {
           description: 'N/A'
         }
       }));
-      
+
       console.log('Mapped Data:', JSON.stringify(mappedData, null, 2));
       setTimesheetData(mappedData);
-      
+
       // Set total records from response
       const totalFromResponse = response?.Data?.recordsTotal || response?.Data?.recordsFiltered || mappedData.length;
       setTotalRecords(totalFromResponse);
@@ -211,7 +215,7 @@ const ManageTimeSheetApproval = ({ navigation }) => {
     if (action === 'approve') {
       setApproveMode('form');
     }
-    
+
     switch (action) {
       case 'approve':
         approveSheetRef.current?.present();
@@ -232,54 +236,76 @@ const ManageTimeSheetApproval = ({ navigation }) => {
     try {
       setApproving(true);
       console.log('Approving timesheet:', selectedTimesheet.headerUuid);
-      
+
       // Call the approve API
-      await approveTimesheet({
+      const response = await approveTimesheet({
         headerUuid: selectedTimesheet.headerUuid
       });
-      
-      console.log('Timesheet approved successfully');
-      
-      // After successful approval, show success state
+
+      console.log('Approve API response:', response);
+
+      // ✅ If API returns success flag as false
+      if (response?.Success === false) {
+        Alert.alert('Error', response.Message || 'Something went wrong.');
+        closeSheet(approveSheetRef);
+        return;
+      }
+
+      // ✅ If successful
+      Alert.alert('Success', response?.Message || 'Timesheet approved successfully.');
       setApproveMode('success');
-      
-      // Refresh the timesheet list to reflect the changes
+
+      // Refresh the timesheet list after a short delay
       setTimeout(() => {
         fetchTimesheetsForApproval(currentPage, pageSize);
-      }, 2000); // Refresh after 2 seconds to allow user to see success message
-      
+      }, 2000);
+
     } catch (error) {
       console.error('Error approving timesheet:', error);
-      Alert.alert('Error', 'Failed to approve timesheet. Please try again.');
-      
-      // Close the modal on error
+
+      // ✅ Handle server/network errors
+      let errorMessage = 'Failed to approve timesheet. Please try again.';
+
+      if (error?.response?.data?.Message) {
+        // Backend sends "Message" key (capital M)
+        errorMessage = error.response.data.Message;
+      } else if (error?.response?.data?.message) {
+        // Some APIs send lowercase "message"
+        errorMessage = error.response.data.message;
+      } else if (error?.message) {
+        // JS or network error
+        errorMessage = error.message;
+      }
+
+      Alert.alert('Error', errorMessage);
       closeSheet(approveSheetRef);
     } finally {
       setApproving(false);
     }
   };
 
+
   const handleReject = async () => {
     try {
       setApproving(true);
       console.log('Rejecting timesheet:', selectedTimesheet.headerUuid, 'Reason:', reason);
-      
+
       // Call the reject API
       await rejectTimesheet({
         headerUuid: selectedTimesheet.headerUuid,
         remark: reason
       });
-      
+
       console.log('Timesheet rejected successfully');
-      
+
       // Close the modal
       rejectSheetRef.current?.dismiss();
-      
+
       // Refresh the timesheet list to reflect the changes
       setTimeout(() => {
         fetchTimesheetsForApproval(currentPage, pageSize);
       }, 1000);
-      
+
     } catch (error) {
       console.error('Error rejecting timesheet:', error);
       Alert.alert('Error', 'Failed to reject timesheet. Please try again.');
@@ -397,10 +423,10 @@ const ManageTimeSheetApproval = ({ navigation }) => {
   return (
     <View style={styles.safeArea}>
       <AppHeader
-          title="Timesheet Approval"
-          onLeftPress={() => navigation.goBack()}
-          onRightPress={() => navigation.navigate('Notification')}
-        />
+        title="Timesheet Approval"
+        onLeftPress={() => navigation.goBack()}
+        onRightPress={() => navigation.navigate('Notification')}
+      />
       <View style={styles.container}>
         {/* Pagination Controls (top) */}
         <View style={styles.paginationContainerTop}>
@@ -465,7 +491,7 @@ const ManageTimeSheetApproval = ({ navigation }) => {
         {/* Pagination Controls - Bottom */}
         {totalRecords > pageSize && (
           <View style={styles.paginationContainerBottom}>
-           <Text style={styles.pageInfo}>
+            <Text style={styles.pageInfo}>
               Show {currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, totalRecords)} of {totalRecords} entries
             </Text>
             <View style={styles.pageNavigation}>
@@ -517,7 +543,7 @@ const ManageTimeSheetApproval = ({ navigation }) => {
                 );
               })}
             </View>
-            
+
           </View>
         )}
 
@@ -551,12 +577,12 @@ const ManageTimeSheetApproval = ({ navigation }) => {
                       <Text style={styles.detailLabel}>Employee:</Text>
                       <Text style={styles.detailValue}>{selectedTimesheet.employeeName}</Text>
                     </View>
-                    
+
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Period:</Text>
                       <Text style={styles.detailValue}>{selectedTimesheet.applyFromDate} - {selectedTimesheet.applyToDate}</Text>
                     </View>
-                    
+
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Total Hours:</Text>
                       <Text style={styles.detailValue}>{selectedTimesheet.totalHoursWorked}</Text>
@@ -575,8 +601,8 @@ const ManageTimeSheetApproval = ({ navigation }) => {
                       />
                     </View> */}
 
-                    <TouchableOpacity 
-                      style={[styles.approveButton, approving && styles.approveButtonDisabled]} 
+                    <TouchableOpacity
+                      style={[styles.approveButton, approving && styles.approveButtonDisabled]}
                       onPress={handleApprove}
                       disabled={approving}
                     >
@@ -584,6 +610,7 @@ const ManageTimeSheetApproval = ({ navigation }) => {
                         {approving ? 'Approving...' : 'Approve'}
                       </Text>
                     </TouchableOpacity>
+
                   </View>
                 )}
               </>
@@ -672,39 +699,39 @@ const ManageTimeSheetApproval = ({ navigation }) => {
               {selectedTimesheet?.timesheetLines?.map((line, index) => (
                 <View key={index} style={styles.timesheetItem}>
                   <Text style={styles.timesheetTitle}>Timesheet Line #{index + 1}</Text>
-                  
+
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Project Title:</Text>
                     <Text style={styles.detailValue}>{line.ProjectTitle || 'N/A'}</Text>
                   </View>
-                  
+
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Task Title:</Text>
                     <Text style={styles.detailValue}>{line.TaskTitle || 'N/A'}</Text>
                   </View>
-                  
+
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Date:</Text>
                     <Text style={styles.detailValue}>{line.Date || 'N/A'}</Text>
                   </View>
-                  
+
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Hours:</Text>
                     <Text style={styles.detailValue}>{line.Hours || '00:00'}</Text>
                   </View>
-                  
+
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Remark:</Text>
                     <Text style={styles.detailValue}>{line.Remark || 'N/A'}</Text>
                   </View>
-                  
+
                   <View style={styles.itemDivider} />
                 </View>
               )) || (
-                <View style={styles.timesheetItem}>
-                  <Text style={styles.timesheetTitle}>No timesheet lines found</Text>
-                </View>
-              )}
+                  <View style={styles.timesheetItem}>
+                    <Text style={styles.timesheetTitle}>No timesheet lines found</Text>
+                  </View>
+                )}
             </ScrollView>
 
             <TouchableOpacity style={styles.closeButtonStyle} onPress={handleView}>
@@ -743,34 +770,34 @@ const ManageTimeSheetApproval = ({ navigation }) => {
                       <Text style={styles.detailLabel}>Action Date:</Text>
                       <Text style={styles.detailValue}>{detail.actiondate || 'N/A'}</Text>
                     </View>
-                    
+
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Entered By:</Text>
                       <Text style={styles.detailValue}>{detail.enteredby || 'N/A'}</Text>
                     </View>
-                    
+
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Status:</Text>
-                      <Text style={[styles.statusBadge, { 
+                      <Text style={[styles.statusBadge, {
                         color: '#fff',
                         backgroundColor: detail.status === 'Approved' ? '#10B981' : '#F59E0B'
                       }]}>
                         {detail.status || 'Pending'}
                       </Text>
                     </View>
-                    
+
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Action Taken By:</Text>
                       <Text style={styles.detailValue}>{detail.actiontakenby || 'N/A'}</Text>
                     </View>
-                    
+
                     {index < selectedTimesheet.approvalDetails.length - 1 && <View style={styles.itemDivider} />}
                   </View>
                 )) || (
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>No approval details available</Text>
-                  </View>
-                )}
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>No approval details available</Text>
+                    </View>
+                  )}
 
                 <TouchableOpacity style={styles.closeButtonStyle} onPress={handleApprovalDetails}>
                   <Text style={styles.closeButtonText}>Close</Text>
@@ -806,7 +833,7 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     marginBottom: hp(1.6),
     ...SHADOW.elevation2,
-      
+
   },
   tsRowHeader: {
     ...layout.rowSpaceBetween,
@@ -850,7 +877,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
     paddingTop: hp(1.2),
-    
+
   },
   tsBadge: {
     borderWidth: 1,
@@ -860,7 +887,7 @@ const styles = StyleSheet.create({
   },
   tsBadgeText: {
     fontSize: TYPOGRAPHY.body,
-    fontWeight: '800', 
+    fontWeight: '800',
   },
   tsActionsRowPrimary: {
     ...layout.rowCenter,
@@ -1105,10 +1132,11 @@ const styles = StyleSheet.create({
   },
   approveButton: {
     backgroundColor: COLORS.primary,
-    paddingVertical: hp(1.5),
-    paddingHorizontal: wp(6),
+    paddingVertical: hp(1),
+    marginHorizontal: 'auto',
     borderRadius: wp(2.5),
     alignItems: 'center',
+    width:wp(35)
   },
   approveButtonDisabled: {
     backgroundColor: COLORS.textMuted,
@@ -1122,10 +1150,12 @@ const styles = StyleSheet.create({
   },
   rejectButton: {
     backgroundColor: '#6b7280',
-    paddingVertical: hp(1.5),
+    paddingVertical: hp(1),
     paddingHorizontal: wp(6),
     borderRadius: wp(2.5),
     alignItems: 'center',
+    width:wp(35),
+    marginHorizontal:'auto'
   },
   rejectButtonText: {
     color: '#fff',
@@ -1135,11 +1165,13 @@ const styles = StyleSheet.create({
   },
   closeButtonStyle: {
     backgroundColor: '#6b7280',
-    paddingVertical: hp(1.5),
+    paddingVertical: hp(1),
     paddingHorizontal: wp(6),
     borderRadius: wp(2.5),
     alignItems: 'center',
     marginTop: hp(2),
+    width:wp(35),
+    marginHorizontal:'auto'
   },
   closeButtonText: {
     color: '#fff',
@@ -1219,7 +1251,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.2),
     position: 'relative',
-    zIndex: 1000, 
+    zIndex: 1000,
     marginHorizontal: wp(-3.4),
     elevation: 2,
     marginBottom: hp(1.5)

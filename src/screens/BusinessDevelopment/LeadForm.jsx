@@ -786,7 +786,7 @@ const LeadForm = ({ route, navigation, onSubmit, onCancel }) => {
             />
             <View style={styles.footerBar}>
               <View style={formStyles.actionsRow}>
-                <TouchableOpacity activeOpacity={0.85} style={formStyles.primaryBtn} onPress={onSave} disabled={isSubmitting}>
+                <TouchableOpacity activeOpacity={0.85} style={[formStyles.primaryBtn,{paddingVertical: hp(1.4)}]} onPress={onSave} disabled={isSubmitting}>
                   <Text style={formStyles.primaryBtnText}>
                     {isSubmitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Save')}
                   </Text>

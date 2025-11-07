@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { rf, wp, hp } from '../../utils/responsive';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { buttonStyles, COLORS, TYPOGRAPHY, RADIUS,SPACING } from '../../screens/styles/styles';
+import { buttonStyles, COLORS, TYPOGRAPHY, RADIUS, SPACING } from '../../screens/styles/styles';
 
 // AccordionItem Component
 const AccordionItem = ({
@@ -32,7 +32,7 @@ const AccordionItem = ({
       Submitted: { bg: COLORS.infoBg, color: COLORS.info, border: COLORS.info },
     };
     const theme = palette[label] || palette.Pending;
-  
+
     return (
       <View style={[styles.badge, { backgroundColor: theme.bg, borderColor: theme.border }]}>
         <Text style={[styles.badgeText, { color: theme.color }]}>{label}</Text>
@@ -69,19 +69,21 @@ const AccordionItem = ({
           </View>
         </View>
         <View style={styles.rightSideContainer}>
-          <View style={{ alignItems: 'flex-end' }}>
+          <View style={{ marginEnd:wp(4) }}>
             <Text style={styles.summaryLabel}>{headerRightLabel}</Text>
-            <Text style={styles.summaryValue}>{item.amount}</Text>
+            <StatusBadge label={item.status} />
           </View>
-          <Svg
-            width={rf(4.5)}
-            height={rf(4.5)}
-            viewBox="0 0 16 16"
-            fill="#64748b"
-            style={[styles.toggleIcon, { transform: [{ rotate: isActive ? '180deg' : '0deg' }] }]}
-          >
-            <Path fillRule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" />
-          </Svg>
+          <View style={{ position: 'absolute', right: 0, top: 0, }}>
+            <Svg
+              width={rf(4)}
+              height={rf(4)}
+              viewBox="0 0 16 16"
+              fill="#64748b"
+              style={[styles.toggleIcon, { transform: [{ rotate: isActive ? '180deg' : '0deg' }] }]}
+            >
+              <Path fillRule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" />
+            </Svg>
+          </View>
         </View>
       </TouchableOpacity>
 

@@ -683,7 +683,7 @@ const styles = StyleSheet.create({
   },
   addButton: {
     backgroundColor: COLORS.primary,
-    paddingVertical: hp(1.2),
+    paddingVertical: wp(1.2),
     paddingHorizontal: wp(3),
     borderRadius: wp(2),
   },
@@ -759,7 +759,7 @@ const styles = StyleSheet.create({
   },
   searchButton: {
     backgroundColor: COLORS.primary,
-    paddingVertical: hp(1),
+    paddingVertical: wp(1.2),
     paddingHorizontal: wp(3),
     borderRadius: wp(2),
   },

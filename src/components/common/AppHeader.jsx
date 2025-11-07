@@ -118,7 +118,6 @@ const styles = StyleSheet.create({
   },
   rightButtonTextMode: {
     backgroundColor: COLORS.primary,
-    paddingVertical: wp(1.5),
     paddingHorizontal: wp(3),
   },
   rightButtonText: {

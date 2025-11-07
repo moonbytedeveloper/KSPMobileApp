@@ -1395,11 +1395,13 @@ const styles = StyleSheet.create({
   },
   closeButtonStyle: {
     backgroundColor: '#6b7280',
-    paddingVertical: hp(1.5),
+    paddingVertical: wp(2),
     paddingHorizontal: wp(6),
     borderRadius: wp(2.5),
     alignItems: 'center',
     marginTop: hp(2),
+    marginHorizontal: 'auto',
+    width:wp(35)
   },
   closeButtonText: {
     color: '#fff',

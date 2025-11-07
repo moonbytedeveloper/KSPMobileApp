@@ -296,24 +296,23 @@ export async function login({ username, password }) {
     return resp.data;
 }
 
-export async function forgotPassword({ email }) {
-    const resp = await api.post(PATHS.forgotPassword, { email });
+export async function forgotPassword({ email, username }) {
+    const payload = { email };
+    if (username) payload.username = username;
+    const resp = await api.post(PATHS.forgotPassword, payload);
     console.log('Forgot Password response:', resp);
     return resp.data;
 }
 
 export async function verifyCode({ email, OtpCode }) {
-    const resp = await api.post(PATHS.verifyCode, { Email: email, OtpCode: OtpCode });
+    const payload = { email, OtpCode };
+    // if (username) payload.username = username;
+    console.log('Verify Code payload:', payload);
+    const resp = await api.post(PATHS.verifyCode, payload);
     console.log('Verify Code response:', resp);
     return resp.data;
 }
-
-export async function resetPassword({ email, newPassword, ConfirmPassword }) {
-    console.log('Reset Password request:', { Email: email, NewPassword: newPassword, ConfirmPassword: ConfirmPassword });
-    const resp = await api.post(PATHS.resetPassword, { Email: email, NewPassword: newPassword, ConfirmPassword: ConfirmPassword });
-    console.log('Reset Password response:', resp);
-    return resp.data;
-}
+     
 
 export async function getProfile() {
     const userUUID = await getUUID();

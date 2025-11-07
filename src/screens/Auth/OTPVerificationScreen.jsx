@@ -32,6 +32,7 @@ const OTPVerificationScreen = ({ navigation, route }) => {
 
   // Get email from route params
   const email = route?.params?.email || '';
+  const username = route?.params?.username || '';
 
   // --- Color utilities for deterministic shading ---
   const clamp01 = (v) => Math.max(0, Math.min(1, v));
@@ -280,7 +281,7 @@ const OTPVerificationScreen = ({ navigation, route }) => {
     if (!email || isResending || resendTimer > 0) return;
     try {
       setIsResending(true);
-      await forgotPassword({ email });
+      await forgotPassword({ email, username });
       setSuccessMessage('A new verification code has been sent.');
       setSuccessSheetVisible(true);
       setResendTimer(120);

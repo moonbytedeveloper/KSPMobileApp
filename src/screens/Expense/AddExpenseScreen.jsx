@@ -1813,13 +1813,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bg,
     borderRadius: wp(2.5),
     paddingHorizontal: wp(4),
-    paddingVertical: hp(1),
+    paddingVertical: wp(1),
     marginTop: hp(1.2),
   },
   textInput: {
     flex: 1,
-    fontSize: rf(4.2),
-    color: COLORS.text,
+    fontSize: rf(3.5),
+    color: COLORS.textMuted,
     paddingVertical: 0,
     marginRight: wp(2),
     fontFamily: TYPOGRAPHY.fontFamilyRegular,
@@ -1832,8 +1832,9 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     backgroundColor: COLORS.bg,
     borderRadius: wp(2.5),
-    paddingHorizontal: wp(4),
-    height: hp(6.2),
+    paddingLeft: wp(4),
+    paddingRight: wp(2),
+    height: hp(5.2),
     marginTop: hp(1.2),
   },
   uploadText: {
@@ -1844,8 +1845,9 @@ const styles = StyleSheet.create({
   },
   uploadButton: {
     backgroundColor: COLORS.primary,
-    padding: wp(2.2),
+    padding: wp(2),
     borderRadius: wp(2),
+    
   },
   uploadHint: {
     marginTop: hp(0.6),
@@ -2018,7 +2020,7 @@ const styles = StyleSheet.create({
   },
   submitBtn: {
     backgroundColor: COLORS.primary,
-    paddingVertical: hp(1.8),
+    paddingVertical: wp(1.2),
     paddingHorizontal: wp(6),
     borderRadius: wp(2),
     flex: 1,
@@ -2033,7 +2035,7 @@ const styles = StyleSheet.create({
   },
   cancelBtn: {
     backgroundColor: '#374151',
-    paddingVertical: hp(1.8),
+    paddingVertical: wp(1.2),
     paddingHorizontal: wp(6),
     borderRadius: wp(2),
     flex: 1,

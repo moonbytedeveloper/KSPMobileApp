@@ -1252,14 +1252,14 @@ const styles = StyleSheet.create({
   },
   leaveButton: {
     backgroundColor: COLORS.primary,
-    paddingVertical: wp(1.5),
+    paddingVertical: wp(1.6),
     paddingHorizontal: wp(3),
     borderRadius: RADIUS.md,
   },
   leaveButtonText: {
     color: COLORS.bg,
     fontWeight: '700',
-    fontSize: rf(3.8),
+    fontSize: rf(3.6),
     fontFamily: TYPOGRAPHY.fontFamilyBold,
   },
   input: {
@@ -1363,7 +1363,7 @@ const styles = StyleSheet.create({
   },
   addRowButton: {
     backgroundColor: COLORS.primary,
-    paddingVertical: hp(1.2),
+    paddingVertical: hp(1),
     paddingHorizontal: wp(4),
     borderRadius: RADIUS.md,
   },
@@ -1380,7 +1380,7 @@ const styles = StyleSheet.create({
   },
   submitInlineButton: {
     backgroundColor: COLORS.primary,
-    paddingVertical: hp(1.2),
+    paddingVertical: hp(1),
     paddingHorizontal: wp(4),
     borderRadius: RADIUS.md,
   },

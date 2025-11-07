@@ -485,18 +485,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   actionBtn: {
-    flex: 1,
-    paddingVertical: hp(1.2),
+    paddingVertical: hp(1),
     paddingHorizontal: wp(2.5),
     borderRadius: wp(2.5),
-    borderWidth: 1,
-    borderColor: '#111827',
+    backgroundColor: '#6b7280',
     marginHorizontal: wp(1),
     alignItems: 'center',
     justifyContent: 'center',
+    marginHorizontal:'auto',
+    width:wp(35)
   },
   actionBtnText: {
-    color: '#111827',
+    color: '#fff',
     fontSize: rf(3),
     fontWeight: '800',
   },

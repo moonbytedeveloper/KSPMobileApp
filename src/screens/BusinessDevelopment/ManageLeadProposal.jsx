@@ -1274,8 +1274,8 @@ const styles = StyleSheet.create({
   },
   btn: {
     // minHeight: hp(4.6),
-    // paddingVertical: hp(1.1),
-    paddingHorizontal: wp(5.2),
+    paddingVertical: hp(1),
+    paddingHorizontal: wp(5.1),
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: hp(1),

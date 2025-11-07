@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   },
   confirmBtn: {
     backgroundColor: COLORS.primary,
-    paddingVertical: hp(1.4),
+    paddingVertical: wp(1.2),
     paddingHorizontal: wp(4),
     borderRadius: wp(3),
     minWidth: wp(35),

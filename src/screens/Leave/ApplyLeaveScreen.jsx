@@ -874,7 +874,7 @@ const styles = StyleSheet.create({
   submitButton: {
     alignSelf: 'flex-end',
     backgroundColor: COLORS.primary,
-    paddingVertical: hp(0.8),
+    paddingVertical: wp(1.6),
     paddingHorizontal: wp(5),
     borderRadius: RADIUS.md,
     marginTop: hp(1),

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Keyboard, Animated, Easing, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Keyboard, Animated, Easing } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { wp, hp, rf, safeAreaTop } from '../../utils/responsive'; 
@@ -9,11 +9,15 @@ import AppHeader from '../../components/common/AppHeader';
 import { forgotPassword } from '../../api/authServices';
 import Icon from '../../utils/CustomIcon';
 import Loader from '../../components/common/Loader';
+import BottomSheetConfirm from '../../components/common/BottomSheetConfirm';
 
 const ForgotPasswordScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorSheetVisible, setErrorSheetVisible] = useState(false);
+  const [errorSheetMessage, setErrorSheetMessage] = useState('Something went wrong.');
   
   // Animation refs for floating icons
   const randomIconsRef = useRef([]);
@@ -218,11 +222,11 @@ const ForgotPasswordScreen = ({ navigation }) => {
   const handleSendCode = async () => {
     setIsLoading(true);
     try {
-      console.log('Sending reset code to:', email);
-      const resp = await forgotPassword({ email });
+      console.log('Sending reset code to:', email, username);
+      const resp = await forgotPassword({ email, username });
       console.log('Forgot password API data:', resp);
       // Use replace to immediately switch without flicker/back possibility
-      navigation.replace('OTPVerification', { email });
+      navigation.replace('OTPVerification', { email, username });
       return;
     } catch (e) {
       setIsLoading(false);
@@ -231,7 +235,8 @@ const ForgotPasswordScreen = ({ navigation }) => {
       const message = typeof serverData === 'string'
         ? serverData
         : (serverData?.message || e?.message || 'Something went wrong.');
-      Alert.alert('Invalid email', serverData?.Message);
+      setErrorSheetMessage(serverData?.Message || message || 'Something went wrong.');
+      setErrorSheetVisible(true);
     }
   };
   
@@ -239,6 +244,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
     return <Loader />;
   }
   return (
+    <>
     <KeyboardAvoidingView
       style={styles.wrapper}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -311,7 +317,23 @@ const ForgotPasswordScreen = ({ navigation }) => {
         <Text style={styles.forgotPasswordTitle}>Forgot Password</Text>
       </View>
 
-      {/* Floating Email Input */}
+      {/* Floating Username Input */}
+      <View style={[
+        styles.floatingInputContainer,
+        { top: isKeyboardOpen ? safeAreaTop + hp(30) : safeAreaTop + hp(55) }
+      ]}>
+        <Ionicons name="person" size={rf(5)} color="#666" style={styles.icon} />
+        <TextInput
+          style={styles.input}
+          placeholder="Enter your username here..."
+          placeholderTextColor="#999"
+          value={username}
+          onChangeText={setUsername}
+          returnKeyType="next"
+          autoCapitalize="none"
+        />
+      </View>
+       {/* Floating Email Input */}
       <View style={[
         styles.floatingInputContainer,
         { top: isKeyboardOpen ? safeAreaTop + hp(38) : safeAreaTop + hp(63) }
@@ -347,6 +369,16 @@ const ForgotPasswordScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
+    <BottomSheetConfirm
+      visible={errorSheetVisible}
+      title="Invalid email"
+      message={errorSheetMessage}
+      confirmText="OK"
+      cancelText=""
+      onConfirm={() => setErrorSheetVisible(false)}
+      onCancel={() => setErrorSheetVisible(false)}
+    />
+    </>
   );
 };
 
