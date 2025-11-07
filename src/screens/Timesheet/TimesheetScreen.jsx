@@ -55,12 +55,55 @@ const normalizeToHhMm = (value) => {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 };
 
+// Date helpers: UI shows dd-MMM-yyyy, API payloads remain yyyy-mm-dd
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const parseDateFlexible = (val) => {
+  if (!val) return null;
+  if (val instanceof Date && !isNaN(val.getTime())) return val;
+  try {
+    if (typeof val === 'string') {
+      const s = val.trim();
+      // dd-MMM-yyyy (e.g., 01-Nov-2025)
+      const m1 = s.match(/^([0-3]?\d)-([A-Za-z]{3})-(\d{4})$/);
+      if (m1) {
+        const day = parseInt(m1[1], 10);
+        const monIdx = MONTHS_SHORT.map(x => x.toLowerCase()).indexOf(m1[2].toLowerCase());
+        const year = parseInt(m1[3], 10);
+        if (monIdx >= 0) return new Date(year, monIdx, day);
+      }
+      // yyyy-mm-dd
+      const m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m2) {
+        const year = parseInt(m2[1], 10);
+        const monIdx = parseInt(m2[2], 10) - 1;
+        const day = parseInt(m2[3], 10);
+        return new Date(year, monIdx, day);
+      }
+    }
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  } catch (_) { return null; }
+};
+
+// UI display format (dd-MMM-yyyy)
 const formatUiDate = (date) => {
-  const d = new Date(date);
-  const yyyy = String(d.getFullYear());
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const d = parseDateFlexible(date);
+  if (!d) return '';
   const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+  const mon = MONTHS_SHORT[d.getMonth()];
+  const yy = d.getFullYear();
+  return `${dd}-${mon}-${yy}`;
+};
+
+// API format (dd-MMM-yyyy) - e.g., 30-Nov-2025
+const formatDateApi = (date) => {
+  const d = parseDateFlexible(date);
+  if (!d) return '';
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mon = MONTHS_SHORT[d.getMonth()];
+  const yy = d.getFullYear();
+  return `${dd}-${mon}-${yy}`;
 };
 
 const TimesheetScreen = ({ navigation }) => {
@@ -113,8 +156,8 @@ const TimesheetScreen = ({ navigation }) => {
           // taskName: `${line.ProjectTitle} • ${line.TaskTitle}`,
           projectName: line.ProjectTitle,
           projectTask: line.TaskTitle,
-          fromDate: apiData.From_Date,
-          toDate: apiData.To_Date,
+          fromDate: apiData.From_Date ? formatUiDate(parseDateFlexible(apiData.From_Date) || apiData.From_Date) : apiData.From_Date,
+          toDate: apiData.To_Date ? formatUiDate(parseDateFlexible(apiData.To_Date) || apiData.To_Date) : apiData.To_Date,
           status: apiData.Timesheet_Status,
           totalHours: '00:00',
           lines: [],
@@ -177,9 +220,17 @@ const TimesheetScreen = ({ navigation }) => {
       });
 
       console.log('🔧 [TimesheetScreen] Making API call to getManageTimesheet');
+      // Convert display format (dd-MMM-yyyy) to API format (yyyy-mm-dd) if dates are provided
+      const apiFromDate = fromDateParam && fromDateParam !== 'From Date' 
+        ? formatDateApi(parseDateFlexible(fromDateParam) || fromDateParam)
+        : fromDateParam;
+      const apiToDate = toDateParam && toDateParam !== 'To Date'
+        ? formatDateApi(parseDateFlexible(toDateParam) || toDateParam)
+        : toDateParam;
+      
       const response = await getManageTimesheet({
-        frmD: fromDateParam,
-        toD: toDateParam
+        frmD: apiFromDate,
+        toD: apiToDate
       });
       console.log('🔧 [TimesheetScreen] API response received:', { success: response.Success, hasData: !!response.Data });
 
@@ -217,13 +268,20 @@ const TimesheetScreen = ({ navigation }) => {
         }
 
         // Set dates if provided (only if they're different to prevent infinite loops)
+        // Parse and format dates from API for display (dd-MMM-yyyy)
         if (response.Data.From_Date && response.Data.From_Date !== fromDate) {
-          setFromDate(response.Data.From_Date);
-          setFromDateValue(new Date(response.Data.From_Date));
+          const parsedFromDate = parseDateFlexible(response.Data.From_Date);
+          if (parsedFromDate) {
+            setFromDate(formatUiDate(parsedFromDate));
+            setFromDateValue(parsedFromDate);
+          }
         }
         if (response.Data.To_Date && response.Data.To_Date !== toDate) {
-          setToDate(response.Data.To_Date);
-          setToDateValue(new Date(response.Data.To_Date));
+          const parsedToDate = parseDateFlexible(response.Data.To_Date);
+          if (parsedToDate) {
+            setToDate(formatUiDate(parsedToDate));
+            setToDateValue(parsedToDate);
+          }
         }
 
         // Transform and set data
@@ -470,8 +528,8 @@ const TimesheetScreen = ({ navigation }) => {
       // Calculate target week dates (Monday to Sunday)
       const targetMonday = new Date(transferDateValue);
       const targetSunday = getSundayOfWeek(targetMonday);
-      const fromDateStr = formatUiDate(targetMonday);
-      const toDateStr = formatUiDate(targetSunday);
+      const fromDateStr = formatDateApi(targetMonday);
+      const toDateStr = formatDateApi(targetSunday);
 
       // Get all selected items
       const selectedItemsData = data.filter(t => selectedItems.includes(t.id));
@@ -972,7 +1030,7 @@ const TimesheetScreen = ({ navigation }) => {
             setDescText('');
           }
         }}
-        snapPoints={[hp(75), hp(75)]}
+        snapPoints={[hp(40), hp(40)]}
         enablePanDownToClose={false}
         enableContentPanningGesture={false}
         backdropOpacity={0.6}
@@ -988,7 +1046,7 @@ const TimesheetScreen = ({ navigation }) => {
           {!!descContext && (
             <View style={{ marginBottom: hp(1) }}>
               <Text style={{ color: '#6b7280', fontSize: rf(3.2) }}>
-                {`For ${descContext.dateKey} • ${descContext.timeText}`}
+                {`For ${formatUiDate(descContext.dateKey)} • ${descContext.timeText}`}
               </Text>
             </View>
           )}
@@ -1031,7 +1089,7 @@ const TimesheetScreen = ({ navigation }) => {
                     // Resolve header UUID from top-level timesheet data (backend provides HeaderUUID)
                     const headeruuid = timesheetData?.HeaderUUID || timesheetData?.UUID || timesheetData?.Header_UUID || timesheetData?.TimesheetHeader_UUID || timesheetData?.HeaderUuid || timesheetData?.Timesheet_Header_UUID || '';
 
-                    const specificDate = dateKey; // already yyyy-mm-dd
+                    const specificDate = formatUiDate(parseDateFlexible(dateKey)); // already yyyy-mm-dd
                     const normalized = normalizeToHhMm(timeText);
                     if (!normalized) {
                       Alert.alert('Invalid time', 'Please enter time in 24-hour HH:MM format.');

@@ -1273,11 +1273,12 @@ const styles = StyleSheet.create({
     marginTop: hp(0.8),
   },
   btn: {
-    minHeight: hp(5.6),
-    paddingVertical: hp(1.1),
+    // minHeight: hp(4.6),
+    // paddingVertical: hp(1.1),
     paddingHorizontal: wp(5.2),
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: hp(1),
   },
   // spacing helpers
   detailGroup: {

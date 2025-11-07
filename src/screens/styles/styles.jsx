@@ -263,7 +263,7 @@ export const formStyles = StyleSheet.create({
   },
   primaryBtn: {
     backgroundColor: COLORS.primary,
-    paddingVertical: hp(1.8),
+    // paddingVertical: hp(1.8),
     paddingHorizontal: SPACING.xl,
     borderRadius: RADIUS.lg,
     flex: 1,

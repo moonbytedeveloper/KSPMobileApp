@@ -397,7 +397,7 @@ const ManageTimeSheetApproval = ({ navigation }) => {
   return (
     <View style={styles.safeArea}>
       <AppHeader
-          title="Timesheet"
+          title="Timesheet Approval"
           onLeftPress={() => navigation.goBack()}
           onRightPress={() => navigation.navigate('Notification')}
         />

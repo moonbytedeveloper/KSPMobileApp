@@ -769,10 +769,11 @@ const styles = StyleSheet.create({
   },
   addBtn: {
     backgroundColor: COLORS.primary,
-    paddingVertical: hp(1.2),
-    paddingHorizontal: wp(6),
+    paddingVertical: hp(1),
+    paddingHorizontal: wp(5),
     borderRadius: wp(2),
     marginTop: hp(1),
+    marginBottom: hp(1),
   },
   addBtnText: {
     color: '#fff',

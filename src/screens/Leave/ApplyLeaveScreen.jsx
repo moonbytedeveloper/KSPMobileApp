@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import BottomSheetConfirm from '../../components/common/BottomSheetConfirm';
 import { wp, hp, rf, safeAreaTop } from '../../utils/responsive';
 import Dropdown from '../../components/common/Dropdown';
 import AppHeader from '../../components/common/AppHeader';
@@ -32,12 +33,19 @@ const ApplyLeaveScreen = ({ navigation }) => {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [leavesLoading, setLeavesLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
+  const [errorVisible, setErrorVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const showError = (message) => {
+    setErrorMessage(message);
+    setErrorVisible(true);
+  };
 
   const leaveTypeOptions = [
     { value: 'c2837a38-a125-40e0-8c4e-c37e8899', label: 'Paid Leave' },
     { value: 'db9d6e71-fcc1-4898-8928-18e8ab9d', label: 'Unpaid Leave' },
     { value: '3d376ba5-74f0-45ad-b3a4-88a55b43', label: 'Casual Leave' },
-    { value: 'ef1298dc-7475-4b00-94fc-2d6ab7de', label: 'Perment Leave' }
+    // { value: 'ef1298dc-7475-4b00-94fc-2d6ab7de', label: 'Perment Leave' }
   ];
   const parameterOptions = ['Full Day', 'Half Day (First Half)', 'Half Day (Second Half)', 'Short Leave'];
 
@@ -429,11 +437,13 @@ to: formatAnyToDdMmmYyyy(it.LeaveEndDate) || '-',
 
               // Check for overlapping leave dates
               if (checkForOverlappingLeaves(from, to)) {
-                setStatus({ apiError: 'A leave request already exists for the selected date range. Please choose different dates.' });
+                showError('You already have an approved or pending leave for the selected dates. Please choose different dates.');
                 return;
               }
 
-              // optimistic UI
+              // Do NOT add optimistic UI entry here. We'll add the server-confirmed
+              // leave only after the API returns success to avoid transient items appearing
+              // in the list when the call fails.
               const newLeave = {
                 id: `lv-${Date.now()}`,
                 appliedBy: 'You',
@@ -448,7 +458,6 @@ to: formatAnyToDdMmmYyyy(it.LeaveEndDate) || '-',
                 actionTakenBy: '',
                 remark: '',
               };
-              setLeaves((prev) => [newLeave, ...prev]);
 
               // clear UI
               resetForm();
@@ -458,41 +467,91 @@ to: formatAnyToDdMmmYyyy(it.LeaveEndDate) || '-',
               setToDateValue(new Date());
 
               // call API in background
+              // Debug log selected values
+              console.log('Selected leave type:', {
+                label: vals.leaveType,
+                uuid: vals.leaveTypeUuid,
+                fullValues: vals
+              });
+              
+              // Convert dates to YYYY-MM-DD format for API
+              const formatDateForApi = (dateStr) => {
+                const parts = dateStr.split('-');
+                const months = { 'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5, 
+                               'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11 };
+                const day = parseInt(parts[0], 10);
+                const month = months[parts[1]];
+                const year = parseInt(parts[2], 10);
+                const date = new Date(year, month, day);
+                return date.toISOString().split('T')[0]; // Returns YYYY-MM-DD
+              };
+
               const payload = {
-                leaveType: vals.leaveTypeUuid,
+                leaveType: vals.leaveTypeUuid,  // Sending UUID to API
                 parameter: vals.parameter,
-                fromDate: from,
-                toDate: to,
+                fromDate: formatDateForApi(from),
+                toDate: formatDateForApi(to),
                 reason: vals.reason.trim(),
                 contactNo: (vals.contact || '').replace(/\D/g, ''),
               };
-              // add New Line
-try {
-  const resp = await applyLeave(payload);
-  console.log('ApplyLeave response:', resp);
 
-  // ✅ update optimistic record after API success
+              console.log('Submitting leave payload:', payload);
+
+              try {
+                const resp = await applyLeave(payload);
+                console.log('ApplyLeave response:', resp);
+
+  // On success: add the server-confirmed leave to the list (no optimistic insertion before)
   if (resp?.data) {
-    setLeaves((prev) =>
-      prev.map((lv) =>
-        lv.id === newLeave.id
-          ? {
-              ...lv,
-              id: resp.data.UUID || lv.id,
-              leaveType: resp.data.LeaveType || lv.leaveType,
-              from: formatAnyToDdMmmYyyy(resp.data.LeaveStartDate),
-              to: formatAnyToDdMmmYyyy(resp.data.LeaveEndDate),
-              status: resp.data.Status || lv.status,
-            }
-          : lv
-      )
-    );
+    const s = resp.data;
+    const serverLeave = {
+      id: s.UUID || String(Date.now()),
+      appliedBy: s.AppliedBy || 'You',
+      applyDate: s.AppliedDate || formatUiDate(new Date()),
+      status: s.Status || 'Pending',
+      leaveType: s.LeaveType || vals.leaveType,
+      parameter: s.LeaveParameter || vals.parameter,
+      from: formatAnyToDdMmmYyyy(s.LeaveStartDate) || from,
+      to: formatAnyToDdMmmYyyy(s.LeaveEndDate) || to,
+      reason: s.Reason || vals.reason.trim(),
+      contactNo: s.ContactNumber ? String(s.ContactNumber) : (vals.contact || '').replace(/\D/g, ''),
+      actionTakenBy: s.ActionTakenBy || '',
+      remark: s.Remark || '',
+    };
+    setLeaves((prev) => [serverLeave, ...prev]);
   }
 } catch (e) {
   console.log('ApplyLeave API error:', e?.response?.data || e?.message || e);
+
+  // Show only the message provided by the API. Do not add static explanation text.
+  const data = e?.response?.data;
+
+  const pickMessageField = (obj) => {
+    if (!obj) return undefined;
+    return obj.Message ?? obj.message ?? obj.error ?? obj.Error;
+  };
+
+  let msg = undefined;
+  if (typeof data === 'string') {
+    msg = data;
+  } else if (data && typeof data === 'object') {
+    msg = pickMessageField(data) ?? pickMessageField(data.Data) ?? pickMessageField(data.Data?.Data);
+  }
+
+  // If we have a message, convert arrays/objects to strings; otherwise do not show any static message.
+  if (Array.isArray(msg)) {
+    msg = msg.join('\n');
+  } else if (msg && typeof msg === 'object') {
+    try { msg = JSON.stringify(msg); } catch (_) { msg = String(msg); }
+  }
+
+  if (msg) {
+    showError(String(msg));
+  } else {
+    // No server-provided message available — log for debugging and do not show a static message
+    console.log('ApplyLeave API returned no Message field:', data || e?.message || e);
+  }
 }
-
-
 
             } finally {
               setFSubmitting(false);
@@ -728,6 +787,15 @@ try {
         </View>
       </ScrollView>
 
+      <BottomSheetConfirm
+        visible={errorVisible}
+        title="Error"
+        message={errorMessage}
+        confirmText="OK"
+        cancelText=""
+        onConfirm={() => setErrorVisible(false)}
+        onCancel={() => setErrorVisible(false)}
+      />
 
     </View>
   );

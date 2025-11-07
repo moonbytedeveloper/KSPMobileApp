@@ -30,12 +30,10 @@ const StatusBadge = ({ label  }) => {
   );
 };
 
-const TimesheetAccordion = ({ item, onManagePress }) => {
-  const [expanded, setExpanded] = useState(false);
-  const toggle = () => setExpanded(s => !s);
+const TimesheetAccordion = ({ item, onManagePress, isExpanded, onToggle }) => {
   return (
     <View style={styles.tsCard}>
-      <TouchableOpacity activeOpacity={0.85} onPress={toggle}>
+      <TouchableOpacity activeOpacity={0.85} onPress={onToggle}>
         <View style={styles.tsRowHeader}>
           <View style={styles.tsHeaderLeft}>
             <View style={[styles.tsDot, { backgroundColor: (item.status === 'Approved' ? COLORS.success : 
@@ -50,12 +48,12 @@ const TimesheetAccordion = ({ item, onManagePress }) => {
               <Text style={[styles.tsCaption, { textAlign: 'right' }]}>Total Hours</Text>
               <Text style={styles.tsHours}>{item.totalHoursWorked}</Text>
             </View>
-            <Icon name={expanded ? 'expand-less' : 'expand-more'} size={rf(4.2)} color={COLORS.textMuted} />
+            <Icon name={isExpanded ? 'expand-less' : 'expand-more'} size={rf(4.2)} color={COLORS.textMuted} />
           </View>
         </View>
       </TouchableOpacity>
 
-      {expanded && (
+      {isExpanded && (
         <View>
         <View style={styles.tsDetailArea}>
           <View style={styles.fieldRow}>
@@ -81,8 +79,9 @@ const TimesheetAccordion = ({ item, onManagePress }) => {
               activeOpacity={0.9}
               style={styles.manageBtn}
             >
-              <Icon name="open-in-new" size={rf(4.2)} color="#fff" />
+                <View style={styles.submitButton}>
               <Text style={styles.manageBtnText}>Action</Text>
+              </View>
             </TouchableOpacity>
           </View>
           
@@ -100,17 +99,25 @@ const TimesheetsApprovalScreen = ({ navigation }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [expandedId, setExpandedId] = useState(null);
 
-  const formatDate = (iso) => {
+  const formatDate = (val) => {
     try {
-      if (!iso) return '';
-      const d = new Date(iso);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${day}`;
+      if (!val) return '';
+      // If already in dd-MMM-yyyy, return as-is
+      if (typeof val === 'string') {
+        const s = val.trim();
+        if (/^\d{2}-[A-Za-z]{3}-\d{4}$/.test(s)) return s;
+      }
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return String(val);
+      const dd = String(d.getDate()).padStart(2, '0');
+      const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const mon = MONTHS_SHORT[d.getMonth()];
+      const yy = d.getFullYear();
+      return `${dd}-${mon}-${yy}`;
     } catch (e) {
-      return String(iso);
+      return String(val);
     }
   };
 
@@ -240,7 +247,7 @@ const TimesheetsApprovalScreen = ({ navigation }) => {
           onRightPress={handleNotificationPress}
         />
         {/* Pagination Controls (same UX as BusinessDevelopmentScreen) */}
-       {!(timesheetSummaries.length === 0) && <View style={styles.paginationContainer}>
+      {!(timesheetSummaries.length === 0) && <View style={styles.paginationContainer}>
           <View style={styles.itemsPerPageContainer}>
             <Text style={styles.paginationLabel}>Show</Text>
             <Dropdown
@@ -268,7 +275,7 @@ const TimesheetsApprovalScreen = ({ navigation }) => {
               <Text style={styles.emptyText}>{errorText}</Text>
             </View>
           )}
-         
+        
           {timesheetSummaries.map(item => (
             <TimesheetAccordion
               key={item.id}
@@ -279,16 +286,18 @@ const TimesheetsApprovalScreen = ({ navigation }) => {
                 toDate: item.toDate,
                 status: item.status,
               }}
+              isExpanded={expandedId === item.id}
+              onToggle={() => setExpandedId(expandedId === item.id ? null : item.id)}
               onManagePress={() => navigation.navigate('ManageTimeSheetApproval')}
             />
           ))}
 
           
         </ScrollView>
-     
+    
       </View>
-       <View style={styles.paginationContainer}>
-       <Text style={styles.pageInfo}>
+      <View style={styles.paginationContainer}>
+      <Text style={styles.pageInfo}>
             Showing {totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1} to {Math.min((currentPage + 1) * itemsPerPage, totalRecords)} of {totalRecords} entries
           </Text>
 
@@ -324,7 +333,7 @@ const TimesheetsApprovalScreen = ({ navigation }) => {
               );
             })}
           </View>
-       </View>
+      </View>
     </View>
   );
 };
@@ -512,20 +521,28 @@ const styles = StyleSheet.create({
     marginTop: hp(1.2),
   },
   manageBtn: {
-    width: '100%',
-    flexDirection: 'row',
+  marginTop: hp(1.5),
+    marginHorizontal: -wp(1.2),
+    flex: 1,
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(2.5),
+    borderRadius: wp(2.5),
+    backgroundColor: COLORS.primary + '33',
+    borderColor: COLORS.primary,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: wp(2),
-    backgroundColor: COLORS.primary,
-    paddingVertical: hp(1.8),
-    paddingHorizontal: wp(4),
-    borderRadius: wp(2),
+    width: wp(85),
+  },
+  submitButton:{
+    marginHorizontal: wp(1),
   },
   manageBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: rf(3.4),
+  color: COLORS.primary,
+    fontSize: rf(3),
+    fontWeight: '600',
+    textAlign: 'center',
+    fontFamily: TYPOGRAPHY.fontFamilyBold,
   },
   sectionTitle: {
     fontSize: rf(4.2),

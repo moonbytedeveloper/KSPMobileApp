@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, TextInput, ScrollView } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { rf, wp, hp } from '../../utils/responsive';
@@ -21,14 +21,52 @@ const Dot = ({ color }) => (
 );
 
 const parseDateSafe = (maybeDate) => {
+  if (!maybeDate) return null;
   try {
-    // Expecting 'yyyy-mm-dd'. If not, Date may still parse; otherwise fallback
+    // Handle both dd-MMM-yyyy (e.g., 01-Nov-2025) and yyyy-mm-dd formats
+    if (typeof maybeDate === 'string') {
+      const s = maybeDate.trim();
+      const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      
+      // Try dd-MMM-yyyy format first
+      const m1 = s.match(/^([0-3]?\d)-([A-Za-z]{3})-(\d{4})$/);
+      if (m1) {
+        const day = parseInt(m1[1], 10);
+        const monIdx = MONTHS_SHORT.map(x => x.toLowerCase()).indexOf(m1[2].toLowerCase());
+        const year = parseInt(m1[3], 10);
+        if (monIdx >= 0) {
+          const d = new Date(year, monIdx, day);
+          if (!isNaN(d.getTime())) return d;
+        }
+      }
+      
+      // Try yyyy-mm-dd format
+      const m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m2) {
+        const year = parseInt(m2[1], 10);
+        const monIdx = parseInt(m2[2], 10) - 1;
+        const day = parseInt(m2[3], 10);
+        const d = new Date(year, monIdx, day);
+        if (!isNaN(d.getTime())) return d;
+      }
+    }
+    
+    // Fallback to standard Date parsing
     const d = new Date(maybeDate);
     if (!isNaN(d.getTime())) return d;
     return null;
   } catch (_) {
     return null;
   }
+};
+
+// Format date to yyyy-mm-dd using local time (not UTC) to avoid timezone issues
+const formatDateKey = (date) => {
+  const d = new Date(date);
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
 };
 
 const formatDayLabel = (date) => {
@@ -39,29 +77,29 @@ const formatDayLabel = (date) => {
   return `${wk}\n(${dd}/${mm})`;
 };
 
-// Build a user-friendly formatter for HH:MM while typing
+const normalizeDateKey = (value) => {
+  if (!value) return '';
+  const parsed = parseDateSafe(value);
+  if (parsed) return formatDateKey(parsed);
+  if (typeof value === 'string') return value.trim();
+  return '';
+};
+
+// Minimal formatter - let user type manually, just clean up invalid characters
 const formatDisplayTime = (text) => {
   // Return empty string if input is empty
   if (!text || text.trim() === '') return '';
   
-  const digits = String(text).replace(/\D/g, '').slice(0, 4);
+  // Allow user to type manually - just remove invalid characters except digits and colon
+  // User can type: "1", "1:30", "12:45", "23:59", etc.
+  const cleaned = String(text).replace(/[^\d:]/g, '');
   
-  // Don't auto-format while typing, let user type freely
-  if (digits.length <= 2) {
-    return digits;
+  // Limit to reasonable length (max 5 chars: "23:59")
+  if (cleaned.length > 5) {
+    return cleaned.slice(0, 5);
   }
   
-  // Only format when we have 3+ digits, add colon after 2nd digit
-  if (digits.length === 3) {
-    return `${digits.slice(0, 2)}:${digits.slice(2)}`;
-  }
-  
-  // Format as HH:MM when we have 4 digits
-  if (digits.length === 4) {
-    return `${digits.slice(0, 2)}:${digits.slice(2)}`;
-  }
-  
-  return text;
+  return cleaned;
 };
 
 const parseDisplayToHhMm = (text) => {
@@ -92,7 +130,8 @@ const sumHhMm = (records) => {
 const TimesheetItem = ({ item, isActive, onToggle, onSave, onDelete, onDayHoursFilled, isSelectionMode, isSelected, onLongPress, onSelect, leaveData = [], timesheetStatus }) => {
   const statusStyles = statusStyleMap[item.status] || statusStyleMap.Pending;
   const [isEditing, setIsEditing] = useState(false);
-   console.log(item.taskName);
+  const [timeErrors, setTimeErrors] = useState({}); // Track validation errors per day
+  //  console.log(item.taskName);
   // Check if editing is allowed based on timesheet status
   const isEditAllowed = timesheetStatus === 'Rejected' || timesheetStatus === 'Pending';
   
@@ -116,19 +155,70 @@ const TimesheetItem = ({ item, isActive, onToggle, onSave, onDelete, onDayHoursF
   const initialDayMap = useMemo(() => {
     const base = {};
     daysInRange.forEach((d) => {
-      const key = d.toISOString().slice(0, 10);
+      const key = formatDateKey(d);
       base[key] = '';
     });
     return base;
   }, [daysInRange]);
 
-  const [perDayHours, setPerDayHours] = useState(initialDayMap);
+  // Initialize perDayHours with line data for current date range
+  const initializePerDayHours = useMemo(() => {
+    const base = { ...initialDayMap };
+    if (item.lines && item.lines.length > 0 && from && to) {
+      item.lines.forEach(line => {
+        const lineDate = line.Date_of_Task || line.Date;
+        if (lineDate) {
+          const dateKey = normalizeDateKey(lineDate);
+          if (!dateKey) return;
+          const lineDateObj = parseDateSafe(dateKey);
+          if (line.Hours && line.Hours !== '00:00' && lineDateObj && lineDateObj >= from && lineDateObj <= to) {
+            base[dateKey] = line.Hours;
+          }
+        }
+      });
+    }
+    return base;
+  }, [initialDayMap, item.lines, from, to]);
+
+  const [perDayHours, setPerDayHours] = useState(initializePerDayHours);
   const computedTotal = useMemo(() => sumHhMm(perDayHours), [perDayHours]);
+
+  // Track previous date range and lines to detect actual changes
+  const prevDateRangeRef = useRef(from && to ? `${formatDateKey(from)}-${formatDateKey(to)}` : '');
+  const prevLinesHashRef = useRef('');
+
+  // Reset perDayHours when date range or line data actually changes
+  useEffect(() => {
+    if (!from || !to) return;
+    
+    const currentRange = `${formatDateKey(from)}-${formatDateKey(to)}`;
+    // Create a simple hash of line data to detect changes
+    const linesHash = item.lines ? item.lines.map(l => `${normalizeDateKey(l.Date_of_Task || l.Date)}-${l.Hours}`).join('|') : '';
+    const rangeChanged = prevDateRangeRef.current !== currentRange;
+    const linesChanged = prevLinesHashRef.current !== linesHash;
+    
+    if (rangeChanged || linesChanged) {
+      if (rangeChanged) {
+        prevDateRangeRef.current = currentRange;
+      }
+      if (linesChanged) {
+        prevLinesHashRef.current = linesHash;
+      }
+      
+      // Update with new initialized data (includes line data prefilling)
+      // Use initializePerDayHours which is already memoized
+      setPerDayHours(initializePerDayHours);
+      if (rangeChanged) {
+        setTimeErrors({}); // Clear errors when dates change
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [from, to, item.lines]);
 
   // Function to check if a date is a leave day
   const isLeaveDay = (date) => {
     if (!leaveData || leaveData.length === 0) return false;
-    const dateStr = date.toISOString().slice(0, 10);
+    const dateStr = formatDateKey(date);
     const isLeave = leaveData.some(leave => {
       const leaveDate = leave.LeaveDate;
       if (!leaveDate) return false;
@@ -147,36 +237,6 @@ const TimesheetItem = ({ item, isActive, onToggle, onSave, onDelete, onDayHoursF
     
     return isLeave;
   };
-
-  // Initialize perDayHours with line data when available (only once)
-  useEffect(() => {
-    if (item.lines && item.lines.length > 0) {
-      const lineDataMap = {};
-      item.lines.forEach(line => {
-        const lineDate = line.Date_of_Task || line.Date;
-        if (lineDate) {
-          const dateStr = lineDate.includes('T') ? lineDate.split('T')[0] : lineDate;
-          // Only set hours if they exist and are not '00:00'
-          if (line.Hours && line.Hours !== '00:00') {
-            lineDataMap[dateStr] = line.Hours;
-          }
-        }
-      });
-      
-      // Only initialize if perDayHours is empty (first time)
-      setPerDayHours(prev => {
-        const hasAnyData = Object.values(prev).some(val => val && val.trim() !== '');
-        if (hasAnyData) {
-          // Don't override user input
-          return prev;
-        }
-        return {
-          ...prev,
-          ...lineDataMap
-        };
-      });
-    }
-  }, [item.lines]);
 
   // Delete is handled by the screen via a bottom sheet
 
@@ -266,17 +326,15 @@ const TimesheetItem = ({ item, isActive, onToggle, onSave, onDelete, onDayHoursF
             <View style={{ marginTop: hp(1) }}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {daysInRange.map((d) => {
-                  const key = d.toISOString().slice(0, 10);
+                  const key = formatDateKey(d);
                   const val = perDayHours[key] ?? '';
                   const isLeave = isLeaveDay(d);
                   
                   // Find line data for this date
                   const lineData = item.lines?.find(line => {
-                    // Handle both date formats: '2025-09-29' and '2025-09-29T00:00:00'
                     const lineDate = line.Date_of_Task || line.Date;
                     if (!lineDate) return false;
-                    const dateStr = lineDate.includes('T') ? lineDate.split('T')[0] : lineDate;
-                    return dateStr === key;
+                    return normalizeDateKey(lineDate) === key;
                   });
                   
                   return (
@@ -287,73 +345,165 @@ const TimesheetItem = ({ item, isActive, onToggle, onSave, onDelete, onDayHoursF
                           <Text style={styles.leaveDayText}>Leave</Text>
                         </View>
                       ) : isEditing ? (
-                        <TextInput
-                          value={val}
-                          onChangeText={(t) => {
-                            // Allow empty input - don't format if empty
-                            const v = t.trim() === '' ? '' : formatDisplayTime(t);
-                            setPerDayHours((prev) => {
-                              const next = { ...prev, [key]: v };
-                              // Trigger as soon as HH:MM is complete to support iOS where onBlur may not fire
-                              if (
-                                onDayHoursFilled &&
-                                v && v.length === 5 && /\d{2}:\d{2}/.test(v) &&
-                                (prev[key] || '') !== v
-                              ) {
-                                onDayHoursFilled(item.id, key, v);
+                        <View>
+                          {timeErrors[key] && (
+                            <Text style={styles.errorText}>{timeErrors[key]}</Text>
+                          )}
+                          <TextInput
+                            value={val}
+                            onChangeText={(t) => {
+                              // Allow empty input - don't format if empty
+                              const v = t.trim() === '' ? '' : formatDisplayTime(t);
+                              
+                              // Validate time format and range
+                              let error = '';
+                              if (v && v.trim() !== '') {
+                                const match = v.match(/^(\d{1,2})(?::(\d{1,2}))?$/);
+                                if (match) {
+                                  const hours = parseInt(match[1], 10) || 0;
+                                  const minutes = parseInt(match[2] || '0', 10) || 0;
+                                  
+                                  // Check if time exceeds 23:59
+                                  if (hours > 23 || (hours === 23 && minutes > 59)) {
+                                    error = 'Please enter time in 24 hour HH:MM format';
+                                  } else if (minutes > 59) {
+                                    error = 'Please enter time in 24 hour HH:MM format';
+                                  }
+                                }
                               }
-                              return next;
-                            });
-                          }}
-                          editable={isEditing && isEditAllowed}
-                          keyboardType="number-pad"
-                          style={[styles.hoursInput, !isEditAllowed && styles.inputDisabled]}
-                          placeholder="HH:MM"
-                          placeholderTextColor="#9ca3af"
-                          onBlur={() => {
-                            const current = perDayHours[key];
-                            if (current && current.trim() !== '') {
-                              // Validate hours and minutes
-                              const match = current.match(/^(\d{1,2})(?::(\d{1,2}))?$/);
-                              if (match) {
-                                let hours = parseInt(match[1], 10) || 0;
-                                let minutes = parseInt(match[2] || '0', 10) || 0;
-                                
-                                // Cap minutes at 60
-                                if (minutes > 60) {
-                                  minutes = 60;
-                                }
-                                
-                                // Cap at 23:60 if exceeds
-                                let validHours = hours;
-                                let validMinutes = minutes;
-                                
-                                if (hours > 23) {
-                                  validHours = 23;
-                                  validMinutes = 60;
-                                } else if (hours === 23 && minutes > 60) {
-                                  validMinutes = 60;
-                                }
-                                
-                                const correctedTime = `${String(validHours).padStart(2, '0')}:${String(validMinutes).padStart(2, '0')}`;
-                                
-                                // Update with corrected time if needed
-                                if (correctedTime !== current) {
-                                  setPerDayHours(prev => ({
+                              
+                              // Update error state
+                              setTimeErrors(prev => ({
+                                ...prev,
+                                [key]: error
+                              }));
+                              
+                              setPerDayHours((prev) => {
+                                const next = { ...prev, [key]: v };
+                                // Don't auto-trigger bottom sheet - only open on arrow/check button press (onSubmitEditing)
+                                return next;
+                              });
+                            }}
+                            editable={isEditing && isEditAllowed}
+                            keyboardType="default"
+                            style={[
+                              styles.hoursInput, 
+                              !isEditAllowed && styles.inputDisabled,
+                              timeErrors[key] && styles.hoursInputError
+                            ]}
+                            placeholder="HH:MM"
+                            placeholderTextColor="#9ca3af"
+                            returnKeyType="done"
+                            onSubmitEditing={() => {
+                              const current = perDayHours[key];
+                              if (current && current.trim() !== '') {
+                                // Validate hours and minutes
+                                const match = current.match(/^(\d{1,2})(?::(\d{1,2}))?$/);
+                                if (match) {
+                                  let hours = parseInt(match[1], 10) || 0;
+                                  let minutes = parseInt(match[2] || '0', 10) || 0;
+                                  
+                                  let error = '';
+                                  // Check if time exceeds 23:59
+                                  if (hours > 23 || (hours === 23 && minutes > 59)) {
+                                    error = 'Please enter time in 24 hour HH:MM format';
+                                    // Cap at 23:59
+                                    hours = 23;
+                                    minutes = 59;
+                                  } else if (minutes > 59) {
+                                    error = 'Please enter time in 24 hour HH:MM format';
+                                    minutes = 59;
+                                  }
+                                  
+                                  // Normalize for API (HH:MM format with padding)
+                                  const normalizedForApi = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                                  
+                                  // Keep display format (preserve single digit hours like 1:00)
+                                  const displayTime = `${hours}:${String(minutes).padStart(2, '0')}`;
+                                  
+                                  // Update error state
+                                  setTimeErrors(prev => ({
                                     ...prev,
-                                    [key]: correctedTime
+                                    [key]: error
                                   }));
+                                  
+                                  // Update with display format (preserve user's input style)
+                                  if (displayTime !== current && !error) {
+                                    setPerDayHours(prev => ({
+                                      ...prev,
+                                      [key]: displayTime
+                                    }));
+                                  }
+                                  
+                                  // Open description sheet if time is valid (send normalized format to API)
+                                  if (onDayHoursFilled && !error) {
+                                    onDayHoursFilled(item.id, key, normalizedForApi);
+                                  }
+                                } else if (onDayHoursFilled && current) {
+                                  // Try to open even if format is not perfect
+                                  onDayHoursFilled(item.id, key, current);
                                 }
-                                
-                                if (onDayHoursFilled) {
-                                  onDayHoursFilled(item.id, key, correctedTime);
-                                }
-                              } else if (onDayHoursFilled) {
-                                onDayHoursFilled(item.id, key, current);
                               }
-                            }
-                          }}
-                        />
+                            }}
+                            onBlur={() => {
+                              const current = perDayHours[key];
+                              if (current && current.trim() !== '') {
+                                // Validate hours and minutes
+                                const match = current.match(/^(\d{1,2})(?::(\d{1,2}))?$/);
+                                if (match) {
+                                  let hours = parseInt(match[1], 10) || 0;
+                                  let minutes = parseInt(match[2] || '0', 10) || 0;
+                                  
+                                  let error = '';
+                                  // Check if time exceeds 23:59
+                                  if (hours > 23 || (hours === 23 && minutes > 59)) {
+                                    error = 'Please enter time in 24 hour HH:MM format';
+                                    // Cap at 23:59
+                                    hours = 23;
+                                    minutes = 59;
+                                  } else if (minutes > 59) {
+                                    error = 'Please enter time in 24 hour HH:MM format';
+                                    minutes = 59;
+                                  }
+                                  
+                                  // Normalize for API (HH:MM format with padding)
+                                  const normalizedForApi = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                                  
+                                  // Keep display format (preserve single digit hours like 1:00)
+                                  const displayTime = `${hours}:${String(minutes).padStart(2, '0')}`;
+                                  
+                                  // Update error state
+                                  setTimeErrors(prev => ({
+                                    ...prev,
+                                    [key]: error
+                                  }));
+                                  
+                                  // Update with display format (preserve user's input style)
+                                  if (displayTime !== current && !error) {
+                                    setPerDayHours(prev => ({
+                                      ...prev,
+                                      [key]: displayTime
+                                    }));
+                                  }
+                                  
+                                  // Send normalized format to API
+                                  if (onDayHoursFilled && !error) {
+                                    onDayHoursFilled(item.id, key, normalizedForApi);
+                                  }
+                                } else if (onDayHoursFilled) {
+                                  onDayHoursFilled(item.id, key, current);
+                                }
+                              } else {
+                                // Clear error if input is empty
+                                setTimeErrors(prev => {
+                                  const next = { ...prev };
+                                  delete next[key];
+                                  return next;
+                                });
+                              }
+                            }}
+                          />
+                        </View>
                       ) : (
                         <View style={styles.hoursDisplayContainer}>
                           <Text style={styles.hoursDisplay}>
@@ -461,6 +611,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: rf(3.2),
     color: '#111827',
+  },
+  hoursInputError: {
+    borderColor: '#ef4444',
+    borderWidth: 2,
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: rf(2.4),
+    marginBottom: hp(0.4),
+    textAlign: 'center',
+    fontWeight: '500',
   },
   totalText: {
     fontSize: rf(3.2),

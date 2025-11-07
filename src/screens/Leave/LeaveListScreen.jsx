@@ -77,17 +77,23 @@ const toggleExpanded = (leaveId) => { // add toggle function
 };
 
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
+  const formatDate = (val) => {
+    if (!val) return 'N/A';
     try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      });
+      // If already in dd-MMM-yyyy, return as-is
+      if (typeof val === 'string') {
+        const s = val.trim();
+        if (/^\d{2}-[A-Za-z]{3}-\d{4}$/.test(s)) return s;
+      }
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return String(val);
+      const dd = String(d.getDate()).padStart(2, '0');
+      const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const mon = MONTHS_SHORT[d.getMonth()];
+      const yy = d.getFullYear();
+      return `${dd}-${mon}-${yy}`;
     } catch (e) {
-      return dateString;
+      return String(val);
     }
   };
 
