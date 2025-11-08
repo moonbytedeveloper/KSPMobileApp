@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Dropdown from '../../components/common/Dropdown';
@@ -51,7 +51,10 @@ const TimesheetCard = ({ timesheet, onActionPress, getStatusColor, getStatusBgCo
       <TouchableOpacity activeOpacity={0.8} onPress={toggle}>
         <View style={styles.tsRowHeader}>
           <View style={styles.tsHeaderLeft}>
-            <View style={[styles.tsDot, { backgroundColor: getFlagColor(timesheet.flagColor) }]} />
+            <View style={[styles.tsDot, {
+              backgroundColor: (timesheet.status === 'Approved' ? COLORS.success :
+                timesheet.status === 'Pending' ? COLORS.warning : timesheet.status === 'Not Updated' ? 'grey' : COLORS.info)
+            }]} />
             <View style={styles.tsHeaderLeftContent}>
               <Text style={[text.caption, styles.tsCaption]}>Employee Name</Text>
               <Text style={[text.title, styles.tsTitle]} numberOfLines={1}>{timesheet.employeeName || `Timesheet #${timesheet.srNo}`}</Text>
@@ -116,13 +119,16 @@ const ManageTimeSheetApproval = ({ navigation }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [expandedCardId, setExpandedCardId] = useState(null);
+  const [alertSheetData, setAlertSheetData] = useState({ title: '', message: '', type: 'error' }); // 'error' | 'success'
 
   const approveSheetRef = useRef(null);
   const rejectSheetRef = useRef(null);
   const viewSheetRef = useRef(null);
   const approvalDetailsSheetRef = useRef(null);
+  const alertSheetRef = useRef(null);
 
   const snapPoints = useMemo(() => [hp(60), hp(90)], []);
+  const alertSnapPoints = useMemo(() => [hp(40)], []);
 
   // Fetch timesheets for approval
   useEffect(() => {
@@ -175,7 +181,7 @@ const ManageTimeSheetApproval = ({ navigation }) => {
     } catch (err) {
       console.error('Error fetching timesheets for approval:', err);
       setError('Failed to load timesheets. Please try again.');
-      Alert.alert('Error', 'Failed to load timesheets. Please try again.');
+      showAlert('Error', 'Failed to load timesheets. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
@@ -246,13 +252,13 @@ const ManageTimeSheetApproval = ({ navigation }) => {
 
       // ✅ If API returns success flag as false
       if (response?.Success === false) {
-        Alert.alert('Error', response.Message || 'Something went wrong.');
+        showAlert('Error', response.Message || 'Something went wrong.', 'error');
         closeSheet(approveSheetRef);
         return;
       }
 
       // ✅ If successful
-      Alert.alert('Success', response?.Message || 'Timesheet approved successfully.');
+      showAlert('Success', response?.Message || 'Timesheet approved successfully.', 'success');
       setApproveMode('success');
 
       // Refresh the timesheet list after a short delay
@@ -277,7 +283,7 @@ const ManageTimeSheetApproval = ({ navigation }) => {
         errorMessage = error.message;
       }
 
-      Alert.alert('Error', errorMessage);
+      showAlert('Error', errorMessage, 'error');
       closeSheet(approveSheetRef);
     } finally {
       setApproving(false);
@@ -308,7 +314,7 @@ const ManageTimeSheetApproval = ({ navigation }) => {
 
     } catch (error) {
       console.error('Error rejecting timesheet:', error);
-      Alert.alert('Error', 'Failed to reject timesheet. Please try again.');
+      showAlert('Error', 'Failed to reject timesheet. Please try again.', 'error');
     } finally {
       setApproving(false);
     }
@@ -334,6 +340,11 @@ const ManageTimeSheetApproval = ({ navigation }) => {
     setReason('');
     setApproveMode('form');
     setApproving(false);
+  };
+
+  const showAlert = (title, message, type = 'error') => {
+    setAlertSheetData({ title, message, type });
+    alertSheetRef.current?.present();
   };
 
   // Pagination logic
@@ -419,6 +430,21 @@ const ManageTimeSheetApproval = ({ navigation }) => {
       </View>
     );
   }
+
+  const StatusBadge = ({ label = 'Pending' }) => {
+    const palette = {
+      Pending: { bg: COLORS.warningBg, color: COLORS.warning, border: COLORS.warning },
+      Approved: { bg: COLORS.successBg, color: COLORS.success, border: COLORS.success },
+      Rejected: { bg: COLORS.dangerBg, color: COLORS.danger, border: COLORS.danger },
+    };
+    const theme = palette[label] || palette.Pending;
+
+    return (
+      <View style={[styles.badge, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+        <Text style={[styles.badgeText, { color: theme.color }]}>{label}</Text>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.safeArea}>
@@ -778,12 +804,7 @@ const ManageTimeSheetApproval = ({ navigation }) => {
 
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Status:</Text>
-                      <Text style={[styles.statusBadge, {
-                        color: '#fff',
-                        backgroundColor: detail.status === 'Approved' ? '#10B981' : '#F59E0B'
-                      }]}>
-                        {detail.status || 'Pending'}
-                      </Text>
+                      <StatusBadge label={detail.status} />
                     </View>
 
                     <View style={styles.detailRow}>
@@ -806,6 +827,43 @@ const ManageTimeSheetApproval = ({ navigation }) => {
             )}
           </BottomSheetView>
         </BottomSheetModal>
+
+
+        {/* Alert Bottom Sheet (Error/Success) */}
+        <BottomSheetModal
+          ref={alertSheetRef}
+          snapPoints={alertSnapPoints}
+          enablePanDownToClose
+          enableContentPanningGesture={false}
+          onDismiss={() => setAlertSheetData({ title: '', message: '', type: 'error' })}
+          handleIndicatorStyle={styles.handle}
+          handleStyle={{ backgroundColor: 'transparent' }}
+          backgroundStyle={styles.sheetBackground}
+          backdropComponent={(props) => (
+            <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.45} pressBehavior="close" />
+          )}
+        >
+          <BottomSheetView style={[styles.sheetContent, { paddingBottom: hp(2) }]}>
+            <View style={styles.alertContainer}>
+              <View style={[styles.alertIconCircle, alertSheetData.type === 'success' ? styles.alertIconCircleSuccess : styles.alertIconCircleError]}>
+                <Icon 
+                  name={alertSheetData.type === 'success' ? 'check-circle' : 'error'} 
+                  size={rf(8)} 
+                  color={alertSheetData.type === 'success' ? COLORS.success : COLORS.error || '#EF4444'} 
+                />
+              </View>
+              <Text style={styles.alertTitle}>{alertSheetData.title}</Text>
+              <Text style={styles.alertMessage}>{alertSheetData.message}</Text>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                style={[styles.alertButton, alertSheetData.type === 'success' ? styles.alertButtonSuccess : styles.alertButtonError]}
+                onPress={() => alertSheetRef.current?.dismiss()}
+              >
+                <Text style={styles.alertButtonText}>Ok</Text>
+              </TouchableOpacity>
+            </View>
+          </BottomSheetView>
+        </BottomSheetModal>
       </View>
     </View>
   );
@@ -820,6 +878,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: wp(4),
+  },
+  badge: {
+    borderWidth: 1,
+    paddingVertical: hp(0.2),
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.md,
+  },
+  badgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    padding: 1
   },
   listContent: {
     paddingBottom: hp(4),
@@ -1136,7 +1205,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 'auto',
     borderRadius: wp(2.5),
     alignItems: 'center',
-    width:wp(35)
+    width: wp(35)
   },
   approveButtonDisabled: {
     backgroundColor: COLORS.textMuted,
@@ -1154,8 +1223,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(6),
     borderRadius: wp(2.5),
     alignItems: 'center',
-    width:wp(35),
-    marginHorizontal:'auto'
+    width: wp(35),
+    marginHorizontal: 'auto'
   },
   rejectButtonText: {
     color: '#fff',
@@ -1170,8 +1239,8 @@ const styles = StyleSheet.create({
     borderRadius: wp(2.5),
     alignItems: 'center',
     marginTop: hp(2),
-    width:wp(35),
-    marginHorizontal:'auto'
+    width: wp(35),
+    marginHorizontal: 'auto'
   },
   closeButtonText: {
     color: '#fff',
@@ -1346,6 +1415,61 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.6)',
+  },
+  // Alert Bottom Sheet Styles
+  alertContainer: {
+    alignItems: 'center',
+    // paddingVertical: hp(1),
+  },
+  alertIconCircle: {
+    width: wp(16),
+    height: wp(16),
+    borderRadius: wp(8),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: hp(1.5),
+  },
+  alertIconCircleSuccess: {
+    backgroundColor: COLORS.success + '20',
+  },
+  alertIconCircleError: {
+    backgroundColor: (COLORS.error || '#EF4444') + '20',
+  },
+  alertTitle: {
+    fontSize: rf(4.5),
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: hp(1),
+    fontFamily: TYPOGRAPHY.fontFamilyBold,
+    textAlign: 'center',
+  },
+  alertMessage: {
+    fontSize: rf(3.6),
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginBottom: hp(2.5),
+    paddingHorizontal: wp(4),
+    fontFamily: TYPOGRAPHY.fontFamilyRegular,
+    lineHeight: rf(5),
+  },
+  alertButton: {
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(12),
+    borderRadius: RADIUS.md,
+    minWidth: wp(30),
+    alignItems: 'center',
+  },
+  alertButtonSuccess: {
+    backgroundColor: COLORS.success,
+  },
+  alertButtonError: {
+    backgroundColor: COLORS.error || '#EF4444',
+  },
+  alertButtonText: {
+    color: '#fff',
+    fontSize: rf(3.8),
+    fontWeight: '700',
+    fontFamily: TYPOGRAPHY.fontFamilyBold,
   },
 });
 

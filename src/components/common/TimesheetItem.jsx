@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, TextInput, ScrollView } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { rf, wp, hp } from '../../utils/responsive';
+import { COLORS,SPACING,RADIUS } from '../../screens/styles/styles';
 
 const statusStyleMap = {
   Pending: { fg: '#92400e', bg: '#fef3c7' },
@@ -240,6 +241,21 @@ const TimesheetItem = ({ item, isActive, onToggle, onSave, onDelete, onDayHoursF
 
   // Delete is handled by the screen via a bottom sheet
 
+  const StatusBadge = ({ label = 'Pending' }) => {
+    const palette = {
+      Pending: { bg: COLORS.warningBg, color: COLORS.warning, border: COLORS.warning },
+      Approved: { bg: COLORS.successBg, color: COLORS.success, border: COLORS.success },
+      Rejected: { bg: COLORS.dangerBg, color: COLORS.danger, border: COLORS.danger },
+    };
+    const theme = palette[label] || palette.Pending;
+
+    return (
+      <View style={[styles.badge, { backgroundColor: theme.bg, borderColor: theme.border }]}>
+        <Text style={[styles.badgeText, { color: theme.color }]}>{label}</Text>
+      </View>
+    );
+  };
+
   return (
     <View style={[styles.container, isSelected && styles.selectedContainer]}>
       <TouchableOpacity 
@@ -284,7 +300,7 @@ const TimesheetItem = ({ item, isActive, onToggle, onSave, onDelete, onDayHoursF
           </View>
           <View style={styles.row}> 
             <Text style={styles.rowLabel}>Status</Text>
-            <Text style={[styles.statusPill, { color: statusStyles.fg, backgroundColor: statusStyles.bg }]}>{item.status}</Text>
+            <StatusBadge label={item.status || '-'} />
           </View>
 
           <View style={styles.separator} />
@@ -559,6 +575,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
+  },
+  badge: {
+    borderWidth: 1,
+    paddingVertical: hp(0.2),
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.md,
+  },
+  badgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    padding: 1
   },
   headerLeft: {
     flexDirection: 'row',

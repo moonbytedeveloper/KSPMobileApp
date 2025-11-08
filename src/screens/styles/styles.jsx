@@ -320,7 +320,7 @@ export const buttonStyles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    paddingVertical: hp(1.2),
+    paddingVertical: hp(1),
     paddingHorizontal: wp(3),
     borderRadius: wp(2),
     alignItems: 'center',

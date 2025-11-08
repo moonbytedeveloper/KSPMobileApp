@@ -121,24 +121,52 @@ const refreshClient = axios.create({
 });
 
 export async function refresh() {
+    console.log('🔄 [REFRESH FUNCTION] ==========================================');
+    console.log('🔄 [REFRESH FUNCTION] Manual refresh function called');
+    console.log('🔄 [REFRESH FUNCTION] Time:', new Date().toISOString());
+    
     const refreshToken = await getRefreshToken();
-    if (!refreshToken) throw new Error('No refresh token');
+    if (!refreshToken) {
+        console.log('❌ [REFRESH FUNCTION] No refresh token found!');
+        throw new Error('No refresh token');
+    }
 
-    console.log('Attempting token refresh...');
+    console.log('🔄 [REFRESH FUNCTION] Refresh token found');
+    console.log('🔄 [REFRESH FUNCTION] Refresh token (first 20 chars):', refreshToken.substring(0, 20) + '...');
+    console.log('🔄 [REFRESH FUNCTION] Calling refresh API...');
+    console.log('🔄 [REFRESH FUNCTION] URL:', `${BASE_URL}${PATHS.refresh}`);
+    console.log('🔄 [REFRESH FUNCTION] Payload:', { refreshToken: refreshToken.substring(0, 20) + '...' });
+    
     const resp = await refreshClient.post(PATHS.refresh, { refreshToken });
-    console.log('Refresh response:', resp.data);
+    
+    console.log('✅ [REFRESH FUNCTION] Refresh API Response Received!');
+    console.log('✅ [REFRESH FUNCTION] Status:', resp.status);
+    console.log('✅ [REFRESH FUNCTION] Full Response:', JSON.stringify(resp.data, null, 2));
 
     // Handle different possible response formats
     const responseData = resp.data?.Data || resp.data;
     const { AccessToken, RefreshToken } = responseData?.Token || responseData || {};
 
+    console.log('🔄 [REFRESH FUNCTION] Parsing response...');
+    console.log('🔄 [REFRESH FUNCTION] ResponseData:', JSON.stringify(responseData, null, 2));
+    console.log('🔄 [REFRESH FUNCTION] AccessToken found:', !!AccessToken);
+    console.log('🔄 [REFRESH FUNCTION] RefreshToken found:', !!RefreshToken);
+
     if (!AccessToken || !RefreshToken) {
-        console.log('Invalid refresh response - missing tokens');
+        console.log('❌ [REFRESH FUNCTION] Invalid refresh response - missing tokens');
+        console.log('❌ [REFRESH FUNCTION] AccessToken:', AccessToken ? 'Present' : 'Missing');
+        console.log('❌ [REFRESH FUNCTION] RefreshToken:', RefreshToken ? 'Present' : 'Missing');
         throw new Error('Invalid refresh response');
     }
 
+    console.log('✅ [REFRESH FUNCTION] Tokens extracted successfully!');
+    console.log('✅ [REFRESH FUNCTION] New AccessToken (first 20 chars):', AccessToken.substring(0, 20) + '...');
+    console.log('✅ [REFRESH FUNCTION] New RefreshToken (first 20 chars):', RefreshToken.substring(0, 20) + '...');
+
     await setTokens({ accessToken: AccessToken, refreshToken: RefreshToken });
-    console.log('Tokens refreshed successfully');
+    console.log('✅ [REFRESH FUNCTION] Tokens saved to storage successfully!');
+    console.log('✅ [REFRESH FUNCTION] Refresh completed successfully!');
+    console.log('✅ [REFRESH FUNCTION] ==========================================');
     return { accessToken: AccessToken, refreshToken: RefreshToken };
 }
 

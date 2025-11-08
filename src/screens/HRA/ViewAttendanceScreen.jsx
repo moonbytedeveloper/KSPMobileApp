@@ -4,10 +4,33 @@ import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import AppHeader from '../../components/common/AppHeader';
 import { wp, hp, rf, safeAreaTop } from '../../utils/responsive';
-import { buttonStyles, COLORS, TYPOGRAPHY } from '../styles/styles'
+import { buttonStyles, COLORS, TYPOGRAPHY ,SPACING,RADIUS} from '../styles/styles'
 import { getHRAApproveLeaves, approveOrRejectLeave } from '../../api/authServices';
 import { getUUID, getCMPUUID, getENVUUID, getReportingDesignation } from '../../api/tokenStorage';
 const LeaveCard = ({ leave, onActionPress, getStatusColor, getStatusBgColor }) => {
+  
+const StatusBadge = ({ label = 'Pending' }) => {
+  const palette = {
+    Pending: { bg: COLORS.warningBg, color: COLORS.warning, border: COLORS.warning },
+    'Not Updated': { bg: COLORS.divider, color: 'gray', border: 'gray' },
+    Submitted: { bg: COLORS.infoBg, color: COLORS.info, border: COLORS.info },
+    Approved: { bg: COLORS.successBg, color: COLORS.success, border: COLORS.success },
+    Closed: { bg: COLORS.dangerBg, color: COLORS.danger, border: COLORS.danger },
+  };
+  
+  const theme = palette[label] || palette.Pending;
+
+  return (
+    <View style={[{ borderWidth: 1,paddingVertical: hp(0.2),paddingHorizontal: SPACING.sm,
+      borderRadius: RADIUS.md,}, { backgroundColor: theme.bg, borderColor: theme.border }]}> 
+      <Text style={[{ fontSize: 9,
+      fontWeight: '600',
+      padding: 1 }, { color: theme.color }]}>{label}</Text>
+    </View>
+  );
+ 
+};
+
   return (
     <View style={styles.leaveCard}>
       <Text style={styles.sectionTitle}>Leave Request #{leave.srNo}</Text>
@@ -28,12 +51,7 @@ const LeaveCard = ({ leave, onActionPress, getStatusColor, getStatusBgColor }) =
 
       <View style={styles.fieldRow}>
         <Text style={styles.fieldLabel}>Status</Text>
-        <Text style={[styles.statusBadge, { 
-          color: getStatusColor(leave.status),
-          backgroundColor: getStatusBgColor(leave.status)
-        }]}>
-          {leave.status}
-        </Text>
+        <StatusBadge label={leave.status} />
       </View>
 
       <View style={styles.divider} />
@@ -43,6 +61,7 @@ const LeaveCard = ({ leave, onActionPress, getStatusColor, getStatusBgColor }) =
       </TouchableOpacity>
     </View>
   );
+
 };
 
 const ViewAttendanceScreen = ({ navigation }) => {
@@ -529,16 +548,15 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1.2),
     paddingHorizontal: wp(2.5),
     borderRadius: wp(2.5),
-    borderWidth: 1,
-    borderColor: COLORS.success,
+    backgroundColor: COLORS.primary,
     marginRight: wp(1),
     alignItems: 'center',
     justifyContent: 'center',
   },
   buttonPositiveText: {
-    color: COLORS.success,
+    color: COLORS.bg,
     fontSize: rf(3),
-    fontWeight: '600',
+    fontWeight: '700',
     fontFamily: TYPOGRAPHY.fontFamilyBold,
     textAlign: 'center',
   },
@@ -547,14 +565,13 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1.2),
     paddingHorizontal: wp(2.5),
     borderRadius: wp(2.5),
-    borderWidth: 1,
-    borderColor: COLORS.danger,
+    backgroundColor: COLORS.text,
     marginLeft: wp(1),
     alignItems: 'center',
     justifyContent: 'center',
   },
   buttonNegativeText: {
-    color: COLORS.danger,
+    color: COLORS.bg,
     fontSize: rf(3),
     fontWeight: '600',
     fontFamily: TYPOGRAPHY.fontFamilyBold,

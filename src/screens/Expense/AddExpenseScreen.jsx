@@ -2020,7 +2020,7 @@ const styles = StyleSheet.create({
   },
   submitBtn: {
     backgroundColor: COLORS.primary,
-    paddingVertical: wp(1.2),
+    paddingVertical: wp(2.2),
     paddingHorizontal: wp(6),
     borderRadius: wp(2),
     flex: 1,
@@ -2035,7 +2035,7 @@ const styles = StyleSheet.create({
   },
   cancelBtn: {
     backgroundColor: '#374151',
-    paddingVertical: wp(1.2),
+    paddingVertical: wp(2.2),
     paddingHorizontal: wp(6),
     borderRadius: wp(2),
     flex: 1,

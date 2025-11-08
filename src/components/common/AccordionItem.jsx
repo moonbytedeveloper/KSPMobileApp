@@ -24,7 +24,7 @@ const AccordionItem = ({
   status,
 }) => {
   // Defer delete confirmation to the screen-level bottom sheet
-  const StatusBadge = ({ label }) => {
+  const StatusBadge = ({ label= 'Pending' }) => {
     const palette = {
       Pending: { bg: COLORS.warningBg, color: COLORS.warning, border: COLORS.warning },
       Approved: { bg: COLORS.successBg, color: COLORS.success, border: COLORS.success },
@@ -71,12 +71,12 @@ const AccordionItem = ({
         <View style={styles.rightSideContainer}>
           <View style={{ marginEnd:wp(4) }}>
             <Text style={styles.summaryLabel}>{headerRightLabel}</Text>
-            <StatusBadge label={item.status} />
+            <StatusBadge label={item?.status|| item?.ProjectStatus|| 'Pending'} />
           </View>
           <View style={{ position: 'absolute', right: 0, top: 0, }}>
             <Svg
-              width={rf(4)}
-              height={rf(4)}
+              width={rf(3)}
+              height={rf(3)}
               viewBox="0 0 16 16"
               fill="#64748b"
               style={[styles.toggleIcon, { transform: [{ rotate: isActive ? '180deg' : '0deg' }] }]}
@@ -114,7 +114,7 @@ const AccordionItem = ({
               </View>
               <View style={styles.cardRow}>
                 <Text style={styles.cardLabel}>Status</Text>
-                <StatusBadge label={item.status} />
+                <StatusBadge label={item?.status|| 'Pending'} />
               </View>
             </>
           )}

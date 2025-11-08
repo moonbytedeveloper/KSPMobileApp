@@ -1345,7 +1345,6 @@ const styles = StyleSheet.create({
   sheetContent: {
     backgroundColor: COLORS.bg,
     paddingHorizontal: wp(6),
-    paddingBottom: hp(2.5),
     borderTopLeftRadius: wp(6),
     borderTopRightRadius: wp(6),
   },
@@ -1414,7 +1413,6 @@ const styles = StyleSheet.create({
   },
   timesheetList: {
     maxHeight: hp(35),
-    marginBottom: hp(2),
   },
   timesheetItem: {
     marginBottom: hp(2),

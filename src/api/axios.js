@@ -179,6 +179,13 @@ api.interceptors.response.use(
 			return Promise.reject(error);
 		}
 
+		// 🔄 401 Unauthorized detected - Token refresh will be triggered
+		console.log('🔄 [TOKEN REFRESH] ==========================================');
+		console.log('🔄 [TOKEN REFRESH] 401 Unauthorized detected!');
+		console.log('🔄 [TOKEN REFRESH] Original Request URL:', `${originalRequest?.baseURL || BASE_URL}${originalRequest?.url || ''}`);
+		console.log('🔄 [TOKEN REFRESH] Time:', new Date().toISOString());
+		console.log('🔄 [TOKEN REFRESH] ==========================================');
+
 		// Prevent refresh for auth-related endpoints (login/forgot/verify/reset/KSP)
         const urlPath = originalRequest?.url || '';
         const authPaths = [PATHS.login, PATHS.forgotPassword, PATHS.verifyCode, PATHS.resetPassword, PATHS.kspAuth].filter(Boolean);
@@ -196,6 +203,7 @@ api.interceptors.response.use(
 
 		if (originalRequest._retry) {
 			// already retried, reject
+			console.log('🔄 [TOKEN REFRESH] Request already retried, rejecting...');
 			return Promise.reject(error);
 		}
 
@@ -203,10 +211,12 @@ api.interceptors.response.use(
 
 		if (isRefreshing) {
 			// queue the request while refresh is in progress
+			console.log('🔄 [TOKEN REFRESH] Refresh already in progress, queuing request...');
 			return new Promise(function (resolve, reject) {
 				failedQueue.push({ resolve, reject });
 			})
 				.then(token => {
+					console.log('🔄 [TOKEN REFRESH] Queued request resolved with new token');
 					originalRequest.headers.Authorization = 'Bearer ' + token;
 					return api(originalRequest);
 				})
@@ -214,45 +224,91 @@ api.interceptors.response.use(
 		}
 
 		isRefreshing = true;
+		console.log('🔄 [TOKEN REFRESH] Starting token refresh process...');
 
 		try {
 			const refreshToken = await getRefreshToken();
 			if (!refreshToken) {
+				console.log('❌ [TOKEN REFRESH] No refresh token found!');
 				// No token to refresh with; clear and reject original error
 				await clearTokens();
 				return Promise.reject(error);
 			}
 
+			console.log('🔄 [TOKEN REFRESH] Refresh token found, calling refresh API...');
+			console.log('🔄 [TOKEN REFRESH] Refresh token (first 20 chars):', refreshToken.substring(0, 20) + '...');
+
 			// Call refresh endpoint
-            const refreshPath = PATHS.refresh;
+            const refreshPath = PATHS.refresh || '/api/CompanySetup/auth/refresh';
+            const refreshUrl = `${BASE_URL}${refreshPath}`;
+            
+            console.log('🔄 [TOKEN REFRESH] ==========================================');
+            console.log('🔄 [TOKEN REFRESH] Calling Refresh API...');
+            console.log('🔄 [TOKEN REFRESH] URL:', refreshUrl);
+            console.log('🔄 [TOKEN REFRESH] Method: POST');
+            console.log('🔄 [TOKEN REFRESH] Payload:', { refreshToken: refreshToken.substring(0, 20) + '...' });
+            console.log('🔄 [TOKEN REFRESH] Time:', new Date().toISOString());
+            console.log('🔄 [TOKEN REFRESH] ==========================================');
+            
             const resp = await refreshClient.post(refreshPath, { refreshToken });
-			console.log('Refresh response in interceptor:', resp.data);
+			
+			console.log('✅ [TOKEN REFRESH] ==========================================');
+			console.log('✅ [TOKEN REFRESH] Refresh API Response Received!');
+			console.log('✅ [TOKEN REFRESH] Status:', resp.status);
+			console.log('✅ [TOKEN REFRESH] Response Data:', JSON.stringify(resp.data, null, 2));
+			console.log('✅ [TOKEN REFRESH] Time:', new Date().toISOString());
+			console.log('✅ [TOKEN REFRESH] ==========================================');
 
 			// Handle different possible response formats
 			const responseData = resp.data?.Data || resp.data;
 			const { AccessToken, RefreshToken } = responseData?.Token || responseData || {};
 			
+			console.log('🔄 [TOKEN REFRESH] Parsing response...');
+			console.log('🔄 [TOKEN REFRESH] ResponseData:', JSON.stringify(responseData, null, 2));
+			console.log('🔄 [TOKEN REFRESH] AccessToken found:', !!AccessToken);
+			console.log('🔄 [TOKEN REFRESH] RefreshToken found:', !!RefreshToken);
+			
 			if (!AccessToken || !RefreshToken) {
+				console.log('❌ [TOKEN REFRESH] Invalid refresh response - missing tokens');
+				console.log('❌ [TOKEN REFRESH] AccessToken:', AccessToken ? 'Present' : 'Missing');
+				console.log('❌ [TOKEN REFRESH] RefreshToken:', RefreshToken ? 'Present' : 'Missing');
 				throw new Error('Invalid refresh response - missing tokens');
 			}
 
+			console.log('✅ [TOKEN REFRESH] Tokens extracted successfully!');
+			console.log('✅ [TOKEN REFRESH] New AccessToken (first 20 chars):', AccessToken.substring(0, 20) + '...');
+			console.log('✅ [TOKEN REFRESH] New RefreshToken (first 20 chars):', RefreshToken.substring(0, 20) + '...');
+
 			// persist tokens
 			await setTokens({ accessToken: AccessToken, refreshToken: RefreshToken });
+			console.log('✅ [TOKEN REFRESH] Tokens saved to storage successfully!');
 
 			// replay queued requests
+			console.log('🔄 [TOKEN REFRESH] Processing queued requests:', failedQueue.length);
 			processQueue(null, AccessToken);
 
 			// update header & retry original
 			originalRequest.headers.Authorization = 'Bearer ' + AccessToken;
+			console.log('✅ [TOKEN REFRESH] Retrying original request with new token...');
+			console.log('✅ [TOKEN REFRESH] Original Request URL:', `${originalRequest?.baseURL || BASE_URL}${originalRequest?.url || ''}`);
 			return api(originalRequest);
 		} catch (err) {
+			console.log('❌ [TOKEN REFRESH] ==========================================');
+			console.log('❌ [TOKEN REFRESH] Refresh API Failed!');
+			console.log('❌ [TOKEN REFRESH] Error:', err.message);
+			console.log('❌ [TOKEN REFRESH] Error Details:', JSON.stringify(err.response?.data || err, null, 2));
+			console.log('❌ [TOKEN REFRESH] Status:', err.response?.status);
+			console.log('❌ [TOKEN REFRESH] Time:', new Date().toISOString());
+			console.log('❌ [TOKEN REFRESH] ==========================================');
+			
 			processQueue(err, null);
 			// refresh failed -> clear tokens & force logout flow in your app
 			await handleSessionExpired();
-			console.log('Refresh failed -> clear tokens & force logout flow in your app', err);
+			console.log('❌ [TOKEN REFRESH] Refresh failed -> cleared tokens & forcing logout');
 			return Promise.reject(err);
 		} finally {
 			isRefreshing = false;
+			console.log('🔄 [TOKEN REFRESH] Refresh process completed. isRefreshing = false');
 		}
 	}
 );
