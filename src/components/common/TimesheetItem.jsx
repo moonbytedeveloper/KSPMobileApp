@@ -142,6 +142,29 @@ const TimesheetItem = ({ item, isActive, onToggle, onSave, onDelete, onDayHoursF
   const to = parseDateSafe(item.toDate);
 
   const daysInRange = useMemo(() => {
+    const isApprovedOrSubmitted = timesheetStatus === 'Approved' || timesheetStatus === 'Submitted';
+    
+    // For approved/submitted timesheets, use actual dates from the data
+    if (isApprovedOrSubmitted && item.lines && item.lines.length > 0) {
+      const uniqueDates = new Set();
+      item.lines.forEach(line => {
+        const lineDate = line.Date_of_Task || line.Date;
+        if (lineDate) {
+          const parsedDate = parseDateSafe(lineDate);
+          if (parsedDate) {
+            uniqueDates.add(formatDateKey(parsedDate));
+          }
+        }
+      });
+      
+      // Convert back to Date objects and sort
+      return Array.from(uniqueDates)
+        .map(dateKey => parseDateSafe(dateKey))
+        .filter(date => date !== null)
+        .sort((a, b) => a - b);
+    }
+    
+    // For pending/rejected timesheets, use the date range
     if (!from || !to) return [];
     const list = [];
     const cur = new Date(from);
@@ -151,7 +174,7 @@ const TimesheetItem = ({ item, isActive, onToggle, onSave, onDelete, onDayHoursF
       if (list.length > 31) break; // safety guard
     }
     return list;
-  }, [from, to]);
+  }, [from, to, timesheetStatus, item.lines]);
 
   const initialDayMap = useMemo(() => {
     const base = {};
@@ -165,21 +188,30 @@ const TimesheetItem = ({ item, isActive, onToggle, onSave, onDelete, onDayHoursF
   // Initialize perDayHours with line data for current date range
   const initializePerDayHours = useMemo(() => {
     const base = { ...initialDayMap };
-    if (item.lines && item.lines.length > 0 && from && to) {
+    if (item.lines && item.lines.length > 0) {
+      // For approved/submitted timesheets, show all data regardless of date range
+      const isApprovedOrSubmitted = timesheetStatus === 'Approved' || timesheetStatus === 'Submitted';
+      
       item.lines.forEach(line => {
         const lineDate = line.Date_of_Task || line.Date;
         if (lineDate) {
           const dateKey = normalizeDateKey(lineDate);
           if (!dateKey) return;
           const lineDateObj = parseDateSafe(dateKey);
-          if (line.Hours && line.Hours !== '00:00' && lineDateObj && lineDateObj >= from && lineDateObj <= to) {
+          
+          // For approved/submitted timesheets, ignore date range filter
+          const shouldInclude = isApprovedOrSubmitted 
+            ? (line.Hours && line.Hours !== '00:00' && lineDateObj)
+            : (line.Hours && line.Hours !== '00:00' && lineDateObj && from && to && lineDateObj >= from && lineDateObj <= to);
+            
+          if (shouldInclude) {
             base[dateKey] = line.Hours;
           }
         }
       });
     }
     return base;
-  }, [initialDayMap, item.lines, from, to]);
+  }, [initialDayMap, item.lines, from, to, timesheetStatus]);
 
   const [perDayHours, setPerDayHours] = useState(initializePerDayHours);
   const computedTotal = useMemo(() => sumHhMm(perDayHours), [perDayHours]);
@@ -691,7 +723,7 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     marginTop: hp(1.5),
     marginHorizontal: -wp(1.2),
   },
@@ -707,20 +739,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonPositive: {
-    flex: 1,
     paddingVertical: hp(1.2),
-    paddingHorizontal: wp(2.5),
+    paddingHorizontal: wp(3),
     borderRadius: wp(2.5),
     borderWidth: 1,
     borderColor: '#07b807ff',
     marginHorizontal: wp(1),
     alignItems: 'center',
     justifyContent: 'center',
+    minWidth: wp(20),
+    maxWidth: wp(30),
   },
   buttonNegative: {
     flex: 1,
     paddingVertical: hp(1.2),
-    paddingHorizontal: wp(2.5),
+    paddingHorizontal: wp(2.2),
     borderRadius: wp(2.5),
     borderWidth: 1,
     borderColor: '#FF0000',

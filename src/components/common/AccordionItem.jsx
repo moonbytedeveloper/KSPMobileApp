@@ -248,7 +248,8 @@ const styles = StyleSheet.create({
   },
   actionButtonContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    // justifyContent: 'space-between',
+    justifyContent: 'center',
     marginTop: hp(1.5),
     marginHorizontal: -wp(1.2),
   },
@@ -264,15 +265,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   actionButton2: {
-    flex: 1,
+    // flex: 1,
     paddingVertical: hp(1.2),
-    paddingHorizontal: wp(2.5),
+    // paddingHorizontal: wp(2.5),
+    paddingHorizontal: wp(3),
     borderRadius: wp(2.5),
     borderWidth: 1,
     borderColor: COLORS.success,
     marginHorizontal: wp(1),
     alignItems: 'center',
     justifyContent: 'center',
+    // added min and max width for consistency
+    minWidth: wp(20),
+    maxWidth: wp(30),
   },
   actionButton3: {
     flex: 1,
