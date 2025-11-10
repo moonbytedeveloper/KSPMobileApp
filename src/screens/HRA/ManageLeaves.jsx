@@ -12,7 +12,6 @@ import { getCMPUUID, getENVUUID } from '../../api/tokenStorage';
 import Loader from '../../components/common/Loader';
 
 
-
 const StatusBadge = ({ label = 'Pending' }) => {
   const palette = {
     Pending: { bg: COLORS.warningBg, color: COLORS.warning, border: COLORS.warning },
