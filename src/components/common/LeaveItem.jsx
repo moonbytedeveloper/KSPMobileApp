@@ -95,6 +95,7 @@ const LeaveItem = ({ item, isActive, onToggle, onView, onEdit, onDelete, showVie
           <Text style={styles.summaryLabel}>Status</Text>
           <StatusBadge  label={item.status} />
           </View>
+            <Icon name={isActive ? 'expand-less' : 'expand-more'} size={rf(4.2)} color={COLORS.textMuted} /> 
         </View>
       </TouchableOpacity>
 
