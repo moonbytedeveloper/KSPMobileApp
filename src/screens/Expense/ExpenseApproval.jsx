@@ -24,17 +24,15 @@ const pageSizes = [10, 25, 50, 100];
 
 // Reusable component for displaying expense data
 const ExpenseDataComponent = ({ data, onActionPress, getStatusColor, getStatusBgColor, showActions = true, showExpenseDetails = true }) => {
-    const [expandedItemId, setExpandedItemId] = useState(null);
-
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.dataContent}
     >
       {data.map((item, index) => {
-    const expanded = expandedItemId === (item.id || index);
-        const toggle = () => setExpandedItemId(expanded ? null : (item.id || index));
-        const statusColor = getStatusColor(item .status || '');
+        const [expanded, setExpanded] = useState(false);
+        const toggle = () => setExpanded((s) => !s);
+        const statusColor = getStatusColor(item.status || '');
         const statusBg = getStatusBgColor(item.status || '');
         const title = item.expenseName || item.projectName || `Expense #${item.srNo}`;
         return (
@@ -625,20 +623,11 @@ const ExpenseApproval = ({ navigation }) => {
 
   // Debug logging
   console.log('Pagination Debug:', {
-    activeTab,
     totalRecords,
     pageSize,
     totalPages,
     currentPage,
-    shouldShowPagination: totalRecords > pageSize,
-    apiDataLengths: {
-      apiExpenseToApproveData: apiExpenseToApproveData.length,
-      apiApprovedByMeData: apiApprovedByMeData.length,
-      apiMyApprovedExpensesData: apiMyApprovedExpensesData.length,
-      apiMyRejectedExpensesData: apiMyRejectedExpensesData.length,
-      apiPendingApprovalsData: apiPendingApprovalsData.length,
-    },
-    filteredDataLength: filteredData.length
+    shouldShowPagination: totalRecords > pageSize
   });
   const pageItems = useMemo(() => {
     if (totalPages <= 1) return [];
@@ -1215,21 +1204,9 @@ const ExpenseApproval = ({ navigation }) => {
               </View>
             ) : (
               <>
-                 {(() => {
-                  // Check if we're using API data (server-side pagination) or static data (client-side pagination)
-                  const isApiData = (activeTab === 'expenseToApprove' && apiExpenseToApproveData.length > 0) ||
-                                   (activeTab === 'approvedByMe' && apiApprovedByMeData.length > 0) ||
-                                   (activeTab === 'myApprovalExpense' && apiMyApprovedExpensesData.length > 0) ||
-                                   (activeTab === 'myRejectedExpense' && apiMyRejectedExpensesData.length > 0) ||
-                                   (activeTab === 'pendingApproval' && apiPendingApprovalsData.length > 0);
-                  
-                  // For API data, don't slice since API already returns paginated data
-                  // For static data, use client-side slicing
-                  const dataToRender = isApiData ? filteredData : filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
-                  
-                  console.log(`🎬 [Data Render] Tab: ${activeTab}, IsAPI: ${isApiData}, Total: ${filteredData.length}, Rendering: ${dataToRender.length}`);
-                  
-                  return Array.isArray(dataToRender) && dataToRender.length > 0 && dataToRender.map(expense => (
+                {Array.isArray(filteredData) && filteredData
+                  .slice(currentPage * pageSize, (currentPage + 1) * pageSize)
+                  .map(expense => (
                     <ExpenseDataComponent
                       key={expense.id}
                       data={[expense]}
@@ -1239,8 +1216,7 @@ const ExpenseApproval = ({ navigation }) => {
                       showActions={activeTab === 'expenseToApprove'}
                       showExpenseDetails={activeTab !== 'myApprovalExpense' && activeTab !== 'myRejectedExpense'}
                     />
-                 ));
-                })()}
+                  ))}
 
                 {(!Array.isArray(filteredData) || filteredData.length === 0) && (
                   <View style={styles.emptyBox}>
@@ -1907,7 +1883,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#eee',
     padding: SPACING.md,
-    marginBottom: hp(1),
+    marginBottom: hp(-3),
     ...SHADOW.elevation2,
   },
   tsRowHeader: {
