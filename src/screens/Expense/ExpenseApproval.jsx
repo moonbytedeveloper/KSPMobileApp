@@ -8,7 +8,7 @@ import Dropdown from '../../components/common/Dropdown';
 import { wp, hp, rf, safeAreaTop } from '../../utils/responsive';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, text, layout, SHADOW, buttonStyles } from '../styles/styles';
 import { DrawerActions } from '@react-navigation/native';
-import { getApprovedByMeExpenses, getSoleApprovalData, fetchExpenseLinesByHeader, getApprovalDetails, processApprovalOrRejection, getMyApprovedExpenses, getMyRejectedExpenses, getPendingApprovals, fetchUserProjects, getEmployees } from '../../api/authServices';
+import { getApprovedByMeExpenses, getSoleApprovalData, fetchExpenseLinesByHeader, getApprovalDetails, processApprovalOrRejection, getMyApprovedExpenses, getMyRejectedExpenses, getPendingApprovals, fetchUserProjects, getEmployees, getExpenseSlip } from '../../api/authServices';
 
 const sampleProjects = [
   { id: 'p1', name: 'Project Alpha', tasks: ['Design', 'Development', 'Testing'] },
@@ -24,15 +24,17 @@ const pageSizes = [10, 25, 50, 100];
 
 // Reusable component for displaying expense data
 const ExpenseDataComponent = ({ data, onActionPress, getStatusColor, getStatusBgColor, showActions = true, showExpenseDetails = true }) => {
+    const [expandedItemId, setExpandedItemId] = useState(null);
+
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.dataContent}
     >
       {data.map((item, index) => {
-        const [expanded, setExpanded] = useState(false);
-        const toggle = () => setExpanded((s) => !s);
-        const statusColor = getStatusColor(item.status || '');
+    const expanded = expandedItemId === (item.id || index);
+        const toggle = () => setExpandedItemId(expanded ? null : (item.id || index));
+        const statusColor = getStatusColor(item .status || '');
         const statusBg = getStatusBgColor(item.status || '');
         const title = item.expenseName || item.projectName || `Expense #${item.srNo}`;
         return (
@@ -133,7 +135,8 @@ const ExpenseApproval = ({ navigation }) => {
   const [remark, setRemark] = useState('');
   const [reason, setReason] = useState('');
   const [approveMode, setApproveMode] = useState('form'); // 'form' | 'success'
-  
+  const [printing, setPrinting] = useState(false);
+
   // API state management
   const [apiApprovedByMeData, setApiApprovedByMeData] = useState([]);
   const [apiExpenseToApproveData, setApiExpenseToApproveData] = useState([]);
@@ -142,7 +145,7 @@ const ExpenseApproval = ({ navigation }) => {
   const [apiPendingApprovalsData, setApiPendingApprovalsData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
+
   // Projects and employees state management
   const [projects, setProjects] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -150,17 +153,17 @@ const ExpenseApproval = ({ navigation }) => {
   const [employeesLoading, setEmployeesLoading] = useState(false);
   const [projectsError, setProjectsError] = useState(null);
   const [employeesError, setEmployeesError] = useState(null);
-  
+
   // Expense details state management
   const [expenseDetailsData, setExpenseDetailsData] = useState(null);
   const [expenseDetailsLoading, setExpenseDetailsLoading] = useState(false);
   const [expenseDetailsError, setExpenseDetailsError] = useState(null);
-  
+
   // Approval details state management
   const [approvalDetailsData, setApprovalDetailsData] = useState(null);
   const [approvalDetailsLoading, setApprovalDetailsLoading] = useState(false);
   const [approvalDetailsError, setApprovalDetailsError] = useState(null);
-  
+
   // Approval/rejection process state management
   const [processingApproval, setProcessingApproval] = useState(false);
   const [processingRejection, setProcessingRejection] = useState(false);
@@ -190,15 +193,15 @@ const ExpenseApproval = ({ navigation }) => {
         if (/network error/i.test(err.message)) return 'Network error. Check your connection and retry.';
         if (/timeout/i.test(err.message) || err?.code === 'ECONNABORTED') return 'Request timed out. Please try again.';
       }
-    } catch (_) {}
+    } catch (_) { }
     return fallback;
   }, []);
-  
+
   const expenseDetailsSheetRef = useRef(null);
   const approvalDetailsSheetRef = useRef(null);
   const approveSheetRef = useRef(null);
   const rejectSheetRef = useRef(null);
-  
+
   const snapPoints = useMemo(() => [hp(80)], []);
 
   // API call function for approved by me expenses
@@ -209,11 +212,11 @@ const ExpenseApproval = ({ navigation }) => {
       const start = page * size;
       const response = await getApprovedByMeExpenses(start, size);
       console.log('API Response:', response);
-      
+
       // Transform API response to match component structure
       const transformedData = transformApiDataToComponentFormat(response);
       setApiApprovedByMeData(transformedData);
-      
+
       // Set total records for pagination
       const totalFromResponse = response?.Data?.recordsTotal || response?.Data?.TotalCount || response?.TotalCount || transformedData.length;
       console.log('API Response Debug:', {
@@ -243,11 +246,11 @@ const ExpenseApproval = ({ navigation }) => {
         length: size
       });
       console.log('Sole Approval Data API Response:', response);
-      
+
       // Transform API response to match component structure
       const transformedData = transformApiDataToComponentFormat(response);
       setApiExpenseToApproveData(transformedData);
-      
+
       // Set total records for pagination
       const totalFromResponse = response?.Data?.recordsTotal || response?.Data?.TotalCount || response?.TotalCount || transformedData.length;
       console.log('API Response Debug:', {
@@ -277,11 +280,11 @@ const ExpenseApproval = ({ navigation }) => {
         length: size
       });
       console.log('My Approved Expenses API Response:', response);
-      
+
       // Transform API response to match component structure
       const transformedData = transformApiDataToComponentFormat(response);
       setApiMyApprovedExpensesData(transformedData);
-      
+
       // Set total records for pagination
       const totalFromResponse = response?.Data?.recordsTotal || response?.Data?.TotalCount || response?.TotalCount || transformedData.length;
       console.log('API Response Debug:', {
@@ -311,11 +314,11 @@ const ExpenseApproval = ({ navigation }) => {
         length: size
       });
       console.log('My Rejected Expenses API Response:', response);
-      
+
       // Transform API response to match component structure
       const transformedData = transformApiDataToComponentFormat(response);
       setApiMyRejectedExpensesData(transformedData);
-      
+
       // Set total records for pagination
       const totalFromResponse = response?.Data?.recordsTotal || response?.Data?.TotalCount || response?.TotalCount || transformedData.length;
       console.log('API Response Debug:', {
@@ -347,11 +350,11 @@ const ExpenseApproval = ({ navigation }) => {
         length: size
       });
       console.log('Pending Approvals API Response:', response);
-      
+
       // Transform API response to match component structure
       const transformedData = transformApiDataToComponentFormat(response);
       setApiPendingApprovalsData(transformedData);
-      
+
       // Set total records for pagination
       const totalFromResponse = response?.Data?.recordsTotal || response?.Data?.TotalCount || response?.TotalCount || transformedData.length;
       console.log('API Response Debug:', {
@@ -372,24 +375,31 @@ const ExpenseApproval = ({ navigation }) => {
 
   // Transform API data to match component structure
   const transformApiDataToComponentFormat = (apiData) => {
-    // Handle different API response structures
+    // Defensive logging + handle different API response structures
+    try {
+      const topKeys = apiData && typeof apiData === 'object' ? Object.keys(apiData) : [];
+      const dataKeys = apiData?.Data && typeof apiData.Data === 'object' ? Object.keys(apiData.Data) : [];
+      console.log('transformApiDataToComponentFormat keys:', { topKeys, dataKeys });
+    } catch (_) {}
+
+    const tryArrays = [];
+    tryArrays.push(apiData?.Data?.data);
+    tryArrays.push(apiData?.Data); // sometimes Data itself is array
+    tryArrays.push(apiData?.Data?.ExpenseToApprovalData);
+    tryArrays.push(apiData?.Data?.expensetoapprovaldata);
+    tryArrays.push(apiData?.data);
+    tryArrays.push(apiData); // raw array
+
     let dataArray = [];
-    
-    if (apiData && apiData.Data && Array.isArray(apiData.Data.data)) {
-      // For sole approval data API response
-      dataArray = apiData.Data.data;
-    } else if (apiData && Array.isArray(apiData)) {
-      // For direct array response
-      dataArray = apiData;
-    } else if (apiData && apiData.data && Array.isArray(apiData.data)) {
-      // For other API responses
-      dataArray = apiData.data;
+    for (const candidate of tryArrays) {
+      if (Array.isArray(candidate)) { dataArray = candidate; break; }
     }
-    
-    if (!dataArray || dataArray.length === 0) {
+
+    if (!Array.isArray(dataArray) || dataArray.length === 0) {
+      console.warn('transformApiDataToComponentFormat: no list found, returning []');
       return [];
     }
-    
+
     return dataArray.map((item, index) => ({
       id: item.headeruuid || item.headerUuid || item.UUID || item.id || index + 1,
       srNo: item.srno ? String(item.srno).padStart(3, '0') : String(index + 1).padStart(3, '0'),
@@ -429,15 +439,15 @@ const ExpenseApproval = ({ navigation }) => {
     try {
       setExpenseDetailsLoading(true);
       setExpenseDetailsError(null);
-      
+
       const response = await fetchExpenseLinesByHeader({ headerUuid });
       console.log('Expense Details API Response:', response);
-      
+
       // Handle the response structure similar to AddExpenseScreen
       const dataRoot = response?.Data ?? response?.data ?? response;
       let lines = [];
       let headerData = null;
-      
+
       if (dataRoot && typeof dataRoot === 'object') {
         // Check for the new structure with Header and Lines
         if (Array.isArray(dataRoot.Lines)) {
@@ -455,7 +465,7 @@ const ExpenseApproval = ({ navigation }) => {
           lines = candidateArrays.length ? candidateArrays[0] : [];
         }
       }
-      
+
       // Transform the data to match the expected format
       const transformedData = {
         header: headerData,
@@ -466,7 +476,7 @@ const ExpenseApproval = ({ navigation }) => {
           const totalCost = parseFloat(String(line?.TotalCost ?? '').replace(/,/g, '.')) || 0;
           const billAmount = parseFloat(String(line?.BillAmount ?? '').replace(/,/g, '.')) || 0;
           const doc = line?.Document_Date || line?.DocumentDate || '';
-          
+
           return {
             id: line?.UUID || line?.Uuid || line?.uuid || line?.Id || line?.id || index + 1,
             quantity: qty,
@@ -484,7 +494,7 @@ const ExpenseApproval = ({ navigation }) => {
           };
         })
       };
-      
+
       setExpenseDetailsData(transformedData);
     } catch (err) {
       console.error('Error fetching expense details:', err);
@@ -504,14 +514,14 @@ const ExpenseApproval = ({ navigation }) => {
     try {
       setApprovalDetailsLoading(true);
       setApprovalDetailsError(null);
-      
+
       const response = await getApprovalDetails({ headeruuid: headerUuid });
       console.log('Approval Details API Response:', response);
-      
+
       // Transform the response data - handle array format
       const dataArray = response?.Data || [];
       const latestEntry = dataArray.length > 0 ? dataArray[0] : {};
-      
+
       const transformedData = {
         actionDate: latestEntry?.actiondate || 'N/A',
         enteredBy: latestEntry?.enteredby || 'N/A',
@@ -528,34 +538,34 @@ const ExpenseApproval = ({ navigation }) => {
         remarksByApproval: latestEntry?.remarksbyapproval || 'N/A',
         allHistory: dataArray // Keep full history for potential future use
       };
-      
+
       setApprovalDetailsData(transformedData);
     } catch (err) {
-      try { console.log(err?.response?.status, '4001'); } catch (_) {}
+      try { console.log(err?.response?.status, '4001'); } catch (_) { }
       setApprovalDetailsError(getReadableError(err, 'Failed to fetch approval details'));
     } finally {
       setApprovalDetailsLoading(false);
     }
   };
-   // console.log(approvalDetailsError,'approvalDetailsError')
+  // console.log(approvalDetailsError,'approvalDetailsError')
   // Frontend search filter function
   const filterDataBySearch = (data, searchTerm) => {
     // Ensure data is an array
     if (!Array.isArray(data)) {
       return [];
     }
-    
+
     if (!searchTerm || searchTerm.trim() === '') {
       return data;
     }
-    
+
     const searchLower = searchTerm.toLowerCase().trim();
     return data.filter(item => {
       // Ensure item exists and is an object
       if (!item || typeof item !== 'object') {
         return false;
       }
-      
+
       // Search across multiple fields
       const searchableFields = [
         item.expenseName || '',
@@ -567,8 +577,8 @@ const ExpenseApproval = ({ navigation }) => {
         item.documentFromDate || '',
         item.documentToDate || ''
       ];
-      
-      return searchableFields.some(field => 
+
+      return searchableFields.some(field =>
         field.toLowerCase().includes(searchLower)
       );
     });
@@ -578,32 +588,32 @@ const ExpenseApproval = ({ navigation }) => {
     let data = [];
     switch (activeTab) {
       case 'expenseToApprove':
-        data = (apiExpenseToApproveData && apiExpenseToApproveData.length > 0) ? apiExpenseToApproveData : expenseToApproveData;
+        data = (apiExpenseToApproveData && apiExpenseToApproveData.length > 0) ? apiExpenseToApproveData : [];
         break;
       case 'myApprovalExpense':
-        data = (apiMyApprovedExpensesData && apiMyApprovedExpensesData.length > 0) ? apiMyApprovedExpensesData : myApprovalExpenseData;
+        data = (apiMyApprovedExpensesData && apiMyApprovedExpensesData.length > 0) ? apiMyApprovedExpensesData : [];
         break;
       case 'pendingApproval':
-        data = (apiPendingApprovalsData && apiPendingApprovalsData.length > 0) ? apiPendingApprovalsData : pendingApprovalData;
+        data = (apiPendingApprovalsData && apiPendingApprovalsData.length > 0) ? apiPendingApprovalsData : [];
         break;
       case 'myExpense':
         data = myExpenseData || [];
         break;
       case 'myRejectedExpense':
-        data = (apiMyRejectedExpensesData && apiMyRejectedExpensesData.length > 0) ? apiMyRejectedExpensesData : myRejectedExpenseData;
+        data = (apiMyRejectedExpensesData && apiMyRejectedExpensesData.length > 0) ? apiMyRejectedExpensesData : [];
         break;
       case 'approvedByMe':
-        data = (apiApprovedByMeData && apiApprovedByMeData.length > 0) ? apiApprovedByMeData : approvedByMeData;
+        data = (apiApprovedByMeData && apiApprovedByMeData.length > 0) ? apiApprovedByMeData : [];
         break;
       default:
         data = [];
     }
-    
+
     // Ensure data is an array before filtering
     if (!Array.isArray(data)) {
       data = [];
     }
-    
+
     // Apply frontend search filter
     return filterDataBySearch(data, searchValue);
   };
@@ -612,14 +622,23 @@ const ExpenseApproval = ({ navigation }) => {
   const filteredData = getCurrentData();
   const totalFilteredRecords = Array.isArray(filteredData) ? filteredData.length : 0;
   const totalPages = Math.ceil(totalRecords / pageSize) || 0;
-  
+
   // Debug logging
   console.log('Pagination Debug:', {
+    activeTab,
     totalRecords,
     pageSize,
     totalPages,
     currentPage,
-    shouldShowPagination: totalRecords > pageSize
+    shouldShowPagination: totalRecords > pageSize,
+    apiDataLengths: {
+      apiExpenseToApproveData: apiExpenseToApproveData.length,
+      apiApprovedByMeData: apiApprovedByMeData.length,
+      apiMyApprovedExpensesData: apiMyApprovedExpensesData.length,
+      apiMyRejectedExpensesData: apiMyRejectedExpensesData.length,
+      apiPendingApprovalsData: apiPendingApprovalsData.length,
+    },
+    filteredDataLength: filteredData.length
   });
   const pageItems = useMemo(() => {
     if (totalPages <= 1) return [];
@@ -724,7 +743,7 @@ const ExpenseApproval = ({ navigation }) => {
       setEmployeesLoading(true);
       setProjectsError(null);
       setEmployeesError(null);
-      
+
       // Fetch projects and employees in parallel
       const [projectsResp, employeesResp] = await Promise.all([
         fetchUserProjects().catch(err => {
@@ -738,17 +757,17 @@ const ExpenseApproval = ({ navigation }) => {
           return { Data: [] };
         })
       ]);
-      
+
       console.log('[ExpenseApproval] fetchUserProjects response:', projectsResp);
       console.log('[ExpenseApproval] getEmployees response:', employeesResp);
-      
+
       // Transform projects data
       const projectsRaw = Array.isArray(projectsResp?.Data?.Projects) ? projectsResp.Data.Projects : [];
       const projectOptions = projectsRaw
         .filter(p => p && p.Project_Title)
         .map(p => ({ id: p.UUID || p.Uuid || p.id, name: String(p.Project_Title) }));
       setProjects(projectOptions);
-      
+
       // Transform employees data (API returns [{ Uuid, FullName }, ...])
       const employeesRawCandidates = [
         Array.isArray(employeesResp?.Data) ? employeesResp.Data : null,
@@ -760,7 +779,7 @@ const ExpenseApproval = ({ navigation }) => {
         .filter(e => e && (e.FullName || e.Name))
         .map(e => ({ id: e.Uuid || e.UUID || e.uuid || e.Id || e.id, name: String(e.FullName || e.Name) }));
       setEmployees(employeeOptions);
-      
+
       console.log('[ExpenseApproval] mapped projects:', projectOptions);
       console.log('[ExpenseApproval] mapped employees:', employeeOptions);
     } catch (e) {
@@ -781,208 +800,7 @@ const ExpenseApproval = ({ navigation }) => {
   useEffect(() => {
     setCurrentPage(0);
   }, [searchValue]);
-
-  // Sample data for different tabs
-  const expenseToApproveData = [
-    {
-      id: 1,
-      srNo: '001',
-      projectName: 'Moonbyte001',
-      projectTask: 'Testing The Data',
-      enteredBy: 'Abhinav Kumar',
-      soleExpenseCode: 'KSP-2025-001',
-      expenseName: 'Travel Expense',
-      documentFromDate: '01-08-2025',
-      documentToDate: '07-08-2025',
-      amount: '₹ 12,500',
-      status: 'Pending',
-      expenseDetails: {
-        project: 'Moonbyte001',
-        task: 'Testing The Data',
-        date: '04/08/2025',
-        amount: '₹ 12,500',
-        description: 'Business travel expense'
-      },
-      approvalDetails: {
-        actionDate: '04-08-2025',
-        enteredBy: 'Abhinav Kumar',
-        status: 'Pending',
-        contactNo: 'Manan Jadav'
-      }
-    },
-    {
-      id: 2,
-      srNo: '002',
-      projectName: 'Moonbyte001',
-      projectTask: 'Testing The Data',
-      enteredBy: 'Riya Sharma',
-      soleExpenseCode: 'KSP-2025-002',
-      expenseName: 'Meal Expense',
-      documentFromDate: '08-08-2025',
-      documentToDate: '14-08-2025',
-      amount: '₹ 7,200',
-      status: 'Pending',
-      expenseDetails: {
-        project: 'Moonbyte001',
-        task: 'Testing The Data',
-        date: '10/08/2025',
-        amount: '₹ 7,200',
-        description: 'Client meeting meal expense'
-      },
-      approvalDetails: {
-        actionDate: '05-08-2025',
-        enteredBy: 'Riya Sharma',
-        status: 'Pending',
-        contactNo: 'HR Manager'
-      }
-    }
-  ];
-
-  const myApprovalExpenseData = [
-    {
-      id: 3,
-      srNo: '003',
-      projectName: 'Project Alpha',
-      projectTask: 'Development',
-      enteredBy: 'Aman Verma',
-      soleExpenseCode: 'KSP-2025-003',
-      expenseName: 'Software License',
-      documentFromDate: '15-08-2025',
-      documentToDate: '21-08-2025',
-      amount: '₹ 15,000',
-      status: 'Under Review',
-      expenseDetails: {
-        project: 'Project Alpha',
-        task: 'Development',
-        date: '18/08/2025',
-        amount: '₹ 15,000',
-        description: 'Software license purchase'
-      },
-      approvalDetails: {
-        actionDate: '06-08-2025',
-        enteredBy: 'Aman Verma',
-        status: 'Under Review',
-        contactNo: 'Finance Manager'
-      }
-    }
-  ];
-
-  const pendingApprovalData = [
-    {
-      id: 4,
-      srNo: '004',
-      projectName: 'Project Beta',
-      projectTask: 'Research',
-      enteredBy: 'John Doe',
-      soleExpenseCode: 'KSP-2025-004',
-      expenseName: 'Conference Fee',
-      documentFromDate: '22-08-2025',
-      documentToDate: '28-08-2025',
-      amount: '₹ 25,000',
-      status: 'Pending',
-      expenseDetails: {
-        project: 'Project Beta',
-        task: 'Research',
-        date: '25/08/2025',
-        amount: '₹ 25,000',
-        description: 'Conference registration fee'
-      },
-      approvalDetails: {
-        actionDate: '07-08-2025',
-        enteredBy: 'John Doe',
-        status: 'Pending',
-        contactNo: 'Project Manager'
-      }
-    }
-  ];
-
-  const myRejectedExpenseData = [
-    {
-      id: 5,
-      srNo: '005',
-      projectName: 'Internal Ops',
-      projectTask: 'Procurement',
-      enteredBy: 'Jane Smith',
-      soleExpenseCode: 'KSP-2025-005',
-      expenseName: 'Office Supplies',
-      documentFromDate: '29-08-2025',
-      documentToDate: '04-09-2025',
-      amount: '₹ 5,500',
-      status: 'Rejected',
-      expenseDetails: {
-        project: 'Internal Ops',
-        task: 'Procurement',
-        date: '01/09/2025',
-        amount: '₹ 5,500',
-        description: 'Office supplies purchase'
-      },
-      approvalDetails: {
-        actionDate: '08-08-2025',
-        enteredBy: 'Jane Smith',
-        status: 'Rejected',
-        contactNo: 'Admin Manager'
-      }
-    }
-  ];
-
-  const approvedByMeData = [
-    {
-      id: 6,
-      srNo: '006',
-      projectName: 'Real Estate Software',
-      projectTask: 'Planning',
-      enteredBy: 'Current User',
-      soleExpenseCode: 'KSP-2025-006',
-      expenseName: 'Training Course',
-      documentFromDate: '05-09-2025',
-      documentToDate: '11-09-2025',
-      amount: '₹ 8,000',
-      status: 'Approved',
-      expenseDetails: {
-        project: 'Real Estate Software',
-        task: 'Planning',
-        date: '08/09/2025',
-        amount: '₹ 8,000',
-        description: 'Online training course'
-      },
-      approvalDetails: {
-        actionDate: '09-08-2025',
-        enteredBy: 'Current User',
-        status: 'Approved',
-        contactNo: 'Learning Manager'
-      }
-    }
-  ];
-
-  const myExpenseData = [
-    {
-      id: 7,
-      srNo: '007',
-      projectName: 'Project Gamma',
-      projectTask: 'Testing',
-      enteredBy: 'Current User',
-      soleExpenseCode: 'KSP-2025-007',
-      expenseName: 'Equipment Purchase',
-      documentFromDate: '12-09-2025',
-      documentToDate: '18-09-2025',
-      amount: '₹ 12,000',
-      status: 'Submitted',
-      expenseDetails: {
-        project: 'Project Gamma',
-        task: 'Testing',
-        date: '15/09/2025',
-        amount: '₹ 12,000',
-        description: 'Testing equipment purchase'
-      },
-      approvalDetails: {
-        actionDate: '10-08-2025',
-        enteredBy: 'Current User',
-        status: 'Submitted',
-        contactNo: 'Project Lead'
-      }
-    }
-  ];
-
+ 
   const getStatusColor = (status) => {
     switch (status.toLowerCase()) {
       case 'approved':
@@ -1020,7 +838,7 @@ const ExpenseApproval = ({ navigation }) => {
     setRemark('');
     setReason('');
     if (action === 'approve') setApproveMode('form');
-    
+
     switch (action) {
       case 'viewExpenseDetails':
         // Only show expense details for tabs other than myApprovalExpense and myRejectedExpense
@@ -1063,16 +881,16 @@ const ExpenseApproval = ({ navigation }) => {
     try {
       setProcessingApproval(true);
       console.log('Approving expense:', selectedExpense.id, 'Remark:', remark);
-      
+
       const response = await processApprovalOrRejection({
         headerUuid: selectedExpense.headerUuid,
         isApproved: true,
         remark: remark.trim()
       });
-      
+
       console.log('Approval response:', response);
       setApproveMode('success');
-      
+
       // Refresh the data after successful approval
       if (activeTab === 'expenseToApprove') {
         await fetchExpenseToApproveData();
@@ -1105,17 +923,17 @@ const ExpenseApproval = ({ navigation }) => {
     try {
       setProcessingRejection(true);
       console.log('Rejecting expense:', selectedExpense.id, 'Reason:', reason);
-      
+
       const response = await processApprovalOrRejection({
         headerUuid: selectedExpense.headerUuid,
         isApproved: false,
         remark: reason.trim()
       });
-      
+
       console.log('Rejection response:', response);
       Alert.alert('Success', 'Expense has been rejected successfully');
       rejectSheetRef.current?.dismiss();
-      
+
       // Refresh the data after successful rejection
       if (activeTab === 'expenseToApprove') {
         await fetchExpenseToApproveData();
@@ -1138,6 +956,33 @@ const ExpenseApproval = ({ navigation }) => {
     console.log('Viewing expense details:', selectedExpense.id);
     expenseDetailsSheetRef.current?.dismiss();
   };
+
+  const handlePrintTimesheet = useCallback(async () => {
+    try {
+      if (!selectedExpense?.headerUuid) {
+        Alert.alert('Error', 'No expense selected');
+        return;
+      }
+      setPrinting(true);
+      const pdfBase64 = await getExpenseSlip({ headerUuid: selectedExpense.headerUuid });
+      if (!pdfBase64) {
+        Alert.alert('Preview Unavailable', 'Expense PDF is not available right now.');
+        return;
+      }
+      expenseDetailsSheetRef.current?.dismiss();
+      navigation.navigate('FileViewerScreen', {
+        pdfBase64,
+        fileName: `ExpenseSlip_${selectedExpense?.srNo || selectedExpense?.id}`,
+        opportunityTitle: selectedExpense?.projectName || 'Expense',
+        companyName: selectedExpense?.enteredBy || '',
+      });
+    } catch (e) {
+      console.log('[ExpenseApproval] print open failed:', e?.message || e);
+      Alert.alert('Failed', 'Unable to open the expense slip.');
+    } finally {
+      setPrinting(false);
+    }
+  }, [selectedExpense]);
 
   const handleViewApprovalDetails = () => {
     console.log('Viewing approval details:', selectedExpense.id);
@@ -1206,29 +1051,29 @@ const ExpenseApproval = ({ navigation }) => {
   return (
     <View style={styles.safeArea}>
       <AppHeader
-          title="Expense Approval"
-          onLeftPress={() => {
-            if (navigation.canGoBack()) {
-              navigation.goBack();
+        title="Expense Approval"
+        onLeftPress={() => {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+            return;
+          }
+          let parent = navigation;
+          for (let i = 0; i < 3; i++) {
+            parent = parent?.getParent?.();
+            if (!parent) break;
+            if (typeof parent.openDrawer === 'function') {
+              parent.openDrawer();
               return;
             }
-            let parent = navigation;
-            for (let i = 0; i < 3; i++) {
-              parent = parent?.getParent?.();
-              if (!parent) break;
-              if (typeof parent.openDrawer === 'function') {
-                parent.openDrawer();
-                return;
-              }
-            }
-            navigation.dispatch(DrawerActions.openDrawer());
-            // no drawer? fall back to initial route behavior if needed
-          }}
-          onRightPress={() => navigation.navigate('Notification')}
-        />
+          }
+          navigation.dispatch(DrawerActions.openDrawer());
+          // no drawer? fall back to initial route behavior if needed
+        }}
+        onRightPress={() => navigation.navigate('Notification')}
+      />
       <View style={styles.container}>
-        
-        
+
+
         {/* Tab Selection Dropdown */}
         <View style={styles.tabDropdownContainer}>
           <Dropdown
@@ -1252,50 +1097,50 @@ const ExpenseApproval = ({ navigation }) => {
         </View>
 
         {/* Filter and Search Section */}
-        
-        <View style={styles.filterSection}>
-        <View style={styles.inlineRow}>
-        <View style={styles.inlineHalf}>
-          <Dropdown
-            placeholder={projectsLoading ? "Loading projects..." : "Project Name"}
-            value={selectedProject?.name}
-            options={projects.length ? projects : sampleProjects}
-            getLabel={(p) => p.name}
-            getKey={(p) => p.id}
-            hint="Project Name"
-            onSelect={(project) => setSelectedProject(project)}
-            disabled={projectsLoading}
-            isOpen={isProjectDropdownOpen}
-            onOpenChange={(next) => {
-              setIsProjectDropdownOpen(next);
-              if (next) {
-                setIsTabDropdownOpen(false);
-                setIsEmployeeDropdownOpen(false);
-              }
-            }}
-          />
-          </View>
 
-          <View style={styles.inlineHalf}>
-          <Dropdown
-            placeholder={employeesLoading ? "Loading employees..." : "Employee"}
-            value={selectedEmployee?.name}
-            options={employees}
-            getLabel={(e) => e.name}
-            getKey={(e) => e.id}
-            hint="Employee"
-            onSelect={(employee) => setSelectedEmployee(employee)}
-            disabled={employeesLoading}
-            isOpen={isEmployeeDropdownOpen}
-            onOpenChange={(next) => {
-              setIsEmployeeDropdownOpen(next);
-              if (next) {
-                setIsTabDropdownOpen(false);
-                setIsProjectDropdownOpen(false);
-              }
-            }}
-          />
-          </View>
+        <View style={styles.filterSection}>
+          <View style={styles.inlineRow}>
+            <View style={styles.inlineHalf}>
+              <Dropdown
+                placeholder={projectsLoading ? "Loading projects..." : "Project Name"}
+                value={selectedProject?.name}
+                options={projects.length ? projects : sampleProjects}
+                getLabel={(p) => p.name}
+                getKey={(p) => p.id}
+                hint="Project Name"
+                onSelect={(project) => setSelectedProject(project)}
+                disabled={projectsLoading}
+                isOpen={isProjectDropdownOpen}
+                onOpenChange={(next) => {
+                  setIsProjectDropdownOpen(next);
+                  if (next) {
+                    setIsTabDropdownOpen(false);
+                    setIsEmployeeDropdownOpen(false);
+                  }
+                }}
+              />
+            </View>
+
+            <View style={styles.inlineHalf}>
+              <Dropdown
+                placeholder={employeesLoading ? "Loading employees..." : "Employee"}
+                value={selectedEmployee?.name}
+                options={employees}
+                getLabel={(e) => e.name}
+                getKey={(e) => e.id}
+                hint="Employee"
+                onSelect={(employee) => setSelectedEmployee(employee)}
+                disabled={employeesLoading}
+                isOpen={isEmployeeDropdownOpen}
+                onOpenChange={(next) => {
+                  setIsEmployeeDropdownOpen(next);
+                  if (next) {
+                    setIsTabDropdownOpen(false);
+                    setIsProjectDropdownOpen(false);
+                  }
+                }}
+              />
+            </View>
           </View>
 
           {/* Error messages for dropdowns */}
@@ -1315,11 +1160,11 @@ const ExpenseApproval = ({ navigation }) => {
             <Dropdown
               placeholder={String(pageSize)}
               value={String(pageSize)}
-              options={pageSizes} 
+              options={pageSizes}
               hideSearch
               maxPanelHeightPercent={15}
               inputBoxStyle={{ paddingHorizontal: wp(3.2) }}
-              style={{ width: wp(14), marginBottom: hp(1.1),marginEnd: wp(1.1) }}
+              style={{ width: wp(14), marginBottom: hp(1.1), marginEnd: wp(1.1) }}
               onSelect={handleItemsPerPageChange}
             />
 
@@ -1337,9 +1182,9 @@ const ExpenseApproval = ({ navigation }) => {
               />
             </View>
 
-            <TouchableOpacity 
-              activeOpacity={0.85} 
-              style={[styles.searchButton, searchValue.trim() && styles.clearButton]} 
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={[styles.searchButton, searchValue.trim() && styles.clearButton]}
               onPress={searchValue.trim() ? handleClearSearch : handleSearch}
             >
               <Text style={styles.searchButtonText}>
@@ -1348,7 +1193,7 @@ const ExpenseApproval = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         </View>
-        
+
         <View style={styles.contentContainer}>
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -1370,9 +1215,21 @@ const ExpenseApproval = ({ navigation }) => {
               </View>
             ) : (
               <>
-                {Array.isArray(filteredData) && filteredData
-                  .slice(currentPage * pageSize, (currentPage + 1) * pageSize)
-                  .map(expense => (
+                 {(() => {
+                  // Check if we're using API data (server-side pagination) or static data (client-side pagination)
+                  const isApiData = (activeTab === 'expenseToApprove' && apiExpenseToApproveData.length > 0) ||
+                                   (activeTab === 'approvedByMe' && apiApprovedByMeData.length > 0) ||
+                                   (activeTab === 'myApprovalExpense' && apiMyApprovedExpensesData.length > 0) ||
+                                   (activeTab === 'myRejectedExpense' && apiMyRejectedExpensesData.length > 0) ||
+                                   (activeTab === 'pendingApproval' && apiPendingApprovalsData.length > 0);
+                  
+                  // For API data, don't slice since API already returns paginated data
+                  // For static data, use client-side slicing
+                  const dataToRender = isApiData ? filteredData : filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+                  
+                  console.log(`🎬 [Data Render] Tab: ${activeTab}, IsAPI: ${isApiData}, Total: ${filteredData.length}, Rendering: ${dataToRender.length}`);
+                  
+                  return Array.isArray(dataToRender) && dataToRender.length > 0 && dataToRender.map(expense => (
                     <ExpenseDataComponent
                       key={expense.id}
                       data={[expense]}
@@ -1382,7 +1239,8 @@ const ExpenseApproval = ({ navigation }) => {
                       showActions={activeTab === 'expenseToApprove'}
                       showExpenseDetails={activeTab !== 'myApprovalExpense' && activeTab !== 'myRejectedExpense'}
                     />
-                  ))}
+                 ));
+                })()}
 
                 {(!Array.isArray(filteredData) || filteredData.length === 0) && (
                   <View style={styles.emptyBox}>
@@ -1484,7 +1342,7 @@ const ExpenseApproval = ({ navigation }) => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView 
+            <ScrollView
               style={styles.scrollableContent}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContentContainer}
@@ -1496,8 +1354,8 @@ const ExpenseApproval = ({ navigation }) => {
               ) : expenseDetailsError ? (
                 <View style={styles.errorContainer}>
                   <Text style={styles.errorText}>{expenseDetailsError}</Text>
-                  <TouchableOpacity 
-                    style={styles.retryButton} 
+                  <TouchableOpacity
+                    style={styles.retryButton}
                     onPress={() => selectedExpense?.headerUuid && fetchExpenseDetails(selectedExpense.headerUuid)}
                   >
                     <Text style={styles.retryButtonText}>Retry</Text>
@@ -1513,42 +1371,42 @@ const ExpenseApproval = ({ navigation }) => {
                         <Text style={styles.detailLabel}>Project:</Text>
                         <Text style={styles.detailValue}>{expenseDetailsData.header.ProjectName || expenseDetailsData.header.Project_Title || 'N/A'}</Text>
                       </View>
-                      
+
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>Task:</Text>
                         <Text style={styles.detailValue}>{expenseDetailsData.header.ProjectTask || expenseDetailsData.header.Task_Title || 'N/A'}</Text>
                       </View>
-                      
+
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>From Date:</Text>
                         <Text style={styles.detailValue}>{expenseDetailsData.header.DocumentDateFrom || expenseDetailsData.header.Doc_Date_From || 'N/A'}</Text>
                       </View>
-                      
+
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>To Date:</Text>
                         <Text style={styles.detailValue}>{expenseDetailsData.header.DocumentDateTo || expenseDetailsData.header.Doc_Date_To || 'N/A'}</Text>
                       </View>
-                      
+
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>Expense Type:</Text>
                         <Text style={styles.detailValue}>{expenseDetailsData.header.ExpenseType || 'N/A'}</Text>
                       </View>
-                      
+
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>Country:</Text>
                         <Text style={styles.detailValue}>{expenseDetailsData.header.CountryName || expenseDetailsData.header.Country || 'N/A'}</Text>
                       </View>
-                      
+
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>State:</Text>
                         <Text style={styles.detailValue}>{expenseDetailsData.header.StateName || expenseDetailsData.header.State || 'N/A'}</Text>
                       </View>
-                      
+
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>City:</Text>
                         <Text style={styles.detailValue}>{expenseDetailsData.header.CityName || expenseDetailsData.header.City || 'N/A'}</Text>
                       </View>
-                      
+
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>Currency:</Text>
                         <Text style={styles.detailValue}>{expenseDetailsData.header.CurrencyName || expenseDetailsData.header.Currency || 'N/A'}</Text>
@@ -1563,56 +1421,56 @@ const ExpenseApproval = ({ navigation }) => {
                       {expenseDetailsData.lines.map((line, index) => (
                         <View key={line.id || index} style={styles.lineItemContainer}>
                           <Text style={styles.lineItemTitle}>Line {index + 1}</Text>
-                          
+
                           <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Quantity:</Text>
                             <Text style={styles.detailValue}>{line.quantity}</Text>
                           </View>
-                          
+
                           <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Unit Type:</Text>
                             <Text style={styles.detailValue}>{line.unitType}</Text>
                           </View>
-                          
+
                           <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Unit Cost:</Text>
                             <Text style={styles.detailValue}>₹ {line.unitCost}</Text>
                           </View>
-                          
+
                           <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Total Cost:</Text>
                             <Text style={styles.detailValue}>₹ {line.totalCost}</Text>
                           </View>
-                          
+
                           <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Tax Amount:</Text>
                             <Text style={styles.detailValue}>₹ {line.taxAmount}</Text>
                           </View>
-                          
+
                           <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Bill Amount:</Text>
                             <Text style={styles.detailValue}>₹ {line.billAmount}</Text>
                           </View>
-                          
+
                           <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Document Date:</Text>
                             <Text style={styles.detailValue}>{line.documentDate || 'N/A'}</Text>
                           </View>
-                          
+
                           {line.billUrl && (
                             <View style={styles.detailRow}>
                               <Text style={styles.detailLabel}>Bill URL:</Text>
                               <Text style={styles.detailValue}>{line.billUrl}</Text>
                             </View>
                           )}
-                          
+
                           {line.expenseRemarks && (
                             <View style={styles.detailRow}>
                               <Text style={styles.detailLabel}>Remarks:</Text>
                               <Text style={styles.detailValue}>{line.expenseRemarks}</Text>
                             </View>
                           )}
-                          
+
                           {line.isOtherExpenseType && line.otherExpenseTypeName && (
                             <View style={styles.detailRow}>
                               <Text style={styles.detailLabel}>Other Expense Type:</Text>
@@ -1624,9 +1482,18 @@ const ExpenseApproval = ({ navigation }) => {
                     </>
                   )}
 
-                  <TouchableOpacity style={styles.closeButtonStyle} onPress={handleViewExpenseDetails}>
-                    <Text style={styles.closeButtonText}>Close</Text>
-                  </TouchableOpacity>
+                  <View style={styles.actionButtonsContainer}>
+                    <TouchableOpacity style={styles.closeButtonStyle} onPress={handleViewExpenseDetails}>
+                      <Text style={styles.closeButtonText}>Close</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                  style={[styles.closeButtonStyle, printing && styles.disabledButton]}
+                  onPress={handlePrintTimesheet}
+                  disabled={printing}
+                >
+                  <Text style={styles.closeButtonText}>{printing ? 'Opening...' : 'Print'}</Text>
+                </TouchableOpacity>
+                  </View>
                 </View>
               ) : (
                 <View style={styles.emptyBox}>
@@ -1678,44 +1545,44 @@ const ExpenseApproval = ({ navigation }) => {
                 {(approvalDetailsData.allHistory || []).map((detail, idx) => (
                   <View key={`${idx}-${detail?.actiondate || detail?.ActionDate || 'row'}`} style={styles.approvalItem}>
                     <Text style={styles.approvalTitle}>Approval #{idx + 1}</Text>
-                    
+
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Action Date:</Text>
                       <Text style={styles.detailValue}>{detail.ActionDate || detail.actiondate || detail.actionDate || '-'}</Text>
                     </View>
-                    
+
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Entered By:</Text>
                       <Text style={styles.detailValue}>{detail.EnteredBy || detail.enteredby || detail.enteredBy || '-'}</Text>
                     </View>
-                    
+
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Status:</Text>
-                      <Text style={[styles.statusBadge, { 
+                      <Text style={[styles.statusBadge, {
                         color: '#fff',
                         backgroundColor: getStatusColor(detail.Status || detail.status || 'Pending')
                       }]}>
                         {detail.Status || detail.status || 'Pending'}
                       </Text>
                     </View>
-                    
+
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Action Taken By:</Text>
                       <Text style={styles.detailValue}>{detail.ActionTakenBy || detail.actiontakenby || detail.actionTakenBy || '-'}</Text>
                     </View>
 
-                    {(detail.RemarksByApproval || detail.remarksbyapproval || detail.remarksByApproval) && 
-                     (detail.RemarksByApproval || detail.remarksbyapproval || detail.remarksByApproval) !== 'N/A' && (
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Remarks:</Text>
-                        <Text style={styles.detailValue}>{detail.RemarksByApproval || detail.remarksbyapproval || detail.remarksByApproval}</Text>
-                      </View>
-                    )}
-                    
+                    {(detail.RemarksByApproval || detail.remarksbyapproval || detail.remarksByApproval) &&
+                      (detail.RemarksByApproval || detail.remarksbyapproval || detail.remarksByApproval) !== 'N/A' && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Remarks:</Text>
+                          <Text style={styles.detailValue}>{detail.RemarksByApproval || detail.remarksbyapproval || detail.remarksByApproval}</Text>
+                        </View>
+                      )}
+
                     <View style={styles.approvalDivider} />
                   </View>
                 ))}
-                
+
                 {(!approvalDetailsData.allHistory || approvalDetailsData.allHistory.length === 0) && (
                   <View style={styles.emptyBox}>
                     <Text style={styles.emptyText}>No approval details available.</Text>
@@ -1764,7 +1631,7 @@ const ExpenseApproval = ({ navigation }) => {
                       <Text style={styles.detailLabel}>Expense:</Text>
                       <Text style={styles.detailValue}>{selectedExpense.expenseName}</Text>
                     </View>
-                    
+
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Amount:</Text>
                       <Text style={styles.detailValue}>{selectedExpense.amount}</Text>
@@ -1783,8 +1650,8 @@ const ExpenseApproval = ({ navigation }) => {
                       />
                     </View> */}
 
-                    <TouchableOpacity 
-                      style={[styles.approveButton, processingApproval && styles.disabledButton]} 
+                    <TouchableOpacity
+                      style={[styles.approveButton, processingApproval && styles.disabledButton]}
                       onPress={handleApprove}
                       disabled={processingApproval}
                     >
@@ -1848,8 +1715,8 @@ const ExpenseApproval = ({ navigation }) => {
               />
             </View>
 
-            <TouchableOpacity 
-              style={[styles.rejectButton, processingRejection && styles.disabledButton]} 
+            <TouchableOpacity
+              style={[styles.rejectButton, processingRejection && styles.disabledButton]}
               onPress={handleReject}
               disabled={processingRejection}
             >
@@ -1868,7 +1735,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#ffffff',
-   // paddingTop: safeAreaTop,
+    // paddingTop: safeAreaTop,
   },
   container: {
     flex: 1,
@@ -1908,7 +1775,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     paddingHorizontal: wp(2),
     height: hp(5.3), // added
-    flex: 1, 
+    flex: 1,
     marginEnd: wp(2),
   },
   searchInput: {
@@ -1916,7 +1783,7 @@ const styles = StyleSheet.create({
     marginLeft: wp(1.5),
     fontSize: rf(4),
     color: COLORS.text,
-    height:hp(6),
+    height: hp(6),
     fontFamily: TYPOGRAPHY.fontFamilyRegular,
   },
   // Reimbursement pill-style buttons
@@ -2040,7 +1907,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#eee',
     padding: SPACING.md,
-    marginBottom: hp(-3),
+    marginBottom: hp(1),
     ...SHADOW.elevation2,
   },
   tsRowHeader: {
@@ -2097,7 +1964,7 @@ const styles = StyleSheet.create({
   },
   tsBadgeText: {
     fontSize: TYPOGRAPHY.body,
-    fontWeight: '800', 
+    fontWeight: '800',
     fontFamily: TYPOGRAPHY.fontFamilyBold,
   },
   tsActionsRowPrimary: {
@@ -2114,10 +1981,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
     marginTop: hp(2),
     paddingTop: hp(1),
     paddingBottom: hp(1),
-    gap: hp(1),
+    gap: wp(2),
   },
   buttonRow: {
     flexDirection: 'row',
@@ -2332,11 +2201,13 @@ const styles = StyleSheet.create({
   },
   closeButtonStyle: {
     backgroundColor: '#6b7280',
-    paddingVertical: hp(1.5),
+    paddingVertical: wp(2),
     paddingHorizontal: wp(6),
     borderRadius: wp(2.5),
     alignItems: 'center',
     marginTop: hp(2),
+    marginHorizontal: 'auto',
+    width:wp(35)
   },
   closeButtonText: {
     color: '#fff',
@@ -2358,7 +2229,7 @@ const styles = StyleSheet.create({
     paddingVertical: hp(4),
   },
   errorText: {
-    fontSize: rf(3.2), 
+    fontSize: rf(3.2),
     textAlign: 'center',
     marginBottom: hp(2),
     fontFamily: TYPOGRAPHY.fontFamilyRegular,

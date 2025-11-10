@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
-import { SafeAreaView, View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { SafeAreaView, View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import AppHeader from '../../components/common/AppHeader';
@@ -7,7 +7,7 @@ import Loader from '../../components/common/Loader';
 import Dropdown from '../../components/common/Dropdown';
 import { wp, hp, rf, safeAreaTop } from '../../utils/responsive';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, text, layout, SHADOW, buttonStyles } from '../styles/styles';
-import { getApprovedTimesheets, getSubmittedAndPendingTimesheets } from '../../api/authServices';
+import { getApprovedTimesheets, getSubmittedAndPendingTimesheets, getTimesheetPDF } from '../../api/authServices';
 
 const sampleProjects = [
   { id: 'p1', name: 'Project Alpha', tasks: ['Design', 'Development', 'Testing'] },
@@ -134,6 +134,7 @@ const ManageMyWorklist = ({ navigation }) => {
   const [currentPage, setCurrentPage] = useState(0); // zero-based
   const [isLoadingSubmitted, setIsLoadingSubmitted] = useState(false);
   const [expandedId, setExpandedId] = useState(null); // New state for expanded card
+  const [printing, setPrinting] = useState(false);
 
 
   const viewSheetRef = useRef(null);
@@ -232,6 +233,7 @@ const ManageMyWorklist = ({ navigation }) => {
   const submittedTimesheetData = [
     {
       id: 1,
+      headerUuid: 1,
       srNo: '001',
       employeeName: 'Abhinav Kumar',
       totalHoursWorked: '40:00',
@@ -249,6 +251,7 @@ const ManageMyWorklist = ({ navigation }) => {
     },
     {
       id: 2,
+      headerUuid: 2,
       srNo: '002',
       employeeName: 'Riya Sharma',
       totalHoursWorked: '32:30',
@@ -270,6 +273,7 @@ const ManageMyWorklist = ({ navigation }) => {
   const approvedTimesheetData = [
     {
       id: 3,
+      headerUuid: 3,
       srNo: '003',
       employeeName: 'Aman Verma',
       totalHoursWorked: '38:45',
@@ -292,6 +296,7 @@ const ManageMyWorklist = ({ navigation }) => {
     },
     {
       id: 4,
+      headerUuid: 4,
       srNo: '004',
       employeeName: 'John Doe',
       totalHoursWorked: '35:20',
@@ -357,7 +362,40 @@ const ManageMyWorklist = ({ navigation }) => {
         break;
     }
   };
+  const handlePrintTimesheet = useCallback(async () => {
+    if (!selectedTimesheet || printing) {
+      return;
+    }
 
+    const timesheet = selectedTimesheet;
+
+    try {
+      setPrinting(true);
+      const pdfBase64 = await getTimesheetPDF({
+        headerUuid: timesheet.headerUuid || timesheet.id,
+      });
+
+      if (!pdfBase64) {
+        Alert.alert('Preview Unavailable', 'Timesheet PDF is not available right now.');
+        return;
+      }
+
+      // Close the sheet before navigating
+      closeSheet(viewSheetRef);
+
+      navigation.navigate('FileViewerScreen', {
+        pdfBase64,
+        fileName: `Timesheet_${timesheet.srNo || timesheet.id}`,
+        opportunityTitle: timesheet.projectDetails?.project || 'Timesheet',
+        companyName: timesheet.employeeName,
+      });
+    } catch (error) {
+      console.log('Error preparing timesheet PDF:', error?.message || error);
+      Alert.alert('Preview Failed', 'Unable to load the timesheet PDF. Please try again.');
+    } finally {
+      setPrinting(false);
+    }
+  }, [selectedTimesheet, printing]);
   const handleView = () => {
     console.log('Viewing timesheet:', selectedTimesheet.id);
     viewSheetRef.current?.dismiss();
@@ -395,6 +433,7 @@ const ManageMyWorklist = ({ navigation }) => {
         const firstLine = Array.isArray(row.TimesheetLines) && row.TimesheetLines.length > 0 ? row.TimesheetLines[0] : null;
         return {
           id: row.UUID || row.Uuid || row.Id || row.id || idx + 1,
+          headerUuid: row.HeaderUuid || row.HeaderUUID || row.UUID || row.Uuid || row.Id || row.id || null,
           srNo: String(row.SrNo || row.Sr_No || row.Sr || row.srNo || idx + 1).padStart(3, '0'),
           employeeName: employee || `Timesheet #${idx + 1}`,
           totalHoursWorked: String(totalHours),
@@ -475,6 +514,7 @@ const ManageMyWorklist = ({ navigation }) => {
         const firstLine = Array.isArray(row.TimesheetLines) && row.TimesheetLines.length > 0 ? row.TimesheetLines[0] : null;
         return {
           id: row.HeaderUuid || row.HeaderUUID || row.UUID || row.Id || row.id || idx + 1,
+          headerUuid: row.HeaderUuid || row.HeaderUUID || row.UUID || row.Id || row.id || null,
           srNo: String(idx + 1).padStart(3, '0'),
           employeeName: employee || `Timesheet #${idx + 1}`,
           totalHoursWorked: String(totalHours),
@@ -883,9 +923,18 @@ const ManageMyWorklist = ({ navigation }) => {
                   )}
                 </ScrollView>
 
+                <View style={styles.actionButtonsContainer}>
                 <TouchableOpacity style={styles.closeButtonStyle} onPress={handleView}>
                   <Text style={styles.closeButtonText}>Close</Text>
                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.closeButtonStyle, printing && styles.disabledButton]}
+                  onPress={handlePrintTimesheet}
+                  disabled={printing}
+                >
+                  <Text style={styles.closeButtonText}>{printing ? 'Opening...' : 'Print'}</Text>
+                </TouchableOpacity>
+                </View>
               </View>
             )}
           </BottomSheetView>
@@ -1407,6 +1456,9 @@ const styles = StyleSheet.create({
     fontSize: rf(3.6),
     fontWeight: '700',
     fontFamily: TYPOGRAPHY.fontFamilyBold,
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   approvalDetails: {
     marginBottom: hp(2),

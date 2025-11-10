@@ -82,6 +82,8 @@ const PATHS = {
     deleteTimesheetLine: Config.API_DELETE_TIMESHEET_LINE_PATH || '/api/TimeSheet/DeleteTimesheetLine',
     submitTimesheetLine: Config.API_SUBMIT_TIMESHEET_LINE_PATH || '/api/TimeSheet/SubmitTimesheet',
     transferTimesheetTasks: Config.API_TRANSFER_TIMESHEET_TASKS_PATH || '/api/TimeSheet/transfer-tasks',
+    attendanceSubmit: Config.API_ATTENDANCE_SUBMIT || '/api/HRA/ManageAttendance',
+    timesheetSlip : Config.API_TIMESHEET_SLIP || '/api/TimeSheet/api/timesheet/slip',
     // Timesheet eligibility check
     addTimesheetEligibility: Config.API_ADD_TIMESHEET_ELIGIBILITY_PATH || '/api/TimeSheet/AddTimesheet',
     employeeDashboard: Config.API_EMPLOYEE_DASHBOARD_PATH || '/api/DashBoard/employee/dashboard',
@@ -92,6 +94,8 @@ const PATHS = {
     // Timesheet - For Approval
     timesheetsForApproval: Config.API_TIMESHEETS_FOR_APPROVAL_PATH || '/api/TimeSheet/TimesheetsForApproval',
     approveTimesheet: Config.API_APPROVE_TIMESHEET_PATH || '/api/TimeSheet/ApproveTimesheet',
+    timesheetSlip: '/api/TimeSheet/GetTimesheetPDF',
+    expenseSlip: '/api/Expense/expense-slip',
     // Dashboard Lead Summary
     getDashboardLeadSummary: Config.API_GET_DASHBOARD_LEAD_SUMMARY_PATH || '/api/DashBoard/GetDashboardLeadSummary',
     adminDashboard: '/api/DashBoard/superadmin/dashboard',
@@ -124,7 +128,7 @@ export async function refresh() {
     console.log('🔄 [REFRESH FUNCTION] ==========================================');
     console.log('🔄 [REFRESH FUNCTION] Manual refresh function called');
     console.log('🔄 [REFRESH FUNCTION] Time:', new Date().toISOString());
-    
+
     const refreshToken = await getRefreshToken();
     if (!refreshToken) {
         console.log('❌ [REFRESH FUNCTION] No refresh token found!');
@@ -136,9 +140,9 @@ export async function refresh() {
     console.log('🔄 [REFRESH FUNCTION] Calling refresh API...');
     console.log('🔄 [REFRESH FUNCTION] URL:', `${BASE_URL}${PATHS.refresh}`);
     console.log('🔄 [REFRESH FUNCTION] Payload:', { refreshToken: refreshToken.substring(0, 20) + '...' });
-    
+
     const resp = await refreshClient.post(PATHS.refresh, { refreshToken });
-    
+
     console.log('✅ [REFRESH FUNCTION] Refresh API Response Received!');
     console.log('✅ [REFRESH FUNCTION] Status:', resp.status);
     console.log('✅ [REFRESH FUNCTION] Full Response:', JSON.stringify(resp.data, null, 2));
@@ -340,7 +344,7 @@ export async function verifyCode({ email, OtpCode }) {
     console.log('Verify Code response:', resp);
     return resp.data;
 }
-     
+
 
 export async function getProfile() {
     const userUUID = await getUUID();
@@ -1721,6 +1725,104 @@ export async function getSubmittedAndPendingTimesheets({ cmpUuid, envUuid, userU
     return resp.data;
 }
 
+// Timesheet: Get Timesheet PDF (base64 string)
+export async function getTimesheetPDF({ headerUuid, cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        if (!headerUuid) throw new Error('headerUuid is required');
+
+        // Resolve missing IDs from storage
+        if (!cmpUuid || !envUuid || !userUuid) {
+            const [c, e, u] = await Promise.all([
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+                userUuid || getUUID(),
+            ]);
+            cmpUuid = c; envUuid = e; userUuid = u;
+        }
+
+        if (!cmpUuid) throw new Error('cmpUuid is required');
+        if (!envUuid) throw new Error('envUuid is required');
+        if (!userUuid) throw new Error('userUuid is required');
+
+        const params = { headerUuid, cmpUuid, envUuid, userUuid };
+
+        try {
+            const fullUrl = `${api.defaults.baseURL}/api/TimeSheet/GetTimesheetPDF`;
+            console.log('🖨️ [getTimesheetPDF] Request URL:', fullUrl);
+            console.log('📋 [getTimesheetPDF] Request Params:', params);
+        } catch (_) { }
+
+        const resp = await api.get(PATHS.timesheetSlip, { params });
+        console.log('✅ [getTimesheetPDF] Response Status:', resp?.status);
+
+        const unwrap = resp?.data ?? resp;
+        const payload = unwrap?.Data ?? unwrap?.data ?? unwrap;
+
+        const pdfBase64 =
+            payload?.SlipBase64 ||
+            payload?.pdfBase64 ||
+            payload?.Pdf ||
+            payload?.pdf ||
+            payload?.FileBase64 ||
+            payload?.fileBase64 ||
+
+            (typeof payload === 'string' ? payload : null);
+
+        if (!pdfBase64) {
+            console.log('❌ [getTimesheetPDF] No base64 PDF found in response:', JSON.stringify(payload, null, 2));
+            throw new Error('Timesheet PDF not found in response');
+        }
+
+        return pdfBase64;
+    } catch (error) {
+        console.log('❌ [getTimesheetPDF] Error:', error?.message || error);
+        console.log('❌ [getTimesheetPDF] Error response:', error?.response?.data);
+        console.log('❌ [getTimesheetPDF] Error status:', error?.response?.status);
+        throw error;
+    }
+}
+
+// Expense: Get Expense Slip PDF (base64 string)
+export async function getExpenseSlip({ headerUuid, cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        if (!headerUuid) throw new Error('headerUuid is required');
+        if (!cmpUuid || !envUuid || !userUuid) {
+            const [c, e, u] = await Promise.all([
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+                userUuid || getUUID(),
+            ]);
+            cmpUuid = c; envUuid = e; userUuid = u;
+        }
+        const params = { headerUuid, cmpUuid, envUuid, userUuid };
+        try {
+            const fullUrl = `${api.defaults.baseURL}${PATHS.expenseSlip}`;
+            console.log('🧾 [getExpenseSlip] URL:', fullUrl, 'params:', params);
+        } catch (_) { }
+        const resp = await api.get(PATHS.expenseSlip, { params });
+        const unwrap = resp?.data ?? resp;
+        const payload = unwrap?.Data ?? unwrap?.data ?? unwrap;
+        const pdfBase64 =
+            payload?.SlipBase64 ||
+            payload?.pdfBase64 ||
+            payload?.Pdf ||
+            payload?.pdf ||
+            payload?.FileBase64 ||
+            payload?.fileBase64 ||
+            (typeof payload === 'string' ? payload : null);
+        if (!pdfBase64) {
+            console.log('❌ [getExpenseSlip] No base64 found in response:', JSON.stringify(payload, null, 2));
+            throw new Error('Expense PDF not found in response');
+        }
+        return pdfBase64;
+    } catch (error) {
+        console.log('❌ [getExpenseSlip] Error:', error?.message || error);
+        console.log('❌ [getExpenseSlip] Error response:', error?.response?.data);
+        console.log('❌ [getExpenseSlip] Error status:', error?.response?.status);
+        throw error;
+    }
+}
+
 // HRA: Submit Attendance
 export async function submitAttendance(payload, overrides = {}) {
     console.log('Submitting attendance with payload:', JSON.stringify(payload, null, 2));
@@ -1742,7 +1844,7 @@ export async function submitAttendance(payload, overrides = {}) {
         const params = { userUuid, cmpUuid, envUuid };
         console.log('API params:', params);
 
-        const resp = await api.post('/api/HRA/ManageAttendance', payload, { params });
+        const resp = await api.post(PATHS.attendanceSubmit, payload, { params });
         console.log('Submit attendance response:', resp);
         return resp.data;
     } catch (error) {

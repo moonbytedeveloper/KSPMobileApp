@@ -71,7 +71,8 @@ const AccordionItem = ({
         <View style={styles.rightSideContainer}>
           <View style={{ marginEnd:wp(4) }}>
             <Text style={styles.summaryLabel}>{headerRightLabel}</Text>
-            <StatusBadge label={item?.status|| item?.ProjectStatus|| 'Pending'} />
+            <Text style={styles.summaryValue} numberOfLines={1} ellipsizeMode="tail">{item.amount}</Text>
+
           </View>
           <View style={{ position: 'absolute', right: 0, top: 0, }}>
             <Svg
