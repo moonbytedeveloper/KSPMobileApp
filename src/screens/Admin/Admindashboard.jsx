@@ -115,7 +115,7 @@ const Admindashboard = ({ navigation }) => {
       if (selectedCompanyUUID) { // 👈 Only show alert if still logged in
         console.error('Error fetching dashboard data:', err);
         setError(err.message || 'Failed to fetch dashboard data');
-        Alert.alert('Error', 'Failed to load dashboard data. Please try again.');
+        // Alert.alert('Error', 'Failed to load dashboard data. Please try again.');
       }
     } finally {
       setLoading(false);

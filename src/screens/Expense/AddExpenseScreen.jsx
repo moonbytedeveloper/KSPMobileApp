@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert, Image, PermissionsAndroid, Platform } from 'react-native';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -198,6 +198,31 @@ const AddExpenseScreen = ({ navigation, route }) => {
   // Line add success bottom sheet
   const [lineAddSheetVisible, setLineAddSheetVisible] = useState(false);
   const [lineAddMessage, setLineAddMessage] = useState('');
+  const [infoSheet, setInfoSheet] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    confirmText: 'OK',
+    cancelText: '',
+    onConfirm: undefined,
+    onCancel: undefined,
+  });
+
+  const showInfoSheet = useCallback((config = {}) => {
+    setInfoSheet({
+      visible: true,
+      title: config.title || '',
+      message: config.message || '',
+      confirmText: config.confirmText || 'OK',
+      cancelText: config.cancelText ?? '',
+      onConfirm: config.onConfirm,
+      onCancel: config.onCancel,
+    });
+  }, []);
+
+  const hideInfoSheet = useCallback(() => {
+    setInfoSheet(prev => ({ ...prev, visible: false }));
+  }, []);
 
   const availableTasks = useMemo(() => {
     if (!selectedProject) return [];
@@ -532,7 +557,11 @@ const AddExpenseScreen = ({ navigation, route }) => {
     try {
       const hasPerm = await requestStoragePermissionAndroid();
       if (!hasPerm) {
-        Alert.alert('Permission required', 'Storage permission is needed to pick a file.');
+        showInfoSheet({
+          title: 'Permission required',
+          message: 'Storage permission is needed to pick a file.',
+          confirmText: 'OK',
+        });
         return;
       }
 
@@ -1188,7 +1217,11 @@ const AddExpenseScreen = ({ navigation, route }) => {
       try { console.log('Update Expense Line payload:', JSON.stringify(linePayload, null, 2)); } catch (_e) { }
       await updateExpenseLine(linePayload);
       await loadHeaderLines();
-      Alert.alert('Success', 'Expense line updated successfully.');
+      showInfoSheet({
+        title: 'Success',
+        message: 'Expense line updated successfully.',
+        confirmText: 'OK',
+      });
       // After successful update, reset to allow adding a new line immediately
       resetLineForm();
     } catch (e) {
@@ -1660,6 +1693,26 @@ const AddExpenseScreen = ({ navigation, route }) => {
         cancelText={''}
         onConfirm={() => setLineAddSheetVisible(false)}
         onCancel={() => setLineAddSheetVisible(false)}
+      />
+
+      <BottomSheetConfirm
+        visible={infoSheet.visible}
+        title={infoSheet.title}
+        message={infoSheet.message}
+        confirmText={infoSheet.confirmText}
+        cancelText={infoSheet.cancelText}
+        onConfirm={() => {
+          hideInfoSheet();
+          if (typeof infoSheet.onConfirm === 'function') {
+            infoSheet.onConfirm();
+          }
+        }}
+        onCancel={() => {
+          hideInfoSheet();
+          if (typeof infoSheet.onCancel === 'function') {
+            infoSheet.onCancel();
+          }
+        }}
       />
 
       <DatePickerBottomSheet
