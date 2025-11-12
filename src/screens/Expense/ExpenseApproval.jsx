@@ -5,11 +5,12 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import AppHeader from '../../components/common/AppHeader';
 import Loader from '../../components/common/Loader';
 import Dropdown from '../../components/common/Dropdown';
+import BottomSheetConfirm from '../../components/common/BottomSheetConfirm';
 import { wp, hp, rf, safeAreaTop } from '../../utils/responsive';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, text, layout, SHADOW, buttonStyles } from '../styles/styles';
 import { DrawerActions } from '@react-navigation/native';
 import { getApprovedByMeExpenses, getSoleApprovalData, fetchExpenseLinesByHeader, getApprovalDetails, processApprovalOrRejection, getMyApprovedExpenses, getMyRejectedExpenses, getPendingApprovals, fetchUserProjects, getEmployees, getExpenseSlip } from '../../api/authServices';
-
+  
 const sampleProjects = [
   { id: 'p1', name: 'Project Alpha', tasks: ['Design', 'Development', 'Testing'] },
   { id: 'p2', name: 'Project Beta', tasks: ['Research', 'Implementation'] },
@@ -143,6 +144,9 @@ const ExpenseApproval = ({ navigation }) => {
   const [apiPendingApprovalsData, setApiPendingApprovalsData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showErrorBottomSheet, setShowErrorBottomSheet] = useState(false);
+  const [errorBottomSheetTitle, setErrorBottomSheetTitle] = useState('');
+  const [errorBottomSheetMessage, setErrorBottomSheetMessage] = useState('');
 
   // Projects and employees state management
   const [projects, setProjects] = useState([]);
@@ -621,6 +625,18 @@ const ExpenseApproval = ({ navigation }) => {
   const totalFilteredRecords = Array.isArray(filteredData) ? filteredData.length : 0;
   const totalPages = Math.ceil(totalRecords / pageSize) || 0;
 
+  // Determine if the current tab is backed by server-side paginated API data.
+  const isApiTab = useMemo(() => {
+    return ['expenseToApprove', 'myApprovalExpense', 'pendingApproval', 'myRejectedExpense', 'approvedByMe'].includes(activeTab);
+  }, [activeTab]);
+
+  // Choose data to render: if API tab, the API already returns a paginated page so don't slice again.
+  const dataToRender = useMemo(() => {
+    if (!Array.isArray(filteredData)) return [];
+    if (isApiTab) return filteredData;
+    return filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  }, [filteredData, isApiTab, currentPage, pageSize]);
+
   // Debug logging
   console.log('Pagination Debug:', {
     totalRecords,
@@ -789,6 +805,18 @@ const ExpenseApproval = ({ navigation }) => {
   useEffect(() => {
     setCurrentPage(0);
   }, [searchValue]);
+
+  // Show API errors in BottomSheetConfirm (keeps existing `error` inline display but also shows bottom sheet)
+  useEffect(() => {
+    if (error) {
+      console.log('[ExpenseApproval] Opening error bottom sheet with message:', error);
+      setErrorBottomSheetTitle('Error');
+      setErrorBottomSheetMessage(String(error));
+      setShowErrorBottomSheet(true);
+    } else {
+      setShowErrorBottomSheet(false);
+    }
+  }, [error]);
  
   const getStatusColor = (status) => {
     switch (status.toLowerCase()) {
@@ -863,7 +891,7 @@ const ExpenseApproval = ({ navigation }) => {
 
   const handleApprove = async () => {
     if (!selectedExpense?.headerUuid) {
-      Alert.alert('Error', 'No expense selected for approval');
+      setError('No expense selected for approval');
       return;
     }
 
@@ -890,9 +918,9 @@ const ExpenseApproval = ({ navigation }) => {
       } else if (activeTab === 'pendingApproval') {
         await fetchPendingApprovals();
       }
-    } catch (error) {
-      console.error('Error approving expense:', error);
-      Alert.alert('Approval Failed', error.message || 'Failed to approve expense');
+    } catch (e) {
+      console.error('Error approving expense:', e);
+      setError(getReadableError(e, 'Failed to approve expense'));
     } finally {
       setProcessingApproval(false);
     }
@@ -900,12 +928,12 @@ const ExpenseApproval = ({ navigation }) => {
 
   const handleReject = async () => {
     if (!selectedExpense?.headerUuid) {
-      Alert.alert('Error', 'No expense selected for rejection');
+      setError('No expense selected for rejection');
       return;
     }
 
     if (!reason.trim()) {
-      Alert.alert('Error', 'Please provide a reason for rejection');
+      setError('Please provide a reason for rejection');
       return;
     }
 
@@ -933,9 +961,9 @@ const ExpenseApproval = ({ navigation }) => {
       } else if (activeTab === 'pendingApproval') {
         await fetchPendingApprovals();
       }
-    } catch (error) {
-      console.error('Error rejecting expense:', error);
-      Alert.alert('Rejection Failed', error.message || 'Failed to reject expense');
+    } catch (e) {
+      console.error('Error rejecting expense:', e);
+      setError(getReadableError(e, 'Failed to reject expense'));
     } finally {
       setProcessingRejection(false);
     }
@@ -949,13 +977,13 @@ const ExpenseApproval = ({ navigation }) => {
   const handlePrintTimesheet = useCallback(async () => {
     try {
       if (!selectedExpense?.headerUuid) {
-        Alert.alert('Error', 'No expense selected');
+        setError('No expense selected');
         return;
       }
       setPrinting(true);
       const pdfBase64 = await getExpenseSlip({ headerUuid: selectedExpense.headerUuid });
       if (!pdfBase64) {
-        Alert.alert('Preview Unavailable', 'Expense PDF is not available right now.');
+        setError('Expense PDF is not available right now.');
         return;
       }
       expenseDetailsSheetRef.current?.dismiss();
@@ -967,11 +995,11 @@ const ExpenseApproval = ({ navigation }) => {
       });
     } catch (e) {
       console.log('[ExpenseApproval] print open failed:', e?.message || e);
-      Alert.alert('Failed', 'Unable to open the expense slip.');
+      setError(getReadableError(e, 'Unable to open the expense slip.'));
     } finally {
       setPrinting(false);
     }
-  }, [selectedExpense]);
+  }, [selectedExpense, getReadableError, navigation]);
 
   const handleViewApprovalDetails = () => {
     console.log('Viewing approval details:', selectedExpense.id);
@@ -1204,19 +1232,17 @@ const ExpenseApproval = ({ navigation }) => {
               </View>
             ) : (
               <>
-                {Array.isArray(filteredData) && filteredData
-                  .slice(currentPage * pageSize, (currentPage + 1) * pageSize)
-                  .map(expense => (
-                    <ExpenseDataComponent
-                      key={expense.id}
-                      data={[expense]}
-                      onActionPress={handleActionPress}
-                      getStatusColor={getStatusColor}
-                      getStatusBgColor={getStatusBgColor}
-                      showActions={activeTab === 'expenseToApprove'}
-                      showExpenseDetails={activeTab !== 'myApprovalExpense' && activeTab !== 'myRejectedExpense'}
-                    />
-                  ))}
+                {Array.isArray(dataToRender) && dataToRender.map(expense => (
+                  <ExpenseDataComponent
+                    key={expense.id}
+                    data={[expense]}
+                    onActionPress={handleActionPress}
+                    getStatusColor={getStatusColor}
+                    getStatusBgColor={getStatusBgColor}
+                    showActions={activeTab === 'expenseToApprove'}
+                    showExpenseDetails={activeTab !== 'myApprovalExpense' && activeTab !== 'myRejectedExpense'}
+                  />
+                ))}
 
                 {(!Array.isArray(filteredData) || filteredData.length === 0) && (
                   <View style={styles.emptyBox}>
@@ -1702,6 +1728,16 @@ const ExpenseApproval = ({ navigation }) => {
             </TouchableOpacity>
           </BottomSheetView>
         </BottomSheetModal>
+        {/* API Error Bottom Sheet (re-uses BottomSheetConfirm) */}
+        <BottomSheetConfirm
+          visible={showErrorBottomSheet}
+          title={errorBottomSheetTitle}
+          message={errorBottomSheetMessage}
+          confirmText="Ok"
+          cancelText={null}
+          onConfirm={() => setShowErrorBottomSheet(false)}
+          onCancel={() => setShowErrorBottomSheet(false)}
+        />
       </View>
     </View>
   );

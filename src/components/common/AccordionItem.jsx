@@ -22,14 +22,18 @@ const AccordionItem = ({
   customRows,
   editLabel = 'Edit',
   status,
+  headerRightIsStatusBadge = false,
+  extraRowsAfterLine = [],
 }) => {
   // Defer delete confirmation to the screen-level bottom sheet
   const StatusBadge = ({ label= 'Pending' }) => {
     const palette = {
       Pending: { bg: COLORS.warningBg, color: COLORS.warning, border: COLORS.warning },
       Approved: { bg: COLORS.successBg, color: COLORS.success, border: COLORS.success },
+      Won: { bg: COLORS.successBg, color: COLORS.success, border: COLORS.success },
       Rejected: { bg: COLORS.dangerBg, color: COLORS.danger, border: COLORS.danger },
       Submitted: { bg: COLORS.infoBg, color: COLORS.info, border: COLORS.info },
+      'Not Updated': { bg: COLORS.divider, color: 'gray', border: 'gray' },
     };
     const theme = palette[label] || palette.Pending;
 
@@ -69,9 +73,15 @@ const AccordionItem = ({
           </View>
         </View>
         <View style={styles.rightSideContainer}>
-          <View style={{ marginEnd:wp(4) }}>
+          <View style={{ marginEnd:wp(4) , textAlign:'left'}}>
             <Text style={styles.summaryLabel}>{headerRightLabel}</Text>
-            <Text style={styles.summaryValue} numberOfLines={1} ellipsizeMode="tail">{item.amount}</Text>
+            {headerRightIsStatusBadge ? (
+              <View >
+                <StatusBadge label={String(item.amount)} />
+              </View>
+            ) : (
+              <Text style={styles.summaryValue} numberOfLines={1} ellipsizeMode="tail">{item.amount}</Text>
+            )}
 
           </View>
           <View style={{ position: 'absolute', right: 0, top: 0, }}>
@@ -95,7 +105,11 @@ const AccordionItem = ({
               {customRows.map((row, idx) => (
                 <View key={idx} style={styles.cardRow}>
                   <Text style={styles.cardLabel}>{String(row.label)}</Text>
-                  <Text style={styles.cardValue}>{row.value}</Text>
+                  {row?.isStatus ? (
+                    <StatusBadge label={String(row.value)} />
+                  ) : (
+                    <Text style={styles.cardValue}>{row.value}</Text>
+                  )}
                 </View>
               ))}
             </>
@@ -120,9 +134,20 @@ const AccordionItem = ({
             </>
           )}
           <View style={styles.line} />
+          {Array.isArray(extraRowsAfterLine) && extraRowsAfterLine.length > 0 && (
+            <>
+              {extraRowsAfterLine.map((row, idx) => (
+                <View key={`extra-${idx}`} style={styles.cardRow}>
+                  <Text style={styles.cardLabel}>{String(row.label)}</Text>
+                  <Text style={styles.cardValue}>{String(row.value)}</Text>
+                </View>
+              ))}
+            </>
+          )}
           <View style={styles.actionButtonContainer}>
             {onView && (
-              <TouchableOpacity style={styles.actionButton1} onPress={() => onView(item)}>
+              <TouchableOpacity style={styles.actionButton1}   activeOpacity={0.85}
+                 onPress={() => onView(item)}>
                 <Text style={styles.actionButtonText1}>View</Text>
               </TouchableOpacity>
             )}
@@ -255,12 +280,12 @@ const styles = StyleSheet.create({
     marginHorizontal: -wp(1.2),
   },
   actionButton1: {
-    flex: 1,
+    // flex: 1,
     paddingVertical: hp(1.2),
-    paddingHorizontal: wp(2.5),
+    paddingHorizontal: wp(8.5),
     borderRadius: wp(2.5),
     borderWidth: 1,
-    borderColor: COLORS.warning,
+    borderColor: COLORS.TextWarning,
     marginHorizontal: wp(1),
     alignItems: 'center',
     justifyContent: 'center',
@@ -292,7 +317,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   actionButtonText1: {
-    color: COLORS.warning,
+    color: COLORS.TextWarning,
     fontSize: rf(3),
     fontWeight: '800',
     textAlign: 'center',

@@ -94,7 +94,7 @@ const PATHS = {
     // Timesheet - For Approval
     timesheetsForApproval: Config.API_TIMESHEETS_FOR_APPROVAL_PATH || '/api/TimeSheet/TimesheetsForApproval',
     approveTimesheet: Config.API_APPROVE_TIMESHEET_PATH || '/api/TimeSheet/ApproveTimesheet',
-    timesheetSlip: '/api/TimeSheet/GetTimesheetPDF',
+    timesheetSlip: '/api/TimeSheet/api/timesheet/slip',
     expenseSlip: '/api/Expense/expense-slip',
     // Dashboard Lead Summary
     getDashboardLeadSummary: Config.API_GET_DASHBOARD_LEAD_SUMMARY_PATH || '/api/DashBoard/GetDashboardLeadSummary',
@@ -2299,7 +2299,7 @@ export async function rejectTimesheet({ headerUuid, cmpUuid, envUuid, userUuid, 
 }
 
 // Dashboard: Get Lead Summary
-export async function getDashboardLeadSummary({ cmpUuid, envUuid, superAdminUuid } = {}) {
+export async function getDashboardLeadSummary({ cmpUuid, envUuid, superAdminUuid, start, length } = {}) {
     try {
         // Resolve missing IDs from storage
         if (!cmpUuid || !envUuid || !superAdminUuid) {
@@ -2347,7 +2347,10 @@ export async function getDashboardLeadSummary({ cmpUuid, envUuid, superAdminUuid
         const params = {
             cmpUuid: cmpUuid,
             envUuid: envUuid,
-            superAdminUuid: superAdminUuid
+            superAdminUuid: superAdminUuid,
+            // Optional server-side pagination (support multiple casings)
+            ...(start !== undefined && { start, Start: start }),
+            ...(length !== undefined && { length, Length: length }),
         };
 
         try {

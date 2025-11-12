@@ -21,6 +21,7 @@ export const COLORS = {
   edit: '#16a34a',
   delete: '#EF4444',
   view: '#22c55e',
+  TextWarning:'#6b7280',
 
   // Neutral
   text: '#111827',

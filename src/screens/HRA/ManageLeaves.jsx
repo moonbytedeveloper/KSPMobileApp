@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1),
     paddingHorizontal: wp(2.5),
     borderRadius: wp(2.5),
-    borderColor: '#6b7280',
+    borderColor: COLORS.TextWarning,
     borderWidth: 1,
     marginHorizontal: wp(1),
     alignItems: 'center',
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
     width:wp(35)
   },
   actionBtnText: {
-    color: '#6b7280',
+    color: COLORS.TextWarning,
     fontSize: rf(3),
     fontWeight: '800',
   },

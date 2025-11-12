@@ -1,120 +1,158 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
-import { wp, hp, rf, safeAreaTop } from '../../utils/responsive';
-import { COLORS, TYPOGRAPHY } from '../styles/styles';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AppHeader from '../../components/common/AppHeader';
 import AccordionItem from '../../components/common/AccordionItem';
-import { getTotalHoursReported } from '../../api/authServices';
-import { getUUID, getCMPUUID, getENVUUID } from '../../api/tokenStorage';
 import Loader from '../../components/common/Loader';
-// Sample data shaped for AccordionItem
-// expenseName -> employee name, amount -> project name
- 
+import { getTotalHoursReported } from '../../api/authServices';
+import { getCMPUUID, getENVUUID } from '../../api/tokenStorage';
+import { hp, rf, wp } from '../../utils/responsive';
+import { COLORS, TYPOGRAPHY } from '../styles/styles';
+
+// Screen to show Project -> Task -> Employee hours with pagination and list-only loader
 const TotalHoursReportedScreen = ({ navigation }) => {
   const [activeCode, setActiveCode] = useState(null);
   const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // initial/full fetch indicator (if ever needed for top-level)
+  const [listLoading, setListLoading] = useState(false); // loader shown only over list area (page changes / initial list)
   const [selectedCompanyUUID, setSelectedCompanyUUID] = useState(null);
   const [error, setError] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-  
-  const onRefresh = React.useRef(async () => {
-    await fetchTotalHoursReportedData();
-  });
 
-  // Load required UUIDs first, then fetch data
+  // Client-side pagination state
+  const [pageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(0); // 0-based
+  const [totalRecords, setTotalRecords] = useState(0);
+
+  // INITIAL LOAD: fetch UUIDs then data
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [cmpUUID, envUUID] = await Promise.all([
-          getCMPUUID(),
-          getENVUUID(),
-        ]);
+        const [cmpUUID, envUUID] = await Promise.all([getCMPUUID(), getENVUUID()]);
         setSelectedCompanyUUID(cmpUUID);
-        if (cmpUUID && envUUID ) {
+        if (cmpUUID && envUUID) {
           await fetchTotalHoursReportedData({ cmpUuid: cmpUUID, envUuid: envUUID });
-        } else {
-          console.log('Missing one or more UUIDs', { cmpUUID, envUUID });
         }
       } catch (err) {
-        console.error('Error loading company UUID:', err);
         setError('Failed to load company information');
       }
     };
-    
     loadData();
   }, []);
-  
+
+  // Fetch and normalize API data into flattened accordion items
   const fetchTotalHoursReportedData = async (ids) => {
     try {
       setLoading(true);
+      setListLoading(true);
       setError(null);
-      
-      // Ensure we have the required UUIDs
+
       const cmpUUID = ids?.cmpUuid || ids?.cmpUUID || selectedCompanyUUID || (await getCMPUUID());
       const envUUID = ids?.envUuid || ids?.envUUID || (await getENVUUID());
-      if (!cmpUUID || !envUUID ) {
-        console.log('Missing UUIDs, skipping API call', { cmpUUID, envUUID });
-        return;
-      }
-      
-      console.log('Fetching total hours reported data with params:', {
-        cmpUUID,
-        envUUID,
-      });
-      
+      if (!cmpUUID || !envUUID) return;
+
       const response = await getTotalHoursReported({ cmpUuid: cmpUUID, envUuid: envUUID });
-      
-      console.log('Total hours reported API response:', response.Data);
-      
-      // Handle different response structures
-      let responseData = [];
-      if (response && response.Data) {
-        responseData = Array.isArray(response.Data) ? response.Data : [];
-      } else if (Array.isArray(response.Data)) {
-        responseData = response;
-      }
-      
-      // Map the API response to AccordionItem expected structure
-      const mappedData = responseData.map((item, index) => ({
-        id: item.id || item.projectId || item.employeeId || index,
-        expenseName: item.EmployeeName || item.employee || item.name || 'Unknown Employee',
-        amount: item.ProjectName || item.project || item.title || 'Unknown Project',
-        WorkingHours: item.ReportedHrs || item.hoursWorked || item.totalHours || '0',
-        TotalHours: item.TotalHrs || item.totalWorkingHours || item.hours || '0',
-        // Additional fields that might be useful
-        projectId: item.projectId,
-        employeeId: item.employeeId,
-        fromDate: item.fromDate,
-        toDate: item.toDate,
-      }));
-      
-      console.log('Mapped data for AccordionItem:', mappedData);
-      setData(mappedData);
+
+      const toArray = (v) => (Array.isArray(v) ? v : []);
+      const looksLikeProject = (obj) =>
+        obj && typeof obj === 'object' && ('ProjectName' in obj || 'projectName' in obj || 'Tasks' in obj || 'tasks' in obj);
+      const findProjectsArray = (src, depth = 0) => {
+        if (!src || depth > 4) return [];
+        if (Array.isArray(src)) {
+          if (src.some((el) => looksLikeProject(el))) return src;
+        }
+        if (typeof src === 'object') {
+          for (const key of Object.keys(src)) {
+            const val = src[key];
+            if (Array.isArray(val) && val.some((el) => looksLikeProject(el))) return val;
+            if (val && typeof val === 'object') {
+              const found = findProjectsArray(val, depth + 1);
+              if (found.length) return found;
+            }
+          }
+        }
+        return [];
+      };
+
+      const root = response?.Data ?? response?.data ?? response ?? [];
+      const projects = Array.isArray(root) ? root : findProjectsArray(root);
+
+      const flattened = [];
+      projects.forEach((proj, pIdx) => {
+        const projectName = String(proj?.ProjectName || proj?.projectName || 'Unknown Project');
+        const projectTotal = String(proj?.TotalHours || proj?.totalHours || '0:00');
+        let tasks = toArray(proj?.Tasks || proj?.tasks);
+        // If tasks missing but task-like fields exist at project level, wrap single task
+        if (!tasks.length && (proj?.TaskName || proj?.taskName)) {
+          tasks = [
+            {
+              TaskName: proj?.TaskName || proj?.taskName,
+              TotalUsedHours: proj?.TotalUsedHours || proj?.totalUsedHours || projectTotal || '0:00',
+              HoursUsed: toArray(proj?.HoursUsed || proj?.hoursUsed),
+            },
+          ];
+        }
+        // Placeholder if still no tasks
+        if (!tasks.length) {
+          flattened.push({
+            id: `${pIdx}-no-task-${projectName}`,
+            expenseName: projectName,
+            amount: projectTotal || '0:00',
+            customRows: [{ label: 'Task Name', value: '—' }],
+          });
+          return;
+        }
+        // Each task becomes one accordion item
+        tasks.forEach((task, tIdx) => {
+          const taskName = String(task?.TaskName || task?.taskName || 'Unknown Task');
+          const totalUsed = String(task?.TotalUsedHours || task?.totalUsedHours || '0:00');
+          const hoursUsed = toArray(task?.HoursUsed || task?.hoursUsed);
+          const rows = [
+            { label: 'Task Name', value: taskName },
+            ...hoursUsed.map((h, i) => ({
+              label: String(h?.EmployeeName || h?.employeeName || `Employee ${i + 1}`),
+              value: String(h?.UsedHours || h?.usedHours || '0:00'),
+            })),
+          ];
+          flattened.push({
+            id: `${pIdx}-${tIdx}-${projectName}-${taskName}`,
+            expenseName: projectName, // header left
+            amount: projectTotal, // header right (Project Total Hours)
+            customRows: rows,
+            extraRowsAfterLine: [{ label: 'Total Used Hours', value: totalUsed }],
+          });
+        });
+      });
+
+      setData(flattened);
+      setTotalRecords(flattened.length);
     } catch (err) {
-      console.error('Error fetching total hours reported data:', err);
-      setError(err.message || 'Failed to fetch total hours reported data');
-      Alert.alert('Error', 'Failed to load total hours reported data. Please try again.');
+      setError(err?.message || 'Failed to fetch total hours reported data');
+      try { Alert.alert('Error', 'Failed to load total hours reported data. Please try again.'); } catch (_) {}
     } finally {
       setLoading(false);
+      setListLoading(false);
     }
   };
 
-  const handleToggle = (code) => setActiveCode(prev => (prev === code ? null : code));
-  if(loading) {
-    return (
-      <View style={styles.container}>
-      <AppHeader
-        title={'All Proposals'}
-        onLeftPress={() => navigation.goBack()}
-        navigation={navigation}
-        rightNavigateTo={'Notification'}
-        rightIconName={'notifications'}
-      />
-      <Loader />
-    </View>
-    );
-  }
+  // Accordion toggle handler
+  const handleToggle = (code) => setActiveCode((prev) => (prev === code ? null : code));
+
+  // Derived pagination values
+  const totalPages = useMemo(() => Math.ceil((totalRecords || 0) / pageSize) || 0, [totalRecords, pageSize]);
+  const pagedData = useMemo(() => {
+    const start = currentPage * pageSize;
+    const end = start + pageSize;
+    return Array.isArray(data) ? data.slice(start, end) : [];
+  }, [data, currentPage, pageSize]);
+
+  // Page change shows list-only loader briefly
+  const handlePageChange = (page) => {
+    setListLoading(true);
+    const max = Math.max(0, Math.ceil((totalRecords || 0) / pageSize) - 1);
+    const clamped = Math.max(0, Math.min(page, max));
+    setCurrentPage(clamped);
+    setTimeout(() => setListLoading(false), 150);
+  };
+
   return (
     <View style={styles.container}>
       <AppHeader
@@ -126,20 +164,20 @@ const TotalHoursReportedScreen = ({ navigation }) => {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {loading ? (
-          <View style={styles.loadingBox}>
-            <Text style={styles.loadingText}>Loading total hours reported data...</Text>
-          </View>
-        ) : error ? (
+        {error ? (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={fetchTotalHoursReportedData}>
               <Text style={styles.retryButtonText}>Retry</Text>
             </TouchableOpacity>
           </View>
+        ) : listLoading ? (
+          <View style={styles.loadingBox}>
+            <Loader />
+          </View>
         ) : (
           <>
-            {data.map((item) => (
+            {pagedData.map((item) => (
               <AccordionItem
                 key={item.id}
                 item={item}
@@ -148,12 +186,10 @@ const TotalHoursReportedScreen = ({ navigation }) => {
                 onView={false}
                 onEdit={false}
                 onDelete={false}
-                headerLeftLabel={'Employee Name'}
-                headerRightLabel={'Project Name'}
-                customRows={[
-                  { label: 'Working Hours', value: item.WorkingHours },
-                  { label: 'Total Hours', value: item.TotalHours },
-                ]}
+                headerLeftLabel={'Project Name'}
+                headerRightLabel={'Total Hours'}
+                customRows={item.customRows}
+                extraRowsAfterLine={item.extraRowsAfterLine}
               />
             ))}
             {data.length === 0 && !loading && (
@@ -164,6 +200,63 @@ const TotalHoursReportedScreen = ({ navigation }) => {
           </>
         )}
       </ScrollView>
+
+      {totalRecords > 0 && (
+        <View style={styles.paginationContainer}>
+          <Text style={styles.pageInfo}>
+            Showing {totalRecords === 0 ? 0 : currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, totalRecords)} of {totalRecords} entries
+          </Text>
+          <View style={styles.pageNavigation}>
+            <TouchableOpacity
+              style={[styles.pageButtonTextual, currentPage === 0 && styles.pageButtonDisabled]}
+              disabled={currentPage === 0}
+              onPress={() => handlePageChange(currentPage - 1)}
+            >
+              <Text style={[styles.pageText, currentPage === 0 && styles.pageTextDisabled]}>Previous</Text>
+            </TouchableOpacity>
+
+            {totalPages > 0 && (
+              <>
+                <TouchableOpacity
+                  style={[styles.pageNumberBtn, currentPage === 0 && styles.pageNumberBtnActive]}
+                  onPress={() => handlePageChange(0)}
+                >
+                  <Text style={[styles.pageNumberText, currentPage === 0 && styles.pageNumberTextActive]}>1</Text>
+                </TouchableOpacity>
+                {totalPages > 3 && (
+                  <View style={styles.pageDots}>
+                    <Text style={styles.pageNumberText}>...</Text>
+                  </View>
+                )}
+                {totalPages > 2 && (
+                  <TouchableOpacity
+                    style={[styles.pageNumberBtn, currentPage === totalPages - 2 && styles.pageNumberBtnActive]}
+                    onPress={() => handlePageChange(Math.max(0, totalPages - 2))}
+                  >
+                    <Text style={[styles.pageNumberText, currentPage === totalPages - 2 && styles.pageNumberTextActive]}>{Math.max(1, totalPages - 1)}</Text>
+                  </TouchableOpacity>
+                )}
+                {totalPages > 1 && (
+                  <TouchableOpacity
+                    style={[styles.pageNumberBtn, currentPage === totalPages - 1 && styles.pageNumberBtnActive]}
+                    onPress={() => handlePageChange(totalPages - 1)}
+                  >
+                    <Text style={[styles.pageNumberText, currentPage === totalPages - 1 && styles.pageNumberTextActive]}>{totalPages}</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+
+            <TouchableOpacity
+              style={[styles.pageButtonTextual, currentPage >= totalPages - 1 && styles.pageButtonDisabled]}
+              disabled={currentPage >= totalPages - 1}
+              onPress={() => handlePageChange(currentPage + 1)}
+            >
+              <Text style={[styles.pageText, currentPage >= totalPages - 1 && styles.pageTextDisabled]}>Next</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -174,7 +267,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.bg,
-   // paddingTop: safeAreaTop,
   },
   header: {
     flexDirection: 'row',
@@ -239,6 +331,75 @@ const styles = StyleSheet.create({
     color: COLORS.bg,
     fontSize: rf(3.2),
     fontFamily: TYPOGRAPHY.fontFamilyBold,
+  },
+  paginationContainer: {
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1),
+    backgroundColor: '#f8f9fa',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  pageNavigation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(2.5),
+    marginBottom: hp(1),
+  },
+  pageButtonTextual: {
+    paddingVertical: hp(0.8),
+    paddingHorizontal: wp(3),
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: wp(2),
+    backgroundColor: '#fff',
+  },
+  pageButtonDisabled: {
+    backgroundColor: '#f3f4f6',
+  },
+  pageText: {
+    fontSize: rf(3.5),
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  pageTextDisabled: {
+    color: '#9ca3af',
+  },
+  pageDots: {
+    paddingHorizontal: wp(1.5),
+    minWidth: wp(8),
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: hp(0.8),
+  },
+  pageNumberBtn: {
+    minWidth: wp(8),
+    paddingVertical: hp(0.8),
+    paddingHorizontal: wp(2.4),
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: wp(2),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  pageNumberBtnActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  pageNumberText: {
+    fontSize: rf(3.6),
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+  pageNumberTextActive: {
+    color: '#fff',
+  },
+  pageInfo: {
+    fontSize: rf(3.5),
+    color: '#6b7280',
+    marginBottom: hp(0.5),
+    textAlign: 'center',
   },
 });
 
