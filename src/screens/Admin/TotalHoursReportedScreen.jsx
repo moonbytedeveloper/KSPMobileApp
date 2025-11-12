@@ -12,9 +12,9 @@ import { COLORS, TYPOGRAPHY } from '../styles/styles';
 const TotalHoursReportedScreen = ({ navigation }) => {
   const [activeCode, setActiveCode] = useState(null);
   const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false); // initial/full fetch indicator (if ever needed for top-level)
-  const [listLoading, setListLoading] = useState(false); // loader shown only over list area (page changes / initial list)
+  const [loading, setLoading] = useState(false); // initial/full fetch indicator (used to suppress empty state during fetch)
   const [selectedCompanyUUID, setSelectedCompanyUUID] = useState(null);
+  const [listLoading, setListLoading] = useState(false); // loader only for pagination page changes
   const [error, setError] = useState(null);
 
   // Client-side pagination state
@@ -41,8 +41,7 @@ const TotalHoursReportedScreen = ({ navigation }) => {
   // Fetch and normalize API data into flattened accordion items
   const fetchTotalHoursReportedData = async (ids) => {
     try {
-      setLoading(true);
-      setListLoading(true);
+  setLoading(true);
       setError(null);
 
       const cmpUUID = ids?.cmpUuid || ids?.cmpUUID || selectedCompanyUUID || (await getCMPUUID());
@@ -89,7 +88,7 @@ const TotalHoursReportedScreen = ({ navigation }) => {
               HoursUsed: toArray(proj?.HoursUsed || proj?.hoursUsed),
             },
           ];
-        }
+        } 
         // Placeholder if still no tasks
         if (!tasks.length) {
           flattened.push({
@@ -128,8 +127,7 @@ const TotalHoursReportedScreen = ({ navigation }) => {
       setError(err?.message || 'Failed to fetch total hours reported data');
       try { Alert.alert('Error', 'Failed to load total hours reported data. Please try again.'); } catch (_) {}
     } finally {
-      setLoading(false);
-      setListLoading(false);
+  setLoading(false);
     }
   };
 
@@ -144,13 +142,13 @@ const TotalHoursReportedScreen = ({ navigation }) => {
     return Array.isArray(data) ? data.slice(start, end) : [];
   }, [data, currentPage, pageSize]);
 
-  // Page change shows list-only loader briefly
+  // Page change shows a small loader in the list area (pagination remains visible)
   const handlePageChange = (page) => {
     setListLoading(true);
     const max = Math.max(0, Math.ceil((totalRecords || 0) / pageSize) - 1);
     const clamped = Math.max(0, Math.min(page, max));
     setCurrentPage(clamped);
-    setTimeout(() => setListLoading(false), 150);
+    setTimeout(() => setListLoading(false), 200);
   };
 
   return (
@@ -172,7 +170,7 @@ const TotalHoursReportedScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         ) : listLoading ? (
-          <View style={styles.loadingBox}>
+          <View style={styles.listLoaderWrapper}>
             <Loader />
           </View>
         ) : (
@@ -190,6 +188,8 @@ const TotalHoursReportedScreen = ({ navigation }) => {
                 headerRightLabel={'Total Hours'}
                 customRows={item.customRows}
                 extraRowsAfterLine={item.extraRowsAfterLine}
+                rowLabelStyleMap={{ 'Task Name': { color: COLORS.primary, fontSize: rf(3.6), fontWeight: '700' } }}
+                rowValueStyleMap={{ 'Task Name': { color: COLORS.primary, fontSize: rf(3.6), fontWeight: '700' } }}
               />
             ))}
             {data.length === 0 && !loading && (
@@ -257,6 +257,11 @@ const TotalHoursReportedScreen = ({ navigation }) => {
           </View>
         </View>
       )}
+      {loading && (
+        <View style={styles.fullscreenLoader}>
+          <Loader />
+        </View>
+      )}
     </View>
   );
 };
@@ -303,6 +308,22 @@ const styles = StyleSheet.create({
   loadingBox: {
     alignItems: 'center',
     paddingVertical: hp(8),
+  },
+  listLoaderWrapper: {
+    minHeight: hp(40),
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: hp(2),
+  },
+  fullscreenLoader: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.6)'
   },
   loadingText: {
     fontSize: rf(3.4),
