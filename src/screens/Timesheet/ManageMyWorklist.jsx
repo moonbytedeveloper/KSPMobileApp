@@ -1447,7 +1447,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(6),
     borderRadius: wp(2.5),
     alignItems: 'center',
-    marginTop: hp(2),
+    marginBottom: hp(2),
     marginHorizontal: 'auto',
     width:wp(35)
   },

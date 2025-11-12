@@ -70,7 +70,8 @@ const BusinessDevelopmentScreen = () => {
       setData(mapRows(rows));
       if (!Array.isArray(rows) || rows.length === 0) {
         const msg = resp?.Data?.Message || resp?.Message || 'No leads found';
-        setApiError(String(msg));
+        const trimmed = String(msg || '').trim();
+        setApiError(trimmed);
       } else {
         setApiError('');
       }
@@ -85,8 +86,8 @@ const BusinessDevelopmentScreen = () => {
     } catch (e) {
       setData([]);
       setTotalRecords(0);
-      const msg = (e?.response?.data?.Message) || (e?.response?.data?.message) || (e?.message) || 'Failed to load leads';
-      setApiError(String(msg));
+  const msg = (e?.response?.data?.Message) || (e?.response?.data?.message) || (e?.message) || 'Failed to load leads';
+  setApiError(String(msg || '').trim());
     } finally {
       setLoading(false);
     }
@@ -325,7 +326,7 @@ const BusinessDevelopmentScreen = () => {
             refreshing={loading}
             onRefresh={() => fetchWonLeads(currentPage, itemsPerPage, searchValue)}
           />
-          {(!loading && data.length === 0 && !!apiError) ? (
+          {(!loading && data.length === 0 && (apiError || '').trim().length > 0) ? (
             <View style={styles.apiErrorWrap}><Text style={styles.apiErrorText}>{apiError}</Text></View>
           ) : null}
         </View>
@@ -545,6 +546,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(2),
   },
   apiErrorWrap: {
+    flex:1,
     minHeight: hp(20),
     alignItems: 'center',
     justifyContent: 'center',

@@ -934,7 +934,7 @@ const TimesheetScreen = ({ navigation }) => {
           setPickerVisible(false);
           setIsDropdownOpen(false);
         }}
-        snapPoints={isDropdownOpen ? [hp(75), hp(75)] : snapPoints}
+        snapPoints={isDropdownOpen ? [hp(50), hp(75)] : snapPoints}
         enablePanDownToClose
         enableContentPanningGesture={false}
         backdropOpacity={0.45}

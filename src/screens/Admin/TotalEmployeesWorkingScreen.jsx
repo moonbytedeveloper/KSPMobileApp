@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { wp, hp, rf, safeAreaTop } from '../../utils/responsive';
 import { COLORS, TYPOGRAPHY } from '../styles/styles';
@@ -17,6 +17,10 @@ const TotalEmployeesWorkingScreen = ({ navigation }) => {
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Pagination state
+  const [pageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(0); // 0-based
+  const [totalRecords, setTotalRecords] = useState(0);
 
   const handleToggle = (code) => setActiveCode(prev => (prev === code ? null : code));
   const handleView = () => {};
@@ -96,8 +100,9 @@ const TotalEmployeesWorkingScreen = ({ navigation }) => {
         };
       });
 
-      console.log('Mapped data for AccordionItem:', mapped);
-      setData(mapped);
+  console.log('Mapped data for AccordionItem:', mapped);
+  setData(mapped);
+  setTotalRecords(mapped.length);
     } catch (err) {
       console.error('Error fetching total employee working data:', err);
       setError(err.message || 'Failed to fetch total employee working data');
@@ -105,6 +110,59 @@ const TotalEmployeesWorkingScreen = ({ navigation }) => {
     } finally {
       setLoading(false);
     }
+  };
+  
+  // Derived pagination values
+  const totalPages = useMemo(() => Math.ceil((totalRecords || 0) / pageSize) || 0, [totalRecords, pageSize]);
+  const pagedData = useMemo(() => {
+    const start = currentPage * pageSize;
+    const end = start + pageSize;
+    return Array.isArray(data) ? data.slice(start, end) : [];
+  }, [data, currentPage, pageSize]);
+
+  // Adaptive page items (Prev, dynamic pages with ellipses, Next) similar to AllLeads
+  const pageItems = useMemo(() => {
+    if (!totalPages) return [];
+    if (totalPages === 1) return [1];
+    const items = [];
+    const current = currentPage + 1; // 1-based
+    const last = totalPages;
+    items.push('prev');
+    let pages = [];
+    if (last <= 4) {
+      for (let p = 1; p <= last; p++) pages.push(p);
+    } else if (current <= 2) {
+      pages = [1, 2, 3, last];
+    } else if (current >= last - 1) {
+      pages = [1, last - 2, last - 1, last];
+    } else {
+      pages = [1, current - 1, current, last];
+    }
+    pages = Array.from(new Set(pages)).sort((a, b) => a - b);
+    if (last > 4) {
+      while (pages.length < 4) {
+        const first = pages[0];
+        const lastNum = pages[pages.length - 1];
+        if (first > 1) pages.unshift(first - 1);
+        else if (lastNum < last) pages.push(lastNum + 1);
+        else break;
+      }
+    }
+    const isNearEnd = pages[1] === last - 2 && pages[2] === last - 1;
+    items.push(pages[0]);
+    if (isNearEnd && pages[1] > pages[0] + 1) items.push('left-ellipsis');
+    items.push(pages[1]);
+    items.push(pages[2]);
+    if (!isNearEnd && pages[3] > pages[2] + 1) items.push('right-ellipsis');
+    items.push(pages[3]);
+    items.push('next');
+    return items;
+  }, [currentPage, totalPages]);
+
+  const handlePageChange = (page) => {
+    const max = Math.max(0, Math.ceil((totalRecords || 0) / pageSize) - 1);
+    const clamped = Math.max(0, Math.min(page, max));
+    setCurrentPage(clamped);
   };
   if(loading) {
     return (
@@ -145,7 +203,7 @@ const TotalEmployeesWorkingScreen = ({ navigation }) => {
           </View>
         ) : (
           <>
-            {data.map((item) => (
+            {pagedData.map((item) => (
               <AccordionItem
                 key={item.soleExpenseCode}
                 item={item}
@@ -174,6 +232,61 @@ const TotalEmployeesWorkingScreen = ({ navigation }) => {
           </>
         )}
       </ScrollView>
+
+      {totalRecords > 0 && (
+        <View style={styles.paginationContainer}>
+          <Text style={styles.pageInfo}>
+            Showing {totalRecords === 0 ? 0 : currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, totalRecords)} of {totalRecords} entries
+          </Text>
+          <View style={styles.pageNavigation}>
+            {pageItems.map((it, idx) => {
+              if (it === 'prev') {
+                const disabled = currentPage === 0;
+                return (
+                  <TouchableOpacity
+                    key={`prev-${idx}`}
+                    style={[styles.pageButtonTextual, disabled && styles.pageButtonDisabled]}
+                    disabled={disabled}
+                    onPress={() => handlePageChange(currentPage - 1)}
+                  >
+                    <Text style={[styles.pageText, disabled && styles.pageTextDisabled]}>Previous</Text>
+                  </TouchableOpacity>
+                );
+              }
+              if (it === 'next') {
+                const disabled = currentPage >= totalPages - 1;
+                return (
+                  <TouchableOpacity
+                    key={`next-${idx}`}
+                    style={[styles.pageButtonTextual, disabled && styles.pageButtonDisabled]}
+                    disabled={disabled}
+                    onPress={() => handlePageChange(currentPage + 1)}
+                  >
+                    <Text style={[styles.pageText, disabled && styles.pageTextDisabled]}>Next</Text>
+                  </TouchableOpacity>
+                );
+              }
+              if (it === 'left-ellipsis' || it === 'right-ellipsis') {
+                return (
+                  <View key={`dots-${idx}`} style={styles.pageDots}><Text style={styles.pageNumberText}>...</Text></View>
+                );
+              }
+              if (typeof it !== 'number') return null;
+              const pageNum = it;
+              const active = pageNum === currentPage + 1;
+              return (
+                <TouchableOpacity
+                  key={`p-${pageNum}`}
+                  style={[styles.pageNumberBtn, active && styles.pageNumberBtnActive]}
+                  onPress={() => handlePageChange(pageNum - 1)}
+                >
+                  <Text style={[styles.pageNumberText, active && styles.pageNumberTextActive]}>{pageNum}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -250,6 +363,76 @@ const styles = StyleSheet.create({
     color: COLORS.bg,
     fontSize: rf(3.2),
     fontFamily: TYPOGRAPHY.fontFamilyBold,
+  },
+  // Pagination styles (aligned with other screens)
+  paginationContainer: {
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1),
+    backgroundColor: '#f8f9fa',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  pageNavigation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(2.5),
+    marginBottom: hp(1),
+  },
+  pageButtonTextual: {
+    paddingVertical: hp(0.8),
+    paddingHorizontal: wp(3),
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: wp(2),
+    backgroundColor: '#fff',
+  },
+  pageButtonDisabled: {
+    backgroundColor: '#f3f4f6',
+  },
+  pageText: {
+    fontSize: rf(3.5),
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  pageTextDisabled: {
+    color: '#9ca3af',
+  },
+  pageDots: {
+    paddingHorizontal: wp(1.5),
+    minWidth: wp(8),
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: hp(0.8),
+  },
+  pageNumberBtn: {
+    minWidth: wp(8),
+    paddingVertical: hp(0.8),
+    paddingHorizontal: wp(2.4),
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: wp(2),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  pageNumberBtnActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  pageNumberText: {
+    fontSize: rf(3.6),
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+  pageNumberTextActive: {
+    color: '#fff',
+  },
+  pageInfo: {
+    fontSize: rf(3.5),
+    color: '#6b7280',
+    marginBottom: hp(0.5),
+    textAlign: 'center',
   },
   
 });
