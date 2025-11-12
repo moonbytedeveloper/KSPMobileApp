@@ -73,8 +73,8 @@ const AccordionItem = ({
           </View>
         </View>
         <View style={styles.rightSideContainer}>
-          <View style={{ marginEnd:wp(4) , textAlign:'left'}}>
-            <Text style={styles.summaryLabel}>{headerRightLabel}</Text>
+          <View style={{ marginEnd:wp(4) ,  alignItems: 'flex-end'}}>
+            <Text style={[styles.summaryLabel, { textAlign: 'right' }]}>{headerRightLabel}</Text>
             {headerRightIsStatusBadge ? (
               <View >
                 <StatusBadge label={String(item.amount)} />
