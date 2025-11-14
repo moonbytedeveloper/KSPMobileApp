@@ -396,7 +396,23 @@ const ProfileScreen = () => {
   };
   
   if (loading && !profileData) {
-    return <Loader />;
+    return (
+      <View style={styles.container}>
+        <AppHeader
+          title="Profile"
+          onLeftPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+              return; // show back when opened from Drawer
+            } else {
+              setActiveIndex(0);
+            }
+          }}
+          onRightPress={() => navigation.navigate('Notification')}
+        />
+        <Loader />
+      </View>
+    );
   }
 
   return (

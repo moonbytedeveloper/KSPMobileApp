@@ -397,6 +397,30 @@ const ExpenseScreen = ({ navigation }) => {
   //   return <Loader />;
   // }
 
+  // Show header + blocking loader when screen is first visited (no data yet)
+  if (loading ) {
+    return (
+      <View style={styles.container}>
+        <AppHeader
+        title="Expense Reimbursement"
+        // onLeftPress={() =>  setActiveIndex(0)}
+        onLeftPress={() => {
+          if (navigation.canGoBack()) {
+            navigation.goBack()
+            setActiveIndex(0)
+          } else {
+            setActiveIndex(0)
+            // fallback → for BottomTabs (no goBack)
+            // or do nothing
+          }
+        }}
+        onRightPress={() => navigation.navigate('Notification')}
+      />
+        <Loader />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <AppHeader

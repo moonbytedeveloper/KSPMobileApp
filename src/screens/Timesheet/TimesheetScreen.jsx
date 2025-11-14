@@ -686,7 +686,23 @@ const TimesheetScreen = ({ navigation }) => {
 
   // Full-screen loader while first load is in progress (safe position after all hooks)
   if (isLoading && data.length === 0) {
-    return <Loader />;
+    return (
+      <View style={styles.container}>
+        <AppHeader
+          title="Timesheet"
+          onLeftPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+              setActiveIndex(0);
+            } else {
+              setActiveIndex(0);
+            }
+          }}
+          onRightPress={() => navigation.navigate('Notification')}
+        />
+        <Loader />
+      </View>
+    );
   }
 
   const StatusBadge = ({ label = 'Pending' }) => {
