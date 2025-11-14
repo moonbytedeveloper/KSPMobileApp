@@ -14,7 +14,7 @@ const TotalHoursReportedScreen = ({ navigation }) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false); // initial/full fetch indicator (used to suppress empty state during fetch)
   const [selectedCompanyUUID, setSelectedCompanyUUID] = useState(null);
-  const [listLoading, setListLoading] = useState(false); // loader only for pagination page changes
+  // pagination/page-change uses the same loading flag as initial fetch (AllLeadsScreen style)
   const [error, setError] = useState(null);
 
   // Client-side pagination state
@@ -142,14 +142,31 @@ const TotalHoursReportedScreen = ({ navigation }) => {
     return Array.isArray(data) ? data.slice(start, end) : [];
   }, [data, currentPage, pageSize]);
 
-  // Page change shows a small loader in the list area (pagination remains visible)
+  // Page change uses the main `loading` flag so UI matches AllLeadsScreen (blocking loader during fetch)
   const handlePageChange = (page) => {
-    setListLoading(true);
+    setLoading(true);
     const max = Math.max(0, Math.ceil((totalRecords || 0) / pageSize) - 1);
     const clamped = Math.max(0, Math.min(page, max));
     setCurrentPage(clamped);
-    setTimeout(() => setListLoading(false), 200);
+    // Keep loader visible briefly to simulate fetch latency (or until actual fetch completes)
+    setTimeout(() => setLoading(false), 200);
   };
+
+  // If loading (initial load or page change), show blocking loader like AllLeadsScreen
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <AppHeader
+          title={'Total Hours Reported'}
+          onLeftPress={() => navigation.goBack()}
+          navigation={navigation}
+          rightNavigateTo={'Notification'}
+          rightIconName={'notifications'}
+        />
+        <Loader />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -168,10 +185,6 @@ const TotalHoursReportedScreen = ({ navigation }) => {
             <TouchableOpacity style={styles.retryButton} onPress={fetchTotalHoursReportedData}>
               <Text style={styles.retryButtonText}>Retry</Text>
             </TouchableOpacity>
-          </View>
-        ) : listLoading ? (
-          <View style={styles.listLoaderWrapper}>
-            <Loader />
           </View>
         ) : (
           <>
@@ -310,9 +323,7 @@ const styles = StyleSheet.create({
     paddingVertical: hp(8),
   },
   listLoaderWrapper: {
-    minHeight: hp(40),
-    justifyContent: 'center',
-    alignItems: 'center',
+    minHeight: hp(70),
     paddingVertical: hp(2),
   },
   fullscreenLoader: {
