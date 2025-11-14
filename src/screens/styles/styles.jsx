@@ -138,18 +138,14 @@ export const inputStyles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     paddingHorizontal: SPACING.md,
     paddingVertical: hp(0),
-    minHeight: hp(6.2),
+    minHeight: hp(5.2),
   },
   boxMultiline: {
     paddingVertical: hp(2.2),
     minHeight: 'auto',
   },
   input: {
-    flex: 1,
-    paddingVertical: 0,
-    marginLeft: SPACING.xs,
-    fontSize: TYPOGRAPHY.input,
-    color: COLORS.text,
+    paddingVertical: 0, 
     fontFamily: 'Nunito-Regular',
   },
   inputMultiline: {

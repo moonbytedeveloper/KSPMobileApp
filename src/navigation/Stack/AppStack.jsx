@@ -1,11 +1,13 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useUser } from '../../contexts/UserContext';
 
 // Import screens
 import HomeScreen from '../../screens/Home/HomeScreen';
+import AccountsScreen from '../../screens/Accounts/AccountsScreen.jsx';
+import ManageInquiry from '../../screens/Accounts/ManageInquiry.jsx';
 import BusinessDevelopmentScreen from '../../screens/BusinessDevelopment/BusinessDevelopmentScreen';
 import ExpenseScreen from '../../screens/Expense/ExpenseScreen';
 import HRAAttendance from '../../screens/HRA/HRAAttendance.jsx';
@@ -112,6 +114,16 @@ const AppStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen
+        name="Accounts"
+        component={AccountsScreen}
+        options={{ headerShown: false}}
+      />
+      <Stack.Screen
+        name="ManageInquiry"
+        component={ManageInquiry}
+        options={{ headerShown: false}}
+      />
+       <Stack.Screen
         name="BusinessDevelopment"
         component={BusinessDevelopmentScreen}
         options={{ headerShown: false}}
@@ -309,7 +321,16 @@ const DrawerNavigator = () => {
         component={BottomTabs} 
         options={{ headerShown: false, title: "Home" }} 
       />
-
+      <Drawer.Screen 
+        name="Accounts  " 
+        component={AccountsScreen} 
+        options={{ headerShown: false}} 
+      />
+      <Drawer.Screen 
+        name="ManageInquiry" 
+        component={ManageInquiry} 
+        options={{ headerShown: false}} 
+      />
       {/* Other screens inside Drawer */}
       <Drawer.Screen 
         name="BusinessDevelopment" 
@@ -358,6 +379,16 @@ const AdminDrawerNavigator = () => {
       />
 
       {/* Other screens inside Admin Drawer */}
+       <Drawer.Screen 
+        name="Accounts" 
+        component={AccountsScreen} 
+        options={{ headerShown: false}} 
+      />
+        <Drawer.Screen 
+        name="ManageInquiry" 
+        component={ManageInquiry} 
+        options={{ headerShown: false}} 
+      />
       <Drawer.Screen 
         name="BusinessDevelopment" 
         component={BusinessDevelopmentScreen} 
@@ -388,6 +419,7 @@ const AdminDrawerNavigator = () => {
 
  const CustomDrawerContent = ({ navigation }) => {
   const [showLogout, setShowLogout] = useState(false);
+    const [salesOpen, setSalesOpen] = useState(false);
   const insets = useSafeAreaInsets();
   const { logout, userData, allowedCompanies, selectedCompanyUUID, updateSelectedCompany  } = useUser();
   const [displayName, setDisplayName] = useState('');
@@ -445,6 +477,17 @@ const AdminDrawerNavigator = () => {
       }
     });
   };
+
+    // Animated value to slide the Sales submenu open/closed
+    const salesAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+      Animated.timing(salesAnim, {
+        toValue: salesOpen ? 1 : 0,
+        duration: 220,
+        useNativeDriver: false,
+      }).start();
+    }, [salesOpen, salesAnim]);
 
   return (
     <>
@@ -516,21 +559,80 @@ const AdminDrawerNavigator = () => {
         </View>
       </View>
 
-      {/* Profile - outside the orange header */}
-      {/* <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => navigation.navigate('Profile')}
-        style={styles.cardItem}
-      >
-        <View style={styles.itemLeft}>
-          <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
-            <Icon name="person" size={rf(4)} color="#ff6236" />
-          </View>
-          <Text style={styles.itemLabel}>Profile</Text>
-        </View>
-        <Icon name="chevron-right" size={rf(5)} color="#999" />
-      </TouchableOpacity> */}
+       {/* {can('Accounts') && ( */}
+         <>
+          <Text style={styles.sectionTitle}>Accounts</Text>
+          {/* Sales item now expands a small submenu instead of navigating directly */}
+          <View style={[styles.salesSection, salesOpen && styles.salesSectionOpen]}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setSalesOpen((s) => !s)}
+            style={styles.cardItem}
+          >
+            <View style={styles.itemLeft}>
+              <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
+                <Icon name="leaderboard" size={rf(4)} color={COLORS.primary} />
+              </View>
+              <Text style={styles.itemLabel}>Sales</Text>
+            </View>
+            <Icon name={salesOpen ? 'expand-less' : 'chevron-right'} size={rf(5)} color="#999" />
+          </TouchableOpacity>
 
+          <Animated.View
+            style={[
+              styles.subMenuWrap,
+              {
+                height: salesAnim.interpolate({ inputRange: [0, 1], outputRange: [0, hp(10)] }),
+                opacity: salesAnim,
+              },
+            ]}
+            pointerEvents={salesOpen ? 'auto' : 'none'}
+          >
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => navigateFromDrawer('Accounts')}
+              style={[styles.cardItem, styles.subItem]}
+            >
+              <View style={styles.itemLeft}>
+                <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                  <Icon name="receipt-long" size={rf(3.2)} color={COLORS.primary} />
+                </View>
+                <Text style={styles.itemLabel}>Manage Sales Order</Text>
+              </View>
+              <Icon name="chevron-right" size={rf(5)} color="#999" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => navigateFromDrawer('ManageInquiry')}
+              style={[styles.cardItem, styles.subItem]}
+            >
+              <View style={styles.itemLeft}>
+                <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                  <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
+                </View>
+                <Text style={styles.itemLabel}>Manage Inquiry</Text>
+              </View>
+              <Icon name="chevron-right" size={rf(5)} color="#999" />
+            </TouchableOpacity>
+          </Animated.View>
+          </View>
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => navigateFromDrawer('Accounts')}
+            style={styles.cardItem}
+          >
+            <View style={styles.itemLeft}>
+              <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
+                <Icon name="leaderboard" size={rf(4)} color={COLORS.primary} />
+              </View>
+              <Text style={styles.itemLabel}>Purchase</Text>
+            </View>
+            <Icon name="chevron-right" size={rf(5)} color="#999" />
+          </TouchableOpacity>
+        </>
+       {/* )} */}
       {can('Business Development') && (
         <>
           <Text style={styles.sectionTitle}>Business Development</Text>
@@ -776,6 +878,35 @@ const styles = StyleSheet.create({
   },
   footerSpacer: {
     height: hp(1.2),
+  },
+  subMenuWrap: {
+    paddingHorizontal: wp(2),
+    marginBottom: hp(0.6),
+    overflow: 'hidden',
+  },
+  subItem: {
+    paddingVertical: hp(0.8),
+    marginBottom: hp(0.4),
+    marginLeft: wp(1),
+    // Remove shadows/borders when rendered as submenu to avoid visual artifacts
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
+  },
+  salesSection: {
+    marginBottom: hp(0.6),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e6e6e6',
+    borderRadius: wp(2),
+    overflow: 'hidden',
+  },
+  salesSectionOpen: {
+    backgroundColor: '#f3f4f6',
+    paddingVertical: hp(0.6),
   },
   loadingContainer: {
     flex: 1,
