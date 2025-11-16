@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput} from 'react-native';
+import React, { useMemo, useState, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal, TouchableWithoutFeedback, UIManager, findNodeHandle, Dimensions, Platform } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../utils/responsive';
 import { ScrollView } from 'react-native-gesture-handler';
@@ -21,10 +21,15 @@ const Dropdown = ({
   hideSearch = false,
   onOpenChange,
   isOpen: controlledIsOpen,
+  dropdownListStyle
+  ,
+  renderInModal = false // when true render list in top-level Modal to avoid clipping
 }) => {
   const [uncontrolledIsOpen, setUncontrolledIsOpen] = useState(false);
   const [query, setQuery] = useState('');
-  
+  const inputRef = useRef(null);
+  const [coords, setCoords] = useState({ x: 0, y: 0, width: 0, height: 0 });
+
   // Use controlled state if provided, otherwise use internal state
   const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : uncontrolledIsOpen;
 
@@ -46,9 +51,22 @@ const Dropdown = ({
 
   const displayValue = value ?? '';
 
+  const measure = () => {
+    try {
+      const node = findNodeHandle(inputRef.current);
+      if (!node) return;
+      UIManager.measureInWindow(node, (x, y, width, height) => {
+        setCoords({ x, y, width, height });
+      });
+    } catch (e) {
+      // ignore
+    }
+  };
+
   return (
     <View style={[styles.dropdownWrapper, isOpen && styles.dropdownWrapperOpen, style]}>
       <TouchableOpacity
+        ref={inputRef}
         activeOpacity={0.8}
         style={[styles.inputBox, isOpen && styles.inputFocused, disabled && { opacity: 0.6 }, inputBoxStyle]}
         onPress={() => {
@@ -58,6 +76,10 @@ const Dropdown = ({
             setUncontrolledIsOpen(next);
           }
           onOpenChange && onOpenChange(next);
+          if (renderInModal && next) {
+            // measure after a short delay so layout stabilizes
+            setTimeout(() => measure(), 40);
+          }
         }}
         disabled={disabled}
       >
@@ -71,8 +93,7 @@ const Dropdown = ({
         </Text>
         <Icon name={isOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={rf(5)} color="#8e8e93" />
       </TouchableOpacity>
-
-      {isOpen && (
+      {isOpen && !renderInModal && (
         <View style={styles.dropdownPanel}>
           {!hideSearch && (
             <View style={styles.searchBar}>
@@ -123,6 +144,84 @@ const Dropdown = ({
           </ScrollView>
         </View>
       )}
+
+      {/* modal-based overlay to avoid clipping by parents */}
+      {isOpen && renderInModal && (
+        <Modal transparent animationType="none" visible={isOpen} onRequestClose={() => {
+          if (controlledIsOpen === undefined) setUncontrolledIsOpen(false);
+          onOpenChange && onOpenChange(false);
+        }}>
+          <TouchableWithoutFeedback onPress={() => {
+            if (controlledIsOpen === undefined) setUncontrolledIsOpen(false);
+            onOpenChange && onOpenChange(false);
+          }}>
+            <View style={{ flex: 1 }}>
+              <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+                <View
+                  style={[
+                    styles.dropdownPanel,
+                    {
+                      position: 'absolute',
+                      top: coords.y + coords.height,
+                      left: coords.x,
+                      width: dropdownListStyle && dropdownListStyle.width ? dropdownListStyle.width : coords.width || Dimensions.get('window').width * 0.9,
+                    },
+                    dropdownListStyle,
+                  ]}
+                >
+                  {!hideSearch && (
+                    <View style={styles.searchBar}>
+                      <Icon name="search" size={rf(3.8)} color="#8e8e93" />
+                      <TextInput
+                        style={styles.searchBarInput}
+                        placeholder="Search"
+                        placeholderTextColor="#8e8e93"
+                        value={query}
+                        onChangeText={setQuery}
+                      />
+                    </View>
+                  )}
+                  <ScrollView
+                    style={{ maxHeight: hp(maxPanelHeightPercent) }}
+                    showsVerticalScrollIndicator={false}
+                    nestedScrollEnabled
+                    keyboardShouldPersistTaps="handled"
+                    persistentScrollbar
+                    scrollEnabled
+                  >
+                    {hint ? (
+                      <View style={styles.dropdownHintRow}>
+                        <Text style={styles.dropdownHintText}>{hint}</Text>
+                      </View>
+                    ) : null}
+                    {filteredOptions.map((item, index) => {
+                      const label = getLabel(item);
+                      const key = getKey(item, index);
+                      const isActive = label === value;
+                      return (
+                        <TouchableOpacity
+                          key={key}
+                          style={[styles.dropdownItem, isActive && styles.dropdownItemActive]}
+                          onPress={() => handleChoose(item)}
+                        >
+                          <Text style={[styles.dropdownItemText, isActive && styles.dropdownItemTextActive]}>
+                            {label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                    {filteredOptions.length === 0 && (
+                      <View style={styles.emptyStateBox}>
+                        <Text style={styles.emptyStateText}>No results</Text>
+                      </View>
+                    )}
+                  </ScrollView>
+                </View>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
     </View>
   );
 };
@@ -132,15 +231,16 @@ export default Dropdown;
 const styles = StyleSheet.create({
   dropdownWrapper: {
     position: 'relative',
-    zIndex: 1000,
+    zIndex: 99999,
   },
   dropdownWrapperOpen: {
-    zIndex: 4000,
+    zIndex: 999999,
   },
   inputBox: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: "#fff",
     borderWidth: 0.8,
     borderColor: COLORS.border,
     backgroundColor: COLORS.bg,
@@ -148,11 +248,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     height: hp(5.4),
     marginTop: hp(1.0),
-    
+
   },
   inputFocused: {
     borderColor: COLORS.primary,
-    
+
   },
   inputPlaceholder: {
     color: COLORS.textLight,
@@ -176,8 +276,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 20,
-    zIndex: 1001,
+    elevation: 999999,
+    zIndex: 999999,
+    backgroundColor: "#fff",
   },
   searchBar: {
     flexDirection: 'row',

@@ -22,7 +22,7 @@ const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyl
     );
 };
 
-const ManageInquiry = () => {
+const ManagePurchaseInquiry = () => {
     const [expandedId, setExpandedId] = useState(1);
     const navigation = useNavigation();
     const toggleSection = (id) => setExpandedId((prev) => (prev === id ? null : id));
@@ -145,7 +145,7 @@ const ManageInquiry = () => {
             lineItems
         };
         console.log('Submit payload:', payload);
-        Alert.alert('Success', 'Inquiry submitted successfully');
+        Alert.alert('Success', 'Purchase Inquiry submitted successfully');
     };
 
     const handleCancel = () => {
@@ -156,7 +156,7 @@ const ManageInquiry = () => {
         <>
             <View style={{ flex: 1, backgroundColor: '#fff' }}>
                 <AppHeader
-                    title="Manage Inquiry"
+                    title="Manage Purchase Inquiry"
                     onLeftPress={() => {
                         navigation.goBack();
                     }}
@@ -437,7 +437,7 @@ const ManageInquiry = () => {
     );
 };
 
-export default ManageInquiry;
+export default ManagePurchaseInquiry;
 
 const styles = StyleSheet.create({
     container: {

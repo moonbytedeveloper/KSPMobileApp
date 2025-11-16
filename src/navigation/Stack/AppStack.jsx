@@ -6,7 +6,9 @@ import { useUser } from '../../contexts/UserContext';
 
 // Import screens
 import HomeScreen from '../../screens/Home/HomeScreen';
-import AccountsScreen from '../../screens/Accounts/AccountsScreen.jsx';
+import ManageSalesOrder from '../../screens/Accounts/ManageSalesOrder.jsx';
+import ManagePurchaseOrder from '../../screens/Accounts/managePurchaseOrder.jsx';
+import ManagePurchaseInquiry from '../../screens/Accounts/ManagePurchaseInquiry.jsx';
 import ManageInquiry from '../../screens/Accounts/ManageInquiry.jsx';
 import BusinessDevelopmentScreen from '../../screens/BusinessDevelopment/BusinessDevelopmentScreen';
 import ExpenseScreen from '../../screens/Expense/ExpenseScreen';
@@ -73,7 +75,7 @@ const AppStack = () => {
     <Stack.Navigator
       initialRouteName={isAuthenticated ? (userRole === 'admin' ? 'AdminDashboard' : 'Main') : 'Login'}
     >
-        <Stack.Screen
+      <Stack.Screen
         name="Main"
         component={DrawerNavigator}
         options={{ headerShown: false }}
@@ -103,7 +105,7 @@ const AppStack = () => {
         component={AdminDrawerNavigator}
         options={{ headerShown: false }}
       />
-       <Stack.Screen
+      <Stack.Screen
         name="AllProposals"
         component={AllProposalsScreen}
         options={{ headerShown: false }}
@@ -114,19 +116,29 @@ const AppStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen
-        name="Accounts"
-        component={AccountsScreen}
-        options={{ headerShown: false}}
+        name="ManageSalesOrder"
+        component={ManageSalesOrder}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ManagePurchaseOrder"
+        component={ManagePurchaseOrder}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="ManageInquiry"
         component={ManageInquiry}
-        options={{ headerShown: false}}
+        options={{ headerShown: false }}
       />
-       <Stack.Screen
+      <Stack.Screen
+        name="ManagePurchaseInquiry"
+        component={ManagePurchaseInquiry}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
         name="BusinessDevelopment"
         component={BusinessDevelopmentScreen}
-        options={{ headerShown: false}}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="HRA"
@@ -151,7 +163,7 @@ const AppStack = () => {
       <Stack.Screen
         name="Notification"
         component={NotificationScreen}
-        options={{ 
+        options={{
           headerShown: false,
           headerTitleAlign: 'left',
         }}
@@ -240,7 +252,7 @@ const AppStack = () => {
           headerShown: false,
         }}
       />
-        <Stack.Screen
+      <Stack.Screen
         name="ManageLead"
         component={ManageLeadScreen}
         options={{
@@ -316,45 +328,55 @@ const DrawerNavigator = () => {
       drawerContent={(props) => <CustomDrawerContent {...props} />}
     >
       {/* Tabs (Home page with bottom tabs) */}
-      <Drawer.Screen 
-        name="Tabs" 
-        component={BottomTabs} 
-        options={{ headerShown: false, title: "Home" }} 
+      <Drawer.Screen
+        name="Tabs"
+        component={BottomTabs}
+        options={{ headerShown: false, title: "Home" }}
       />
-      <Drawer.Screen 
-        name="Accounts  " 
-        component={AccountsScreen} 
-        options={{ headerShown: false}} 
+      <Drawer.Screen
+        name="ManageSalesOrder"
+        component={ManageSalesOrder}
+        options={{ headerShown: false }}
       />
-      <Drawer.Screen 
-        name="ManageInquiry" 
-        component={ManageInquiry} 
-        options={{ headerShown: false}} 
+      <Drawer.Screen
+        name="ManagePurchaseOrder"
+        component={ManagePurchaseOrder}
+        options={{ headerShown: false }}
+      />
+      <Drawer.Screen
+        name="ManageInquiry"
+        component={ManageInquiry}
+        options={{ headerShown: false }}
+      />
+      <Drawer.Screen
+        name="ManagePurchaseInquiry"
+        component={ManagePurchaseInquiry}
+        options={{ headerShown: false }}
       />
       {/* Other screens inside Drawer */}
-      <Drawer.Screen 
-        name="BusinessDevelopment" 
-        component={BusinessDevelopmentScreen} 
-        options={{ headerShown: false}} 
-      />
-
-      <Drawer.Screen 
-        name="Expense" 
-        component={ExpenseScreen} 
+      <Drawer.Screen
+        name="BusinessDevelopment"
+        component={BusinessDevelopmentScreen}
         options={{ headerShown: false }}
-        
       />
 
-      <Drawer.Screen 
-        name="Timesheet" 
-        component={TimesheetScreen} 
-        options={{ headerShown: false}} 
+      <Drawer.Screen
+        name="Expense"
+        component={ExpenseScreen}
+        options={{ headerShown: false }}
+
       />
 
-      <Drawer.Screen 
-        name="Profile" 
-        component={ProfileScreen} 
-        options={{headerShown: false}} 
+      <Drawer.Screen
+        name="Timesheet"
+        component={TimesheetScreen}
+        options={{ headerShown: false }}
+      />
+
+      <Drawer.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{ headerShown: false }}
       />
     </Drawer.Navigator>
   );
@@ -372,56 +394,63 @@ const AdminDrawerNavigator = () => {
       drawerContent={(props) => <CustomDrawerContent {...props} />}
     >
       {/* Admin Tabs */}
-      <Drawer.Screen 
-        name="AdminTabs" 
-        component={AdminBottomTabs} 
-        options={{ headerShown: false, title: "Admin Dashboard" }} 
+      <Drawer.Screen
+        name="AdminTabs"
+        component={AdminBottomTabs}
+        options={{ headerShown: false, title: "Admin Dashboard" }}
       />
 
       {/* Other screens inside Admin Drawer */}
-       <Drawer.Screen 
-        name="Accounts" 
-        component={AccountsScreen} 
-        options={{ headerShown: false}} 
-      />
-        <Drawer.Screen 
-        name="ManageInquiry" 
-        component={ManageInquiry} 
-        options={{ headerShown: false}} 
-      />
-      <Drawer.Screen 
-        name="BusinessDevelopment" 
-        component={BusinessDevelopmentScreen} 
-        options={{ headerShown: false}} 
-      />
-
-      <Drawer.Screen 
-        name="Expense" 
-        component={ExpenseScreen} 
+      <Drawer.Screen
+        name="ManageSalesOrder"
+        component={ManageSalesOrder}
         options={{ headerShown: false }}
-        
+      />
+      <Drawer.Screen
+        name="ManageInquiry"
+        component={ManageInquiry}
+        options={{ headerShown: false }}
+      />
+      <Drawer.Screen
+        name="ManagePurchaseInquiry"
+        component={ManagePurchaseInquiry}
+        options={{ headerShown: false }}
+      />
+      <Drawer.Screen
+        name="BusinessDevelopment"
+        component={BusinessDevelopmentScreen}
+        options={{ headerShown: false }}
       />
 
-      <Drawer.Screen 
-        name="Timesheet" 
-        component={TimesheetScreen} 
-        options={{ headerShown: false}} 
+      <Drawer.Screen
+        name="Expense"
+        component={ExpenseScreen}
+        options={{ headerShown: false }}
+
       />
 
-      <Drawer.Screen 
-        name="Profile" 
-        component={ProfileScreen} 
-        options={{headerShown: false}} 
+      <Drawer.Screen
+        name="Timesheet"
+        component={TimesheetScreen}
+        options={{ headerShown: false }}
+      />
+
+      <Drawer.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{ headerShown: false }}
       />
     </Drawer.Navigator>
   );
 };
 
- const CustomDrawerContent = ({ navigation }) => {
+const CustomDrawerContent = ({ navigation }) => {
   const [showLogout, setShowLogout] = useState(false);
-    const [salesOpen, setSalesOpen] = useState(false);
+  const [salesOpen, setSalesOpen] = useState(false);
+  const [purchaseOpen, setPurchaseOpen] = useState(false);
+  const purchaseAnim = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
-  const { logout, userData, allowedCompanies, selectedCompanyUUID, updateSelectedCompany  } = useUser();
+  const { logout, userData, allowedCompanies, selectedCompanyUUID, updateSelectedCompany } = useUser();
   const [displayName, setDisplayName] = useState('');
 
   // Build a fast lookup for menu rights from the first role (primary role)
@@ -452,7 +481,7 @@ const AdminDrawerNavigator = () => {
         if (isMounted && name) {
           setDisplayName(name);
         }
-      } catch (_e) {}
+      } catch (_e) { }
     })();
     return () => { isMounted = false; };
   }, [userData]);
@@ -478,71 +507,79 @@ const AdminDrawerNavigator = () => {
     });
   };
 
-    // Animated value to slide the Sales submenu open/closed
-    const salesAnim = useRef(new Animated.Value(0)).current;
+  // Animated value to slide the Sales submenu open/closed
+  const salesAnim = useRef(new Animated.Value(0)).current;
 
-    useEffect(() => {
-      Animated.timing(salesAnim, {
-        toValue: salesOpen ? 1 : 0,
-        duration: 220,
-        useNativeDriver: false,
-      }).start();
-    }, [salesOpen, salesAnim]);
+  useEffect(() => {
+    Animated.timing(salesAnim, {
+      toValue: salesOpen ? 1 : 0,
+      duration: 220,
+      useNativeDriver: false,
+    }).start();
+  }, [salesOpen, salesAnim]);
+
+  useEffect(() => {
+    Animated.timing(purchaseAnim, {
+      toValue: purchaseOpen ? 1 : 0,
+      duration: 220,
+      useNativeDriver: false,
+    }).start();
+  }, [purchaseOpen, purchaseAnim]);
 
   return (
     <>
-    <DrawerContentScrollView
-      contentContainerStyle={[
-        styles.drawerContainer,
-        styles.drawerContentGrow,
-        { paddingTop: insets.top + extraTopPadding, paddingBottom: insets.bottom + extraBottomPadding },
-      ]}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.headerCard}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity
-            style={styles.headerUser}
-            activeOpacity={0.7}
-            onPress={() => navigateFromDrawer('Profile')}
-          >
-            <View style={styles.avatarCircle}>
-              <Image
-                source={{ uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=ffffff&color=ff6236` }}
-                style={styles.avatarImage}
-              />
-            </View>
-            <Text style={styles.headerName}>{displayName || 'Profile'}</Text>
-          </TouchableOpacity>
+      <DrawerContentScrollView
+        contentContainerStyle={[
+          styles.drawerContainer,
+          styles.drawerContentGrow,
+          { paddingTop: insets.top + extraTopPadding, paddingBottom: insets.bottom + extraBottomPadding },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.headerCard}>
           <View style={styles.headerRow}>
-          {allowedCompanies && allowedCompanies.length > 0 && (
+            <TouchableOpacity
+              style={styles.headerUser}
+              activeOpacity={0.7}
+              onPress={() => navigateFromDrawer('Profile')}
+            >
+              <View style={styles.avatarCircle}>
+                <Image
+                  source={{ uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=ffffff&color=ff6236` }}
+                  style={styles.avatarImage}
+                />
+              </View>
+              <Text style={styles.headerName}>{displayName || 'Profile'}</Text>
+            </TouchableOpacity>
+            <View style={styles.headerRow}>
+              {allowedCompanies && allowedCompanies.length > 0 && (
                 <View style={styles.flagRow}>
                   {allowedCompanies.map((companyUUID, index) => {
                     const isActive = selectedCompanyUUID === companyUUID;
                     const isUSACompany = (uuid) => uuid === 'B4A0A90C-FF73-4956-B2F5-E44D4D0046E0';
                     const isIndiaCompany = (uuid) => uuid === '49537615-532c-4c8c-b451-0f094ccb';
-                    
+
                     return (
                       <TouchableOpacity
                         key={companyUUID}
                         activeOpacity={0.85}
                         onPress={() => updateSelectedCompany(companyUUID)}
                         style={[
-                          styles.flagBadge, 
-                          { 
-                            borderWidth: isActive ? 1.5 : 3, 
-                            borderColor: isActive ? COLORS.bg :COLORS.primary,
+                          styles.flagBadge,
+                          {
+                            borderWidth: isActive ? 1.5 : 3,
+                            borderColor: isActive ? COLORS.bg : COLORS.primary,
                             marginLeft: index > 0 ? wp(1) : 0
                           }
                         ]}
                       >
                         <Image
-                          source={{ 
-                            uri: isUSACompany(companyUUID) 
+                          source={{
+                            uri: isUSACompany(companyUUID)
                               ? 'https://img.icons8.com/color/96/usa-circular.png'
                               : isIndiaCompany(companyUUID)
-                              ? 'https://img.icons8.com/color/96/india-circular.png'
-                              : 'https://img.icons8.com/color/96/globe-circular.png'
+                                ? 'https://img.icons8.com/color/96/india-circular.png'
+                                : 'https://img.icons8.com/color/96/globe-circular.png'
                           }}
                           style={styles.flagImage}
                           resizeMode="cover"
@@ -552,75 +589,130 @@ const AdminDrawerNavigator = () => {
                   })}
                 </View>
               )}
-          <TouchableOpacity onPress={() => navigation.closeDrawer()} style={styles.headerCloseBtn}>
-            <Icon name="close" size={rf(5)} color="#fff" />
-          </TouchableOpacity>
+              <TouchableOpacity onPress={() => navigation.closeDrawer()} style={styles.headerCloseBtn}>
+                <Icon name="close" size={rf(5)} color="#fff" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
 
-       {/* {can('Accounts') && ( */}
-         <>
+        {/* {can('Accounts') && ( */}
+        <>
           <Text style={styles.sectionTitle}>Accounts</Text>
           {/* Sales item now expands a small submenu instead of navigating directly */}
           <View style={[styles.salesSection, salesOpen && styles.salesSectionOpen]}>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => setSalesOpen((s) => !s)}
-            style={styles.cardItem}
-          >
-            <View style={styles.itemLeft}>
-              <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
-                <Icon name="leaderboard" size={rf(4)} color={COLORS.primary} />
-              </View>
-              <Text style={styles.itemLabel}>Sales</Text>
-            </View>
-            <Icon name={salesOpen ? 'expand-less' : 'chevron-right'} size={rf(5)} color="#999" />
-          </TouchableOpacity>
-
-          <Animated.View
-            style={[
-              styles.subMenuWrap,
-              {
-                height: salesAnim.interpolate({ inputRange: [0, 1], outputRange: [0, hp(10)] }),
-                opacity: salesAnim,
-              },
-            ]}
-            pointerEvents={salesOpen ? 'auto' : 'none'}
-          >
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => navigateFromDrawer('Accounts')}
-              style={[styles.cardItem, styles.subItem]}
+              onPress={() => setSalesOpen((s) => !s)}
+              style={styles.cardItem}
             >
               <View style={styles.itemLeft}>
-                <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
-                  <Icon name="receipt-long" size={rf(3.2)} color={COLORS.primary} />
+                <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
+                  <Icon name="leaderboard" size={rf(4)} color={COLORS.primary} />
                 </View>
-                <Text style={styles.itemLabel}>Manage Sales Order</Text>
+                <Text style={styles.itemLabel}>Sales</Text>
               </View>
-              <Icon name="chevron-right" size={rf(5)} color="#999" />
+              <Icon name={salesOpen ? 'expand-less' : 'chevron-right'} size={rf(5)} color="#999" />
             </TouchableOpacity>
 
+            <Animated.View
+              style={[
+                styles.subMenuWrap,
+                {
+                  height: salesAnim.interpolate({ inputRange: [0, 1], outputRange: [0, hp(10)] }),
+                  opacity: salesAnim,
+                },
+              ]}
+              pointerEvents={salesOpen ? 'auto' : 'none'}
+            >
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => navigateFromDrawer('ManageSalesOrder')}
+                style={[styles.cardItem, styles.subItem]}
+              >
+                <View style={styles.itemLeft}>
+                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                    <Icon name="receipt-long" size={rf(3.2)} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.itemLabel}>Manage Sales Order</Text>
+                </View>
+                <Icon name="chevron-right" size={rf(5)} color="#999" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => navigateFromDrawer('ManageInquiry')}
+                style={[styles.cardItem, styles.subItem]}
+              >
+                <View style={styles.itemLeft}>
+                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                    <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.itemLabel}>Manage Inquiry</Text>
+                </View>
+                <Icon name="chevron-right" size={rf(5)} color="#999" />
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+          {/* Sales item now expands a small submenu instead of navigating directly */}
+          <View style={[styles.purchaseSection, purchaseOpen && styles.purchaseSectionOpen]}>
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => navigateFromDrawer('ManageInquiry')}
-              style={[styles.cardItem, styles.subItem]}
+              onPress={() => setPurchaseOpen((s) => !s)}
+              style={styles.cardItem}
             >
               <View style={styles.itemLeft}>
-                <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
-                  <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
+                <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
+                  <Icon name="leaderboard" size={rf(4)} color={COLORS.primary} />
                 </View>
-                <Text style={styles.itemLabel}>Manage Inquiry</Text>
+                <Text style={styles.itemLabel}>Purchase</Text>
               </View>
-              <Icon name="chevron-right" size={rf(5)} color="#999" />
+              <Icon name={purchaseOpen ? 'expand-less' : 'chevron-right'} size={rf(5)} color="#999" />
             </TouchableOpacity>
-          </Animated.View>
+
+            <Animated.View
+              style={[
+                styles.subMenuWrap,
+                {
+                  height: purchaseAnim.interpolate({ inputRange: [0, 1], outputRange: [0, hp(10)] }),
+                  opacity: purchaseAnim,
+                },
+              ]}
+              pointerEvents={purchaseOpen ? 'auto' : 'none'}
+            >
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => navigateFromDrawer('ManagePurchaseOrder')}
+                style={[styles.cardItem, styles.subItem]}
+              >
+                <View style={styles.itemLeft}>
+                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                    <Icon name="receipt-long" size={rf(3.2)} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.itemLabel}>Manage Purchase Order</Text>
+                </View>
+                <Icon name="chevron-right" size={rf(5)} color="#999" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => navigateFromDrawer('ManagePurchaseInquiry')}
+                style={[styles.cardItem, styles.subItem]}
+              >
+                <View style={styles.itemLeft}>
+                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                    <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.itemLabel}>Manage Purchase Inquiry</Text>
+                </View>
+                <Icon name="chevron-right" size={rf(5)} color="#999" />
+              </TouchableOpacity>
+            </Animated.View>
           </View>
 
-          <TouchableOpacity
+          {/* <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => navigateFromDrawer('Accounts')}
+            onPress={() => navigateFromDrawer('ManagePurchaseOrder')}
             style={styles.cardItem}
           >
             <View style={styles.itemLeft}>
@@ -630,136 +722,136 @@ const AdminDrawerNavigator = () => {
               <Text style={styles.itemLabel}>Purchase</Text>
             </View>
             <Icon name="chevron-right" size={rf(5)} color="#999" />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </>
-       {/* )} */}
-      {can('Business Development') && (
-        <>
-          <Text style={styles.sectionTitle}>Business Development</Text>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => navigateFromDrawer('BusinessDevelopment')}
-            style={styles.cardItem}
-          >
-            <View style={styles.itemLeft}>
-              <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
-                <Icon name="leaderboard" size={rf(4)} color={COLORS.primary} />
+        {/* )} */}
+        {can('Business Development') && (
+          <>
+            <Text style={styles.sectionTitle}>Business Development</Text>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => navigateFromDrawer('BusinessDevelopment')}
+              style={styles.cardItem}
+            >
+              <View style={styles.itemLeft}>
+                <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
+                  <Icon name="leaderboard" size={rf(4)} color={COLORS.primary} />
+                </View>
+                <Text style={styles.itemLabel}>Sales Opportunity</Text>
               </View>
-              <Text style={styles.itemLabel}>Sales Opportunity</Text>
+              <Icon name="chevron-right" size={rf(5)} color="#999" />
+            </TouchableOpacity>
+          </>
+        )}
+
+        {can('TimeSheet') && (
+          <>
+            <Text style={styles.sectionTitle}>Timesheet</Text>
+            {[
+              { label: 'Manage Timesheet', route: 'Timesheet', icon: 'assignment' },
+              { label: 'Manage Timesheet Approval', route: 'ManageTimeSheetApproval', icon: 'fact-check' },
+              { label: 'Manage My Worklist', route: 'ManageMyWorklist', icon: 'list-alt' },
+              { label: 'Manage Leaves', route: 'ManageLeaves', icon: 'event-available' },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.label}
+                activeOpacity={0.7}
+                onPress={() => navigateFromDrawer(item.route)}
+                style={styles.cardItem}
+              >
+                <View style={styles.itemLeft}>
+                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
+                    <Icon name={item.icon} size={rf(4)} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.itemLabel}>{item.label}</Text>
+                </View>
+                <Icon name="chevron-right" size={rf(5)} color="#999" />
+              </TouchableOpacity>
+            ))}
+          </>
+        )}
+
+        {can('HRA') && (
+          <>
+            <Text style={styles.sectionTitle}>HRA</Text>
+            {[
+              { label: 'Attendance', route: 'HRA', icon: 'badge' },
+              { label: 'Approve Leave', route: 'ViewAttendance', icon: 'visibility' },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.label}
+                activeOpacity={0.7}
+                onPress={() => navigateFromDrawer(item.route)}
+                style={styles.cardItem}
+              >
+                <View style={styles.itemLeft}>
+                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
+                    <Icon name={item.icon} size={rf(4)} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.itemLabel}>{item.label}</Text>
+                </View>
+                <Icon name="chevron-right" size={rf(5)} color="#999" />
+              </TouchableOpacity>
+            ))}
+          </>
+        )}
+
+        {can('Expense') && (
+          <>
+            <Text style={styles.sectionTitle}>Expense</Text>
+            {[
+              { label: 'Expense Reimbursement', route: 'Expense', icon: 'receipt-long' },
+              { label: 'Expense Approval', route: 'ExpenseApproval', icon: 'fact-check' },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.label}
+                activeOpacity={0.7}
+                onPress={() => navigateFromDrawer(item.route)}
+                style={styles.cardItem}
+              >
+                <View style={styles.itemLeft}>
+                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
+                    <Icon name={item.icon} size={rf(4)} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.itemLabel}>{item.label}</Text>
+                </View>
+                <Icon name="chevron-right" size={rf(5)} color="#999" />
+              </TouchableOpacity>
+            ))}
+          </>
+        )}
+
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => setShowLogout(true)}
+          style={[styles.cardItem, { marginTop: hp(1.2) }]}
+        >
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
+              <Icon name="logout" size={rf(4)} color={COLORS.primary} />
             </View>
-            <Icon name="chevron-right" size={rf(5)} color="#999" />
-          </TouchableOpacity>
-        </>
-      )}
-
-      {can('TimeSheet') && (
-        <>
-          <Text style={styles.sectionTitle}>Timesheet</Text>
-          {[
-            { label: 'Manage Timesheet', route: 'Timesheet', icon: 'assignment' },
-            { label: 'Manage Timesheet Approval', route: 'ManageTimeSheetApproval', icon: 'fact-check' },
-            { label: 'Manage My Worklist', route: 'ManageMyWorklist', icon: 'list-alt' },
-            { label: 'Manage Leaves', route: 'ManageLeaves', icon: 'event-available' },
-          ].map((item) => (
-            <TouchableOpacity
-              key={item.label}
-              activeOpacity={0.7}
-              onPress={() => navigateFromDrawer(item.route)}
-              style={styles.cardItem}
-            >
-              <View style={styles.itemLeft}>
-                <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
-                  <Icon name={item.icon} size={rf(4)} color={COLORS.primary} />
-                </View>
-                <Text style={styles.itemLabel}>{item.label}</Text>
-              </View>
-              <Icon name="chevron-right" size={rf(5)} color="#999" />
-            </TouchableOpacity>
-          ))}
-        </>
-      )}
-
-      {can('HRA') && (
-        <>
-          <Text style={styles.sectionTitle}>HRA</Text>
-          {[
-            { label: 'Attendance', route: 'HRA', icon: 'badge' },
-            { label: 'Approve Leave', route: 'ViewAttendance', icon: 'visibility' },
-          ].map((item) => (
-            <TouchableOpacity
-              key={item.label}
-              activeOpacity={0.7}
-              onPress={() => navigateFromDrawer(item.route)}
-              style={styles.cardItem}
-            >
-              <View style={styles.itemLeft}>
-                <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
-                  <Icon name={item.icon} size={rf(4)} color={COLORS.primary} />
-                </View>
-                <Text style={styles.itemLabel}>{item.label}</Text>
-              </View>
-              <Icon name="chevron-right" size={rf(5)} color="#999" />
-            </TouchableOpacity>
-          ))}
-        </>
-      )}
-
-      {can('Expense') && (
-        <>
-          <Text style={styles.sectionTitle}>Expense</Text>
-          {[
-            { label: 'Expense Reimbursement', route: 'Expense', icon: 'receipt-long' },
-            { label: 'Expense Approval', route: 'ExpenseApproval', icon: 'fact-check' },
-          ].map((item) => (
-            <TouchableOpacity
-              key={item.label}
-              activeOpacity={0.7}
-              onPress={() => navigateFromDrawer(item.route)}
-              style={styles.cardItem}
-            >
-              <View style={styles.itemLeft}>
-                <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
-                  <Icon name={item.icon} size={rf(4)} color={COLORS.primary} />
-                </View>
-                <Text style={styles.itemLabel}>{item.label}</Text>
-              </View>
-              <Icon name="chevron-right" size={rf(5)} color="#999" />
-            </TouchableOpacity>
-          ))}
-        </>
-      )}
-
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => setShowLogout(true)}
-        style={[styles.cardItem, { marginTop: hp(1.2) }]}
-      >
-        <View style={styles.itemLeft}>
-          <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
-            <Icon name="logout" size={rf(4)} color={COLORS.primary} />
+            <Text style={styles.itemLabel}>Logout</Text>
           </View>
-          <Text style={styles.itemLabel}>Logout</Text>
-        </View>
-        <Icon name="chevron-right" size={rf(5)} color="#999" />
-      </TouchableOpacity>
-      <View style={styles.footerSpacer} />
-    </DrawerContentScrollView>
-    <LogoutConfirmSheet
-      visible={showLogout}
-      onCancel={() => setShowLogout(false)}
-      onConfirm={async () => {
-        setShowLogout(false);
-        navigation.closeDrawer();
-        await logout();
-        navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
-      }}
-    />
+          <Icon name="chevron-right" size={rf(5)} color="#999" />
+        </TouchableOpacity>
+        <View style={styles.footerSpacer} />
+      </DrawerContentScrollView>
+      <LogoutConfirmSheet
+        visible={showLogout}
+        onCancel={() => setShowLogout(false)}
+        onConfirm={async () => {
+          setShowLogout(false);
+          navigation.closeDrawer();
+          await logout();
+          navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+        }}
+      />
     </>
   );
 };
 
 const styles = StyleSheet.create({
-    
+
   // Flag styles
   flagRow: {
     flexDirection: 'row',

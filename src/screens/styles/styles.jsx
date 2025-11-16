@@ -132,7 +132,7 @@ export const inputStyles = StyleSheet.create({
   box: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.2,
+    borderWidth: 0.8,
     borderColor: COLORS.border,
     backgroundColor: COLORS.bg,
     borderRadius: RADIUS.lg,
