@@ -22,7 +22,7 @@ const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyl
     );
 };
 
-const ManagePurchaseInquiry = () => {
+const ManageInquiry = () => {
     const [expandedId, setExpandedId] = useState(1);
     const navigation = useNavigation();
     const toggleSection = (id) => setExpandedId((prev) => (prev === id ? null : id));
@@ -145,7 +145,7 @@ const ManagePurchaseInquiry = () => {
             lineItems
         };
         console.log('Submit payload:', payload);
-        Alert.alert('Success', 'Purchase Inquiry submitted successfully');
+        Alert.alert('Success', 'Inquiry submitted successfully');
     };
 
     const handleCancel = () => {
@@ -156,7 +156,7 @@ const ManagePurchaseInquiry = () => {
         <>
             <View style={{ flex: 1, backgroundColor: '#fff' }}>
                 <AppHeader
-                    title="Manage Purchase Inquiry"
+                    title="Add Purchase Inquiry"
                     onLeftPress={() => {
                         navigation.goBack();
                     }}
@@ -170,9 +170,11 @@ const ManagePurchaseInquiry = () => {
                                 <Text style={inputStyles.label}>UUID*</Text>
                                 <View style={[inputStyles.box]}>
                                     <TextInput
-                                        style={[inputStyles.input]}
-                                        value={uuid}
-                                        onChangeText={setUuid}
+                                        style={[
+                                            inputStyles.input,
+                                            { color: COLORS.textLight, fontFamily: TYPOGRAPHY.fontFamilyRegular }
+                                        ]}
+                                        value={''}
                                         placeholder="UUID"
                                         placeholderTextColor={COLORS.textLight}
                                         editable={false}
@@ -190,7 +192,7 @@ const ManagePurchaseInquiry = () => {
                                         getKey={(c) => c}
                                         onSelect={(v) => setCurrencyType(v)}
                                         renderInModal={true}
-                                        inputBoxStyle={inputStyles.box}
+                                        inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                                         textStyle={inputStyles.input}
                                     />
                                 </View>
@@ -202,7 +204,7 @@ const ManagePurchaseInquiry = () => {
                                 <Text style={inputStyles.label}>Request Title*</Text>
                                 <View style={[inputStyles.box]}>
                                     <TextInput
-                                        style={[inputStyles.input]}
+                                        style={[inputStyles.input, { color: COLORS.text }]}
                                         value={requestTitle}
                                         onChangeText={setRequestTitle}
                                         placeholder="eg."
@@ -289,8 +291,8 @@ const ManagePurchaseInquiry = () => {
                                         getKey={(it) => it}
                                         onSelect={(v) => setCurrentItem({ ...currentItem, itemType: v })}
                                         renderInModal={true}
-                                        inputBoxStyle={inputStyles.box}
-                                        textStyle={inputStyles.input}
+                                        inputBoxStyle={[inputStyles.box, { minHeight: hp(4.6), paddingVertical: 0, marginTop: hp(0.5) }]}
+                                        textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
                                     />
                                 </View>
                             </View>
@@ -305,8 +307,8 @@ const ManagePurchaseInquiry = () => {
                                         getKey={(item) => item}
                                         onSelect={(v) => setCurrentItem({ ...currentItem, itemName: v })}
                                         renderInModal={true}
-                                        inputBoxStyle={inputStyles.box}
-                                        textStyle={inputStyles.input}
+                                      inputBoxStyle={[inputStyles.box, { minHeight: hp(4.6), paddingVertical: 0, marginTop: hp(0.5) }]}
+                                        textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
                                     />
                                 </View>
                             </View>
@@ -315,9 +317,9 @@ const ManagePurchaseInquiry = () => {
                         <View style={[styles.row, { marginTop: hp(1.5), alignItems: 'flex-end' }]}>
                             <View style={styles.colSmall}>
                                 <Text style={inputStyles.label}>Quantity*</Text>
-                                <View style={[inputStyles.box]}>
+                                <View style={[inputStyles.box, { marginTop: hp(0.5) }]}> 
                                     <TextInput
-                                        style={[inputStyles.input]}
+                                        style={[inputStyles.input, { flex: 1, fontSize: rf(3.4), color: COLORS.text }]}
                                         value={currentItem.quantity}
                                         onChangeText={(v) => setCurrentItem({ ...currentItem, quantity: v })}
                                         placeholder="eg. Auto fill"
@@ -337,12 +339,14 @@ const ManagePurchaseInquiry = () => {
                                         getKey={(u) => u}
                                         onSelect={(v) => setCurrentItem({ ...currentItem, unit: v })}
                                         renderInModal={true}
-                                        inputBoxStyle={inputStyles.box}
+                                        inputBoxStyle={[inputStyles.box, { marginTop: hp(0.5) }]}
                                         textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
-                            <View style={styles.addButtonWrapper}>
+                          
+                        </View>
+                          <View style={styles.addButtonWrapper}>
                                 <TouchableOpacity
                                     activeOpacity={0.8}
                                     style={styles.addButton}
@@ -351,14 +355,16 @@ const ManagePurchaseInquiry = () => {
                                     <Text style={styles.addButtonText}>Add</Text>
                                 </TouchableOpacity>
                             </View>
-                        </View>
                     </AccordionSection>
+
+                    
 
                     {/* Line Items Table */}
                     {lineItems.length > 0 && (
                         <View style={styles.tableContainer}>
                             <View style={styles.tableWrapper}>
-                                <View style={styles.table}>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                    <View style={styles.table}>
                                     {/* Table Header */}
                                     <View style={styles.thead}>
                                         <View style={styles.tr}>
@@ -368,6 +374,8 @@ const ManagePurchaseInquiry = () => {
                                             <Text style={[styles.th, { width: wp(25) }]}>Action</Text>
                                         </View>
                                     </View>
+
+                                    
 
                                     {/* Table Body */}
                                     <View style={styles.tbody}>
@@ -400,11 +408,14 @@ const ManagePurchaseInquiry = () => {
                                             </View>
                                         ))}
                                     </View>
-                                </View>
+                                    </View>
+                                </ScrollView>
                             </View>
                         </View>
                     )}
                 </ScrollView>
+
+                
 
                 <DatePickerBottomSheet
                     isVisible={openDatePicker}
@@ -437,7 +448,7 @@ const ManagePurchaseInquiry = () => {
     );
 };
 
-export default ManagePurchaseInquiry;
+export default ManageInquiry;
 
 const styles = StyleSheet.create({
     container: {
@@ -516,12 +527,12 @@ const styles = StyleSheet.create({
         width: '48%'
     },
     colSmall: {
-        width: '30%'
+        width: '48%'
     },
     addButtonWrapper: {
         flex: 1,
         alignItems: 'flex-end',
-        paddingBottom: hp(0.3),
+        marginTop: hp(5),
         paddingLeft: wp(2),
     },
     addButton: {
@@ -597,8 +608,8 @@ const styles = StyleSheet.create({
     },
     actionButton: {
         backgroundColor: '#6c757d',
-        paddingVertical: hp(0.6),
-        paddingHorizontal: wp(3),
+        paddingVertical: hp(0.5),
+        paddingHorizontal: wp(2),
         borderRadius: wp(1),
     },
     actionButtonText: {
