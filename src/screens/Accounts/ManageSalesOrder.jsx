@@ -508,7 +508,7 @@ const ManageSalesOrder = () => {
                                                 <Text style={[styles.th, { width: COL_WIDTHS.ITEM }]}>ITEM DETAILS</Text>
                                                 <Text style={[styles.th, { width: COL_WIDTHS.QTY }]}>QUANTITY</Text>
                                                 <Text style={[styles.th, { width: COL_WIDTHS.RATE }]}>RATE</Text>
-                                                <Text style={[styles.th, { width: COL_WIDTHS.TAX }]}>TAX</Text>
+                                                {/* <Text style={[styles.th, { width: COL_WIDTHS.TAX }]}>TAX</Text> */}
                                                 <Text style={[styles.th, { width: COL_WIDTHS.AMOUNT }]}>AMOUNT</Text>
                                                 <Text style={[styles.th, { width: COL_WIDTHS.ACTION }]}>ACTION</Text>
                                             </View>
@@ -593,11 +593,11 @@ const ManageSalesOrder = () => {
                                                     </View>
 
                                                     {/* TAX */}
-                                                    <View style={[styles.td, { width: COL_WIDTHS.TAX }]}>
+                                                    {/* <View style={[styles.td, { width: COL_WIDTHS.TAX }]}>
                                                         <Text style={styles.input}>
                                                             {row.tax ?? '- Non Taxable -'}
                                                         </Text>
-                                                    </View>
+                                                    </View> */}
 
                                                     {/* AMOUNT */}
                                                     <View style={[styles.td, { width: COL_WIDTHS.AMOUNT }]}>

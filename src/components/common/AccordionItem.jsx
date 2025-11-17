@@ -24,6 +24,9 @@ const AccordionItem = ({
   status,
   headerRightIsStatusBadge = false,
   extraRowsAfterLine = [],
+  headerRightComponent = null,
+  headerRightContainerStyle,
+  footerComponent = null,
 }) => {
   // Defer delete confirmation to the screen-level bottom sheet
   const StatusBadge = ({ label= 'Pending' }) => {
@@ -72,18 +75,25 @@ const AccordionItem = ({
             <Text style={styles.summaryValue} numberOfLines={1} ellipsizeMode="tail">{item.expenseName}</Text>
           </View>
         </View>
-        <View style={styles.rightSideContainer}>
-          <View style={{ marginEnd:wp(4) ,  alignItems: 'flex-end'}}>
-            <Text style={[styles.summaryLabel, { textAlign: 'right' }]}>{headerRightLabel}</Text>
-            {headerRightIsStatusBadge ? (
-              <View >
-                <StatusBadge label={String(item.amount)} />
-              </View>
-            ) : (
-              <Text style={styles.summaryValue} numberOfLines={1} ellipsizeMode="tail">{item.amount}</Text>
-            )}
+        <View style={[styles.rightSideContainer, headerRightContainerStyle]}>
+          {!!headerRightLabel && (
+            <View style={{ marginEnd:wp(4) ,  alignItems: 'flex-end'}}>
+              <Text style={[styles.summaryLabel, { textAlign: 'right' }]}>{headerRightLabel}</Text>
+              {headerRightIsStatusBadge ? (
+                <View >
+                  <StatusBadge label={String(item.amount)} />
+                </View>
+              ) : (
+                <Text style={styles.summaryValue} numberOfLines={1} ellipsizeMode="tail">{item.amount}</Text>
+              )}
 
-          </View>
+            </View>
+          )}
+          {headerRightComponent && (
+            <View style={styles.customHeaderRight}>
+              {headerRightComponent}
+            </View>
+          )}
           <View style={{ position: 'absolute', right: 0, top: 0, }}>
             <Svg
               width={rf(3)}
@@ -144,35 +154,38 @@ const AccordionItem = ({
               ))}
             </>
           )}
-          <View style={styles.actionButtonContainer}>
-            {onView && (
-              <TouchableOpacity style={styles.actionButton1}   activeOpacity={0.85}
-                 onPress={() => onView(item)}>
-                <Text style={styles.actionButtonText1}>View</Text>
-              </TouchableOpacity>
-            )}
-            {onEdit && (
-              <TouchableOpacity style={styles.actionButton2} onPress={() => onEdit(item)}>
-                <Text style={styles.actionButtonText2}>Edit</Text>
-              </TouchableOpacity>
-            )}
-            {onDelete && (
-              <TouchableOpacity style={styles.actionButton3} onPress={() => onDelete(item.soleExpenseCode)}>
-                <Text style={styles.actionButtonText3}>Delete</Text>
-              </TouchableOpacity>
-            )}
-            {showSubmitButton && (
-              <TouchableOpacity
-                activeOpacity={0.8}
-                style={styles.submitButtonContainer}
-                onPress={() => navigation?.navigate('Main', { screen: 'Timesheet' })}
-              >
-                <View style={styles.submitButton}>
-                  <Text style={styles.submitButtonText}>Submit Timesheet</Text>
-                </View>
-              </TouchableOpacity>
-            )}
-          </View>
+          {(onView || onEdit || onDelete || showSubmitButton) && (
+            <View style={styles.actionButtonContainer}>
+              {onView && (
+                <TouchableOpacity style={styles.actionButton1}   activeOpacity={0.85}
+                   onPress={() => onView(item)}>
+                  <Text style={styles.actionButtonText1}>View</Text>
+                </TouchableOpacity>
+              )}
+              {onEdit && (
+                <TouchableOpacity style={styles.actionButton2} onPress={() => onEdit(item)}>
+                  <Text style={styles.actionButtonText2}>Edit</Text>
+                </TouchableOpacity>
+              )}
+              {onDelete && (
+                <TouchableOpacity style={styles.actionButton3} onPress={() => onDelete(item.soleExpenseCode)}>
+                  <Text style={styles.actionButtonText3}>Delete</Text>
+                </TouchableOpacity>
+              )}
+              {showSubmitButton && (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={styles.submitButtonContainer}
+                  onPress={() => navigation?.navigate('Main', { screen: 'Timesheet' })}
+                >
+                  <View style={styles.submitButton}>
+                    <Text style={styles.submitButtonText}>Submit Timesheet</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+          {footerComponent}
         </View>
       )}
 
@@ -242,6 +255,11 @@ const styles = StyleSheet.create({
     gap: wp(2.5),
     marginLeft: wp(2),
     maxWidth: '40%',
+  },
+  customHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
   },
   toggleIcon: {},
   accordionBody: {

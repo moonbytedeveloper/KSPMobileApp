@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert 
 import AppHeader from '../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import AccordionItem from '../../components/common/AccordionItem';
+import Dropdown from '../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../styles/styles';
@@ -14,134 +15,231 @@ const SALES_ORDERS = [
         customerName: 'Moonbyte',
         deliveryDate: '15-12-24',
         dueDate: '15-12-24',
-        amount: '₹1,25,000',     },
+        amount: '₹1,25,000',
+        status: 'Approved',
+        contactPerson: 'Riya Sharma',
+        email: 'riya@moonbyte.com',
+        phone: '+91 98202 45892',
+        city: 'Mumbai',
+        createdOn: '02-11-24',
+        notes: 'Awaiting final PO confirmation.',
+        nextAction: 'Share final invoice draft',
+        owner: 'Meera Patel',
+    },
     {
         id: 'KP1525',
         salesOrderNumber: 'KP1525',
         customerName: 'Northwind Retail',
         deliveryDate: '04-01-25',
-        dueDate: '15-12-24',
+        dueDate: '20-12-24',
         amount: '₹98,700',
-         },
+        status: 'Pending',
+        contactPerson: 'Anshul Singh',
+        email: 'anshul@northwind.com',
+        phone: '+91 98921 14752',
+        city: 'Pune',
+        createdOn: '05-11-24',
+        notes: 'Need revised payment schedule.',
+        nextAction: 'Confirm revised payment dates',
+        owner: 'Shubham Kulkarni',
+    },
     {
         id: 'KP1526',
         salesOrderNumber: 'KP1526',
         customerName: 'Creative Labs',
         deliveryDate: '22-12-24',
-        dueDate: '15-12-24',
+        dueDate: '18-12-24',
         amount: '₹2,10,000',
-        },
+        status: 'Submitted',
+        contactPerson: 'Neha Patel',
+        email: 'neha@creativelabs.in',
+        phone: '+91 98190 22541',
+        city: 'Ahmedabad',
+        createdOn: '08-11-24',
+        notes: 'Include expedited shipping.',
+        nextAction: 'Send expedited shipping quote',
+        owner: 'Ankit Pawar',
+    },
     {
         id: 'KP1527',
         salesOrderNumber: 'KP1527',
         customerName: 'BlueStone Pvt Ltd',
         deliveryDate: '11-01-25',
-        dueDate: '15-12-24',
+        dueDate: '28-12-24',
         amount: '₹75,420',
-     },
+        status: 'Draft',
+        contactPerson: 'Rohan Malhotra',
+        email: 'rohan@bluestone.com',
+        phone: '+91 99751 74521',
+        city: 'Delhi',
+        createdOn: '10-11-24',
+        notes: 'Waiting for specs approval.',
+        nextAction: 'Collect signed scope document',
+        owner: 'Ishita Batra',
+    },
     {
         id: 'KP1528',
         salesOrderNumber: 'KP1528',
         customerName: 'Aero Technologies',
         deliveryDate: '29-12-24',
-        dueDate: '15-12-24', 
-     },
+        dueDate: '24-12-24',
+        amount: '₹3,42,880',
+        status: 'Approved',
+        contactPerson: 'Sonia Verma',
+        email: 'sonia@aerotech.io',
+        phone: '+91 88501 33211',
+        city: 'Hyderabad',
+        createdOn: '12-11-24',
+        notes: 'Dual currency invoice requested.',
+        nextAction: 'Share USD invoice version',
+        owner: 'Zubin Shah',
+    },
     {
         id: 'KP1529',
         salesOrderNumber: 'KP1529',
         customerName: 'UrbanNest Homes',
         deliveryDate: '05-02-25',
+        dueDate: '12-01-25',
         amount: '₹1,85,300',
-        dueDate: '15-12-24',
-     },
+        status: 'Rejected',
+        contactPerson: 'Kabir Bhatt',
+        email: 'kabir@urbannest.com',
+        phone: '+91 99309 00472',
+        city: 'Bengaluru',
+        createdOn: '15-11-24',
+        notes: 'Pricing not approved.',
+        nextAction: 'Review discount with finance',
+        owner: 'Karan Rao',
+    },
 ];
 
-const PAGE_SIZE = 4;
+const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 
 const ViewSalesOrder = () => {
     const navigation = useNavigation();
     const [activeOrderId, setActiveOrderId] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [itemsPerPage, setItemsPerPage] = useState(Number(ITEMS_PER_PAGE_OPTIONS[1]));
     const [currentPage, setCurrentPage] = useState(0);
 
     const filteredOrders = useMemo(() => {
         const query = searchQuery.trim().toLowerCase();
         if (!query) return SALES_ORDERS;
         return SALES_ORDERS.filter((order) => {
-            const haystack = `${order.salesOrderNumber} ${order.customerName} ${order.contactPerson} `.toLowerCase();
+            const haystack = `${order.salesOrderNumber} ${order.customerName} ${order.contactPerson} ${order.status}`.toLowerCase();
             return haystack.includes(query);
         });
     }, [searchQuery]);
 
-    const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE)), [filteredOrders.length]);
+    const totalPages = useMemo(() => {
+        if (filteredOrders.length === 0) return 0;
+        return Math.ceil(filteredOrders.length / itemsPerPage);
+    }, [filteredOrders.length, itemsPerPage]);
 
     useEffect(() => {
+        if (totalPages === 0) {
+            if (currentPage !== 0) setCurrentPage(0);
+            return;
+        }
         if (currentPage > totalPages - 1) {
             setCurrentPage(totalPages - 1);
         }
     }, [totalPages, currentPage]);
 
     const paginatedOrders = useMemo(() => {
-        const start = currentPage * PAGE_SIZE;
-        return filteredOrders.slice(start, start + PAGE_SIZE);
-    }, [filteredOrders, currentPage]);
+        const start = currentPage * itemsPerPage;
+        return filteredOrders.slice(start, start + itemsPerPage);
+    }, [filteredOrders, currentPage, itemsPerPage]);
 
-    const rangeStart = filteredOrders.length === 0 ? 0 : currentPage * PAGE_SIZE + 1;
-    const rangeEnd = Math.min((currentPage + 1) * PAGE_SIZE, filteredOrders.length);
+    const rangeStart = filteredOrders.length === 0 ? 0 : currentPage * itemsPerPage + 1;
+    const rangeEnd = filteredOrders.length === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, filteredOrders.length);
 
-    const handleQuickAction = (order, action) => {
-        Alert.alert('Action Triggered', `${action.toUpperCase()} clicked for ${order.salesOrderNumber}`);
+    const handleQuickAction = (order, actionLabel) => {
+        Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber}`);
     };
 
-    const renderHeaderActions = (order) => {
+    const renderFooterActions = (order) => {
         const buttons = [
-            { icon: 'delete-outline', action: 'Delete' },
-            { icon: 'file-download', action: 'Download' },
-            { icon: 'chat-bubble-outline', action: 'Message' },
-            { icon: 'visibility', action: 'View' },
-            { icon: 'edit', action: 'Edit' },
+            { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444', action: 'Delete' },
+            { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6', action: 'Download' },
+            { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280', action: 'Forward' },
+            { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E', action: 'View' },
+            { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316', action: 'Update Status'  },
         ];
+
         return (
-            <View style={styles.headerActions}>
+            <View style={styles.cardActionRow}>
                 {buttons.map((btn) => (
                     <TouchableOpacity
                         key={`${order.id}-${btn.icon}`}
-                        style={styles.actionIconButton}
-                        activeOpacity={0.8}
+                        activeOpacity={0.85}
+                        style={[styles.cardActionBtn , { backgroundColor: btn.bg, borderColor: btn.border }]}
                         onPress={() => handleQuickAction(order, btn.action)}
                     >
-                        <Icon name={btn.icon} size={rf(3.5)} color={COLORS.text} />
+                        <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
                     </TouchableOpacity>
                 ))}
             </View>
         );
     };
 
-    const pageNumbers = useMemo(
-        () => Array.from({ length: totalPages }, (_, index) => index),
-        [totalPages]
-    );
+    const pageItems = useMemo(() => {
+        if (totalPages === 0) return [];
+        const items = ['prev'];
+        const current = currentPage + 1;
+        const sequence = [];
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === 1 || i === totalPages || Math.abs(i - current) <= 1) {
+                sequence.push(i);
+            } else if (sequence[sequence.length - 1] !== 'ellipsis') {
+                sequence.push('ellipsis');
+            }
+        }
+        sequence.forEach((entry) => items.push(entry === 'ellipsis' ? 'dots' : entry));
+        items.push('next');
+        return items;
+    }, [currentPage, totalPages]);
+
+    const handlePageChange = (pageIndex) => {
+        const nextPage = Math.max(0, Math.min(pageIndex, Math.max(totalPages - 1, 0)));
+        setCurrentPage(nextPage);
+    };
 
     return (
         <View style={styles.screen}>
                 <AppHeader
                     title="View Sales Order"
-                    onLeftPress={() => {
-                        navigation.goBack();
-                    }}
-                    onRightPress={() => {
-                        navigation.navigate('ManageSalesOrder');
-                    }}
+                onLeftPress={() => navigation.goBack()}
+                onRightPress={() => navigation.navigate('ManageSalesOrder')}
                     rightButtonLabel="Add Sales Order"
-                    showRight={true}
-                />
+                showRight
+            />
             <View style={styles.headerSeparator} />
 
             <View style={styles.controlsWrapper}>
+                <View style={styles.showEntriesRow}>
+                    <Text style={styles.showEntriesLabel}>Show</Text>
+                    <Dropdown
+                        placeholder={String(itemsPerPage)}
+                        value={String(itemsPerPage)}
+                        options={ITEMS_PER_PAGE_OPTIONS}
+                        onSelect={(value) => {
+                            const parsed = parseInt(value, 10);
+                            if (!Number.isNaN(parsed)) {
+                                setItemsPerPage(parsed);
+                                setCurrentPage(0);
+                            }
+                        }}
+                        hideSearch
+                        inputBoxStyle={styles.dropdownInput}
+                        style={styles.dropdownWrapper}
+                    />
+                    <Text style={styles.showEntriesLabel}>entries</Text>
+                </View>
                 <View style={styles.searchInputContainer}>
                     <Icon name="search" size={rf(3.5)} color={COLORS.textLight} />
                     <TextInput
-                        placeholder="Search by customer, order no."
+                        placeholder="Search by customer, order no., status..."
                         placeholderTextColor={COLORS.textLight}
                         style={styles.searchInput}
                         value={searchQuery}
@@ -150,49 +248,6 @@ const ViewSalesOrder = () => {
                             setCurrentPage(0);
                         }}
                     />
-                </View>
-                <View style={styles.paginationMeta}>
-                    <Text style={styles.pageInfoText}>
-                        Showing {filteredOrders.length === 0 ? 0 : rangeStart} to {rangeEnd} of {filteredOrders.length} entries
-                    </Text>
-                    <View style={styles.paginationButtons}>
-                        <TouchableOpacity
-                            style={[styles.pageButton, currentPage === 0 && styles.pageButtonDisabled]}
-                            onPress={() => setCurrentPage((prev) => Math.max(0, prev - 1))}
-                            disabled={currentPage === 0}
-                        >
-                            <Text style={[styles.pageButtonText, currentPage === 0 && styles.pageButtonTextDisabled]}>Prev</Text>
-                        </TouchableOpacity>
-                        {pageNumbers.map((pageIndex) => {
-                            const active = pageIndex === currentPage;
-                            return (
-                                <TouchableOpacity
-                                    key={`page-${pageIndex}`}
-                                    style={[styles.pageNumber, active && styles.pageNumberActive]}
-                                    onPress={() => setCurrentPage(pageIndex)}
-                                >
-                                    <Text style={[styles.pageNumberText, active && styles.pageNumberTextActive]}>{pageIndex + 1}</Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                        <TouchableOpacity
-                            style={[
-                                styles.pageButton,
-                                currentPage >= totalPages - 1 && styles.pageButtonDisabled,
-                            ]}
-                            onPress={() => setCurrentPage((prev) => Math.min(totalPages - 1, prev + 1))}
-                            disabled={currentPage >= totalPages - 1}
-                        >
-                            <Text
-                                style={[
-                                    styles.pageButtonText,
-                                    currentPage >= totalPages - 1 && styles.pageButtonTextDisabled,
-                                ]}
-                            >
-                                Next
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
                 </View>
             </View>
 
@@ -204,18 +259,19 @@ const ViewSalesOrder = () => {
                             soleExpenseCode: order.id,
                             expenseName: order.salesOrderNumber,
                             amount: order.amount,
+                            status: order.status,
                         }}
                         isActive={activeOrderId === order.id}
                         onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
                         customRows={[
-                            { label: 'Customer Name', value: order.customerName }, 
+                            { label: 'Customer Name', value: order.customerName },
                             { label: 'Amount', value: order.amount },
                             { label: 'Delivery Date', value: order.deliveryDate },
                             { label: 'Due Date', value: order.dueDate },
                         ]} 
                         headerLeftLabel="Sales Order Number"
-                        headerRightLabel=""
-                        headerRightComponent={renderHeaderActions(order)}
+                        headerRightLabel="Amount"
+                        footerComponent={renderFooterActions(order)}
                         headerRightContainerStyle={styles.headerRightContainer}
                     />
                 ))}
@@ -229,6 +285,64 @@ const ViewSalesOrder = () => {
                     </View>
                 )}
             </ScrollView>
+
+            {filteredOrders.length > 0 && (
+                <View style={styles.paginationContainer}>
+                    <Text style={styles.pageInfoText}>
+                        Showing {filteredOrders.length === 0 ? 0 : rangeStart} to {rangeEnd} of {filteredOrders.length} entries
+                    </Text>
+                    <View style={styles.paginationButtons}>
+                        {pageItems.map((item, idx) => {
+                            if (item === 'prev') {
+                                const disabled = currentPage === 0;
+                                return (
+                                    <TouchableOpacity
+                                        key={`prev-${idx}`}
+                                        style={[styles.pageButton, disabled && styles.pageButtonDisabled]}
+                                        onPress={() => handlePageChange(currentPage - 1)}
+                                        disabled={disabled}
+                                    >
+                                        <Text style={[styles.pageButtonText, disabled && styles.pageButtonTextDisabled]}>Previous</Text>
+                                    </TouchableOpacity>
+                                );
+                            }
+                            if (item === 'next') {
+                                const disabled = currentPage >= totalPages - 1;
+                                return (
+                                    <TouchableOpacity
+                                        key={`next-${idx}`}
+                                        style={[styles.pageButton, disabled && styles.pageButtonDisabled]}
+                                        onPress={() => handlePageChange(currentPage + 1)}
+                                        disabled={disabled}
+                                    >
+                                        <Text style={[styles.pageButtonText, disabled && styles.pageButtonTextDisabled]}>Next</Text>
+                                    </TouchableOpacity>
+                                );
+                            }
+                            if (item === 'dots') {
+                                return (
+                                    <View key={`dots-${idx}`} style={styles.pageDots}>
+                                        <Text style={styles.pageNumberText}>...</Text>
+                                    </View>
+                                );
+                            }
+                            if (typeof item === 'number') {
+                                const isActive = item === currentPage + 1;
+                                return (
+                                    <TouchableOpacity
+                                        key={`page-${item}`}
+                                        style={[styles.pageNumber, isActive && styles.pageNumberActive]}
+                                        onPress={() => handlePageChange(item - 1)}
+                                    >
+                                        <Text style={[styles.pageNumberText, isActive && styles.pageNumberTextActive]}>{item}</Text>
+                                    </TouchableOpacity>
+                                );
+                            }
+                            return null;
+                        })}
+                    </View>
+                </View>
+            )}
         </View>
     );
 };
@@ -244,9 +358,30 @@ const styles = StyleSheet.create({
     },
     controlsWrapper: {
         paddingHorizontal: wp(4),
-        paddingTop: hp(2),
-        paddingBottom: hp(1),
+        // paddingTop: hp(2),
+        // paddingBottom: hp(1.5),
         backgroundColor: COLORS.bg,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: wp(4),
+    },
+    showEntriesRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2),
+    },
+    showEntriesLabel: {
+        fontSize: rf(3.2),
+        color: COLORS.text,
+        fontFamily: TYPOGRAPHY.fontFamilyMedium,
+    },
+    dropdownWrapper: {
+        width: wp(18),
+    },
+    dropdownInput: {
+        paddingVertical: hp(0.4),
+        borderRadius: RADIUS.md,
     },
     searchInputContainer: {
         flexDirection: 'row',
@@ -265,9 +400,6 @@ const styles = StyleSheet.create({
         color: COLORS.text,
         fontFamily: TYPOGRAPHY.fontFamilyMedium,
     },
-    paginationMeta: {
-        marginTop: hp(1.5),
-    },
     pageInfoText: {
         fontSize: rf(3.2),
         color: COLORS.textLight,
@@ -279,6 +411,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: wp(2),
         flexWrap: 'wrap',
+        justifyContent: 'center',
     },
     pageButton: {
         paddingVertical: hp(0.8),
@@ -321,28 +454,46 @@ const styles = StyleSheet.create({
     pageNumberTextActive: {
         color: '#fff',
     },
+    pageDots: {
+        paddingHorizontal: wp(2),
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: wp(8),
+    },
     listContent: {
         paddingHorizontal: wp(4),
         paddingBottom: hp(4),
-        paddingTop: hp(1),
-    },
-    headerActions: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: wp(1.5),
-    },
-    actionIconButton: {
-        width: wp(8.5),
-        height: wp(8.5),
-        borderRadius: wp(2),
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#fff',
+        // paddingTop: hp(1),
     },
     headerRightContainer: {
         maxWidth: '70%',
+    },
+    cardActionRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: hp(1.5),
+    },
+    cardActionBtn: {
+        width: wp(10),
+        height: wp(10),
+        borderRadius: wp(2),
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        backgroundColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: hp(0.1) },
+        shadowOpacity: 0.08,
+        shadowRadius: hp(0.2),
+        elevation: 1,
+    },
+    paginationContainer: {
+        paddingHorizontal: wp(4),
+        paddingVertical: hp(1.5),
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+        backgroundColor: '#f8f9fb',
     },
     emptyState: {
         paddingVertical: hp(8),
