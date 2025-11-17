@@ -102,6 +102,7 @@ const PATHS = {
     // admin dashboard APIs
     totalHoursReported: '/api/DashBoard/myworklist/projects',
     totalEmployeeWorking: '/api/DashBoard/hr-dashboard/employees-status',
+    getSalesHeaderInquiries: Config.API_GET_SALES_HEADER_INQUIRIES_PATH || '/api/Account/GetSalesHeaderInquiries',
 
 };
 console.log(PATHS, 'PATHS');
@@ -401,6 +402,31 @@ export async function getEmployeeProjectsWithProgress({ cmpUuid, envUuid, userUu
     const params = { cmpUuid, envUuid, userUuid, start, length, searchValue };
     const resp = await api.get(PATHS.employeeProjectsProgress, { params });
     console.log('Employee projects with progress response:', resp);
+    return resp.data;
+}
+
+export async function getSalesHeaderInquiries({ cmpUuid, envUuid, start = 0, length = 10, searchValue = '' } = {}) {
+    if (!cmpUuid || !envUuid) {
+        const [c, e] = await Promise.all([
+            cmpUuid || getCMPUUID(),
+            envUuid || getENVUUID(),
+        ]);
+        cmpUuid = c;
+        envUuid = e;
+    }
+
+    if (!cmpUuid) throw new Error('cmpUuid is required');
+    if (!envUuid) throw new Error('envUuid is required');
+
+    const params = {
+        cmpUuid,
+        envUuid,
+        start,
+        length,
+        searchValue,
+    };
+
+    const resp = await api.get(PATHS.getSalesHeaderInquiries, { params });
     return resp.data;
 }
 

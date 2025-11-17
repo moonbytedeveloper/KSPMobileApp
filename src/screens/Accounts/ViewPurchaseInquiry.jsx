@@ -8,67 +8,31 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../styles/styles';
 
-const SALES_ORDERS = [
+const PURCHASE_REQUESTS = [
     {
-        id: 'KP1524',
-        salesOrderNumber: 'KP1524',
-        customerName: 'Moonbyte',
-        deliveryDate: '15-12-24',
-        dueDate: '15-12-24',
-        amount: '₹1,25,000',
-     
+        id: 'PR001',
+        requestTitle: 'Title',
+        currency: 'Rupee',
+        requestDate: '10-12-24',
+        expectedPurchaseDate: '10-01-25',
+        status: 'Visible'
     },
     {
-        id: 'KP1525',
-        salesOrderNumber: 'KP1525',
-        customerName: 'Northwind Retail',
-        deliveryDate: '04-01-25',
-        dueDate: '20-12-24',
-        amount: '₹98,700',
-       
-    },
-    {
-        id: 'KP1526',
-        salesOrderNumber: 'KP1526',
-        customerName: 'Creative Labs',
-        deliveryDate: '22-12-24',
-        dueDate: '18-12-24',
-        amount: '₹2,10,000',
-        
-    },
-    {
-        id: 'KP1527',
-        salesOrderNumber: 'KP1527',
-        customerName: 'BlueStone Pvt Ltd',
-        deliveryDate: '11-01-25',
-        dueDate: '28-12-24',
-        amount: '₹75,420',
-     
-    },
-    {
-        id: 'KP1528',
-        salesOrderNumber: 'KP1528',
-        customerName: 'Aero Technologies',
-        deliveryDate: '29-12-24',
-        dueDate: '24-12-24',
-        amount: '₹3,42,880',
-        status: 'Approved',
-       
-    },
-    {
-        id: 'KP1529',
-        salesOrderNumber: 'KP1529',
-        customerName: 'UrbanNest Homes',
-        deliveryDate: '05-02-25',
-        dueDate: '12-01-25',
-        amount: '₹1,85,300',
-        
-    },
+        id: 'PR002',
+        requestTitle: 'Office Chairs',
+        currency: 'Rupee',
+        requestDate: '12-12-24',
+        expectedPurchaseDate: '15-01-25',
+        status: 'Pending'
+    }
 ];
+
+
+
 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 
-const ViewSalesOrder = () => {
+const ViewPurchaseInquiry = () => {
     const navigation = useNavigation();
     const [activeOrderId, setActiveOrderId] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -77,12 +41,14 @@ const ViewSalesOrder = () => {
 
     const filteredOrders = useMemo(() => {
         const query = searchQuery.trim().toLowerCase();
-        if (!query) return SALES_ORDERS;
-        return SALES_ORDERS.filter((order) => {
-            const haystack = `${order.salesOrderNumber} ${order.customerName} ${order.contactPerson} ${order.status}`.toLowerCase();
+        if (!query) return PURCHASE_REQUESTS;
+
+        return PURCHASE_REQUESTS.filter((item) => {
+            const haystack = `${item.requestTitle} ${item.currency} ${item.requestDate} ${item.expectedPurchaseDate} ${item.status}`.toLowerCase();
             return haystack.includes(query);
         });
     }, [searchQuery]);
+
 
     const totalPages = useMemo(() => {
         if (filteredOrders.length === 0) return 0;
@@ -108,16 +74,16 @@ const ViewSalesOrder = () => {
     const rangeEnd = filteredOrders.length === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, filteredOrders.length);
 
     const handleQuickAction = (order, actionLabel) => {
-        Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber}`);
+        Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.inquiryNo}`);
     };
 
     const renderFooterActions = (order) => {
         const buttons = [
             { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444', action: 'Delete' },
-            { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6', action: 'Download' },
+            // { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6', action: 'Download' },
             { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280', action: 'Forward' },
-            { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E', action: 'View' },
-            { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316', action: 'Update Status'  },
+            { icon: 'visibility', action: 'View', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6', action: 'Download' },
+            { icon: 'edit', action: 'Edit', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E', action: 'View' },
         ];
 
         return (
@@ -126,8 +92,8 @@ const ViewSalesOrder = () => {
                     <TouchableOpacity
                         key={`${order.id}-${btn.icon}`}
                         activeOpacity={0.85}
-                        style={[styles.cardActionBtn , { backgroundColor: btn.bg, borderColor: btn.border }]}
-                        onPress={() => handleQuickAction(order, btn.action)}
+                        style={[styles.cardActionBtn, { backgroundColor: btn.bg, borderColor: btn.border }]}
+                        onPress={() => handleQuickAction(order, actionLabel)}
                     >
                         <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
                     </TouchableOpacity>
@@ -160,11 +126,11 @@ const ViewSalesOrder = () => {
 
     return (
         <View style={styles.screen}>
-                <AppHeader
-                    title="View Sales Order"
+            <AppHeader
+                title="View Purchase Inquiry"
                 onLeftPress={() => navigation.goBack()}
-                onRightPress={() => navigation.navigate('ManageSalesOrder')}
-                    rightButtonLabel="Add Sales Order"
+                onRightPress={() => navigation.navigate('ManagePurchaseInquiry')}
+                rightButtonLabel="Add Purchase Inquiry"
                 showRight
             />
             <View style={styles.headerSeparator} />
@@ -205,34 +171,42 @@ const ViewSalesOrder = () => {
             </View>
 
             <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-                {paginatedOrders.map((order) => (
+                {paginatedOrders.map((item) => (
                     <AccordionItem
-                        key={order.id}
+                        key={item.id}
+
                         item={{
-                            soleExpenseCode: order.id,
-                            expenseName: order.salesOrderNumber,
-                            amount: order.amount,
+                            headerTitle: item.requestTitle,
+                            headerValue: item.currency,
                         }}
-                        isActive={activeOrderId === order.id}
-                        onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
+
+                        isActive={activeOrderId === item.id}
+                        onToggle={() => setActiveOrderId(prev => prev === item.id ? null : item.id)}
+
                         customRows={[
-                            { label: 'Customer Name', value: order.customerName },
-                            { label: 'Amount', value: order.amount },
-                            { label: 'Delivery Date', value: order.deliveryDate },
-                            { label: 'Due Date', value: order.dueDate },
-                        ]} 
-                        headerLeftLabel="Sales Order Number"
-                        headerRightLabel="Amount"
-                        footerComponent={renderFooterActions(order)}
+                            { label: "Requist Title", value: item.requestTitle },
+                            { label: "Currancy", value: item.currency },
+                            { label: "Requiest Date", value: item.requestDate },
+                            { label: "Expected Purchase Date", value: item.expectedPurchaseDate },
+                            { label: "Status", value: item.status }
+                        ]}
+
+                        headerLeftLabel="Requist Title"
+                        headerRightLabel="Currancy"
+
+                        footerComponent={renderFooterActions(item)}
                         headerRightContainerStyle={styles.headerRightContainer}
                     />
+
+
+
                 ))}
 
                 {paginatedOrders.length === 0 && (
                     <View style={styles.emptyState}>
                         <Text style={styles.emptyStateTitle}>No sales orders found</Text>
                         <Text style={styles.emptyStateSubtitle}>
-                            Try adjusting your search keyword or create a new sales order.
+                            Try adjusting your search keyword or create a new sales inquiry.
                         </Text>
                     </View>
                 )}
@@ -470,4 +444,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default ViewSalesOrder;
+export default ViewPurchaseInquiry;

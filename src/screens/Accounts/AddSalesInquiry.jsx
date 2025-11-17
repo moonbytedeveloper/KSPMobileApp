@@ -22,7 +22,7 @@ const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyl
     );
 };
 
-const ManagePurchaseInquiry = () => {
+const AddSalesInquiry = () => {
     const [expandedId, setExpandedId] = useState(1);
     const navigation = useNavigation();
     const toggleSection = (id) => setExpandedId((prev) => (prev === id ? null : id));
@@ -31,14 +31,20 @@ const ManagePurchaseInquiry = () => {
     const currencyTypes = ['- Select Currency -', 'USD', 'INR', 'EUR', 'GBP'];
     const itemTypes = ['- Select Item -', 'Furniture', 'Electronics', 'Office Supplies', 'Equipment'];
     const itemNames = ['- Select Item -', 'Chair', 'Table', 'Desk', 'Cabinet'];
-    const units = ['- Select Unit -', 'Pcs', 'Box', 'Set', 'Unit'];
+    const CustomerType = ['- Select Customer -', 'Abhinav','Raj',];
+    const countries = ['- Select Country -', 'India', 'United States', 'United Kingdom', 'Australia', 'Germany'];
+    const units = ['- Select Unit -', 'Pcs', 'Box', 'Set', 'Unit', 'failed'];
 
     // Form state
     const [uuid, setUuid] = useState('0e073e1b-3b3f-4ae2-8f77-5');
     const [currencyType, setCurrencyType] = useState('');
+    const [customerName, setCustomerName] = useState('');
     const [requestTitle, setRequestTitle] = useState('');
     const [requestedDate, setRequestedDate] = useState('');
     const [expectedPurchaseDate, setExpectedPurchaseDate] = useState('');
+    const [projectName, setProjectName] = useState('');
+    const [inquiryNo, setInquiryNo] = useState('');
+    const [country, setCountry] = useState('');
     
     // Line items state
     const [lineItems, setLineItems] = useState([]);
@@ -156,7 +162,7 @@ const ManagePurchaseInquiry = () => {
         <>
             <View style={{ flex: 1, backgroundColor: '#fff' }}>
                 <AppHeader
-                    title="Add Purchase Inquiry"
+                    title="Add Customer Inquiry"
                     onLeftPress={() => {
                         navigation.goBack();
                     }}
@@ -182,6 +188,41 @@ const ManagePurchaseInquiry = () => {
                                 </View>
                             </View>
                             <View style={styles.col}>
+                                <Text style={inputStyles.label}>Customer Name*</Text>
+                                <View style={{ zIndex: 9999, elevation: 20 }}>
+                                    <Dropdown
+                                        placeholder="- Select Customer -"
+                                        value={customerName}
+                                        options={CustomerType}
+                                        getLabel={(c) => c}
+                                        getKey={(c) => c}
+                                        onSelect={(v) => setCustomerName(v)}
+                                        renderInModal={true}
+                                        inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                                        textStyle={inputStyles.input}
+                                    />
+                                </View>
+                            </View>
+                        </View>
+
+                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
+                            <View style={styles.col}>
+                                <Text style={inputStyles.label}>Country Name*</Text>
+                               <View style={{ zIndex: 9999, elevation: 20 }}>
+                                    <Dropdown
+                                        placeholder="- Select Country -"
+                                        value={country}
+                                        options={countries}
+                                        getLabel={(c) => c}
+                                        getKey={(c) => c}
+                                        onSelect={(v) => setCountry(v)}
+                                        renderInModal={true}
+                                        inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                                        textStyle={inputStyles.input}
+                                    />
+                                </View>
+                            </View>
+                               <View style={styles.col}>
                                 <Text style={inputStyles.label}>Currency Type*</Text>
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
@@ -197,23 +238,10 @@ const ManagePurchaseInquiry = () => {
                                     />
                                 </View>
                             </View>
-                        </View>
-
-                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Request Title*</Text>
-                                <View style={[inputStyles.box]}>
-                                    <TextInput
-                                        style={[inputStyles.input, { color: COLORS.text }]}
-                                        value={requestTitle}
-                                        onChangeText={setRequestTitle}
-                                        placeholder="eg."
-                                        placeholderTextColor={COLORS.textLight}
-                                    />
-                                </View>
-                            </View>
                             <View style={styles.col} />
                         </View>
+
+                        
 
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             <View style={styles.col}>
@@ -273,6 +301,34 @@ const ManagePurchaseInquiry = () => {
                                         </View>
                                     </View>
                                 </TouchableOpacity>
+                            </View>
+                            
+                        </View>
+
+                        <View style={[styles.row, { marginTop: hp(1.5) }]}> 
+                            <View style={styles.col}>
+                                <Text style={inputStyles.label}>Project Name*</Text>
+                                <View style={[inputStyles.box]}>
+                                    <TextInput
+                                        style={[inputStyles.input, { color: COLORS.text }]}
+                                        value={projectName}
+                                        onChangeText={setProjectName}
+                                        placeholder="eg. Ksp"
+                                        placeholderTextColor={COLORS.textLight}
+                                    />
+                                </View>
+                            </View>
+                            <View style={styles.col}>
+                                <Text style={inputStyles.label}>Inquiry No.*</Text>
+                                <View style={[inputStyles.box]}>
+                                    <TextInput
+                                        style={[inputStyles.input, { color: COLORS.text }]}
+                                        value={inquiryNo}
+                                        onChangeText={setInquiryNo}
+                                        placeholder="eg. ksp500"
+                                        placeholderTextColor={COLORS.textLight}
+                                    />
+                                </View>
                             </View>
                         </View>
                     </AccordionSection>
@@ -448,7 +504,7 @@ const ManagePurchaseInquiry = () => {
     );
 };
 
-export default ManagePurchaseInquiry;
+export default AddSalesInquiry;
 
 const styles = StyleSheet.create({
     container: {

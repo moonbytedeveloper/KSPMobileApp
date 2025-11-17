@@ -11,7 +11,10 @@ import ViewSalesOrder from '../../screens/Accounts/ViewSalesOrder.jsx';
 import ManagePurchaseOrder from '../../screens/Accounts/managePurchaseOrder.jsx';
 import ViewPurchaseOrder from '../../screens/Accounts/ViewPurchaseOrder.jsx';
 import ManagePurchaseInquiry from '../../screens/Accounts/ManagePurchaseInquiry.jsx';
+import ViewPurchaseInquiry from '../../screens/Accounts/ViewPurchaseInquiry.jsx';
 import ManageInquiry from '../../screens/Accounts/ManageInquiry.jsx';
+import AddSalesInquiry from '../../screens/Accounts/AddSalesInquiry.jsx';
+// import AddPurchaseInquiry from '../../screens/Accounts/AddPurchaseInquiry.jsx';
 import BusinessDevelopmentScreen from '../../screens/BusinessDevelopment/BusinessDevelopmentScreen';
 import ExpenseScreen from '../../screens/Expense/ExpenseScreen';
 import HRAAttendance from '../../screens/HRA/HRAAttendance.jsx';
@@ -143,8 +146,18 @@ const AppStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen
+        name="AddSalesInquiry"
+        component={AddSalesInquiry}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
         name="ManagePurchaseInquiry"
         component={ManagePurchaseInquiry}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ViewPurchaseInquiry"
+        component={ViewPurchaseInquiry}
         options={{ headerShown: false }}
       />
       <Stack.Screen
@@ -370,9 +383,19 @@ const DrawerNavigator = () => {
         component={ManageInquiry}
         options={{ headerShown: false }}
       />
+       <Drawer.Screen
+        name="AddSalesInquiry"
+        component={AddSalesInquiry}
+        options={{ headerShown: false }}
+      />
       <Drawer.Screen
         name="ManagePurchaseInquiry"
         component={ManagePurchaseInquiry}
+        options={{ headerShown: false }}
+      />
+      <Drawer.Screen
+        name="ViewPurchaseInquiry"
+        component={ViewPurchaseInquiry}
         options={{ headerShown: false }}
       />
       {/* Other screens inside Drawer */}
@@ -441,6 +464,17 @@ const AdminDrawerNavigator = () => {
        <Drawer.Screen
           name="ViewPurchaseOrder"
         component={ViewPurchaseOrder}
+        options={{ headerShown: false }}
+      />
+      <Drawer.Screen
+        name="ViewPurchaseInquiry"
+        component={ViewPurchaseInquiry}
+        options={{ headerShown: false }}
+      />
+      
+      <Drawer.Screen
+        name="ManageInquiry"
+        component={ManageInquiry}
         options={{ headerShown: false }}
       />
       <Drawer.Screen
@@ -680,7 +714,7 @@ const CustomDrawerContent = ({ navigation }) => {
                   <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
                     <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
                   </View>
-                  <Text style={styles.itemLabel}>Manage Inquiry</Text>
+                  <Text style={styles.itemLabel}>Manage Sales Inquiry</Text>
                 </View>
                 <Icon name="chevron-right" size={rf(5)} color="#999" />
               </TouchableOpacity>
@@ -728,7 +762,7 @@ const CustomDrawerContent = ({ navigation }) => {
 
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() => navigateFromDrawer('ManagePurchaseInquiry')}
+                onPress={() => navigateFromDrawer('ViewPurchaseInquiry')}
                 style={[styles.cardItem, styles.subItem]}
               >
                 <View style={styles.itemLeft}>
