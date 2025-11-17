@@ -7,6 +7,7 @@ import { useUser } from '../../contexts/UserContext';
 // Import screens
 import HomeScreen from '../../screens/Home/HomeScreen';
 import ManageSalesOrder from '../../screens/Accounts/ManageSalesOrder.jsx';
+import ViewSalesOrder from '../../screens/Accounts/ViewSalesOrder.jsx';
 import ManagePurchaseOrder from '../../screens/Accounts/managePurchaseOrder.jsx';
 import ManagePurchaseInquiry from '../../screens/Accounts/ManagePurchaseInquiry.jsx';
 import ManageInquiry from '../../screens/Accounts/ManageInquiry.jsx';
@@ -118,6 +119,11 @@ const AppStack = () => {
       <Stack.Screen
         name="ManageSalesOrder"
         component={ManageSalesOrder}
+        options={{ headerShown: false }}
+      />
+       <Stack.Screen
+        name="ViewSalesOrder"
+        component={ViewSalesOrder}
         options={{ headerShown: false }}
       />
       <Stack.Screen
@@ -338,6 +344,11 @@ const DrawerNavigator = () => {
         component={ManageSalesOrder}
         options={{ headerShown: false }}
       />
+       <Drawer.Screen
+        name="ViewSalesOrder"
+        component={ViewSalesOrder}
+        options={{ headerShown: false }}
+      />
       <Drawer.Screen
         name="ManagePurchaseOrder"
         component={ManagePurchaseOrder}
@@ -406,6 +417,11 @@ const AdminDrawerNavigator = () => {
         component={ManageSalesOrder}
         options={{ headerShown: false }}
       />
+      <Drawer.Screen
+      name="ViewSalesOrder"
+      component={ViewSalesOrder}
+      options={{ headerShown: false }}
+    />
       <Drawer.Screen
         name="ManageInquiry"
         component={ManageInquiry}
@@ -627,7 +643,7 @@ const CustomDrawerContent = ({ navigation }) => {
             >
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() => navigateFromDrawer('ManageSalesOrder')}
+                onPress={() => navigateFromDrawer('ViewSalesOrder')}
                 style={[styles.cardItem, styles.subItem]}
               >
                 <View style={styles.itemLeft}>
