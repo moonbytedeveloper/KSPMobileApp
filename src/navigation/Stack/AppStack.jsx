@@ -9,6 +9,7 @@ import HomeScreen from '../../screens/Home/HomeScreen';
 import ManageSalesOrder from '../../screens/Accounts/ManageSalesOrder.jsx';
 import ViewSalesOrder from '../../screens/Accounts/ViewSalesOrder.jsx';
 import ManagePurchaseOrder from '../../screens/Accounts/managePurchaseOrder.jsx';
+import ViewPurchaseOrder from '../../screens/Accounts/ViewPurchaseOrder.jsx';
 import ManagePurchaseInquiry from '../../screens/Accounts/ManagePurchaseInquiry.jsx';
 import ManageInquiry from '../../screens/Accounts/ManageInquiry.jsx';
 import BusinessDevelopmentScreen from '../../screens/BusinessDevelopment/BusinessDevelopmentScreen';
@@ -129,6 +130,11 @@ const AppStack = () => {
       <Stack.Screen
         name="ManagePurchaseOrder"
         component={ManagePurchaseOrder}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ViewPurchaseOrder"
+        component={ViewPurchaseOrder}
         options={{ headerShown: false }}
       />
       <Stack.Screen
@@ -355,6 +361,11 @@ const DrawerNavigator = () => {
         options={{ headerShown: false }}
       />
       <Drawer.Screen
+        name="ViewPurchaseOrder"
+        component={ViewPurchaseOrder}
+        options={{ headerShown: false }}
+      />
+      <Drawer.Screen
         name="ManageInquiry"
         component={ManageInquiry}
         options={{ headerShown: false }}
@@ -423,8 +434,13 @@ const AdminDrawerNavigator = () => {
       options={{ headerShown: false }}
     />
       <Drawer.Screen
-        name="ManageInquiry"
-        component={ManageInquiry}
+        name="PurchaseOrder"
+        component={ManagePurchaseOrder}
+        options={{ headerShown: false }}
+      />
+       <Drawer.Screen
+          name="ViewPurchaseOrder"
+        component={ViewPurchaseOrder}
         options={{ headerShown: false }}
       />
       <Drawer.Screen
@@ -698,7 +714,7 @@ const CustomDrawerContent = ({ navigation }) => {
             >
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() => navigateFromDrawer('ManagePurchaseOrder')}
+                onPress={() => navigateFromDrawer('ViewPurchaseOrder')}
                 style={[styles.cardItem, styles.subItem]}
               >
                 <View style={styles.itemLeft}>

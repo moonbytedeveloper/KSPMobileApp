@@ -72,7 +72,9 @@ const AccordionItem = ({
           )}
           <View style={{ flex: 1 }}>
             <Text style={styles.summaryLabel}>{headerLeftLabel}</Text>
-            <Text style={styles.summaryValue} numberOfLines={1} ellipsizeMode="tail">{item.expenseName}</Text>
+           {item.headerTitle ? (<Text style={styles.summaryValue} numberOfLines={1} ellipsizeMode="tail">{item.headerTitle}</Text>): (
+            <Text style={styles.summaryValue} numberOfLines={1} ellipsizeMode="tail">{item.expenseName}</Text> )}
+
           </View>
         </View>
         <View style={[styles.rightSideContainer, headerRightContainerStyle]}>
@@ -83,7 +85,7 @@ const AccordionItem = ({
                 <View >
                   <StatusBadge label={String(item.amount)} />
                 </View>
-              ) : (
+              ) : (item.headerValue) ? (<Text style={styles.summaryValue} numberOfLines={1} ellipsizeMode="tail">{item.headerValue}</Text>): (
                 <Text style={styles.summaryValue} numberOfLines={1} ellipsizeMode="tail">{item.amount}</Text>
               )}
 
