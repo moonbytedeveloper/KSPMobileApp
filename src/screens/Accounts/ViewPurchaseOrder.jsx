@@ -154,6 +154,8 @@ const ViewPurchaseOrder = () => {
                         hideSearch
                         inputBoxStyle={styles.dropdownInput}
                         style={styles.dropdownWrapper}
+                        renderInModal={true}
+                        dropdownListStyle={{ width: wp(18) }}
                     />
                     <Text style={styles.showEntriesLabel}>entries</Text>
                 </View>
