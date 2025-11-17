@@ -25,11 +25,11 @@ import { pick, types, isCancel } from '@react-native-documents/picker';
 
 const COL_WIDTHS = {
   ITEM: wp(50), // 35%
-  QTY: wp(30), // 30%
-  RATE: wp(30), // 30%
-  TAX: wp(30), // 30%
-  AMOUNT: wp(30), // 30%
-  ACTION: wp(30), // 30%
+  QTY: wp(35), // 30%
+  RATE: wp(35), // 30%
+  TAX: wp(35), // 30%
+  AMOUNT: wp(35), // 30%
+  ACTION: wp(35), // 30%
 };
 const AccordionSection = ({
   id,
@@ -1855,7 +1855,7 @@ const styles = StyleSheet.create({
   table: { minWidth: wp(180) },
 
   /* ── COMMON ── */
-  thead: { backgroundColor: '#1219a0e5' },
+    thead: { backgroundColor: '#f1f1f1' },
   tr: { flexDirection: 'row' },
 
   /* ── TH (header) ── */

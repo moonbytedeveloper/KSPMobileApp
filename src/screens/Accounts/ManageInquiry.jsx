@@ -54,6 +54,7 @@ const ManageInquiry = () => {
         quantity: '',
         unit: ''
     });
+    const [editItemId, setEditItemId] = useState(null);
 
     // Date picker state
     const [openDatePicker, setOpenDatePicker] = useState(false);
@@ -107,8 +108,19 @@ const ManageInquiry = () => {
             return;
         }
 
+        // If editing an existing item, update it
+        if (editItemId !== null) {
+            setLineItems((prev) => prev.map((it) => (it.id === editItemId ? { ...it, ...currentItem } : it)));
+            // reset edit state
+            setEditItemId(null);
+            setCurrentItem({ itemType: '', itemName: '', quantity: '', unit: '' });
+            return;
+        }
+
+        // Add new item
+        const newId = lineItems.length > 0 ? Math.max(...lineItems.map((i) => i.id)) + 1 : 1;
         const newItem = {
-            id: lineItems.length + 1,
+            id: newId,
             itemType: currentItem.itemType,
             itemName: currentItem.itemName,
             quantity: currentItem.quantity,
@@ -125,15 +137,16 @@ const ManageInquiry = () => {
     };
 
     const handleEditItem = (id) => {
-        const item = lineItems.find(i => i.id === id);
+        const item = lineItems.find((i) => i.id === id);
         if (item) {
+            // populate the fields and set edit mode (do NOT delete yet)
             setCurrentItem({
                 itemType: item.itemType,
                 itemName: item.itemName,
                 quantity: item.quantity,
-                unit: item.unit
+                unit: item.unit,
             });
-            handleDeleteItem(id);
+            setEditItemId(id);
         }
     };
 
@@ -408,7 +421,7 @@ const ManageInquiry = () => {
                                     style={styles.addButton}
                                     onPress={handleAddItem}
                                 >
-                                    <Text style={styles.addButtonText}>Add</Text>
+                                    <Text style={styles.addButtonText}>{editItemId !== null ? 'Update' : 'Add'}</Text>
                                 </TouchableOpacity>
                             </View>
                     </AccordionSection>

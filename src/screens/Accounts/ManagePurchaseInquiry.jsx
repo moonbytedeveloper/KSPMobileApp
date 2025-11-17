@@ -31,14 +31,20 @@ const ManageInquiry = () => {
     const currencyTypes = ['- Select Currency -', 'USD', 'INR', 'EUR', 'GBP'];
     const itemTypes = ['- Select Item -', 'Furniture', 'Electronics', 'Office Supplies', 'Equipment'];
     const itemNames = ['- Select Item -', 'Chair', 'Table', 'Desk', 'Cabinet'];
-    const units = ['- Select Unit -', 'Pcs', 'Box', 'Set', 'Unit'];
+    const CustomerType = ['- Select Customer -', 'Abhinav','Raj',];
+    const countries = ['- Select Country -', 'India', 'United States', 'United Kingdom', 'Australia', 'Germany'];
+    const units = ['- Select Unit -', 'Pcs', 'Box', 'Set', 'Unit', 'failed'];
 
     // Form state
     const [uuid, setUuid] = useState('0e073e1b-3b3f-4ae2-8f77-5');
     const [currencyType, setCurrencyType] = useState('');
+    const [customerName, setCustomerName] = useState('');
     const [requestTitle, setRequestTitle] = useState('');
     const [requestedDate, setRequestedDate] = useState('');
     const [expectedPurchaseDate, setExpectedPurchaseDate] = useState('');
+    const [projectName, setProjectName] = useState('');
+    const [inquiryNo, setInquiryNo] = useState('');
+    const [country, setCountry] = useState('');
     
     // Line items state
     const [lineItems, setLineItems] = useState([]);
@@ -48,6 +54,7 @@ const ManageInquiry = () => {
         quantity: '',
         unit: ''
     });
+    const [editItemId, setEditItemId] = useState(null);
 
     // Date picker state
     const [openDatePicker, setOpenDatePicker] = useState(false);
@@ -101,8 +108,19 @@ const ManageInquiry = () => {
             return;
         }
 
+        // If editing an existing item, update it
+        if (editItemId !== null) {
+            setLineItems((prev) => prev.map((it) => (it.id === editItemId ? { ...it, ...currentItem } : it)));
+            // reset edit state
+            setEditItemId(null);
+            setCurrentItem({ itemType: '', itemName: '', quantity: '', unit: '' });
+            return;
+        }
+
+        // Add new item
+        const newId = lineItems.length > 0 ? Math.max(...lineItems.map((i) => i.id)) + 1 : 1;
         const newItem = {
-            id: lineItems.length + 1,
+            id: newId,
             itemType: currentItem.itemType,
             itemName: currentItem.itemName,
             quantity: currentItem.quantity,
@@ -119,15 +137,16 @@ const ManageInquiry = () => {
     };
 
     const handleEditItem = (id) => {
-        const item = lineItems.find(i => i.id === id);
+        const item = lineItems.find((i) => i.id === id);
         if (item) {
+            // populate the fields and set edit mode (do NOT delete yet)
             setCurrentItem({
                 itemType: item.itemType,
                 itemName: item.itemName,
                 quantity: item.quantity,
-                unit: item.unit
+                unit: item.unit,
             });
-            handleDeleteItem(id);
+            setEditItemId(id);
         }
     };
 
@@ -181,7 +200,7 @@ const ManageInquiry = () => {
                                     />
                                 </View>
                             </View>
-                            <View style={styles.col}>
+                          <View style={styles.col}>
                                 <Text style={inputStyles.label}>Currency Type*</Text>
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
@@ -199,52 +218,55 @@ const ManageInquiry = () => {
                             </View>
                         </View>
 
+                    
+                        
+
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Request Title*</Text>
+                        <View style={styles.col}>
+                                <Text style={inputStyles.label}>Requested Title*</Text>
                                 <View style={[inputStyles.box]}>
                                     <TextInput
                                         style={[inputStyles.input, { color: COLORS.text }]}
-                                        value={requestTitle}
-                                        onChangeText={setRequestTitle}
+                                        value={projectName}
+                                        onChangeText={setProjectName}
                                         placeholder="eg."
                                         placeholderTextColor={COLORS.textLight}
                                     />
                                 </View>
                             </View>
-                            <View style={styles.col} />
+                            <View style={styles.col}>
+                                    <Text style={inputStyles.label}>Requested Date*</Text>
+                                    <TouchableOpacity
+                                        activeOpacity={0.7}
+                                        onPress={() => openDatePickerFor('requested')}
+                                        style={{ marginTop: hp(0.8) }}
+                                    >
+                                        <View style={[inputStyles.box, styles.innerFieldBox, styles.datePickerBox, { alignItems: 'center' }]}>
+                                            <Text style={[
+                                                inputStyles.input,
+                                                styles.datePickerText,
+                                                !requestedDate && { color: COLORS.textLight, fontFamily: TYPOGRAPHY.fontFamilyRegular },
+                                                requestedDate && { color: COLORS.text, fontFamily: TYPOGRAPHY.fontFamilyMedium }
+                                            ]}>
+                                                {requestedDate || 'mm/dd/yyyy'}
+                                            </Text>
+                                            <View style={[
+                                                styles.calendarIconContainer,
+                                                requestedDate && styles.calendarIconContainerSelected
+                                            ]}>
+                                                <Icon
+                                                    name="calendar-today"
+                                                    size={rf(3.2)}
+                                                    color={requestedDate ? COLORS.primary : COLORS.textLight}
+                                                />
+                                            </View>
+                                        </View>
+                                    </TouchableOpacity>
+                                </View>
+                            
                         </View>
 
-                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Requested Date*</Text>
-                                <TouchableOpacity
-                                    activeOpacity={0.7}
-                                    onPress={() => openDatePickerFor('requested')}
-                                    style={{ marginTop: hp(0.8) }}
-                                >
-                                    <View style={[inputStyles.box, styles.innerFieldBox, styles.datePickerBox, { alignItems: 'center' }]}>
-                                        <Text style={[
-                                            inputStyles.input,
-                                            styles.datePickerText,
-                                            !requestedDate && { color: COLORS.textLight, fontFamily: TYPOGRAPHY.fontFamilyRegular },
-                                            requestedDate && { color: COLORS.text, fontFamily: TYPOGRAPHY.fontFamilyMedium }
-                                        ]}>
-                                            {requestedDate || 'mm/dd/yyyy'}
-                                        </Text>
-                                        <View style={[
-                                            styles.calendarIconContainer,
-                                            requestedDate && styles.calendarIconContainerSelected
-                                        ]}>
-                                            <Icon
-                                                name="calendar-today"
-                                                size={rf(3.2)}
-                                                color={requestedDate ? COLORS.primary : COLORS.textLight}
-                                            />
-                                        </View>
-                                    </View>
-                                </TouchableOpacity>
-                            </View>
+                        <View style={[styles.row, { marginTop: hp(1.5) }]}> 
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>Expected Purchase Date*</Text>
                                 <TouchableOpacity
@@ -352,7 +374,7 @@ const ManageInquiry = () => {
                                     style={styles.addButton}
                                     onPress={handleAddItem}
                                 >
-                                    <Text style={styles.addButtonText}>Add</Text>
+                                    <Text style={styles.addButtonText}>{editItemId !== null ? 'Update' : 'Add'}</Text>
                                 </TouchableOpacity>
                             </View>
                     </AccordionSection>
@@ -565,7 +587,7 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     thead: {
-        backgroundColor: '#f1f1f1',
+        backgroundColor: 're',
     },
     tbody: {
         backgroundColor: '#fff',
