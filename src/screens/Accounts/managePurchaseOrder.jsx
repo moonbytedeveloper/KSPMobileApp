@@ -78,7 +78,7 @@ const ManageSalesOrder = () => {
   const toggleSection = id => setExpandedId(prev => (prev === id ? null : id));
 
   // Demo options for dropdowns
-  const paymentTerms = ['- Payment Term -', 'Net 7', 'Net 15', 'Net 30'];
+  const paymentTerms = ['Net 7', 'Net 15', 'Net 30'];
   const taxOptions = ['IGST', 'CGST', 'SGST', 'No Tax'];
   const countries = ['India', 'United States', 'United Kingdom'];
   const salesInquiries = ['- Select Inquiry -', 'SI-1001', 'SI-1002'];
@@ -105,8 +105,9 @@ const ManageSalesOrder = () => {
   const projects = ['- Select Project -', 'Mobile App Development', 'Website Revamp'];
 
   const PaymentTerm = [
-    '- Select Payment Term -',
-    'Montly',
+    'Net 7',
+    'Net 15',
+    'Net 30',
   ];
 
   
@@ -154,6 +155,11 @@ const ManageSalesOrder = () => {
     state: '',
     city: '',
   });
+  // separate selection state for billing country to avoid collisions
+  const [billingCountrySel, setBillingCountrySel] = useState('');
+  // separate selection states for billing state and city
+  const [billingStateSel, setBillingStateSel] = useState('');
+  const [billingCitySel, setBillingCitySel] = useState('');
   const [shippingForm, setShippingForm] = useState({
     buildingNo: '',
     street1: '',
@@ -185,7 +191,7 @@ const ManageSalesOrder = () => {
   const [datePickerSelectedDate, setDatePickerSelectedDate] = useState(
     new Date(),
   );
-  const [paymentTerm, setPaymentTerm] = useState(paymentTerms[0]);
+  const [paymentTerm, setPaymentTerm] = useState('');
   const [notes, setNotes] = useState('');
   const [projectName, setProjectName] = useState('');
   const [vendor, setVendor] = useState('');
@@ -728,11 +734,14 @@ const ManageSalesOrder = () => {
                 <View style={{ zIndex: 9999, elevation: 20 }}>
                   <Dropdown
                     placeholder="- Select Country -"
-                    value={billingForm.country}
+                    value={billingCountrySel || billingForm.country}
                     options={countries}
                     getLabel={c => c}
                     getKey={c => c}
-                    onSelect={c => setBillingForm(s => ({ ...s, country: c }))}
+                    onSelect={c => {
+                      setBillingCountrySel(c);
+                      setBillingForm(s => ({ ...s, country: c }));
+                    }}
                     inputBoxStyle={inputStyles.box}
                     style={{ marginBottom: hp(1.6) }}
                     renderInModal={true}
@@ -744,11 +753,14 @@ const ManageSalesOrder = () => {
                  <View style={{ zIndex: 9999, elevation: 20 }}>
                   <Dropdown
                     placeholder="- Select State -"
-                    value={billingForm.country}
+                    value={billingStateSel || billingForm.state}
                     options={state}
                     getLabel={c => c}
                     getKey={c => c}
-                    onSelect={c => setBillingForm(s => ({ ...s, country: c }))}
+                    onSelect={c => {
+                      setBillingStateSel(c);
+                      setBillingForm(s => ({ ...s, state: c }));
+                    }}
                     inputBoxStyle={inputStyles.box}
                     style={{ marginBottom: hp(1.6) }}
                     renderInModal={true}
@@ -763,11 +775,14 @@ const ManageSalesOrder = () => {
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
                     placeholder="- Select City -"
-                    value={billingForm.city}
+                    value={billingCitySel || billingForm.city}
                     options={city}
                     getLabel={c => c}
                     getKey={c => c}
-                    onSelect={c => setBillingForm(s => ({ ...s, city: c }))}
+                    onSelect={c => {
+                      setBillingCitySel(c);
+                      setBillingForm(s => ({ ...s, city: c }));
+                    }}
                     inputBoxStyle={inputStyles.box}
                     style={{ marginBottom: hp(1.6) }}
                     renderInModal={true}
