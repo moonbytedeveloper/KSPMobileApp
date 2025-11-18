@@ -1,31 +1,93 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import AppHeader from '../../components/common/AppHeader';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
-import AccordionItem from '../../components/common/AccordionItem';
-import Dropdown from '../../components/common/Dropdown';
+import AccordionItem from '../../../../components/common/AccordionItem';
+import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { wp, hp, rf } from '../../utils/responsive';
-import { COLORS, TYPOGRAPHY, RADIUS } from '../styles/styles';
-import { getPurchaseHeaderInquiries, deleteSalesHeader } from '../../api/authServices';
-const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
-import { getUUID, getCMPUUID, getENVUUID } from '../../api/tokenStorage';
+import { wp, hp, rf } from '../../../../utils/responsive';
+import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 
-const ViewPurchaseInquiry = () => {
+const SALES_ORDERS = [
+    {
+        id: 'KP1524',
+        salesOrderNumber: 'KP1524',
+        customerName: 'Moonbyte',
+        deliveryDate: '15-12-24',
+        dueDate: '15-12-24',
+        amount: 'KP1524',
+     
+    },
+    {
+        id: 'KP1525',
+        salesOrderNumber: 'KP1525',
+        customerName: 'Northwind Retail',
+        deliveryDate: '04-01-25',
+        dueDate: '20-12-24',
+        amount: 'KP1524',
+       
+    },
+    {
+        id: 'KP1526',
+        salesOrderNumber: 'KP1526',
+        customerName: 'Creative Labs',
+        deliveryDate: '22-12-24',
+        dueDate: '18-12-24',
+        amount: 'KP1524',
+        
+    },
+    {
+        id: 'KP1527',
+        salesOrderNumber: 'KP1527',
+        customerName: 'BlueStone Pvt Ltd',
+        deliveryDate: '11-01-25',
+        dueDate: '28-12-24',
+        amount: 'KP1524',
+     
+    },
+    {
+        id: 'KP1528',
+        salesOrderNumber: 'KP1528',
+        customerName: 'Aero Technologies',
+        deliveryDate: '29-12-24',
+        dueDate: '24-12-24',
+        amount: 'KP1524',
+        status: 'Approved',
+       
+    },
+    {
+        id: 'KP1529',
+        salesOrderNumber: 'KP1529',
+        customerName: 'UrbanNest Homes',
+        deliveryDate: '05-02-25',
+        dueDate: '12-01-25',
+        amount: 'KP1524',
+        
+    },
+];
+
+const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
+
+const ViewPerfomaPurchaseInvoice = () => {
     const navigation = useNavigation();
     const [activeOrderId, setActiveOrderId] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [itemsPerPage, setItemsPerPage] = useState(Number(ITEMS_PER_PAGE_OPTIONS[1]));
     const [currentPage, setCurrentPage] = useState(0);
-    const [inquiries, setInquiries] = useState([]);
-    const [totalRecords, setTotalRecords] = useState(0);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+
+    const filteredOrders = useMemo(() => {
+        const query = searchQuery.trim().toLowerCase();
+        if (!query) return SALES_ORDERS;
+        return SALES_ORDERS.filter((order) => {
+            const haystack = `${order.salesOrderNumber} ${order.customerName} ${order.contactPerson} ${order.status}`.toLowerCase();
+            return haystack.includes(query);
+        });
+    }, [searchQuery]);
 
     const totalPages = useMemo(() => {
-        if (totalRecords === 0) return 0;
-        return Math.ceil(totalRecords / itemsPerPage);
-    }, [totalRecords, itemsPerPage]);
+        if (filteredOrders.length === 0) return 0;
+        return Math.ceil(filteredOrders.length / itemsPerPage);
+    }, [filteredOrders.length, itemsPerPage]);
 
     useEffect(() => {
         if (totalPages === 0) {
@@ -37,75 +99,25 @@ const ViewPurchaseInquiry = () => {
         }
     }, [totalPages, currentPage]);
 
-    const fetchPurchaseInquiries = useCallback(async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const response = await getPurchaseHeaderInquiries({
-                start: currentPage * itemsPerPage,
-                length: itemsPerPage,
-                searchValue: searchQuery.trim(),
-            });
-            console.log(response, 'viewpurchaseinquiry')
-            const records = response?.Data?.Records || [];
-            const normalized = records.map((record, idx) => ({
-                id: record?.UUID || record?.InquiryNo || `row-${idx}`,
-                inquiryNo: record?.InquiryNo || 'N/A',
-                title: record?.Title || 'N/A',
-                requestDate: record?.RequestDate || '—',
-                status: record?.Status || 'Visible',
-                raw: record,
+    const paginatedOrders = useMemo(() => {
+        const start = currentPage * itemsPerPage;
+        return filteredOrders.slice(start, start + itemsPerPage);
+    }, [filteredOrders, currentPage, itemsPerPage]);
 
-            }));
-            setInquiries(normalized);
-            setTotalRecords(typeof response?.Data?.TotalCount === 'number' ? response.Data.TotalCount : normalized.length);
-        } catch (err) {
-            console.error('Failed to fetch purchase inquiries', err);
-            setError('Failed to fetch purchase inquiries. Please try again.');
-            setInquiries([]);
-            setTotalRecords(0);
-        } finally {
-            setLoading(false);
-        }
-    }, [currentPage, itemsPerPage, searchQuery]);
+    const rangeStart = filteredOrders.length === 0 ? 0 : currentPage * itemsPerPage + 1;
+    const rangeEnd = filteredOrders.length === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, filteredOrders.length);
 
-    useEffect(() => {
-        fetchPurchaseInquiries();
-    }, [fetchPurchaseInquiries]);
-
-    const rangeStart = totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1;
-    const rangeEnd = totalRecords === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, totalRecords);
-
-    const handleQuickAction = async (order, actionLabel) => {
-        // Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.inquiryNo}`);
-        if (actionLabel == 'Delete') {
-
-            try {
-                const [cmpUuid, envUuid] = await Promise.all([getCMPUUID(), getENVUUID()]);
-                await deleteSalesHeader({
-                    overrides: {
-                        userUuid: takerUuid || (await getUUID()),
-                        cmpUuid,
-                        envUuid,
-                        UUID: headerUuid
-                    }
-                });
-                // Refresh from API instead of local state update
-            } catch (e) {
-            } finally {
-                setDeleteConfirmVisible(false);
-                setFollowUpToDelete(null);
-            }
-        }
-
+    const handleQuickAction = (order, actionLabel) => {
+        Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber}`);
     };
 
     const renderFooterActions = (order) => {
         const buttons = [
-            { icon: 'delete-outline', label: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
-            { icon: 'chat-bubble-outline', label: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
-            { icon: 'visibility', label: 'View', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
-            { icon: 'edit', label: 'Edit', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
+            { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444', action: 'Delete' },
+            { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6', action: 'Download' },
+            // { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280', action: 'Forward' },
+            { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E', action: 'View' },
+            // { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316', action: 'Update Status'  },
         ];
 
         return (
@@ -114,8 +126,8 @@ const ViewPurchaseInquiry = () => {
                     <TouchableOpacity
                         key={`${order.id}-${btn.icon}`}
                         activeOpacity={0.85}
-                        style={[styles.cardActionBtn, { backgroundColor: btn.bg, borderColor: btn.border }]}
-                        onPress={() => handleQuickAction(order, btn.label)}
+                        style={[styles.cardActionBtn , { backgroundColor: btn.bg, borderColor: btn.border }]}
+                        onPress={() => handleQuickAction(order, btn.action)}
                     >
                         <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
                     </TouchableOpacity>
@@ -148,11 +160,11 @@ const ViewPurchaseInquiry = () => {
 
     return (
         <View style={styles.screen}>
-            <AppHeader
-                title="View Purchase Inquiry"
+                <AppHeader
+                    title="View Perfoma Purchase Invoice"
                 onLeftPress={() => navigation.goBack()}
-                onRightPress={() => navigation.navigate('ManagePurchaseInquiry')}
-                rightButtonLabel="Add Purchase Inquiry"
+                onRightPress={() => navigation.navigate('AddPerfomaPurchaseInvoice')}
+                    rightButtonLabel="Add Perfoma In"
                 showRight
             />
             <View style={styles.headerSeparator} />
@@ -174,6 +186,8 @@ const ViewPurchaseInquiry = () => {
                         hideSearch
                         inputBoxStyle={styles.dropdownInput}
                         style={styles.dropdownWrapper}
+                        renderInModal={true}
+                        dropdownListStyle={{ width: wp(18) }}
                     />
                     <Text style={styles.showEntriesLabel}>entries</Text>
                 </View>
@@ -191,61 +205,45 @@ const ViewPurchaseInquiry = () => {
                     />
                 </View>
             </View>
-            {error && <Text style={styles.errorText}>{error}</Text>}
 
             <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-                {inquiries.map((item) => (
+                {paginatedOrders.map((order) => (
                     <AccordionItem
-                        key={item.id}
-
+                        key={order.id}
                         item={{
-                            soleExpenseCode: item.id,
-                            expenseName: item.inquiryNo,
-                            amount: item.title,
-                            status: item.status,
+                            soleExpenseCode: order.id,
+                            expenseName: order.salesOrderNumber,
+                            amount: order.amount,
                         }}
-
-                        isActive={activeOrderId === item.id}
-                        onToggle={() => setActiveOrderId(prev => prev === item.id ? null : item.id)}
-
+                        isActive={activeOrderId === order.id}
+                        onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
                         customRows={[
-                            { label: "Inquiry No.", value: item.inquiryNo },
-                            { label: "Request Title", value: item.title },
-                            { label: "Request Date", value: item.requestDate },
-                            { label: "Status", value: item.status, isStatus: true }
-                        ]}
-
-                        headerLeftLabel="Inquiry No."
-                        headerRightLabel="Request Title"
-
-                        footerComponent={renderFooterActions(item)}
+                            { label: 'Vendor Name', value: order.customerName },
+                            { label: 'Purchase Order', value: order.amount },
+                            { label: 'Tax Invoice', value: 'Kalpesh' },
+                            { label: 'Delivery Date', value: order.deliveryDate },
+                        ]} 
+                        headerLeftLabel="Purchase Order"
+                        headerRightLabel="Perfoma Invoice No."
+                        footerComponent={renderFooterActions(order)}
                         headerRightContainerStyle={styles.headerRightContainer}
                     />
-
-
-
                 ))}
 
-                {!loading && inquiries.length === 0 && (
+                {paginatedOrders.length === 0 && (
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyStateTitle}>No purchase inquiries found</Text>
+                        <Text style={styles.emptyStateTitle}>No sales orders found</Text>
                         <Text style={styles.emptyStateSubtitle}>
-                            Try adjusting your search keyword or create a new sales inquiry.
+                            Try adjusting your search keyword or create a new sales order.
                         </Text>
-                    </View>
-                )}
-                {loading && (
-                    <View style={{ paddingVertical: hp(4), alignItems: 'center' }}>
-                        <ActivityIndicator size="large" color={COLORS.primary} />
-                        <Text style={{ marginTop: hp(1), color: COLORS.textLight }}>Loading inquiries...</Text>
                     </View>
                 )}
             </ScrollView>
 
-            {totalRecords > 0 && (
+            {filteredOrders.length > 0 && (
                 <View style={styles.paginationContainer}>
                     <Text style={styles.pageInfoText}>
-                        Showing {rangeStart} to {rangeEnd} of {totalRecords} entries
+                        Showing {filteredOrders.length === 0 ? 0 : rangeStart} to {rangeEnd} of {filteredOrders.length} entries
                     </Text>
                     <View style={styles.paginationButtons}>
                         {pageItems.map((item, idx) => {
@@ -472,12 +470,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: wp(5),
         fontFamily: TYPOGRAPHY.fontFamilyRegular,
     },
-    errorText: {
-        color: COLORS.danger || '#dc2626',
-        fontSize: rf(3),
-        paddingHorizontal: wp(4),
-        marginBottom: hp(1),
-    },
 });
 
-export default ViewPurchaseInquiry;
+export default ViewPerfomaPurchaseInvoice;

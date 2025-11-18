@@ -1,12 +1,13 @@
+
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import AppHeader from '../../components/common/AppHeader';
+import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
-import AccordionItem from '../../components/common/AccordionItem';
-import Dropdown from '../../components/common/Dropdown';
+import AccordionItem from '../../../../components/common/AccordionItem';
+import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { wp, hp, rf } from '../../utils/responsive';
-import { COLORS, TYPOGRAPHY, RADIUS } from '../styles/styles';
+import { wp, hp, rf } from '../../../../utils/responsive';
+import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 
 const SALES_ORDERS = [
     {
@@ -15,7 +16,7 @@ const SALES_ORDERS = [
         customerName: 'Moonbyte',
         deliveryDate: '15-12-24',
         dueDate: '15-12-24',
-        amount: '₹1,25,000',
+        salesInvoiceNumber: 'OR.002',
      
     },
     {
@@ -24,7 +25,7 @@ const SALES_ORDERS = [
         customerName: 'Northwind Retail',
         deliveryDate: '04-01-25',
         dueDate: '20-12-24',
-        amount: '₹98,700',
+        salesInvoiceNumber: 'OR.002',
        
     },
     {
@@ -33,7 +34,7 @@ const SALES_ORDERS = [
         customerName: 'Creative Labs',
         deliveryDate: '22-12-24',
         dueDate: '18-12-24',
-        amount: '₹2,10,000',
+        salesInvoiceNumber: 'OR.002',
         
     },
     {
@@ -42,7 +43,7 @@ const SALES_ORDERS = [
         customerName: 'BlueStone Pvt Ltd',
         deliveryDate: '11-01-25',
         dueDate: '28-12-24',
-        amount: '₹75,420',
+        salesInvoiceNumber: 'OR.002',
      
     },
     {
@@ -51,8 +52,7 @@ const SALES_ORDERS = [
         customerName: 'Aero Technologies',
         deliveryDate: '29-12-24',
         dueDate: '24-12-24',
-        amount: '₹3,42,880',
-        status: 'Approved',
+        salesInvoiceNumber: 'OR.002',
        
     },
     {
@@ -61,14 +61,14 @@ const SALES_ORDERS = [
         customerName: 'UrbanNest Homes',
         deliveryDate: '05-02-25',
         dueDate: '12-01-25',
-        amount: '₹1,85,300',
+        salesInvoiceNumber: '₹1,85,300',
         
     },
 ];
 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 
-const ViewSalesOrder = () => {
+const ManageSalesInvoice = () => {
     const navigation = useNavigation();
     const [activeOrderId, setActiveOrderId] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -161,10 +161,10 @@ const ViewSalesOrder = () => {
     return (
         <View style={styles.screen}>
                 <AppHeader
-                    title="View Sales Order"
+                title="Manage Sales "
                 onLeftPress={() => navigation.goBack()}
-                onRightPress={() => navigation.navigate('ManageSalesOrder')}
-                    rightButtonLabel="Add Sales Order"
+                onRightPress={() => navigation.navigate('AddSalesInvoice')}
+                rightButtonLabel="Add sales Invoice"
                 showRight
             />
             <View style={styles.headerSeparator} />
@@ -213,18 +213,18 @@ const ViewSalesOrder = () => {
                         item={{
                             soleExpenseCode: order.id,
                             expenseName: order.salesOrderNumber,
-                            amount: order.amount,
+                            amount: order.salesInvoiceNumber,
                         }}
                         isActive={activeOrderId === order.id}
                         onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
                         customRows={[
                             { label: 'Customer Name', value: order.customerName },
-                            { label: 'Amount', value: order.amount },
+                            { label: 'Sales Invoice Number', value: order.salesInvoiceNumber },
                             { label: 'Delivery Date', value: order.deliveryDate },
-                            { label: 'Due Date', value: order.dueDate },
+                            // { label: 'Due Date', value: order.dueDate },
                         ]} 
                         headerLeftLabel="Sales Order Number"
-                        headerRightLabel="Amount"
+                        headerRightLabel="Sales Invoice Number"
                         footerComponent={renderFooterActions(order)}
                         headerRightContainerStyle={styles.headerRightContainer}
                     />
@@ -472,4 +472,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default ViewSalesOrder;
+export default ManageSalesInvoice;

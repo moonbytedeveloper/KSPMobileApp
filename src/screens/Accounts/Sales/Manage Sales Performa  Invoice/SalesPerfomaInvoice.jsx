@@ -1,15 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import AppHeader from '../../components/common/AppHeader';
+import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
-import AccordionItem from '../../components/common/AccordionItem';
-import Dropdown from '../../components/common/Dropdown';
+import AccordionItem from '../../../../components/common/AccordionItem';
+import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { wp, hp, rf } from '../../utils/responsive';
-import { COLORS, TYPOGRAPHY, RADIUS } from '../styles/styles';
-import { getPurchaseHeaderInquiries, deleteSalesHeader } from '../../api/authServices';
+import { wp, hp, rf } from '../../../../utils/responsive';
+import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
+import { getPurchaseHeaderInquiries, deleteSalesHeader } from '../../../../api/authServices';
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
-import { getUUID, getCMPUUID, getENVUUID } from '../../api/tokenStorage';
+import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 
 const SalesPerfomaInvoice = () => {
     const navigation = useNavigation();

@@ -6,20 +6,24 @@ import { useUser } from '../../contexts/UserContext';
 
 // Import screens
 import HomeScreen from '../../screens/Home/HomeScreen';
-import ManageSalesOrder from '../../screens/Accounts/ManageSalesOrder.jsx';
-import ViewSalesOrder from '../../screens/Accounts/ViewSalesOrder.jsx';
-import ManagePurchaseOrder from '../../screens/Accounts/managePurchaseOrder.jsx';
-import ViewPurchaseOrder from '../../screens/Accounts/ViewPurchaseOrder.jsx';
-import ManagePurchaseInquiry from '../../screens/Accounts/ManagePurchaseInquiry.jsx';
-import ViewPurchaseInquiry from '../../screens/Accounts/ViewPurchaseInquiry.jsx';
-import ManageInquiry from '../../screens/Accounts/ManageInquiry.jsx';
-import AddSalesInquiry from '../../screens/Accounts/AddSalesInquiry.jsx';
-import SalesPerfomaInvoice from '../../screens/Accounts/SalesPerfomaInvoice.jsx';
-import AddSalesPerfomaInvoice from '../../screens/Accounts/AddSalesPerfomaInvoice.jsx';
-import ManageSalesInvoice from '../../screens/Accounts/ManageSalesInvoice.jsx';
-import AddSalesInvoice from '../../screens/Accounts/AddSalesInvoice.jsx';
-import ViewPurchaseQuotation from '../../screens/Accounts/ViewPurchaseQuotation.jsx';
-import AddPurchaseQuotation from '../../screens/Accounts/AddPurchaseQuotation.jsx';
+import ManageSalesOrder from '../../screens/Accounts/Sales/Manage Sales Order/ManageSalesOrder.jsx';
+import ViewSalesOrder from '../../screens/Accounts/Sales/Manage Sales Order/ViewSalesOrder.jsx';
+import ManagePurchaseOrder from '../../screens/Accounts/Purchase/Manage Purchase Order/managePurchaseOrder.jsx';
+import ViewPurchaseOrder from '../../screens/Accounts/Purchase/Manage Purchase Order/ViewPurchaseOrder.jsx';
+import ManagePurchaseInquiry from '../../screens/Accounts/Purchase/Manage Purchase Inquiry/ManagePurchaseInquiry.jsx';
+import ViewPurchaseInquiry from '../../screens/Accounts/Purchase/Manage Purchase Inquiry/ViewPurchaseInquiry.jsx';
+import ManageInquiry from '../../screens/Accounts/Sales/Manage Inquiry/ManageInquiry.jsx';
+import AddSalesInquiry from '../../screens/Accounts/Sales/Manage Inquiry/AddSalesInquiry.jsx';
+import SalesPerfomaInvoice from '../../screens/Accounts/Sales/Manage Sales Performa  Invoice/SalesPerfomaInvoice.jsx';
+import AddSalesPerfomaInvoice from '../../screens/Accounts/Sales/Manage Sales Performa  Invoice/AddSalesPerfomaInvoice.jsx';
+import ManageSalesInvoice from '../../screens/Accounts/Sales/Manage Sales Invoice/ManageSalesInvoice.jsx';
+import AddSalesInvoice from '../../screens/Accounts/Sales/Manage Sales Invoice/AddSalesInvoice.jsx';
+import ViewPurchaseQuotation from '../../screens/Accounts/Purchase/Manage Quotation/ViewPurchaseQuotation.jsx';
+import AddPurchaseQuotation from '../../screens/Accounts/Purchase/Manage Quotation/AddPurchaseQuotation.jsx';
+import ViewPerfomaPurchaseInvoice from '../../screens/Accounts/Purchase/Manage Purchase Performa Invoice/ViewPerfomaPurchaseInvoice.jsx';
+import AddPerfomaPurchaseInvoice from '../../screens/Accounts/Purchase/Manage Purchase Performa Invoice/AddPerfomaPurchaseInvoice.jsx';
+import ManagePurchaseInvoice from '../../screens/Accounts/Purchase/Manage Purchase Invoice/ManagePurchaseInvoice.jsx';
+import AddPurchaseInvoice from '../../screens/Accounts/Purchase/Manage Purchase Invoice/AddPurchaseInvoice.jsx';
 
 // import AddPurchaseInquiry from '../../screens/Accounts/AddPurchaseInquiry.jsx';
 import BusinessDevelopmentScreen from '../../screens/BusinessDevelopment/BusinessDevelopmentScreen';
@@ -132,7 +136,7 @@ const AppStack = () => {
         component={ManageSalesOrder}
         options={{ headerShown: false }}
       />
-       <Stack.Screen
+      <Stack.Screen
         name="ViewSalesOrder"
         component={ViewSalesOrder}
         options={{ headerShown: false }}
@@ -153,16 +157,36 @@ const AppStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen
+        name="ViewPerfomaPurchaseInvoice"
+        component={ViewPerfomaPurchaseInvoice}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ManagePurchaseInvoice"
+        component={ManagePurchaseInvoice}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AddPurchaseInvoice"
+        component={AddPurchaseInvoice}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AddPerfomaPurchaseInvoice"
+        component={AddPerfomaPurchaseInvoice}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
         name="ManageSalesInvoice"
         component={ManageSalesInvoice}
         options={{ headerShown: false }}
       />
-        <Stack.Screen
+      <Stack.Screen
         name="ViewPurchaseQuotation"
         component={ViewPurchaseQuotation}
         options={{ headerShown: false }}
       />
-        <Stack.Screen
+      <Stack.Screen
         name="AddPurchaseQuotation"
         component={AddPurchaseQuotation}
         options={{ headerShown: false }}
@@ -177,7 +201,7 @@ const AppStack = () => {
         component={AddSalesInvoice}
         options={{ headerShown: false }}
       />
-       <Stack.Screen
+      <Stack.Screen
         name="AddSalesPerfomaInvoice"
         component={AddSalesPerfomaInvoice}
         options={{ headerShown: false }}
@@ -400,7 +424,7 @@ const DrawerNavigator = () => {
         component={ManageSalesOrder}
         options={{ headerShown: false }}
       />
-       <Drawer.Screen
+      <Drawer.Screen
         name="ViewSalesOrder"
         component={ViewSalesOrder}
         options={{ headerShown: false }}
@@ -421,22 +445,32 @@ const DrawerNavigator = () => {
         options={{ headerShown: false }}
       />
       <Drawer.Screen
+        name="ViewPerfomaPurchaseInvoice"
+        component={ViewPerfomaPurchaseInvoice}
+        options={{ headerShown: false }}
+      />
+      <Drawer.Screen
+        name="ManagePurchaseInvoice"
+        component={ManagePurchaseInvoice}
+        options={{ headerShown: false }}
+      />
+      <Drawer.Screen
         name="ManageSalesInvoice"
         component={ManageSalesInvoice}
         options={{ headerShown: false }}
       />
-       <Drawer.Screen
+      <Drawer.Screen
         name="ViewPurchaseQuotation"
         component={ViewPurchaseQuotation}
         options={{ headerShown: false }}
       />
-       
+
       <Drawer.Screen
         name="SalesPerfomaInvoice"
         component={SalesPerfomaInvoice}
         options={{ headerShown: false }}
       />
-       <Drawer.Screen
+      <Drawer.Screen
         name="AddSalesInquiry"
         component={AddSalesInquiry}
         options={{ headerShown: false }}
@@ -505,17 +539,17 @@ const AdminDrawerNavigator = () => {
         options={{ headerShown: false }}
       />
       <Drawer.Screen
-      name="ViewSalesOrder"
-      component={ViewSalesOrder}
-      options={{ headerShown: false }}
-    />
+        name="ViewSalesOrder"
+        component={ViewSalesOrder}
+        options={{ headerShown: false }}
+      />
       <Drawer.Screen
         name="PurchaseOrder"
         component={ManagePurchaseOrder}
         options={{ headerShown: false }}
       />
-       <Drawer.Screen
-          name="ViewPurchaseOrder"
+      <Drawer.Screen
+        name="ViewPurchaseOrder"
         component={ViewPurchaseOrder}
         options={{ headerShown: false }}
       />
@@ -524,10 +558,20 @@ const AdminDrawerNavigator = () => {
         component={ViewPurchaseInquiry}
         options={{ headerShown: false }}
       />
-      
+
       <Drawer.Screen
         name="ManageInquiry"
         component={ManageInquiry}
+        options={{ headerShown: false }}
+      />
+      <Drawer.Screen
+        name="ViewPerfomaPurchaseInvoice"
+        component={ViewPerfomaPurchaseInvoice}
+        options={{ headerShown: false }}
+      />
+      <Drawer.Screen
+        name="ManagePurchaseInvoice"
+        component={ManagePurchaseInvoice}
         options={{ headerShown: false }}
       />
       <Drawer.Screen
@@ -535,7 +579,7 @@ const AdminDrawerNavigator = () => {
         component={ManageSalesInvoice}
         options={{ headerShown: false }}
       />
-       <Drawer.Screen
+      <Drawer.Screen
         name="ViewPurchaseQuotation"
         component={ViewPurchaseQuotation}
         options={{ headerShown: false }}
@@ -834,7 +878,7 @@ const CustomDrawerContent = ({ navigation }) => {
               style={[
                 styles.subMenuWrap,
                 {
-                  height: purchaseAnim.interpolate({ inputRange: [0, 1], outputRange: [0, hp(20)] }),
+                  height: purchaseAnim.interpolate({ inputRange: [0, 1], outputRange: [0, hp(25)] }),
                   opacity: purchaseAnim,
                 },
               ]}
@@ -877,6 +921,32 @@ const CustomDrawerContent = ({ navigation }) => {
                     <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
                   </View>
                   <Text style={styles.itemLabel}>View Purchase Quotation</Text>
+                </View>
+                <Icon name="chevron-right" size={rf(5)} color="#999" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => navigateFromDrawer('ViewPerfomaPurchaseInvoice')}
+                style={[styles.cardItem, styles.subItem]}
+              >
+                <View style={styles.itemLeft}>
+                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                    <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.itemLabel}>View Perfoma Purchase Invoice</Text>
+                </View>
+                <Icon name="chevron-right" size={rf(5)} color="#999" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => navigateFromDrawer('ManagePurchaseInvoice')}
+                style={[styles.cardItem, styles.subItem]}
+              >
+                <View style={styles.itemLeft}>
+                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                    <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.itemLabel}>Manage Purchase Invoice</Text>
                 </View>
                 <Icon name="chevron-right" size={rf(5)} color="#999" />
               </TouchableOpacity>
