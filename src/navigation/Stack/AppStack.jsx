@@ -16,6 +16,10 @@ import ManageInquiry from '../../screens/Accounts/ManageInquiry.jsx';
 import AddSalesInquiry from '../../screens/Accounts/AddSalesInquiry.jsx';
 import SalesPerfomaInvoice from '../../screens/Accounts/SalesPerfomaInvoice.jsx';
 import AddSalesPerfomaInvoice from '../../screens/Accounts/AddSalesPerfomaInvoice.jsx';
+import ManageSalesInvoice from '../../screens/Accounts/ManageSalesInvoice.jsx';
+import AddSalesInvoice from '../../screens/Accounts/AddSalesInvoice.jsx';
+import ViewPurchaseQuotation from '../../screens/Accounts/ViewPurchaseQuotation.jsx';
+import AddPurchaseQuotation from '../../screens/Accounts/AddPurchaseQuotation.jsx';
 
 // import AddPurchaseInquiry from '../../screens/Accounts/AddPurchaseInquiry.jsx';
 import BusinessDevelopmentScreen from '../../screens/BusinessDevelopment/BusinessDevelopmentScreen';
@@ -149,8 +153,28 @@ const AppStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen
+        name="ManageSalesInvoice"
+        component={ManageSalesInvoice}
+        options={{ headerShown: false }}
+      />
+        <Stack.Screen
+        name="ViewPurchaseQuotation"
+        component={ViewPurchaseQuotation}
+        options={{ headerShown: false }}
+      />
+        <Stack.Screen
+        name="AddPurchaseQuotation"
+        component={AddPurchaseQuotation}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
         name="SalesPerfomaInvoice"
         component={SalesPerfomaInvoice}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AddSalesInvoice"
+        component={AddSalesInvoice}
         options={{ headerShown: false }}
       />
        <Stack.Screen
@@ -397,6 +421,17 @@ const DrawerNavigator = () => {
         options={{ headerShown: false }}
       />
       <Drawer.Screen
+        name="ManageSalesInvoice"
+        component={ManageSalesInvoice}
+        options={{ headerShown: false }}
+      />
+       <Drawer.Screen
+        name="ViewPurchaseQuotation"
+        component={ViewPurchaseQuotation}
+        options={{ headerShown: false }}
+      />
+       
+      <Drawer.Screen
         name="SalesPerfomaInvoice"
         component={SalesPerfomaInvoice}
         options={{ headerShown: false }}
@@ -493,6 +528,16 @@ const AdminDrawerNavigator = () => {
       <Drawer.Screen
         name="ManageInquiry"
         component={ManageInquiry}
+        options={{ headerShown: false }}
+      />
+      <Drawer.Screen
+        name="ManageSalesInvoice"
+        component={ManageSalesInvoice}
+        options={{ headerShown: false }}
+      />
+       <Drawer.Screen
+        name="ViewPurchaseQuotation"
+        component={ViewPurchaseQuotation}
         options={{ headerShown: false }}
       />
       <Drawer.Screen
@@ -754,6 +799,19 @@ const CustomDrawerContent = ({ navigation }) => {
                 </View>
                 <Icon name="chevron-right" size={rf(5)} color="#999" />
               </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => navigateFromDrawer('ManageSalesInvoice')}
+                style={[styles.cardItem, styles.subItem]}
+              >
+                <View style={styles.itemLeft}>
+                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                    <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.itemLabel}>Manage Sales Invoice</Text>
+                </View>
+                <Icon name="chevron-right" size={rf(5)} color="#999" />
+              </TouchableOpacity>
             </Animated.View>
           </View>
           {/* Sales item now expands a small submenu instead of navigating directly */}
@@ -776,7 +834,7 @@ const CustomDrawerContent = ({ navigation }) => {
               style={[
                 styles.subMenuWrap,
                 {
-                  height: purchaseAnim.interpolate({ inputRange: [0, 1], outputRange: [0, hp(10)] }),
+                  height: purchaseAnim.interpolate({ inputRange: [0, 1], outputRange: [0, hp(20)] }),
                   opacity: purchaseAnim,
                 },
               ]}
@@ -806,6 +864,19 @@ const CustomDrawerContent = ({ navigation }) => {
                     <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
                   </View>
                   <Text style={styles.itemLabel}>Manage Purchase Inquiry</Text>
+                </View>
+                <Icon name="chevron-right" size={rf(5)} color="#999" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => navigateFromDrawer('ViewPurchaseQuotation')}
+                style={[styles.cardItem, styles.subItem]}
+              >
+                <View style={styles.itemLeft}>
+                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                    <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.itemLabel}>View Purchase Quotation</Text>
                 </View>
                 <Icon name="chevron-right" size={rf(5)} color="#999" />
               </TouchableOpacity>

@@ -41,19 +41,7 @@ const AccordionSection = ({
 }) => {
   return (
     <View style={[styles.sectionWrapper, wrapperStyle]}>
-      {/* <TouchableOpacity
-                activeOpacity={0.8}
-                style={styles.sectionHeader}
-                onPress={() => {
-                  setStatus && setStatus(undefined);
-                  setOpenSection1(true);
-                  setOpenSection2(false);
-                  setOpenSection3(false);
-                }}
-              >
-                <Text style={styles.sectionHeaderText}>Basic Details</Text>
-                <Icon name={openSection1 ? 'expand-less' : 'expand-more'} size={rf(4.2)} color={COLORS.text} />
-              </TouchableOpacity> */}
+     
       <TouchableOpacity
         activeOpacity={0.8}
         style={styles.sectionHeader}
@@ -72,7 +60,7 @@ const AccordionSection = ({
   );
 };
 
-const ManageSalesOrder = () => {
+const AddPurchaseQuotation = () => {
   const [expandedId, setExpandedId] = useState(1);
   const navigation = useNavigation();
   const toggleSection = id => setExpandedId(prev => (prev === id ? null : id));
@@ -654,7 +642,7 @@ const ManageSalesOrder = () => {
           </AccordionSection>
 
           {/* Section 2: Billing Address */}
-          <AccordionSection
+          {/* <AccordionSection
             id={2}
             title="Billing Address"
             expanded={expandedId === 2}
@@ -800,10 +788,10 @@ const ManageSalesOrder = () => {
                 </TouchableOpacity>
               </View>
             </View>
-          </AccordionSection>
+          </AccordionSection> */}
 
           {/* Section 3: Shipping Address */}
-          <AccordionSection
+          {/* <AccordionSection
             id={3}
             title="Shipping Address"
             expanded={expandedId === 3}
@@ -928,7 +916,7 @@ const ManageSalesOrder = () => {
               </View>
               <View style={styles.col} />
             </View>
-          </AccordionSection>
+          </AccordionSection> */}
 
           {/* Section 4: Create Order */}
           <AccordionSection
@@ -1319,7 +1307,7 @@ const ManageSalesOrder = () => {
   );
 };
 
-export default ManageSalesOrder;
+export default AddPurchaseQuotation;
 
 const styles = StyleSheet.create({
   container: {

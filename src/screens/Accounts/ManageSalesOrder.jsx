@@ -1337,8 +1337,8 @@ const ManageSalesOrder = () => {
               disabled={false}
             >
               <Text style={formStyles.primaryBtnText}>
-                Save & Send
-                {/* {isSubmitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Save & Send')} */}
+                Submit
+                {/* {isSubmitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Submit')} */}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -1351,7 +1351,7 @@ const ManageSalesOrder = () => {
           </View>
           {/* <View style={styles.centerButtonContainer}>
                     <TouchableOpacity style={styles.primaryButton} onPress={handleCreateOrder}>
-                        <Text style={styles.primaryButtonText}>Save & Send</Text>
+                        <Text style={styles.primaryButtonText}>Submit</Text>
                     </TouchableOpacity> */}
         </View>
       </View>
