@@ -124,6 +124,8 @@ const AddSalesPerfomaInvoice = () => {
     const [headerForm, setHeaderForm] = useState({
         companyName: '',
         opportunityTitle: '',
+        salesInquiryText: '',
+        salesInquiry: '',
         clientName: '',
         phone: '',
         email: '',
@@ -434,8 +436,8 @@ const AddSalesPerfomaInvoice = () => {
                                 <View style={[inputStyles.box]}>
                                     <TextInput
                                         style={[inputStyles.input]}
-                                        value={headerForm.companyName}
-                                        onChangeText={v => setHeaderForm(s => ({ ...s, companyName: v }))}
+                                        value={headerForm.salesInquiryText}
+                                        onChangeText={v => setHeaderForm(s => ({ ...s, salesInquiryText: v }))}
                                         placeholder="eg."
                                         placeholderTextColor={COLORS.textLight}
                                     />
@@ -464,11 +466,11 @@ const AddSalesPerfomaInvoice = () => {
                                 {/* <Text style={[inputStyles.label, { fontWeight: '600' }]}>Sales Inquiry No.</Text> */}
                                 <Dropdown
                                     placeholder="Sales Inquiry No."
-                                    value={headerForm.companyName}
+                                    value={headerForm.salesInquiry}
                                     options={salesInquiries}
                                     getLabel={s => s}
                                     getKey={s => s}
-                                    onSelect={v => setHeaderForm(s => ({ ...s, companyName: v }))}
+                                    onSelect={v => setHeaderForm(s => ({ ...s, salesInquiry: v }))}
                                     inputBoxStyle={inputStyles.box}
                                     textStyle={inputStyles.input}
                                 />

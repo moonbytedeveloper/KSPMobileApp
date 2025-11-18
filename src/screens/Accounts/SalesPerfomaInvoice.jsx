@@ -165,7 +165,8 @@ const SalesPerfomaInvoice = () => {
                         value={String(itemsPerPage)}
                         options={ITEMS_PER_PAGE_OPTIONS}
                         onSelect={(value) => {
-                            const parsed = parseInt(value, 10);
+                            // Dropdown returns the selected option (string). Parse and apply.
+                            const parsed = parseInt(String(value), 10);
                             if (!Number.isNaN(parsed)) {
                                 setItemsPerPage(parsed);
                                 setCurrentPage(0);
@@ -174,6 +175,8 @@ const SalesPerfomaInvoice = () => {
                         hideSearch
                         inputBoxStyle={styles.dropdownInput}
                         style={styles.dropdownWrapper}
+                        renderInModal
+                        dropdownListStyle={{ width: wp(18) }}
                     />
                     <Text style={styles.showEntriesLabel}>entries</Text>
                 </View>

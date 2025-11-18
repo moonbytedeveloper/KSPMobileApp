@@ -443,6 +443,8 @@ const ManageSalesOrder = () => {
                   textStyle={inputStyles.input}
                 />
               </View>
+
+              
               <View style={styles.col}>
              <Text style={inputStyles.label}>Customer Name* </Text>
 
@@ -726,11 +728,11 @@ const ManageSalesOrder = () => {
                  <View style={{ zIndex: 9999, elevation: 20 }}>
                   <Dropdown
                     placeholder="- Select State -"
-                    value={billingForm.country}
+                    value={billingForm.state}
                     options={state}
                     getLabel={c => c}
                     getKey={c => c}
-                    onSelect={c => setBillingForm(s => ({ ...s, country: c }))}
+                    onSelect={c => setBillingForm(s => ({ ...s, state: c }))}
                     inputBoxStyle={inputStyles.box}
                     style={{ marginBottom: hp(1.6) }}
                     renderInModal={true}
