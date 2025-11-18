@@ -54,6 +54,7 @@ const AddSalesInquiry = () => {
         quantity: '',
         unit: ''
     });
+    const [editLineItemId, setEditLineItemId] = useState(null);
 
     // Date picker state
     const [openDatePicker, setOpenDatePicker] = useState(false);
@@ -107,8 +108,23 @@ const AddSalesInquiry = () => {
             return;
         }
 
+        // If editing, update the existing item
+        if (editLineItemId) {
+            setLineItems(prev => prev.map(it => it.id === editLineItemId ? {
+                ...it,
+                itemType: currentItem.itemType,
+                itemName: currentItem.itemName,
+                quantity: currentItem.quantity,
+                unit: currentItem.unit
+            } : it));
+            // reset editor
+            setEditLineItemId(null);
+            setCurrentItem({ itemType: '', itemName: '', quantity: '', unit: '' });
+            return;
+        }
+
         const newItem = {
-            id: lineItems.length + 1,
+            id: lineItems.length ? Math.max(...lineItems.map(i => i.id)) + 1 : 1,
             itemType: currentItem.itemType,
             itemName: currentItem.itemName,
             quantity: currentItem.quantity,
@@ -116,12 +132,7 @@ const AddSalesInquiry = () => {
         };
 
         setLineItems([...lineItems, newItem]);
-        setCurrentItem({
-            itemType: '',
-            itemName: '',
-            quantity: '',
-            unit: ''
-        });
+        setCurrentItem({ itemType: '', itemName: '', quantity: '', unit: '' });
     };
 
     const handleEditItem = (id) => {
@@ -133,8 +144,15 @@ const AddSalesInquiry = () => {
                 quantity: item.quantity,
                 unit: item.unit
             });
-            handleDeleteItem(id);
+            setEditLineItemId(id);
+            // Expand LINE section so editor is visible (optional)
+            setExpandedId(2);
         }
+    };
+
+    const cancelEdit = () => {
+        setEditLineItemId(null);
+        setCurrentItem({ itemType: '', itemName: '', quantity: '', unit: '' });
     };
 
     const handleDeleteItem = (id) => {
@@ -408,7 +426,7 @@ const AddSalesInquiry = () => {
                                     style={styles.addButton}
                                     onPress={handleAddItem}
                                 >
-                                    <Text style={styles.addButtonText}>Add</Text>
+                                    <Text style={styles.addButtonText}>{editLineItemId ? 'Update' : 'Add'}</Text>
                                 </TouchableOpacity>
                             </View>
                     </AccordionSection>
