@@ -385,7 +385,13 @@ const ManagePurchaseInquiry = () => {
                     {lineItems.length > 0 && (
                         <View style={styles.tableContainer}>
                             <View style={styles.tableWrapper}>
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    nestedScrollEnabled={true}
+                                    keyboardShouldPersistTaps="handled"
+                                    directionalLockEnabled={true}
+                                >
                                     <View style={styles.table}>
                                     {/* Table Header */}
                                     <View style={styles.thead}>

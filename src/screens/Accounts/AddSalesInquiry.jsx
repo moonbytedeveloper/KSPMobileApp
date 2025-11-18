@@ -31,7 +31,7 @@ const AddSalesInquiry = () => {
     const currencyTypes = ['- Select Currency -', 'USD', 'INR', 'EUR', 'GBP'];
     const itemTypes = ['- Select Item -', 'Furniture', 'Electronics', 'Office Supplies', 'Equipment'];
     const itemNames = ['- Select Item -', 'Chair', 'Table', 'Desk', 'Cabinet'];
-    const CustomerType = ['- Select Customer -', 'Abhinav','Raj',];
+    const CustomerType = ['- Select Customer -', 'Abhinav', 'Raj',];
     const countries = ['- Select Country -', 'India', 'United States', 'United Kingdom', 'Australia', 'Germany'];
     const units = ['- Select Unit -', 'Pcs', 'Box', 'Set', 'Unit', 'failed'];
 
@@ -45,7 +45,7 @@ const AddSalesInquiry = () => {
     const [projectName, setProjectName] = useState('');
     const [inquiryNo, setInquiryNo] = useState('');
     const [country, setCountry] = useState('');
-    
+
     // Line items state
     const [lineItems, setLineItems] = useState([]);
     const [currentItem, setCurrentItem] = useState({
@@ -159,17 +159,23 @@ const AddSalesInquiry = () => {
         setLineItems(lineItems.filter(item => item.id !== id));
     };
 
-    const handleSubmit = () => {
-        const payload = {
-            uuid,
-            currencyType,
-            requestTitle,
-            requestedDate,
-            expectedPurchaseDate,
-            lineItems
-        };
-        console.log('Submit payload:', payload);
-        Alert.alert('Success', 'Inquiry submitted successfully');
+    const handleSubmit = () => { 
+            const payload = {
+                projectName,
+                customerName,
+                requestedDate,
+                expectedPurchaseDate,
+                lineItems: lineItems.map((item, index) => ({
+                    srNo: index + 1,
+                    itemType: item.itemType,
+                    itemName: item.itemName,
+                    quantity: item.quantity,
+                    unit: item.unit
+                }))
+            };
+
+            console.log("Final Payload:", payload);
+     
     };
 
     const handleCancel = () => {
@@ -180,7 +186,7 @@ const AddSalesInquiry = () => {
         <>
             <View style={{ flex: 1, backgroundColor: '#fff' }}>
                 <AppHeader
-                    title="Add Customer Inquiry"
+                    title="Add Sales Inquiry"
                     onLeftPress={() => {
                         navigation.goBack();
                     }}
@@ -190,7 +196,7 @@ const AddSalesInquiry = () => {
                     {/* Section 1: HEADER */}
                     <AccordionSection id={1} title="HEADER" expanded={expandedId === 1} onToggle={toggleSection}>
                         <View style={styles.row}>
-                            <View style={styles.col}>
+                            {/* <View style={styles.col}>
                                 <Text style={inputStyles.label}>UUID*</Text>
                                 <View style={[inputStyles.box]}>
                                     <TextInput
@@ -202,6 +208,18 @@ const AddSalesInquiry = () => {
                                         placeholder="UUID"
                                         placeholderTextColor={COLORS.textLight}
                                         editable={false}
+                                    />
+                                </View>
+                            </View> */}
+                            <View style={styles.col}>
+                                <Text style={inputStyles.label}>Project Name*</Text>
+                                <View style={[inputStyles.box]}>
+                                    <TextInput
+                                        style={[inputStyles.input, { color: COLORS.text }]}
+                                        value={projectName}
+                                        onChangeText={setProjectName}
+                                        placeholder="eg. Ksp"
+                                        placeholderTextColor={COLORS.textLight}
                                     />
                                 </View>
                             </View>
@@ -223,7 +241,7 @@ const AddSalesInquiry = () => {
                             </View>
                         </View>
 
-                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
+                        {/* <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>Country Name*</Text>
                                <View style={{ zIndex: 9999, elevation: 20 }}>
@@ -257,9 +275,9 @@ const AddSalesInquiry = () => {
                                 </View>
                             </View>
                             <View style={styles.col} />
-                        </View>
+                        </View> */}
 
-                        
+
 
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             <View style={styles.col}>
@@ -320,23 +338,12 @@ const AddSalesInquiry = () => {
                                     </View>
                                 </TouchableOpacity>
                             </View>
-                            
+
                         </View>
 
-                        <View style={[styles.row, { marginTop: hp(1.5) }]}> 
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Project Name*</Text>
-                                <View style={[inputStyles.box]}>
-                                    <TextInput
-                                        style={[inputStyles.input, { color: COLORS.text }]}
-                                        value={projectName}
-                                        onChangeText={setProjectName}
-                                        placeholder="eg. Ksp"
-                                        placeholderTextColor={COLORS.textLight}
-                                    />
-                                </View>
-                            </View>
-                            <View style={styles.col}>
+                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
+
+                            {/* <View style={styles.col}>
                                 <Text style={inputStyles.label}>Inquiry No.*</Text>
                                 <View style={[inputStyles.box]}>
                                     <TextInput
@@ -347,7 +354,7 @@ const AddSalesInquiry = () => {
                                         placeholderTextColor={COLORS.textLight}
                                     />
                                 </View>
-                            </View>
+                            </View> */}
                         </View>
                     </AccordionSection>
 
@@ -381,7 +388,7 @@ const AddSalesInquiry = () => {
                                         getKey={(item) => item}
                                         onSelect={(v) => setCurrentItem({ ...currentItem, itemName: v })}
                                         renderInModal={true}
-                                      inputBoxStyle={[inputStyles.box, { minHeight: hp(4.6), paddingVertical: 0, marginTop: hp(0.5) }]}
+                                        inputBoxStyle={[inputStyles.box, { minHeight: hp(4.6), paddingVertical: 0, marginTop: hp(0.5) }]}
                                         textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
                                     />
                                 </View>
@@ -391,7 +398,7 @@ const AddSalesInquiry = () => {
                         <View style={[styles.row, { marginTop: hp(1.5), alignItems: 'flex-end' }]}>
                             <View style={styles.colSmall}>
                                 <Text style={inputStyles.label}>Quantity*</Text>
-                                <View style={[inputStyles.box, { marginTop: hp(0.5) }]}> 
+                                <View style={[inputStyles.box, { marginTop: hp(0.5) }]}>
                                     <TextInput
                                         style={[inputStyles.input, { flex: 1, fontSize: rf(3.4), color: COLORS.text }]}
                                         value={currentItem.quantity}
@@ -418,7 +425,7 @@ const AddSalesInquiry = () => {
                                     />
                                 </View>
                             </View>
-                          
+
                         </View>
                           <View style={styles.addButtonWrapper}>
                                 <TouchableOpacity
@@ -426,62 +433,68 @@ const AddSalesInquiry = () => {
                                     style={styles.addButton}
                                     onPress={handleAddItem}
                                 >
-                                    <Text style={styles.addButtonText}>{editLineItemId ? 'Update' : 'Add'}</Text>
+                                    <Text style={styles.addButtonText}>Add</Text>
                                 </TouchableOpacity>
                             </View>
                     </AccordionSection>
 
-                    
+
 
                     {/* Line Items Table */}
                     {lineItems.length > 0 && (
                         <View style={styles.tableContainer}>
                             <View style={styles.tableWrapper}>
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    nestedScrollEnabled={true}
+                                    keyboardShouldPersistTaps="handled"
+                                    directionalLockEnabled={true}
+                                >
                                     <View style={styles.table}>
-                                    {/* Table Header */}
-                                    <View style={styles.thead}>
-                                        <View style={styles.tr}>
-                                            <Text style={[styles.th, { width: wp(15) }]}>Sr.No</Text>
-                                            <Text style={[styles.th, { width: wp(50) }]}>Item</Text>
-                                            <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
-                                            <Text style={[styles.th, { width: wp(25) }]}>Action</Text>
-                                        </View>
-                                    </View>
-
-                                    
-
-                                    {/* Table Body */}
-                                    <View style={styles.tbody}>
-                                        {lineItems.map((item, index) => (
-                                            <View key={item.id} style={styles.tr}>
-                                                <View style={[styles.td, { width: wp(15) }]}>
-                                                    <Text style={styles.tdText}>{index + 1}</Text>
-                                                </View>
-                                                <View style={[styles.td, { width: wp(50), alignItems: 'flex-start', paddingLeft: wp(2) }]}>
-                                                    <Text style={styles.tdText}>• Item Type: {item.itemType}</Text>
-                                                    <Text style={styles.tdText}>• Name: {item.itemName}</Text>
-                                                </View>
-                                                <View style={[styles.td, { width: wp(20) }]}>
-                                                    <Text style={styles.tdText}>{item.quantity}</Text>
-                                                </View>
-                                                <View style={[styles.tdAction, { width: wp(25) }]}>
-                                                    <TouchableOpacity
-                                                        style={styles.actionButton}
-                                                        onPress={() => handleEditItem(item.id)}
-                                                    >
-                                                        <Text style={styles.actionButtonText}>Edit</Text>
-                                                    </TouchableOpacity>
-                                                    <TouchableOpacity
-                                                        style={[styles.actionButton, { marginLeft: wp(2) }]}
-                                                        onPress={() => handleDeleteItem(item.id)}
-                                                    >
-                                                        <Text style={styles.actionButtonText}>Delete</Text>
-                                                    </TouchableOpacity>
-                                                </View>
+                                        {/* Table Header */}
+                                        <View style={styles.thead}>
+                                            <View style={styles.tr}>
+                                                <Text style={[styles.th, { width: wp(15) }]}>Sr.No</Text>
+                                                <Text style={[styles.th, { width: wp(50) }]}>Item</Text>
+                                                <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
+                                                <Text style={[styles.th, { width: wp(25) }]}>Action</Text>
                                             </View>
-                                        ))}
-                                    </View>
+                                        </View>
+
+
+
+                                        {/* Table Body */}
+                                        <View style={styles.tbody}>
+                                            {lineItems.map((item, index) => (
+                                                <View key={item.id} style={styles.tr}>
+                                                    <View style={[styles.td, { width: wp(15) }]}>
+                                                        <Text style={styles.tdText}>{index + 1}</Text>
+                                                    </View>
+                                                    <View style={[styles.td, { width: wp(50), alignItems: 'flex-start', paddingLeft: wp(2) }]}>
+                                                        <Text style={styles.tdText}>• Item Type: {item.itemType}</Text>
+                                                        <Text style={styles.tdText}>• Name: {item.itemName}</Text>
+                                                    </View>
+                                                    <View style={[styles.td, { width: wp(20) }]}>
+                                                        <Text style={styles.tdText}>{item.quantity}</Text>
+                                                    </View>
+                                                    <View style={[styles.tdAction, { width: wp(25) }]}>
+                                                        <TouchableOpacity
+                                                            style={styles.actionButton}
+                                                            onPress={() => handleEditItem(item.id)}
+                                                        >
+                                                            <Text style={styles.actionButtonText}>Edit</Text>
+                                                        </TouchableOpacity>
+                                                        <TouchableOpacity
+                                                            style={[styles.actionButton, { marginLeft: wp(2) }]}
+                                                            onPress={() => handleDeleteItem(item.id)}
+                                                        >
+                                                            <Text style={styles.actionButtonText}>Delete</Text>
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                </View>
+                                            ))}
+                                        </View>
                                     </View>
                                 </ScrollView>
                             </View>
@@ -489,7 +502,7 @@ const AddSalesInquiry = () => {
                     )}
                 </ScrollView>
 
-                
+
 
                 <DatePickerBottomSheet
                     isVisible={openDatePicker}
@@ -517,7 +530,7 @@ const AddSalesInquiry = () => {
                         </TouchableOpacity>
                     </View>
                 </View>
-        </View>
+            </View>
         </>
     );
 };

@@ -443,6 +443,8 @@ const ManageSalesOrder = () => {
                   textStyle={inputStyles.input}
                 />
               </View>
+
+              
               <View style={styles.col}>
              <Text style={inputStyles.label}>Customer Name* </Text>
 

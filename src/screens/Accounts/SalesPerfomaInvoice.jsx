@@ -11,7 +11,7 @@ import { getPurchaseHeaderInquiries, deleteSalesHeader } from '../../api/authSer
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 import { getUUID, getCMPUUID, getENVUUID } from '../../api/tokenStorage';
 
-const ViewPurchaseInquiry = () => {
+const SalesPerfomaInvoice = () => {
     const navigation = useNavigation();
     const [activeOrderId, setActiveOrderId] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -149,9 +149,9 @@ const ViewPurchaseInquiry = () => {
     return (
         <View style={styles.screen}>
             <AppHeader
-                title="View Purchase Inquiry"
+                title="Sales Perfoma Invoice"
                 onLeftPress={() => navigation.goBack()}
-                onRightPress={() => navigation.navigate('ManagePurchaseInquiry')}
+                onRightPress={() => navigation.navigate('AddSalesPerfomaInvoice')}
                 rightButtonLabel="Add Purchase Inquiry"
                 showRight
             />
@@ -165,7 +165,8 @@ const ViewPurchaseInquiry = () => {
                         value={String(itemsPerPage)}
                         options={ITEMS_PER_PAGE_OPTIONS}
                         onSelect={(value) => {
-                            const parsed = parseInt(value, 10);
+                            // Dropdown returns the selected option (string). Parse and apply.
+                            const parsed = parseInt(String(value), 10);
                             if (!Number.isNaN(parsed)) {
                                 setItemsPerPage(parsed);
                                 setCurrentPage(0);
@@ -174,6 +175,8 @@ const ViewPurchaseInquiry = () => {
                         hideSearch
                         inputBoxStyle={styles.dropdownInput}
                         style={styles.dropdownWrapper}
+                        renderInModal
+                        dropdownListStyle={{ width: wp(18) }}
                     />
                     <Text style={styles.showEntriesLabel}>entries</Text>
                 </View>
@@ -480,4 +483,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default ViewPurchaseInquiry;
+export default SalesPerfomaInvoice;

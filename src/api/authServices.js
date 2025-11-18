@@ -102,7 +102,10 @@ const PATHS = {
     // admin dashboard APIs
     totalHoursReported: '/api/DashBoard/myworklist/projects',
     totalEmployeeWorking: '/api/DashBoard/hr-dashboard/employees-status',
+    // Account Sales 
+    deleteSalesHeader: '/api/Account/DeleteSalesHeader',
     getSalesHeaderInquiries: Config.API_GET_SALES_HEADER_INQUIRIES_PATH || '/api/Account/GetSalesHeaderInquiries',
+    getPurchaseHeaderInquiries: Config.API_GET_PURCHASE_HEADER_INQUIRIES_PATH || '/api/Account/GetPurchaseHeaderInquiries',
 
 };
 console.log(PATHS, 'PATHS');
@@ -405,6 +408,7 @@ export async function getEmployeeProjectsWithProgress({ cmpUuid, envUuid, userUu
     return resp.data;
 }
 
+// Account Sales
 export async function getSalesHeaderInquiries({ cmpUuid, envUuid, start = 0, length = 10, searchValue = '' } = {}) {
     if (!cmpUuid || !envUuid) {
         const [c, e] = await Promise.all([
@@ -427,6 +431,56 @@ export async function getSalesHeaderInquiries({ cmpUuid, envUuid, start = 0, len
     };
 
     const resp = await api.get(PATHS.getSalesHeaderInquiries, { params });
+    console.log(resp, 'Sales inquiry get')
+    return resp.data;
+}
+export async function deleteSalesHeader({ overrides = {} }) {
+    let { userUuid, cmpUuid, envUuid,UUID } = overrides || {};
+    if (!UUID || !userUuid || !cmpUuid || !envUuid ) {
+        const [u, c, e] = await Promise.all([
+            userUuid || getUUID(),
+            cmpUuid || getCMPUUID(),
+            envUuid || getENVUUID(),
+            UUID
+        ]);
+        userUuid = u; cmpUuid = c; envUuid = e;
+    }
+    const params = { followupUuid, cmpUuid, envUuid, userUuid, userIp: userIp };
+    console.log('Delete Follow-Up params:', params);
+    const resp = await api.delete(PATHS.deleteSalesHeader, { params });
+    console.log('Delete Follow-Up response:', resp);
+    return resp.data;
+}
+
+// Account Purchase
+
+export async function getPurchaseHeaderInquiries({ cmpUuid, envUuid,userUuid, start = 0, length = 10, searchValue = '' } = {}) {
+    if (!cmpUuid || !envUuid) {
+        const [c, e, g] = await Promise.all([
+            cmpUuid || getCMPUUID(),
+            envUuid || getENVUUID(),
+            userUuid || getUUID(),
+        ]);
+        cmpUuid = c;
+        envUuid = e;
+        userUuid = g;
+    }
+
+    if (!cmpUuid) throw new Error('cmpUuid is required');
+    if (!envUuid) throw new Error('envUuid is required');
+
+    const params = {
+        cmpUuid,
+        envUuid,
+        start,
+        length,
+        searchValue,
+    };
+     console.log(params, "purchase inquiry")
+
+    const resp = await api.get(PATHS.getPurchaseHeaderInquiries, { params });
+    console.log(resp);
+    
     return resp.data;
 }
 
