@@ -138,9 +138,11 @@ const ManageInquiry = () => {
                 <View style={styles.showEntriesRow}>
                     <Text style={styles.showEntriesLabel}>Show</Text>
                     <Dropdown
-                        placeholder={String(itemsPerPage)}
+                        placeholder="Show entries"
                         value={String(itemsPerPage)}
                         options={ITEMS_PER_PAGE_OPTIONS}
+                        getLabel={v => v}
+                        getKey={v => v}
                         onSelect={(value) => {
                             const parsed = parseInt(value, 10);
                             if (!Number.isNaN(parsed)) {
@@ -149,7 +151,9 @@ const ManageInquiry = () => {
                             }
                         }}
                         hideSearch
+                        renderInModal={true}
                         inputBoxStyle={styles.dropdownInput}
+                        dropdownListStyle={{ width: wp(18) }}
                         style={styles.dropdownWrapper}
                     />
                     <Text style={styles.showEntriesLabel}>entries</Text>
