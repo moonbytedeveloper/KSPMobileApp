@@ -410,7 +410,7 @@ const AddSalesInvoice = () => {
         <>
             <View style={{ flex: 1, backgroundColor: '#fff' }}>
                 <AppHeader
-                    title="Manage Sales Order"
+                    title="Manage Sales Invoice"
                     onLeftPress={() => {
                         navigation.goBack();
                     }}
