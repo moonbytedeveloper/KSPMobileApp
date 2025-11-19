@@ -46,7 +46,6 @@ function HomeScreen({ navigation }) {
   });
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  console.log('dashboardData', dashboardData);
   
   // Chart data based on summary statistics - using raw values
   const chartData = [
@@ -73,8 +72,6 @@ function HomeScreen({ navigation }) {
   ]; // Show all items, even with 0 values
 
   // Debug log
-  console.log('Chart data:', chartData);
-  console.log('Dashboard data:', dashboardData);
 
   const handleMenuPress = () => {
     if (navigation && typeof navigation.openDrawer === 'function') {
@@ -95,8 +92,6 @@ function HomeScreen({ navigation }) {
         getENVUUID(),
         getUUID(),
       ]);
-      console.log('Loading dashboard data with:', { cmpUuid, envUuid, userUuid });
-      
       // Debug: Check if UUIDs are valid
       if (!cmpUuid) {
         //console.error('❌ cmpUuid is missing or null');

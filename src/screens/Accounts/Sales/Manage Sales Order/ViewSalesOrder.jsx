@@ -7,64 +7,9 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
+import { getSalesOrderHeaders } from '../../../../api/authServices';
 
-const SALES_ORDERS = [
-    {
-        id: 'KP1524',
-        salesOrderNumber: 'KP1524',
-        customerName: 'Moonbyte',
-        deliveryDate: '15-12-24',
-        dueDate: '15-12-24',
-        amount: '₹1,25,000',
-     
-    },
-    {
-        id: 'KP1525',
-        salesOrderNumber: 'KP1525',
-        customerName: 'Northwind Retail',
-        deliveryDate: '04-01-25',
-        dueDate: '20-12-24',
-        amount: '₹98,700',
-       
-    },
-    {
-        id: 'KP1526',
-        salesOrderNumber: 'KP1526',
-        customerName: 'Creative Labs',
-        deliveryDate: '22-12-24',
-        dueDate: '18-12-24',
-        amount: '₹2,10,000',
-        
-    },
-    {
-        id: 'KP1527',
-        salesOrderNumber: 'KP1527',
-        customerName: 'BlueStone Pvt Ltd',
-        deliveryDate: '11-01-25',
-        dueDate: '28-12-24',
-        amount: '₹75,420',
-     
-    },
-    {
-        id: 'KP1528',
-        salesOrderNumber: 'KP1528',
-        customerName: 'Aero Technologies',
-        deliveryDate: '29-12-24',
-        dueDate: '24-12-24',
-        amount: '₹3,42,880',
-        status: 'Approved',
-       
-    },
-    {
-        id: 'KP1529',
-        salesOrderNumber: 'KP1529',
-        customerName: 'UrbanNest Homes',
-        deliveryDate: '05-02-25',
-        dueDate: '12-01-25',
-        amount: '₹1,85,300',
-        
-    },
-];
+// sales orders will be fetched from API
 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 
@@ -74,20 +19,23 @@ const ViewSalesOrder = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [itemsPerPage, setItemsPerPage] = useState(Number(ITEMS_PER_PAGE_OPTIONS[1]));
     const [currentPage, setCurrentPage] = useState(0);
+    const [orders, setOrders] = useState([]);
+    const [totalRecords, setTotalRecords] = useState(0);
+    const [loading, setLoading] = useState(false);
 
     const filteredOrders = useMemo(() => {
         const query = searchQuery.trim().toLowerCase();
-        if (!query) return SALES_ORDERS;
-        return SALES_ORDERS.filter((order) => {
-            const haystack = `${order.salesOrderNumber} ${order.customerName} ${order.contactPerson} ${order.status}`.toLowerCase();
+        if (!query) return orders;
+        return orders.filter((order) => {
+            const haystack = `${order.SalesOrderNo || order.salesOrderNumber || ''} ${order.CustomerName || order.customerName || ''} ${order.ContactPerson || ''} ${order.Status || order.status || ''}`.toLowerCase();
             return haystack.includes(query);
         });
-    }, [searchQuery]);
+    }, [searchQuery, orders]);
 
     const totalPages = useMemo(() => {
-        if (filteredOrders.length === 0) return 0;
-        return Math.ceil(filteredOrders.length / itemsPerPage);
-    }, [filteredOrders.length, itemsPerPage]);
+        if (totalRecords === 0) return 0;
+        return Math.ceil(totalRecords / itemsPerPage);
+    }, [totalRecords, itemsPerPage]);
 
     useEffect(() => {
         if (totalPages === 0) {
@@ -104,12 +52,45 @@ const ViewSalesOrder = () => {
         return filteredOrders.slice(start, start + itemsPerPage);
     }, [filteredOrders, currentPage, itemsPerPage]);
 
-    const rangeStart = filteredOrders.length === 0 ? 0 : currentPage * itemsPerPage + 1;
-    const rangeEnd = filteredOrders.length === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, filteredOrders.length);
+    const rangeStart = totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1;
+    const rangeEnd = totalRecords === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, totalRecords);
 
     const handleQuickAction = (order, actionLabel) => {
         Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber}`);
     };
+
+    const fetchOrders = async ({ start = 0, length = itemsPerPage, searchValue = '' } = {}) => {
+        try {
+            setLoading(true);
+            const resp = await getSalesOrderHeaders({ start, length, searchValue });
+            console.log('getSalesOrderHeaders ->', resp);
+            const records = resp?.Data?.Records || resp?.Data || resp || [];
+            // Normalize records to expected UI fields
+            const normalized = (records || []).map((r, idx) => ({
+                id: r?.UUID || r?.SalesOrderUUID || r?.SalesOrderNo || `so-${idx}`,
+                salesOrderNumber: r?.SalesOrderNo || r?.SalesOrderNumber || r?.SalesOrderNumber || r?.SalesOrderNo || '',
+                customerName: r?.CustomerName || r?.Customer || r?.CustomerDisplayName || '',
+                // API may return OrderDate as in example; prefer DeliveryDate, then OrderDate, then ExpectedDeliveryDate
+                deliveryDate: r?.DeliveryDate || r?.OrderDate || r?.ExpectedDeliveryDate || '',
+                dueDate: r?.DueDate || r?.PaymentDueDate || '',
+                amount: r?.Amount || r?.TotalAmount || r?.NetAmount || '',
+                raw: r,
+            }));
+            setOrders(normalized);
+            const total = typeof resp?.Data?.TotalCount === 'number' ? resp.Data.TotalCount : normalized.length;
+            setTotalRecords(total);
+        } catch (e) {
+            console.log('getSalesOrderHeaders error ->', e?.message || e);
+            setOrders([]);
+            setTotalRecords(0);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchOrders({ start: currentPage * itemsPerPage, length: itemsPerPage, searchValue: searchQuery.trim() });
+    }, [currentPage, itemsPerPage]);
 
     const renderFooterActions = (order) => {
         const buttons = [
@@ -207,6 +188,11 @@ const ViewSalesOrder = () => {
             </View>
 
             <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+                {loading && (
+                    <View style={{ paddingVertical: hp(4), alignItems: 'center' }}>
+                        <Text style={{ color: COLORS.textLight }}>Loading sales orders...</Text>
+                    </View>
+                )}
                 {paginatedOrders.map((order) => (
                     <AccordionItem
                         key={order.id}

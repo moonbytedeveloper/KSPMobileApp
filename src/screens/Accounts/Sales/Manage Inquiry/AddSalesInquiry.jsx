@@ -5,19 +5,28 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { COLORS, TYPOGRAPHY, inputStyles } from '../../../styles/styles';
 import AppHeader from '../../../../components/common/AppHeader';
-import { useNavigation } from '@react-navigation/native';
-import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker'; 
-import { addSalesInquiry } from '../../../../api/authServices';
-import { getUUID } from '../../../../api/tokenStorage';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
+import { addSalesInquiry, getCustomers, getItemTypes, getItemMasters, getUnits, addSalesHeader, addSalesLine, updateSalesHeader, getSalesHeader, getSalesLines, updateSalesLine, deleteSalesLine } from '../../../../api/authServices';
+import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { uiDateToApiDate } from '../../../../utils/dateUtils';
 import BottomSheetConfirm from '../../../../components/common/BottomSheetConfirm';
- 
-const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyle }) => {
+
+const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyle, rightActions }) => {
     return (
         <View style={[styles.sectionWrapper, wrapperStyle]}>
             <TouchableOpacity activeOpacity={0.8} style={styles.sectionHeader} onPress={() => onToggle(id)}>
                 <Text style={styles.sectionTitle}>{title}</Text>
-                <Icon name={expanded ? 'expand-less' : 'expand-more'} size={rf(4.2)} color={COLORS.text} />
+
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    
+                    {rightActions ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: wp(2) }}>
+                            {rightActions}
+                        </View>
+                    ) : null}
+                    <Icon name={expanded ? 'expand-less' : 'expand-more'} size={rf(4.2)} color={COLORS.text} />
+                </View>
             </TouchableOpacity>
             {expanded && <View style={styles.line} />}
             {expanded && <View style={styles.sectionBody}>{children}</View>}
@@ -29,10 +38,18 @@ const AddSalesInquiry = () => {
     const [expandedId, setExpandedId] = useState(1);
     const navigation = useNavigation();
     const toggleSection = (id) => setExpandedId((prev) => (prev === id ? null : id));
+    // If header is saved, prevent opening it by tapping the header area (unless editing)
+    const handleHeaderToggle = (id) => {
+        if (id === 1 && headerSaved && !headerEditing) {
+            Alert.alert('Header saved', 'To edit the header, please tap the edit icon.');
+            return;
+        }
+        toggleSection(id);
+    };
 
     // Demo options for dropdowns
     const currencyTypes = ['- Select Currency -', 'USD', 'INR', 'EUR', 'GBP'];
-    const itemTypes = ['- Select Item -', 'Furniture', 'Electronics', 'Office Supplies', 'Equipment'];
+    const demoItemTypes = ['- Select Item -', 'Furniture', 'Electronics', 'Office Supplies', 'Equipment'];
     const itemNames = ['- Select Item -', 'Chair', 'Table', 'Desk', 'Cabinet'];
     const CustomerType = ['- Select Customer -', 'Abhinav', 'Raj',];
     const countries = ['- Select Country -', 'India', 'United States', 'United Kingdom', 'Australia', 'Germany'];
@@ -42,6 +59,14 @@ const AddSalesInquiry = () => {
     const [uuid, setUuid] = useState('0e073e1b-3b3f-4ae2-8f77-5');
     const [currencyType, setCurrencyType] = useState('');
     const [customerName, setCustomerName] = useState('');
+    const [customerUuid, setCustomerUuid] = useState(null);
+    const [customers, setCustomers] = useState([]);
+    const [serverItemTypes, setServerItemTypes] = useState([]);
+    const [itemTypesLoading, setItemTypesLoading] = useState(false);
+    const [serverItemMasters, setServerItemMasters] = useState([]);
+    const [itemMastersLoading, setItemMastersLoading] = useState(false);
+    const [serverUnits, setServerUnits] = useState([]);
+    const [unitsLoading, setUnitsLoading] = useState(false);
     const [requestTitle, setRequestTitle] = useState('');
     const [requestedDate, setRequestedDate] = useState('');
     const [expectedPurchaseDate, setExpectedPurchaseDate] = useState('');
@@ -51,14 +76,22 @@ const AddSalesInquiry = () => {
     const [loading, setLoading] = useState(false);
     const [successSheetVisible, setSuccessSheetVisible] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
+    const [headerSubmitting, setHeaderSubmitting] = useState(false);
+    const [headerSaved, setHeaderSaved] = useState(false);
+    const [headerResponse, setHeaderResponse] = useState(null);
+    const [headerEditing, setHeaderEditing] = useState(false);
 
     // Line items state
     const [lineItems, setLineItems] = useState([]);
+    const [lineAdding, setLineAdding] = useState(false);
     const [currentItem, setCurrentItem] = useState({
         itemType: '',
+        itemTypeUuid: null,
         itemName: '',
+        itemNameUuid: null,
         quantity: '',
-        unit: ''
+        unit: '',
+        unitUuid: null
     });
     const [editLineItemId, setEditLineItemId] = useState(null);
 
@@ -80,7 +113,7 @@ const AddSalesInquiry = () => {
         }
     };
 
-    
+
     const openDatePickerFor = (field) => {
         let initial = new Date();
         if (field === 'requested' && requestedDate) {
@@ -114,40 +147,278 @@ const AddSalesInquiry = () => {
             Alert.alert('Validation', 'Please fill all fields');
             return;
         }
-
         // If editing, update the existing item
         if (editLineItemId) {
+            const existing = lineItems.find(it => it.id === editLineItemId);
+            // If the item exists on server (has lineUuid) and header is saved, call update API
+            const headerUuid = headerResponse?.Data?.UUID || headerResponse?.UUID || headerResponse?.Data?.HeaderUUID || headerResponse?.HeaderUUID || headerResponse?.HeaderUuid || headerResponse?.Data?.HeaderUuid;
+            if (existing?.lineUuid && headerSaved && headerUuid) {
+                (async () => {
+                    try {
+                        setLineAdding(true);
+                        const payload = {
+                            UUID: existing.lineUuid,
+                            HeaderUUID: headerUuid,
+                            ItemType_UUID: currentItem.itemTypeUuid || existing.itemTypeUuid || null,
+                            ItemName_UUID: currentItem.itemNameUuid || existing.itemNameUuid || null,
+                            Quantity: Number(currentItem.quantity) || Number(existing.quantity) || 0,
+                            Unit_UUID: currentItem.unitUuid || existing.unitUuid || null,
+                        };
+                        console.log('UpdateSalesLine payload ->', payload);
+                        const resp = await updateSalesLine(payload);
+                        console.log('UpdateSalesLine resp ->', resp);
+                        // Update local state with new values
+                        setLineItems(prev => prev.map(it => it.id === editLineItemId ? {
+                            ...it,
+                            itemType: currentItem.itemType,
+                            itemTypeUuid: currentItem.itemTypeUuid || it.itemTypeUuid,
+                            itemName: currentItem.itemName,
+                            itemNameUuid: currentItem.itemNameUuid || it.itemNameUuid,
+                            quantity: currentItem.quantity,
+                            unit: currentItem.unit,
+                            unitUuid: currentItem.unitUuid || it.unitUuid
+                        } : it));
+                    } catch (e) {
+                        console.log('UpdateSalesLine error ->', e?.message || e);
+                        Alert.alert('Error', e?.message || 'Failed to update line on server');
+                    } finally {
+                        setEditLineItemId(null);
+                        setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
+                        setLineAdding(false);
+                    }
+                })();
+                return;
+            }
+
+            // Local-only update (line not yet saved on server)
             setLineItems(prev => prev.map(it => it.id === editLineItemId ? {
                 ...it,
                 itemType: currentItem.itemType,
+                itemTypeUuid: currentItem.itemTypeUuid || it.itemTypeUuid,
                 itemName: currentItem.itemName,
+                itemNameUuid: currentItem.itemNameUuid || it.itemNameUuid,
                 quantity: currentItem.quantity,
-                unit: currentItem.unit
+                unit: currentItem.unit,
+                unitUuid: currentItem.unitUuid || it.unitUuid
             } : it));
             // reset editor
             setEditLineItemId(null);
-            setCurrentItem({ itemType: '', itemName: '', quantity: '', unit: '' });
+            setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
             return;
         }
 
-        const newItem = {
+        const newItemBase = {
             id: lineItems.length ? Math.max(...lineItems.map(i => i.id)) + 1 : 1,
             itemType: currentItem.itemType,
+            itemTypeUuid: currentItem.itemTypeUuid || null,
             itemName: currentItem.itemName,
+            itemNameUuid: currentItem.itemNameUuid || null,
             quantity: currentItem.quantity,
-            unit: currentItem.unit
+            unit: currentItem.unit,
+            unitUuid: currentItem.unitUuid || null,
+            lineUuid: null,
         };
 
-        setLineItems([...lineItems, newItem]);
-        setCurrentItem({ itemType: '', itemName: '', quantity: '', unit: '' });
+        // If header already saved, post the line immediately
+        if (headerSaved) {
+            (async () => {
+                try {
+                    setLineAdding(true);
+                    // Determine header UUID from headerResponse (try multiple keys)
+                    const headerUuid = headerResponse?.Data?.UUID || headerResponse?.UUID || headerResponse?.Data?.HeaderUUID || headerResponse?.HeaderUUID || headerResponse?.HeaderUuid || headerResponse?.Data?.HeaderUuid;
+                    if (!headerUuid) {
+                        Alert.alert('Error', 'Header UUID missing. Cannot add line to server.');
+                        return;
+                    }
+                    const payload = {
+                        UUID: '',
+                        HeaderUUID: headerUuid,
+                        ItemType_UUID: newItemBase.itemTypeUuid,
+                        ItemName_UUID: newItemBase.itemNameUuid,
+                        Quantity: Number(newItemBase.quantity) || 0,
+                        Unit_UUID: newItemBase.unitUuid || null,
+                    };
+                    console.log('AddSalesLine payload ->', payload);
+                    const resp = await addSalesLine(payload);
+                    console.log('AddSalesLine resp ->', resp);
+                    // Try to extract created line UUID from response
+                    const createdLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || resp?.LineUUID || null;
+                    const newItem = { ...newItemBase, lineUuid: createdLineUuid };
+                    setLineItems(prev => [...prev, newItem]);
+                    setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
+                } catch (e) {
+                    console.log('AddSalesLine error ->', e?.message || e);
+                    Alert.alert('Error', e?.message || 'Failed to add line to server');
+                } finally {
+                    setLineAdding(false);
+                }
+            })();
+            return;
+        }
+
+        // Local-only add (header not saved yet)
+        setLineItems([...lineItems, newItemBase]);
+        setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
     };
+
+    // Fetch customers for dropdown
+    const fetchCustomers = async () => {
+        try {
+            const resp = await getCustomers();
+            console.log('GetCustomers resp ->', resp);
+            const data = resp?.Data || resp || [];
+            const list = Array.isArray(data) ? data : (data?.List || []);
+            setCustomers(list);
+            return list;
+        } catch (e) {
+            console.log('Error fetching customers', e?.message || e);
+            return [];
+        }
+    };
+
+    const fetchItemTypes = async () => {
+        try {
+            setItemTypesLoading(true);
+            const resp = await getItemTypes();
+            console.log('GetItemTypes resp ->', resp);
+            const data = resp?.Data || resp || [];
+            const list = Array.isArray(data) ? data : (data?.List || []);
+            setServerItemTypes(list);
+            return list;
+        } catch (e) {
+            console.log('Error fetching item types', e?.message || e);
+            return [];
+        } finally {
+            setItemTypesLoading(false);
+        }
+    };
+
+    const fetchItemMasters = async (itemTypeUuid = null) => {
+        try {
+            setItemMastersLoading(true);
+            const resp = await getItemMasters({ itemTypeUuid });
+            console.log('GetItemMasters resp ->', resp);
+            const data = resp?.Data || resp || [];
+            const list = Array.isArray(data) ? data : (data?.List || []);
+            setServerItemMasters(list);
+            return list;
+        } catch (e) {
+            console.log('Error fetching item masters', e?.message || e);
+            return [];
+        } finally {
+            setItemMastersLoading(false);
+        }
+    };
+
+    const fetchUnits = async () => {
+        try {
+            setUnitsLoading(true);
+            const resp = await getUnits();
+            console.log('GetUnits resp ->', resp);
+            const data = resp?.Data || resp || [];
+            const list = Array.isArray(data) ? data : (data?.List || []);
+            setServerUnits(list);
+            return list;
+        } catch (e) {
+            console.log('Error fetching units', e?.message || e);
+            return [];
+        } finally {
+            setUnitsLoading(false);
+        }
+    };
+
+    const route = useRoute();
+
+    React.useEffect(() => {
+        // Log incoming route params for debugging navigation issues
+        try {
+            console.log('AddSalesInquiry route params ->', route?.params);
+        } catch (e) {
+            console.log('AddSalesInquiry route params log error ->', e);
+        }
+    }, [route?.params]);
+
+    React.useEffect(() => {
+        (async () => {
+            const headerUuidParam = route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.headerUUID || route?.params?.uuid || route?.params?.headerRaw?.UUID || route?.params?.headerRaw?.Id;
+            console.log('AddSalesInquiry prefill effect - headerUuidParam ->', headerUuidParam);
+            if (!headerUuidParam) return; // nothing to prefill
+
+            // fetch lookup lists first (capture returned lists for immediate lookup)
+            let customersList = [];
+            try {
+                const results = await Promise.all([
+                    fetchCustomers(),
+                    fetchItemTypes(),
+                    fetchItemMasters(null),
+                    fetchUnits(),
+                ]);
+                customersList = results[0] || [];
+            } catch (e) {
+                console.log('Lookup fetch error ->', e?.message || e);
+            }
+
+            try {
+                // fetch header
+                const headerResp = await getSalesHeader({ headerUuid: headerUuidParam });
+                console.log('Prefill getSalesHeader ->', headerResp);
+                const headerData = headerResp?.Data || {};
+
+                // Prefill fields using exact API keys
+                setProjectName(headerData.ProjectName || '');
+                setInquiryNo(headerData.InquiryNo || '');
+                // API returns dates in dd-MMM-yyyy already — keep as-is
+                if (headerData.OrderDate) setRequestedDate(headerData.OrderDate);
+                if (headerData.RequestedDeliveryDate) setExpectedPurchaseDate(headerData.RequestedDeliveryDate);
+
+                // Customer
+                if (headerData.CustomerUUID || headerData.CustomerId || headerData.CustomerID) {
+                    const custUuid = headerData.CustomerUUID || headerData.CustomerId || headerData.CustomerID;
+                    setCustomerUuid(custUuid);
+                    // Prefer the freshly fetched customers list for immediate lookup
+                    const found = (customersList || customers || []).find(c => (c.UUID || c.Id || c.id) === custUuid) || null;
+                    if (found) {
+                        setCustomerName(found?.Name || found?.DisplayName || found?.name || '');
+                    } else if (headerData.CustomerName || headerData.Customer) {
+                        setCustomerName(headerData.CustomerName || headerData.Customer);
+                    }
+                }
+
+                // mark saved and store response
+                setHeaderResponse(headerResp);
+                setHeaderSaved(true);
+                setHeaderEditing(false);
+
+                // fetch lines
+                const linesResp = await getSalesLines({ headerUuid: headerUuidParam });
+                console.log('Prefill getSalesLines ->', linesResp);
+                const records = linesResp?.Data?.Records || [];
+                const mapped = (records || []).map((ln, idx) => ({
+                    id: ln?.SrNo || idx + 1,
+                    itemType: ln?.ItemTypeName || '',
+                    itemTypeUuid: null,
+                    itemName: ln?.ItemName || '',
+                    itemNameUuid: null,
+                    quantity: ln?.Quantity || 0,
+                    unit: '',
+                    unitUuid: null,
+                    lineUuid: ln?.UUID || null,
+                }));
+                setLineItems(mapped);
+            } catch (e) {
+                console.log('Prefill error ->', e?.message || e);
+            }
+        })();
+    }, [route?.params?.headerUuid, route?.params?.HeaderUUID, route?.params?.headerUUID, route?.params?.uuid, route?.params?.headerRaw]);
 
     const handleEditItem = (id) => {
         const item = lineItems.find(i => i.id === id);
         if (item) {
             setCurrentItem({
                 itemType: item.itemType,
+                itemTypeUuid: item.itemTypeUuid || item.ItemType_UUID || null,
                 itemName: item.itemName,
+                itemNameUuid: item.itemNameUuid || item.ItemName_UUID || null,
                 quantity: item.quantity,
                 unit: item.unit
             });
@@ -159,10 +430,33 @@ const AddSalesInquiry = () => {
 
     const cancelEdit = () => {
         setEditLineItemId(null);
-        setCurrentItem({ itemType: '', itemName: '', quantity: '', unit: '' });
+        setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', quantity: '', unit: '' });
     };
 
     const handleDeleteItem = (id) => {
+        const toDelete = lineItems.find(item => item.id === id);
+        // If this line exists on server (has lineUuid) and header is saved, call delete API
+        if (toDelete?.lineUuid && headerSaved) {
+            (async () => {
+                try {
+                    setLineAdding(true);
+                    const headerUuid = headerResponse?.Data?.UUID || headerResponse?.UUID || headerResponse?.Data?.HeaderUUID || headerResponse?.HeaderUUID || headerResponse?.HeaderUuid || headerResponse?.Data?.HeaderUuid;
+                    console.log('Deleting sales line ->', { uuid: toDelete.lineUuid, headerUuid });
+                    const resp = await deleteSalesLine({ lineUuid: toDelete.lineUuid });
+                    console.log('DeleteSalesLine resp ->', resp);
+                    // remove locally after successful delete
+                    setLineItems(prev => prev.filter(it => it.id !== id));
+                } catch (e) {
+                    console.log('DeleteSalesLine error ->', e?.message || e);
+                    Alert.alert('Error', e?.message || 'Failed to delete line on server');
+                } finally {
+                    setLineAdding(false);
+                }
+            })();
+            return;
+        }
+
+        // Local-only remove if not persisted
         setLineItems(lineItems.filter(item => item.id !== id));
     };
 
@@ -176,17 +470,23 @@ const AddSalesInquiry = () => {
                 return;
             }
 
+            if (!customerUuid) {
+                Alert.alert('Validation', 'Please select a customer');
+                setLoading(false);
+                return;
+            }
+
             const payload = {
                 projectName,
-                customerUUID: 'db3a2f1c-6e23-4b9a-a5e3-0d53078e',
+                customerUUID: customerUuid,
                 requestedDate: uiDateToApiDate(requestedDate),
                 expectedPurchaseDate: uiDateToApiDate(expectedPurchaseDate),
                 lineItems: lineItems.map((item, index) => ({
                     srNo: index + 1,
-                    ItemType_UUID: '0bb9ebdc-9a5a-486d-9846-da862a98',
-                    ItemName_UUID: 'b3ff3735-5821-4701-b28c-b6b230ac',
+                    ItemType_UUID: item.itemTypeUuid || item.ItemType_UUID || null,
+                    ItemName_UUID: item.itemNameUuid || item.ItemName_UUID || null,
                     quantity: item.quantity,
-                    Unit_UUID: '7941bfd0-f1d9-42a4-913b-463bc261',
+                    Unit_UUID: item.unitUuid || item.Unit_UUID || null,
                 }))
             };
 
@@ -206,6 +506,80 @@ const AddSalesInquiry = () => {
         }
     };
 
+    // Submit header to AddSalesHeader API
+    const handleSubmitHeader = async () => {
+        try {
+            setHeaderSubmitting(true);
+            // Basic validation
+            if (!customerUuid) {
+                Alert.alert('Validation', 'Please select a customer');
+                setHeaderSubmitting(false);
+                return;
+            }
+            const payload = {
+                UUID: '',
+                CustomerUUID: customerUuid,
+                OrderDate: uiDateToApiDate(requestedDate) || null,
+                RequestedDeliveryDate: uiDateToApiDate(expectedPurchaseDate) || null,
+                ProjectName: projectName || '',
+                InquiryNo: inquiryNo || ''
+            };
+            console.log('AddSalesHeader payload ->', payload);
+            // call API helper
+            const resp = await addSalesHeader(payload, { userUuid: await getUUID(), cmpUuid: await getCMPUUID(), envUuid: await getENVUUID() });
+            console.log('AddSalesHeader resp ->', resp);
+            setHeaderResponse(resp);
+            setHeaderSaved(true);
+            setHeaderEditing(false);
+            // collapse header section
+            setExpandedId(null);
+        } catch (e) {
+            console.log('AddSalesHeader error ->', e?.message || e);
+            Alert.alert('Error', e?.message || 'Failed to save header');
+        } finally {
+            setHeaderSubmitting(false);
+        }
+    };
+
+    const handleUpdateHeader = async () => {
+        try {
+            setHeaderSubmitting(true);
+            if (!customerUuid) {
+                Alert.alert('Validation', 'Please select a customer');
+                setHeaderSubmitting(false);
+                return;
+            }
+            // get header UUID from previous response
+            const headerUuid = headerResponse?.Data?.UUID || headerResponse?.UUID || headerResponse?.Data?.HeaderUUID || headerResponse?.HeaderUUID || headerResponse?.HeaderUuid || headerResponse?.Data?.HeaderUuid;
+            if (!headerUuid) {
+                Alert.alert('Error', 'Header UUID missing. Cannot update header.');
+                setHeaderSubmitting(false);
+                return;
+            }
+
+            const payload = {
+                UUID: headerUuid,
+                CustomerUUID: customerUuid,
+                OrderDate: uiDateToApiDate(requestedDate) || null,
+                RequestedDeliveryDate: uiDateToApiDate(expectedPurchaseDate) || null,
+                ProjectName: projectName || '',
+                InquiryNo: inquiryNo || ''
+            };
+            console.log('UpdateSalesHeader payload ->', payload);
+            const resp = await updateSalesHeader(payload, { userUuid: await getUUID(), cmpUuid: await getCMPUUID(), envUuid: await getENVUUID() });
+            console.log('UpdateSalesHeader resp ->', resp);
+            setHeaderResponse(resp);
+            setHeaderSaved(true);
+            setHeaderEditing(false);
+            setExpandedId(null);
+        } catch (e) {
+            console.log('UpdateSalesHeader error ->', e?.message || e);
+            Alert.alert('Error', e?.message || 'Failed to update header');
+        } finally {
+            setHeaderSubmitting(false);
+        }
+    };
+
     const handleCancel = () => {
         navigation.goBack();
     };
@@ -213,32 +587,37 @@ const AddSalesInquiry = () => {
     return (
         <>
             <View style={{ flex: 1, backgroundColor: '#fff' }}>
-                <AppHeader
-                    title="Add Sales Inquiry"
-                    onLeftPress={() => {
-                        navigation.goBack();
-                    }}
-                />
+               
+                 <AppHeader
+          title="Add Sales Inquiry"
+          onLeftPress={() => {
+            try {
+              navigation.navigate('ManageInquiry');
+            } catch (e) {
+              navigation.goBack();
+            }
+          }}
+        />
                 <View style={styles.headerSeparator} />
                 <ScrollView contentContainerStyle={[styles.container]} showsVerticalScrollIndicator={false}>
                     {/* Section 1: HEADER */}
-                    <AccordionSection id={1} title="HEADER" expanded={expandedId === 1} onToggle={toggleSection}>
-                        <View style={styles.row}>
-                            {/* <View style={styles.col}>
-                                <Text style={inputStyles.label}>UUID*</Text>
-                                <View style={[inputStyles.box]}>
-                                    <TextInput
-                                        style={[
-                                            inputStyles.input,
-                                            { color: COLORS.textLight, fontFamily: TYPOGRAPHY.fontFamilyRegular }
-                                        ]}
-                                        value={''}
-                                        placeholder="UUID"
-                                        placeholderTextColor={COLORS.textLight}
-                                        editable={false}
-                                    />
+                    <AccordionSection
+                        id={1}
+                        title="HEADER"
+                        expanded={expandedId === 1}
+                        onToggle={handleHeaderToggle}
+                        rightActions={
+                                headerSaved ? (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
+                                    <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
+                                    <TouchableOpacity onPress={() => { setHeaderEditing(true); setExpandedId(1); }}>
+                                        <Icon name="edit" size={rf(5)} color={COLORS.primary} />
+                                    </TouchableOpacity>
                                 </View>
-                            </View> */}
+                            ) : null
+                        }
+                    >
+                        <View style={styles.row}>
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>Project Name*</Text>
                                 <View style={[inputStyles.box]}>
@@ -257,10 +636,20 @@ const AddSalesInquiry = () => {
                                     <Dropdown
                                         placeholder="- Select Customer -"
                                         value={customerName}
-                                        options={CustomerType}
-                                        getLabel={(c) => c}
-                                        getKey={(c) => c}
-                                        onSelect={(v) => setCustomerName(v)}
+                                        options={customers}
+                                        getLabel={(c) => c?.Name || c?.DisplayName || c?.name || ''}
+                                        getKey={(c) => c?.UUID || c?.Id || c?.id || (c?.Name ?? c)}
+                                        onSelect={(v) => {
+                                            // Dropdown returns the selected item (object)
+                                            if (v && typeof v === 'object') {
+                                                setCustomerName(v?.Name || v?.DisplayName || v?.name || '');
+                                                setCustomerUuid(v?.UUID || v?.Id || v?.id || null);
+                                            } else {
+                                                // fallback for string values
+                                                setCustomerName(v);
+                                                setCustomerUuid(null);
+                                            }
+                                        }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                                         textStyle={inputStyles.input}
@@ -268,44 +657,6 @@ const AddSalesInquiry = () => {
                                 </View>
                             </View>
                         </View>
-
-                        {/* <View style={[styles.row, { marginTop: hp(1.5) }]}>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Country Name*</Text>
-                               <View style={{ zIndex: 9999, elevation: 20 }}>
-                                    <Dropdown
-                                        placeholder="- Select Country -"
-                                        value={country}
-                                        options={countries}
-                                        getLabel={(c) => c}
-                                        getKey={(c) => c}
-                                        onSelect={(v) => setCountry(v)}
-                                        renderInModal={true}
-                                        inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        textStyle={inputStyles.input}
-                                    />
-                                </View>
-                            </View>
-                               <View style={styles.col}>
-                                <Text style={inputStyles.label}>Currency Type*</Text>
-                                <View style={{ zIndex: 9999, elevation: 20 }}>
-                                    <Dropdown
-                                        placeholder="- Select Currency -"
-                                        value={currencyType}
-                                        options={currencyTypes}
-                                        getLabel={(c) => c}
-                                        getKey={(c) => c}
-                                        onSelect={(v) => setCurrencyType(v)}
-                                        renderInModal={true}
-                                        inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        textStyle={inputStyles.input}
-                                    />
-                                </View>
-                            </View>
-                            <View style={styles.col} />
-                        </View> */}
-
-
 
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             <View style={styles.col}>
@@ -366,96 +717,113 @@ const AddSalesInquiry = () => {
                                     </View>
                                 </TouchableOpacity>
                             </View>
-
                         </View>
+                        <View style={{ marginTop: hp(2), flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' }}>
+                            <TouchableOpacity
+                                activeOpacity={0.85}
+                                style={[styles.submitButton, headerSubmitting && styles.submitButtonDisabled]}
+                                onPress={headerEditing ? handleUpdateHeader : handleSubmitHeader}
+                                disabled={headerSubmitting}
+                            >
+                                <Text style={styles.submitButtonText}>{headerSubmitting ? (headerEditing ? 'Updating...' : 'Saving...') : (headerEditing ? 'Update Header' : 'Save Header')}</Text>
+                            </TouchableOpacity>
 
-                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
-
-                            {/* <View style={styles.col}>
-                                <Text style={inputStyles.label}>Inquiry No.*</Text>
-                                <View style={[inputStyles.box]}>
-                                    <TextInput
-                                        style={[inputStyles.input, { color: COLORS.text }]}
-                                        value={inquiryNo}
-                                        onChangeText={setInquiryNo}
-                                        placeholder="eg. ksp500"
-                                        placeholderTextColor={COLORS.textLight}
-                                    />
-                                </View>
-                            </View> */}
                         </View>
                     </AccordionSection>
 
                     {/* Section 2: LINE */}
-                    <AccordionSection id={2} title="LINE" expanded={expandedId === 2} onToggle={toggleSection}>
-                        <View style={styles.row}>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Item Type*</Text>
-                                <View style={{ zIndex: 9998, elevation: 20 }}>
-                                    <Dropdown
-                                        placeholder="- Select Item -"
-                                        value={currentItem.itemType}
-                                        options={itemTypes}
-                                        getLabel={(it) => it}
-                                        getKey={(it) => it}
-                                        onSelect={(v) => setCurrentItem({ ...currentItem, itemType: v })}
-                                        renderInModal={true}
-                                        inputBoxStyle={[inputStyles.box, { minHeight: hp(4.6), paddingVertical: 0, marginTop: hp(0.5) }]}
-                                        textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
-                                    />
+                    {headerSaved && (
+                        <AccordionSection id={2} title="LINE" expanded={expandedId === 2} onToggle={toggleSection}>
+                            <View style={styles.row}>
+                                <View style={styles.col}>
+                                    <Text style={inputStyles.label}>Item Type*</Text>
+                                    <View style={{ zIndex: 9998, elevation: 20 }}>
+                                        <Dropdown
+                                            placeholder="- Select Item -"
+                                            value={currentItem.itemType}
+                                            options={serverItemTypes.length ? serverItemTypes : demoItemTypes}
+                                            getLabel={(it) => it?.Name || it?.DisplayName || it?.name || it}
+                                            getKey={(it) => it?.UUID || it?.Id || it}
+                                            onSelect={(v) => {
+                                                if (v && typeof v === 'object') {
+                                                    const selectedUuid = v?.UUID || v?.Id || v?.id || null;
+                                                    setCurrentItem({ ...currentItem, itemType: v?.Name || v?.DisplayName || v?.name || '', itemTypeUuid: selectedUuid });
+                                                    // Fetch item masters for this item type
+                                                    fetchItemMasters(selectedUuid);
+                                                } else {
+                                                    setCurrentItem({ ...currentItem, itemType: v, itemTypeUuid: null });
+                                                    fetchItemMasters(null);
+                                                }
+                                            }}
+                                            renderInModal={true}
+                                            inputBoxStyle={[inputStyles.box, { minHeight: hp(4.6), paddingVertical: 0, marginTop: hp(0.5) }]}
+                                            textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
+                                        />
+                                    </View>
                                 </View>
-                            </View>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Item Name*</Text>
-                                <View style={{ zIndex: 9997, elevation: 20 }}>
-                                    <Dropdown
-                                        placeholder="- Select Item -"
-                                        value={currentItem.itemName}
-                                        options={itemNames}
-                                        getLabel={(item) => item}
-                                        getKey={(item) => item}
-                                        onSelect={(v) => setCurrentItem({ ...currentItem, itemName: v })}
-                                        renderInModal={true}
-                                        inputBoxStyle={[inputStyles.box, { minHeight: hp(4.6), paddingVertical: 0, marginTop: hp(0.5) }]}
-                                        textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
-                                    />
-                                </View>
-                            </View>
-                        </View>
-
-                        <View style={[styles.row, { marginTop: hp(1.5), alignItems: 'flex-end' }]}>
-                            <View style={styles.colSmall}>
-                                <Text style={inputStyles.label}>Quantity*</Text>
-                                <View style={[inputStyles.box, { marginTop: hp(0.5) }]}>
-                                    <TextInput
-                                        style={[inputStyles.input, { flex: 1, fontSize: rf(3.4), color: COLORS.text }]}
-                                        value={currentItem.quantity}
-                                        onChangeText={(v) => setCurrentItem({ ...currentItem, quantity: v })}
-                                        placeholder="eg. Auto fill"
-                                        placeholderTextColor={COLORS.textLight}
-                                        keyboardType="numeric"
-                                    />
-                                </View>
-                            </View>
-                            <View style={styles.colSmall}>
-                                <Text style={inputStyles.label}>Unit*</Text>
-                                <View style={{ zIndex: 9996, elevation: 20 }}>
-                                    <Dropdown
-                                        placeholder="- Select Unit -"
-                                        value={currentItem.unit}
-                                        options={units}
-                                        getLabel={(u) => u}
-                                        getKey={(u) => u}
-                                        onSelect={(v) => setCurrentItem({ ...currentItem, unit: v })}
-                                        renderInModal={true}
-                                        inputBoxStyle={[inputStyles.box, { marginTop: hp(0.5) }]}
-                                        textStyle={inputStyles.input}
-                                    />
+                                <View style={styles.col}>
+                                    <Text style={inputStyles.label}>Item Name*</Text>
+                                    <View style={{ zIndex: 9997, elevation: 20 }}>
+                                        <Dropdown
+                                            placeholder="- Select Item -"
+                                            value={currentItem.itemName}
+                                            options={serverItemMasters.length ? serverItemMasters : itemNames}
+                                            getLabel={(it) => it?.Name || it?.DisplayName || it?.name || it}
+                                            getKey={(it) => it?.UUID || it?.Id || it}
+                                            onSelect={(v) => {
+                                                if (v && typeof v === 'object') {
+                                                    setCurrentItem({ ...currentItem, itemName: v?.Name || v?.DisplayName || v?.name || '', itemNameUuid: v?.UUID || v?.Id || v?.id || null });
+                                                } else {
+                                                    setCurrentItem({ ...currentItem, itemName: v, itemNameUuid: null });
+                                                }
+                                            }}
+                                            renderInModal={true}
+                                            inputBoxStyle={[inputStyles.box, { minHeight: hp(4.6), paddingVertical: 0, marginTop: hp(0.5) }]}
+                                            textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
+                                        />
+                                    </View>
                                 </View>
                             </View>
 
-                        </View>
-                          <View style={styles.addButtonWrapper}>
+                            <View style={[styles.row, { marginTop: hp(1.5), alignItems: 'flex-end' }]}>
+                                <View style={styles.colSmall}>
+                                    <Text style={inputStyles.label}>Quantity*</Text>
+                                    <View style={[inputStyles.box, { marginTop: hp(0.5) }]}>
+                                        <TextInput
+                                            style={[inputStyles.input, { flex: 1, fontSize: rf(3.4), color: COLORS.text }]}
+                                            value={currentItem.quantity}
+                                            onChangeText={(v) => setCurrentItem({ ...currentItem, quantity: v })}
+                                            placeholder="eg. Auto fill"
+                                            placeholderTextColor={COLORS.textLight}
+                                            keyboardType="numeric"
+                                        />
+                                    </View>
+                                </View>
+                                <View style={styles.colSmall}>
+                                    <Text style={inputStyles.label}>Unit*</Text>
+                                    <View style={{ zIndex: 9996, elevation: 20 }}>
+                                        <Dropdown
+                                            placeholder="- Select Unit -"
+                                            value={currentItem.unit}
+                                            options={serverUnits.length ? serverUnits : units}
+                                            getLabel={(u) => u?.Name || u?.DisplayName || u?.name || u}
+                                            getKey={(u) => u?.UUID || u?.Id || u}
+                                            onSelect={(v) => {
+                                                if (v && typeof v === 'object') {
+                                                    setCurrentItem({ ...currentItem, unit: v?.Name || v?.DisplayName || v?.name || '', unitUuid: v?.UUID || v?.Id || v?.id || null });
+                                                } else {
+                                                    setCurrentItem({ ...currentItem, unit: v, unitUuid: null });
+                                                }
+                                            }}
+                                            renderInModal={true}
+                                            inputBoxStyle={[inputStyles.box, { marginTop: hp(0.5) }]}
+                                            textStyle={inputStyles.input}
+                                        />
+                                    </View>
+                                </View>
+
+                            </View>
+                            <View style={styles.addButtonWrapper}>
                                 <TouchableOpacity
                                     activeOpacity={0.8}
                                     style={styles.addButton}
@@ -464,9 +832,8 @@ const AddSalesInquiry = () => {
                                     <Text style={styles.addButtonText}>Add</Text>
                                 </TouchableOpacity>
                             </View>
-                    </AccordionSection>
-
-
+                        </AccordionSection>
+                    )}
 
                     {/* Line Items Table */}
                     {lineItems.length > 0 && (
@@ -511,13 +878,13 @@ const AddSalesInquiry = () => {
                                                             style={styles.actionButton}
                                                             onPress={() => handleEditItem(item.id)}
                                                         >
-                                                            <Text style={styles.actionButtonText}>Edit</Text>
+                                                            <Icon name="edit" size={rf(3.6)} color="#fff" />
                                                         </TouchableOpacity>
                                                         <TouchableOpacity
                                                             style={[styles.actionButton, { marginLeft: wp(2) }]}
                                                             onPress={() => handleDeleteItem(item.id)}
                                                         >
-                                                            <Text style={styles.actionButtonText}>Delete</Text>
+                                                            <Icon name="delete" size={rf(3.6)} color="#fff" />
                                                         </TouchableOpacity>
                                                     </View>
                                                 </View>
@@ -562,7 +929,7 @@ const AddSalesInquiry = () => {
                     onCancel={() => setSuccessSheetVisible(false)}
                 />
 
-                <View style={styles.footerBar}>
+                {/* <View style={styles.footerBar}>
                     <View style={styles.footerButtonsRow}>
                         <TouchableOpacity
                             activeOpacity={0.85}
@@ -580,7 +947,7 @@ const AddSalesInquiry = () => {
                             <Text style={styles.submitButtonText}>{loading ? 'Submitting...' : 'Submit'}</Text>
                         </TouchableOpacity>
                     </View>
-                </View>
+                </View> */}
             </View>
         </>
     );

@@ -7,7 +7,7 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons'; 
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
-import { getSalesHeaderInquiries} from '../../../../api/authServices'; 
+import { getSalesHeaderInquiries, deleteSalesHeader } from '../../../../api/authServices'; 
 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 
@@ -80,19 +80,59 @@ const ManageInquiry = () => {
 
     const renderFooterActions = (order) => {
         const buttons = [
-            { icon: 'delete-outline', label: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
+                            { icon: 'delete-outline', label: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
             { icon: 'chat-bubble-outline', label: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
             { icon: 'edit', label: 'Edit', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
         ];
 
         return (
             <View style={styles.cardActionRow}>
-                {buttons.map((btn) => (
+                        {buttons.map((btn) => (
                     <TouchableOpacity
                         key={`${order.id}-${btn.icon}`}
                         activeOpacity={0.85}
                         style={[styles.cardActionBtn, { backgroundColor: btn.bg, borderColor: btn.border }]}
-                        onPress={() => handleQuickAction(order, btn.label)}
+                        onPress={() => {
+                            // Delete action: confirm and call deleteSalesHeader
+                            if (btn.label === 'Delete') {
+                                const headerUuid = order.raw?.UUID || order.raw?.Id || order.raw?.Data?.UUID || order.raw?.Data?.UUIDString || order.id;
+                                Alert.alert(
+                                    'Confirm delete',
+                                    `Delete sales header ${order.inquiryNo}?`,
+                                    [
+                                        { text: 'Cancel', style: 'cancel' },
+                                        { text: 'Delete', style: 'destructive', onPress: async () => {
+                                            try {
+                                                console.log('ManageInquiry -> deleting header ->', headerUuid);
+                                                await deleteSalesHeader({ headerUuid: headerUuid });
+                                                Alert.alert('Deleted', 'Sales header deleted successfully');
+                                                // refresh list
+                                                fetchInquiries();
+                                            } catch (err) {
+                                                console.error('Failed to delete header', err);
+                                                Alert.alert('Error', err?.message || 'Failed to delete header');
+                                            }
+                                        } }
+                                    ]
+                                );
+                                return;
+                            }
+                            // Navigate to AddSalesInquiry when Edit is clicked, passing header UUID
+                            if (btn.label === 'Edit') {
+                                const headerUuid = order.raw?.UUID || order.raw?.Id || order.raw?.Data?.UUID || order.raw?.Data?.UUIDString || order.id;
+                                console.log('ManageInquiry -> navigating to AddSalesInquiry with headerUuid ->', headerUuid, 'raw keys:', order.raw && Object.keys(order.raw));
+                                // Pass multiple param keys (different casings) to be robust across screens
+                                navigation.navigate('AddSalesInquiry', {
+                                    headerUuid,
+                                    HeaderUUID: headerUuid,
+                                    headerUUID: headerUuid,
+                                    uuid: headerUuid,
+                                    headerRaw: order.raw,
+                                });
+                                return;
+                            }
+                            handleQuickAction(order, btn.label);
+                        }}
                     >
                         <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
                     </TouchableOpacity>
