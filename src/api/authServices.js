@@ -106,6 +106,8 @@ const PATHS = {
     deleteSalesHeader: '/api/Account/DeleteSalesHeader',
     getSalesHeaderInquiries: Config.API_GET_SALES_HEADER_INQUIRIES_PATH || '/api/Account/GetSalesHeaderInquiries',
     getPurchaseHeaderInquiries: Config.API_GET_PURCHASE_HEADER_INQUIRIES_PATH || '/api/Account/GetPurchaseHeaderInquiries',
+    addSalesInquiry : Config.ADD_SALES_INQUIRY || '/api/Account/AddCombinedSalesInquiry',
+
 
 };
 console.log(PATHS, 'PATHS');
@@ -434,6 +436,7 @@ export async function getSalesHeaderInquiries({ cmpUuid, envUuid, start = 0, len
     console.log(resp, 'Sales inquiry get')
     return resp.data;
 }
+
 export async function deleteSalesHeader({ overrides = {} }) {
     let { userUuid, cmpUuid, envUuid,UUID } = overrides || {};
     if (!UUID || !userUuid || !cmpUuid || !envUuid ) {
@@ -449,6 +452,30 @@ export async function deleteSalesHeader({ overrides = {} }) {
     console.log('Delete Follow-Up params:', params);
     const resp = await api.delete(PATHS.deleteSalesHeader, { params });
     console.log('Delete Follow-Up response:', resp);
+    return resp.data;
+} 
+export async function addSalesInquiry(payload, overrides = {}) {
+    console.log('Save Manage Lead Opportunity payload:', payload);
+    let { userUuid, cmpUuid, envUuid } = overrides || {};
+    if (!userUuid || !cmpUuid || !envUuid) {
+        const [u, c, e] = await Promise.all([
+            userUuid || getUUID(),
+            cmpUuid || getCMPUUID(),
+            envUuid || getENVUUID(),
+        ]);
+        userUuid = u; cmpUuid = c; envUuid = e;
+    }
+    if (!userUuid) throw new Error('Missing user UUID');
+    if (!cmpUuid) throw new Error('Missing company UUID');
+    if (!envUuid) throw new Error('Missing environment UUID');
+
+    const params = { userUuid, cmpUuid, envUuid };
+    const resp = await api.post(
+        PATHS.addSalesInquiry || '/api/Account/AddCombinedSalesInquiry',
+        payload,
+        { params }
+    );
+    console.log('Save Manage Lead Opportunity response:', resp);
     return resp.data;
 }
 

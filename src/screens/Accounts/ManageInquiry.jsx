@@ -7,7 +7,7 @@ import Dropdown from '../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../styles/styles';
-import { getSalesHeaderInquiries } from '../../api/authServices';
+import { getSalesHeaderInquiries , } from '../../api/authServices';
 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 

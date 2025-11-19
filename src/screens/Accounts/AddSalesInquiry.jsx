@@ -7,8 +7,11 @@ import { COLORS, TYPOGRAPHY, inputStyles } from '../styles/styles';
 import AppHeader from '../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import { formStyles } from '../styles/styles';
-import DatePickerBottomSheet from '../../components/common/CustomDatePicker';
-
+import DatePickerBottomSheet from '../../components/common/CustomDatePicker'; 
+import { addSalesInquiry } from '../../api/authServices';
+import { getUUID } from '../../api/tokenStorage';
+import { uiDateToApiDate } from '../../utils/dateUtils';
+import BottomSheetConfirm from '../../components/common/BottomSheetConfirm';
 const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyle }) => {
     return (
         <View style={[styles.sectionWrapper, wrapperStyle]}>
@@ -45,6 +48,9 @@ const AddSalesInquiry = () => {
     const [projectName, setProjectName] = useState('');
     const [inquiryNo, setInquiryNo] = useState('');
     const [country, setCountry] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [successSheetVisible, setSuccessSheetVisible] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
 
     // Line items state
     const [lineItems, setLineItems] = useState([]);
@@ -74,6 +80,7 @@ const AddSalesInquiry = () => {
         }
     };
 
+    
     const openDatePickerFor = (field) => {
         let initial = new Date();
         if (field === 'requested' && requestedDate) {
@@ -159,23 +166,44 @@ const AddSalesInquiry = () => {
         setLineItems(lineItems.filter(item => item.id !== id));
     };
 
-    const handleSubmit = () => { 
+    const handleSubmit = async () => {
+        try {
+            setLoading(true);
+            const userUuid = await getUUID();
+            if (!userUuid) {
+                Alert.alert('Authentication', 'User not logged in');
+                setLoading(false);
+                return;
+            }
+
             const payload = {
                 projectName,
-                customerName,
-                requestedDate,
-                expectedPurchaseDate,
+                customerUUID: 'db3a2f1c-6e23-4b9a-a5e3-0d53078e',
+                requestedDate: uiDateToApiDate(requestedDate),
+                expectedPurchaseDate: uiDateToApiDate(expectedPurchaseDate),
                 lineItems: lineItems.map((item, index) => ({
                     srNo: index + 1,
-                    itemType: item.itemType,
-                    itemName: item.itemName,
+                    ItemType_UUID: '0bb9ebdc-9a5a-486d-9846-da862a98',
+                    ItemName_UUID: 'b3ff3735-5821-4701-b28c-b6b230ac',
                     quantity: item.quantity,
-                    unit: item.unit
+                    Unit_UUID: '7941bfd0-f1d9-42a4-913b-463bc261',
                 }))
             };
 
-            console.log("Final Payload:", payload);
-     
+            console.log('Final Payload:', payload);
+
+            const resp = await addSalesInquiry(payload);
+            console.log('Final SALES INQUIRY resp:', resp);
+            // Use sensible response message fallbacks
+            const message = resp?.Message || resp?.message || resp?.Data?.Message || 'Sales inquiry submitted successfully';
+            setSuccessMessage(String(message));
+            setSuccessSheetVisible(true);
+        } catch (e) {
+            console.log('Error Message:', e && e.message ? e.message : e);
+            Alert.alert('Error', e && e.message ? e.message : 'Failed to submit sales inquiry');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleCancel = () => {
@@ -512,6 +540,28 @@ const AddSalesInquiry = () => {
                     title="Select Date"
                 />
 
+                <BottomSheetConfirm
+                    visible={successSheetVisible}
+                    title="Success"
+                    message={successMessage}
+                    confirmText="OK"
+                    cancelText={null}
+                    onConfirm={() => {
+                        // Clear form data when confirming
+                        setProjectName('');
+                        setCustomerName('');
+                        setRequestedDate('');
+                        setExpectedPurchaseDate('');
+                        setLineItems([]);
+                        setCurrentItem({ itemType: '', itemName: '', quantity: '', unit: '' });
+                        setInquiryNo('');
+                        setCountry('');
+                        setCurrencyType('');
+                        setSuccessSheetVisible(false);
+                    }}
+                    onCancel={() => setSuccessSheetVisible(false)}
+                />
+
                 <View style={styles.footerBar}>
                     <View style={styles.footerButtonsRow}>
                         <TouchableOpacity
@@ -523,10 +573,11 @@ const AddSalesInquiry = () => {
                         </TouchableOpacity>
                         <TouchableOpacity
                             activeOpacity={0.85}
-                            style={styles.submitButton}
+                            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
                             onPress={handleSubmit}
+                            disabled={loading}
                         >
-                            <Text style={styles.submitButtonText}>Submit</Text>
+                            <Text style={styles.submitButtonText}>{loading ? 'Submitting...' : 'Submit'}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -536,6 +587,7 @@ const AddSalesInquiry = () => {
 };
 
 export default AddSalesInquiry;
+
 
 const styles = StyleSheet.create({
     container: {
@@ -739,6 +791,9 @@ const styles = StyleSheet.create({
         borderRadius: wp(1.5),
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    submitButtonDisabled: {
+        opacity: 0.6,
     },
     submitButtonText: {
         color: '#fff',
