@@ -6,12 +6,11 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { COLORS, TYPOGRAPHY, inputStyles } from '../../../styles/styles';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
-import { formStyles } from '../styles/styles';
-import DatePickerBottomSheet from '../../components/common/CustomDatePicker'; 
-import { addSalesInquiry } from '../../api/authServices';
-import { getUUID } from '../../api/tokenStorage';
-import { uiDateToApiDate } from '../../utils/dateUtils';
-import BottomSheetConfirm from '../../components/common/BottomSheetConfirm';
+import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker'; 
+import { addSalesInquiry } from '../../../../api/authServices';
+import { getUUID } from '../../../../api/tokenStorage';
+import { uiDateToApiDate } from '../../../../utils/dateUtils';
+import BottomSheetConfirm from '../../../../components/common/BottomSheetConfirm';
  
 const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyle }) => {
     return (

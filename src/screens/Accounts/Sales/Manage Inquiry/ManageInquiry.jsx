@@ -4,10 +4,10 @@ import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
 import Dropdown from '../../../../components/common/Dropdown';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { wp, hp, rf } from '../../utils/responsive';
-import { COLORS, TYPOGRAPHY, RADIUS } from '../styles/styles';
-import { getSalesHeaderInquiries} from '../../api/authServices'; 
+import Icon from 'react-native-vector-icons/MaterialIcons'; 
+import { wp, hp, rf } from '../../../../utils/responsive';
+import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
+import { getSalesHeaderInquiries} from '../../../../api/authServices'; 
 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 
