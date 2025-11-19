@@ -78,19 +78,18 @@ const ManageSalesOrder = () => {
   const toggleSection = id => setExpandedId(prev => (prev === id ? null : id));
 
   // Demo options for dropdowns
-  const paymentTerms = ['- Payment Term -', 'Net 7', 'Net 15', 'Net 30'];
+  const paymentTerms = [ 'Net 7', 'Net 15', 'Net 30'];
   const taxOptions = ['IGST', 'CGST', 'SGST', 'No Tax'];
   const countries = ['India', 'United States', 'United Kingdom'];
-  const salesInquiries = ['- Select Inquiry -', 'SI-1001', 'SI-1002'];
-  const customers = ['- Select Customer -', 'Acme Corp', 'Beta Ltd'];
-  const state = ['- Select state -', 'Gujarat', 'Delhi', 'Mumbai'];
-  const city = ['- Select city -', 'vadodara', 'surat', ];
+  const salesInquiries = [ 'SI-1001', 'SI-1002'];
+  const customers = [ 'Acme Corp', 'Beta Ltd'];
+  const state = [ 'Gujarat', 'Delhi', 'Mumbai'];
+  const city = ['vadodara', 'surat', ];
 
 
 
   const paymentMethods = [
-    '- Select Method -',
-    'Cash',
+  
     'Bank Transfer',
     'Mobile App Development',
     
@@ -171,6 +170,7 @@ const ManageSalesOrder = () => {
   );
   const [paymentTerm, setPaymentTerm] = useState(paymentTerms[0]);
   const [notes, setNotes] = useState('');
+  const [terms, setTerms] = useState('');
   const [project, setProject] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [shippingCharges, setShippingCharges] = useState('0');
@@ -205,7 +205,25 @@ const ManageSalesOrder = () => {
   const copyBillingToShipping = () => {
     setShippingForm({ ...billingForm });
     setIsShippingSame(true);
-    setExpandedId(3);
+  };
+
+  // Toggle copy: if already copied, clear shipping form and uncheck
+  const toggleCopyBillingToShipping = () => {
+    if (!isShippingSame) {
+      setShippingForm({ ...billingForm });
+      setIsShippingSame(true);
+    } else {
+      setShippingForm({
+        buildingNo: '',
+        street1: '',
+        street2: '',
+        postalCode: '',
+        country: '',
+        state: '',
+        city: '',
+      });
+      setIsShippingSame(false);
+    }
   };
 
   const formatUiDate = date => {
@@ -469,14 +487,14 @@ const ManageSalesOrder = () => {
          <Text style={inputStyles.label}>Sales Order Number* </Text>
 
                 {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
-                <View style={[inputStyles.box]}>
+                <View style={[inputStyles.box]} pointerEvents="box-none">
                   <TextInput
-                    style={[inputStyles.input]}
+                    style={[inputStyles.input, { flex: 1 }]}
                     value={headerForm.clientName}
                     onChangeText={v =>
                       setHeaderForm(s => ({ ...s, clientName: v }))
                     }
-                    placeholder="Sales Order Number*"
+                    placeholder="eg."
                     placeholderTextColor={COLORS.textLight}
                   />
                 </View>
@@ -487,7 +505,7 @@ const ManageSalesOrder = () => {
                 {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
-                    placeholder="-Select Project-"
+                    placeholder="Select Project*"
                     value={project}
                     options={paymentMethods}
                     getLabel={p => p}
@@ -503,12 +521,13 @@ const ManageSalesOrder = () => {
 
             <View style={[styles.row, { marginTop: hp(1.5) }]}>
             
-              <View style={styles.col}>
-                         <Text style={inputStyles.label}>payment Tearm* </Text>
+           <View style={styles.col}>
+                         <Text style={inputStyles.label}>Payment Term </Text>
 
-                <View style={{ zIndex: 9999, elevation: 20 }}>
+                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
+                <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
-                    placeholder="Payment Term*"
+                    placeholder="Select Payment Term*"
                     value={paymentTerm}
                     options={paymentTerms}
                     getLabel={p => p}
@@ -647,9 +666,9 @@ const ManageSalesOrder = () => {
             <View style={styles.row}>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Building No.</Text>
-                <View style={[inputStyles.box]}>
+                <View style={[inputStyles.box]} pointerEvents="box-none">
                   <TextInput
-                    style={[inputStyles.input]}
+                    style={[inputStyles.input, { flex: 1 }]}
                     value={billingForm.buildingNo}
                     onChangeText={v =>
                       setBillingForm(s => ({ ...s, buildingNo: v }))
@@ -661,9 +680,9 @@ const ManageSalesOrder = () => {
               </View>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Street 1</Text>
-                <View style={[inputStyles.box]}>
+                <View style={[inputStyles.box]} pointerEvents="box-none">
                   <TextInput
-                    style={[inputStyles.input]}
+                    style={[inputStyles.input, { flex: 1 }]}
                     value={billingForm.street1}
                     onChangeText={v =>
                       setBillingForm(s => ({ ...s, street1: v }))
@@ -678,9 +697,9 @@ const ManageSalesOrder = () => {
             <View style={styles.row}>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Street 2</Text>
-                <View style={[inputStyles.box]}>
+                <View style={[inputStyles.box]} pointerEvents="box-none">
                   <TextInput
-                    style={[inputStyles.input]}
+                    style={[inputStyles.input, { flex: 1 }]}
                     value={billingForm.street2}
                     onChangeText={v =>
                       setBillingForm(s => ({ ...s, street2: v }))
@@ -692,9 +711,9 @@ const ManageSalesOrder = () => {
               </View>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Postal Code</Text>
-                <View style={[inputStyles.box]}>
+                <View style={[inputStyles.box]} pointerEvents="box-none">
                   <TextInput
-                    style={[inputStyles.input]}
+                    style={[inputStyles.input, { flex: 1 }]}
                     value={billingForm.postalCode}
                     onChangeText={v =>
                       setBillingForm(s => ({ ...s, postalCode: v }))
@@ -711,7 +730,7 @@ const ManageSalesOrder = () => {
                 <Text style={inputStyles.label}>Country Name</Text>
                 <View style={{ zIndex: 9999, elevation: 20 }}>
                   <Dropdown
-                    placeholder="- Select Country -"
+                    placeholder="Select Country*"
                     value={billingForm.country}
                     options={countries}
                     getLabel={c => c}
@@ -727,7 +746,7 @@ const ManageSalesOrder = () => {
                 <Text style={inputStyles.label}>State Name</Text>
                  <View style={{ zIndex: 9999, elevation: 20 }}>
                   <Dropdown
-                    placeholder="- Select State -"
+                    placeholder="Select State*"
                     value={billingForm.state}
                     options={state}
                     getLabel={c => c}
@@ -763,10 +782,10 @@ const ManageSalesOrder = () => {
                   activeOpacity={0.8}
                   style={styles.checkboxRow}
                   onPress={() => {
-                    copyBillingToShipping();
+                    toggleCopyBillingToShipping();
                   }}
                 >
-                  <View style={styles.checkboxBox}>
+                  <View style={[styles.checkboxBox, isShippingSame && styles.checkboxBoxChecked]}>
                     {isShippingSame ? (
                       <Icon name="check" size={rf(3)} color="#fff" />
                     ) : null}
@@ -796,9 +815,9 @@ const ManageSalesOrder = () => {
             <View style={styles.row}>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Building No.</Text>
-                <View style={[inputStyles.box]}>
+                <View style={[inputStyles.box]} pointerEvents="box-none">
                   <TextInput
-                    style={[inputStyles.input]}
+                    style={[inputStyles.input, { flex: 1 }]}
                     value={shippingForm.buildingNo}
                     onChangeText={v =>
                       setShippingForm(s => ({ ...s, buildingNo: v }))
@@ -810,9 +829,9 @@ const ManageSalesOrder = () => {
               </View>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Street 1</Text>
-                <View style={[inputStyles.box]}>
+                <View style={[inputStyles.box]} pointerEvents="box-none">
                   <TextInput
-                    style={[inputStyles.input]}
+                    style={[inputStyles.input, { flex: 1 }]}
                     value={shippingForm.street1}
                     onChangeText={v =>
                       setShippingForm(s => ({ ...s, street1: v }))
@@ -827,9 +846,9 @@ const ManageSalesOrder = () => {
             <View style={styles.row}>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Street 2</Text>
-                <View style={[inputStyles.box]}>
+                <View style={[inputStyles.box]} pointerEvents="box-none">
                   <TextInput
-                    style={[inputStyles.input]}
+                    style={[inputStyles.input, { flex: 1 }]}
                     value={shippingForm.street2}
                     onChangeText={v =>
                       setShippingForm(s => ({ ...s, street2: v }))
@@ -841,9 +860,9 @@ const ManageSalesOrder = () => {
               </View>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Postal Code</Text>
-                <View style={[inputStyles.box]}>
+                <View style={[inputStyles.box]} pointerEvents="box-none">
                   <TextInput
-                    style={[inputStyles.input]}
+                    style={[inputStyles.input, { flex: 1 }]}
                     value={shippingForm.postalCode}
                     onChangeText={v =>
                       setShippingForm(s => ({ ...s, postalCode: v }))
@@ -1261,6 +1280,18 @@ const ManageSalesOrder = () => {
                     placeholderTextColor={COLORS.textLight}
                   />
                 </View>
+                <View style={styles.notesCol}>
+                  <Text style={inputStyles.label}>Terms & Conditions</Text>
+                  <TextInput
+                    style={styles.noteBox}
+                    multiline
+                    numberOfLines={4}
+                    value={terms}
+                    onChangeText={setTerms}
+                    placeholder="Terms & Conditions..."
+                    placeholderTextColor={COLORS.textLight}
+                  />
+                </View>
                 <View style={styles.attachCol}>
                   <Text style={inputStyles.label}>Attach file</Text>
                   <View
@@ -1313,14 +1344,8 @@ const ManageSalesOrder = () => {
                             <TextInput style={styles.noteBox} multiline numberOfLines={4} value={notes} onChangeText={setNotes} placeholder="Add any remarks..." placeholderTextColor={COLORS.textLight} />
                         </AccordionSection> */}
         </ScrollView>
-        <DatePickerBottomSheet
-          isVisible={openDatePicker}
-          onClose={closeDatePicker}
-          selectedDate={datePickerSelectedDate}
-          onDateSelect={handleDateSelect}
-          title="Select Date"
-        />
 
+                        
         <View style={styles.footerBar}>
           <View
             style={[
@@ -1356,6 +1381,14 @@ const ManageSalesOrder = () => {
                         <Text style={styles.primaryButtonText}>Submit</Text>
                     </TouchableOpacity> */}
         </View>
+        <DatePickerBottomSheet
+          isVisible={openDatePicker}
+          onClose={closeDatePicker}
+          selectedDate={datePickerSelectedDate}
+          onDateSelect={handleDateSelect}
+          title="Select Date"
+        />
+
       </View>
     </>
   );
@@ -1366,7 +1399,7 @@ export default ManageSalesOrder;
 const styles = StyleSheet.create({
   container: {
     padding: wp(3.5),
-    paddingBottom: hp(6),
+    // paddingBottom: hp(6),
     backgroundColor: '#fff',
   },
   line: {
@@ -1478,6 +1511,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  checkboxBoxChecked: {
+    backgroundColor: '#F97316',
+    borderColor: '#F97316',
   },
   smallInput: {
     width: wp(12),
@@ -1758,6 +1795,8 @@ const styles = StyleSheet.create({
     width: wp(90.5),
     flex: 1,
     paddingRight: wp(2),
+    marginTop: hp(0.8),
+
   },
   attachCol: {
     width: wp(88.5),
@@ -1857,8 +1896,10 @@ const styles = StyleSheet.create({
   table: { minWidth: wp(180) },
 
   /* ── COMMON ── */
-    thead: { backgroundColor: '#f1f1f1' },
-  tr: { flexDirection: 'row' },
+ thead: {
+        backgroundColor: '#f1f1f1',
+    },
+      tr: { flexDirection: 'row' },
 
   /* ── TH (header) ── */
   th: {
