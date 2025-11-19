@@ -13,14 +13,14 @@ import {
   Modal,
   TouchableWithoutFeedback,
 } from 'react-native';
-import { wp, hp, rf } from '../../utils/responsive';
-import Dropdown from '../../components/common/Dropdown';
+import { wp, hp, rf } from '../../../../utils/responsive';
+import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { COLORS, TYPOGRAPHY, inputStyles, SPACING } from '../styles/styles';
-import AppHeader from '../../components/common/AppHeader';
+import { COLORS, TYPOGRAPHY, inputStyles, SPACING } from '../../../styles/styles';
+import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
-import { formStyles } from '../styles/styles';
-import DatePickerBottomSheet from '../../components/common/CustomDatePicker';
+import { formStyles } from '../../../styles/styles';
+import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 
 const COL_WIDTHS = {
@@ -41,7 +41,19 @@ const AccordionSection = ({
 }) => {
   return (
     <View style={[styles.sectionWrapper, wrapperStyle]}>
-     
+      {/* <TouchableOpacity
+                activeOpacity={0.8}
+                style={styles.sectionHeader}
+                onPress={() => {
+                  setStatus && setStatus(undefined);
+                  setOpenSection1(true);
+                  setOpenSection2(false);
+                  setOpenSection3(false);
+                }}
+              >
+                <Text style={styles.sectionHeaderText}>Basic Details</Text>
+                <Icon name={openSection1 ? 'expand-less' : 'expand-more'} size={rf(4.2)} color={COLORS.text} />
+              </TouchableOpacity> */}
       <TouchableOpacity
         activeOpacity={0.8}
         style={styles.sectionHeader}
@@ -60,44 +72,28 @@ const AccordionSection = ({
   );
 };
 
-const AddPurchaseQuotation = () => {
+const ManageSalesOrder = () => {
   const [expandedId, setExpandedId] = useState(1);
   const navigation = useNavigation();
   const toggleSection = id => setExpandedId(prev => (prev === id ? null : id));
 
   // Demo options for dropdowns
-  const paymentTerms = ['- Payment Term -', 'Net 7', 'Net 15', 'Net 30'];
+  const paymentTerms = [ 'Net 7', 'Net 15', 'Net 30'];
   const taxOptions = ['IGST', 'CGST', 'SGST', 'No Tax'];
   const countries = ['India', 'United States', 'United Kingdom'];
-  const salesInquiries = ['- Select Inquiry -', 'SI-1001', 'SI-1002'];
-  const customers = ['- Select Customer -', 'Acme Corp', 'Beta Ltd'];
-  const state = ['- Select state -', 'Gujarat', 'Delhi', 'Mumbai'];
-  const city = ['- Select city -', 'vadodara', 'surat', ];
+  const salesInquiries = [ 'SI-1001', 'SI-1002'];
+  const customers = [ 'Acme Corp', 'Beta Ltd'];
+  const state = [ 'Gujarat', 'Delhi', 'Mumbai'];
+  const city = ['vadodara', 'surat', ];
 
 
 
   const paymentMethods = [
-    '- Select Method -',
-    'Cash',
+  
     'Bank Transfer',
     'Mobile App Development',
     
   ];
-
-
-   const Vendor = [
-    '- Select vendor -',
-    'Vendorna',
-  ];
-
-  const projects = ['- Select Project -', 'Mobile App Development', 'Website Revamp'];
-
-  const PaymentTerm = [
-    'Monthly',
-  ];
-
-  
-
 
   // Master items (would come from API normally)
   const masterItems = [
@@ -128,8 +124,6 @@ const AddPurchaseQuotation = () => {
   const [headerForm, setHeaderForm] = useState({
     companyName: '',
     opportunityTitle: '',
-    purchaseOrderNumber: '',
-    quotationTitle: '',
     clientName: '',
     phone: '',
     email: '',
@@ -174,11 +168,10 @@ const AddPurchaseQuotation = () => {
   const [datePickerSelectedDate, setDatePickerSelectedDate] = useState(
     new Date(),
   );
-  const [paymentTerm, setPaymentTerm] = useState('');
+  const [paymentTerm, setPaymentTerm] = useState(paymentTerms[0]);
   const [notes, setNotes] = useState('');
   const [terms, setTerms] = useState('');
-  const [projectName, setProjectName] = useState('');
-  const [vendor, setVendor] = useState('');
+  const [project, setProject] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [shippingCharges, setShippingCharges] = useState('0');
   const [adjustments, setAdjustments] = useState('0');
@@ -212,7 +205,25 @@ const AddPurchaseQuotation = () => {
   const copyBillingToShipping = () => {
     setShippingForm({ ...billingForm });
     setIsShippingSame(true);
-    setExpandedId(3);
+  };
+
+  // Toggle copy: if already copied, clear shipping form and uncheck
+  const toggleCopyBillingToShipping = () => {
+    if (!isShippingSame) {
+      setShippingForm({ ...billingForm });
+      setIsShippingSame(true);
+    } else {
+      setShippingForm({
+        buildingNo: '',
+        street1: '',
+        street2: '',
+        postalCode: '',
+        country: '',
+        state: '',
+        city: '',
+      });
+      setIsShippingSame(false);
+    }
   };
 
   const formatUiDate = date => {
@@ -415,9 +426,9 @@ const AddPurchaseQuotation = () => {
 
   return (
     <>
-      <View style={{ flex: 1, backgroundColor: '#fff'}}>
+      <View style={{ flex: 1, backgroundColor: '#fff' }}>
         <AppHeader
-          title="Add Quotation Order"
+          title="Manage Sales Order"
           onLeftPress={() => {
             navigation.goBack();
           }}
@@ -435,28 +446,12 @@ const AddPurchaseQuotation = () => {
             onToggle={toggleSection}
           >
             <View style={styles.row}>
-             <View style={styles.col}>
-         <Text style={inputStyles.label}>Purchase Quotation Number*</Text>
-
-                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
-                <View style={[inputStyles.box]}>
-                  <TextInput
-                    style={[inputStyles.input]}
-                    value={headerForm.purchaseOrderNumber}
-                    onChangeText={v =>
-                      setHeaderForm(s => ({ ...s, purchaseOrderNumber: v }))
-                    }
-                    placeholder="eg."
-                    placeholderTextColor={COLORS.textLight}
-                  />
-                </View>
-              </View>
-            <View style={styles.col}>
-                <Text style={inputStyles.label}>Purchase Inquiry No.</Text>
+              <View style={styles.col}>
+                                <Text style={inputStyles.label}>Sales Inquiry No.</Text>
 
                 {/* <Text style={[inputStyles.label, { fontWeight: '600' }]}>Sales Inquiry No.</Text> */}
                 <Dropdown
-                  placeholder="select Purchase Inquiry"
+                  placeholder="Sales Inquiry No."
                   value={headerForm.companyName}
                   options={salesInquiries}
                   getLabel={s => s}
@@ -466,40 +461,59 @@ const AddPurchaseQuotation = () => {
                   textStyle={inputStyles.input}
                 />
               </View>
+
+              
+              <View style={styles.col}>
+             <Text style={inputStyles.label}>Customer Name* </Text>
+
+                {/* <Text style={inputStyles.label}>Customer Name*</Text> */}
+                <Dropdown
+                  placeholder="Customer Name*"
+                  value={headerForm.opportunityTitle}
+                  options={customers}
+                  getLabel={c => c}
+                  getKey={c => c}
+                  onSelect={v =>
+                    setHeaderForm(s => ({ ...s, opportunityTitle: v }))
+                  }
+                  inputBoxStyle={inputStyles.box}
+                  textStyle={inputStyles.input}
+                />
+              </View>
             </View>
 
             <View style={[styles.row, { marginTop: hp(1.5) }]}>
               <View style={styles.col}>
-         <Text style={inputStyles.label}> Vendor Name*  </Text>
+         <Text style={inputStyles.label}>Sales Order Number* </Text>
 
                 {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
-               <View style={{ zIndex: 9998, elevation: 20 }}>
-                  <Dropdown
-                    placeholder="-Select Vendor-"
-                    value={vendor}
-                    options={Vendor}
-                    getLabel={p => p}
-                    getKey={p => p}
-                    onSelect={v => setVendor(v)}
-                    renderInModal={true}
-                    inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                    textStyle={inputStyles.input}
-                  />
-                </View>
-              </View>
-             <View style={styles.col}>
-         <Text style={inputStyles.label}>Quotation Title*</Text>
-
-                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
-                <View style={[inputStyles.box]}>
+                <View style={[inputStyles.box]} pointerEvents="box-none">
                   <TextInput
-                    style={[inputStyles.input]}
-                    value={headerForm.quotationTitle}
+                    style={[inputStyles.input, { flex: 1 }]}
+                    value={headerForm.clientName}
                     onChangeText={v =>
-                      setHeaderForm(s => ({ ...s, quotationTitle: v }))
+                      setHeaderForm(s => ({ ...s, clientName: v }))
                     }
                     placeholder="eg."
                     placeholderTextColor={COLORS.textLight}
+                  />
+                </View>
+              </View>
+              <View style={styles.col}>
+                         <Text style={inputStyles.label}>Project Name </Text>
+
+                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
+                <View style={{ zIndex: 9998, elevation: 20 }}>
+                  <Dropdown
+                    placeholder="Select Project*"
+                    value={project}
+                    options={paymentMethods}
+                    getLabel={p => p}
+                    getKey={p => p}
+                    onSelect={v => setProject(v)}
+                    renderInModal={true}
+                    inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                    textStyle={inputStyles.input}
                   />
                 </View>
               </View>
@@ -508,13 +522,14 @@ const AddPurchaseQuotation = () => {
             <View style={[styles.row, { marginTop: hp(1.5) }]}>
             
            <View style={styles.col}>
-                                         <Text style={inputStyles.label}>Payment Term* </Text>
+                         <Text style={inputStyles.label}>Payment Term </Text>
 
+                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
-                    placeholder="Select Payment Term"
+                    placeholder="Select Payment Term*"
                     value={paymentTerm}
-                    options={PaymentTerm}
+                    options={paymentTerms}
                     getLabel={p => p}
                     getKey={p => p}
                     onSelect={v => setPaymentTerm(v)}
@@ -543,53 +558,106 @@ const AddPurchaseQuotation = () => {
               </View>
             </View>
             <View style={[styles.row, { marginTop: hp(1.5) }]}>
-           <View style={styles.attachCol}>
-                  <Text style={inputStyles.label}>Upload PQ Document*</Text>
+              <View style={styles.col}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => openDatePickerFor('invoice')}
+                  style={{ marginTop: hp(0.8) }}
+                >
+                <Text style={inputStyles.label}>Order Date* </Text>
+
                   <View
                     style={[
                       inputStyles.box,
-                      { justifyContent: 'space-between' },
-                      styles.fileInputBox,
+                      styles.innerFieldBox,
+                      styles.datePickerBox,
+                      { alignItems: 'center' },
                     ]}
                   >
-                    <TextInput
-                      style={[inputStyles.input, { fontSize: rf(4.2) }]}
-                      placeholder="Attach file"
-                      placeholderTextColor="#9ca3af"
-                      value={file?.name || ''}
-                      editable={false}
-                    />
-                    {file ? (
-                      <TouchableOpacity
-                        activeOpacity={0.85}
-                        onPress={removeFile}
-                      >
-                        <Icon
-                          name="close"
-                          size={rf(3.6)}
-                          color="#ef4444"
-                          style={{ marginRight: SPACING.sm }}
-                        />
-                      </TouchableOpacity>
-                    ) : (
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        style={[styles.uploadButton]}
-                        onPress={pickFile}
-                      >
-                        <Icon name="cloud-upload" size={rf(4)} color="#fff" />
-                      </TouchableOpacity>
-                    )}
+                    <Text
+                      style={[
+                        inputStyles.input,
+                        styles.datePickerText,
+                        !invoiceDate && {
+                          color: COLORS.textLight,
+                          fontFamily: TYPOGRAPHY.fontFamilyRegular,
+                        },
+                        invoiceDate && {
+                          color: COLORS.text,
+                          fontFamily: TYPOGRAPHY.fontFamilyMedium,
+                        },
+                      ]}
+                    >
+                      {invoiceDate || 'Order Date*'}
+                    </Text>
+                    <View
+                      style={[
+                        styles.calendarIconContainer,
+                        invoiceDate && styles.calendarIconContainerSelected,
+                      ]}
+                    >
+                      <Icon
+                        name="calendar-today"
+                        size={rf(3.2)}
+                        color={invoiceDate ? COLORS.primary : COLORS.textLight}
+                      />
+                    </View>
                   </View>
-                  <Text style={styles.uploadHint}>
-                    Allowed: PDF, PNG, JPG • Max size 10 MB
-                  </Text>
-                </View>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.col}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => openDatePickerFor('due')}
+                  style={{ marginTop: hp(0.8) }}
+                >
+                                    <Text style={inputStyles.label}>Due Date* </Text>
+
+                  <View
+                    style={[
+                      inputStyles.box,
+                      styles.innerFieldBox,
+                      styles.datePickerBox,
+                      { alignItems: 'center' },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        inputStyles.input,
+                        styles.datePickerText,
+                        !dueDate && {
+                          color: COLORS.textLight,
+                          fontFamily: TYPOGRAPHY.fontFamilyRegular,
+                        },
+                        dueDate && {
+                          color: COLORS.text,
+                          fontFamily: TYPOGRAPHY.fontFamilyMedium,
+                        },
+                      ]}
+                    >
+                      {dueDate || 'Due Date*'}
+                    </Text>
+                    <View
+                      style={[
+                        styles.calendarIconContainer,
+                        dueDate && styles.calendarIconContainerSelected,
+                      ]}
+                    >
+                      <Icon
+                        name="calendar-today"
+                        size={rf(3.2)}
+                        color={dueDate ? COLORS.primary : COLORS.textLight}
+                      />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </View>
             </View>
           </AccordionSection>
 
           {/* Section 2: Billing Address */}
-          {/* <AccordionSection
+          <AccordionSection
             id={2}
             title="Billing Address"
             expanded={expandedId === 2}
@@ -598,9 +666,9 @@ const AddPurchaseQuotation = () => {
             <View style={styles.row}>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Building No.</Text>
-                <View style={[inputStyles.box]}>
+                <View style={[inputStyles.box]} pointerEvents="box-none">
                   <TextInput
-                    style={[inputStyles.input]}
+                    style={[inputStyles.input, { flex: 1 }]}
                     value={billingForm.buildingNo}
                     onChangeText={v =>
                       setBillingForm(s => ({ ...s, buildingNo: v }))
@@ -612,9 +680,9 @@ const AddPurchaseQuotation = () => {
               </View>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Street 1</Text>
-                <View style={[inputStyles.box]}>
+                <View style={[inputStyles.box]} pointerEvents="box-none">
                   <TextInput
-                    style={[inputStyles.input]}
+                    style={[inputStyles.input, { flex: 1 }]}
                     value={billingForm.street1}
                     onChangeText={v =>
                       setBillingForm(s => ({ ...s, street1: v }))
@@ -629,9 +697,9 @@ const AddPurchaseQuotation = () => {
             <View style={styles.row}>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Street 2</Text>
-                <View style={[inputStyles.box]}>
+                <View style={[inputStyles.box]} pointerEvents="box-none">
                   <TextInput
-                    style={[inputStyles.input]}
+                    style={[inputStyles.input, { flex: 1 }]}
                     value={billingForm.street2}
                     onChangeText={v =>
                       setBillingForm(s => ({ ...s, street2: v }))
@@ -643,9 +711,9 @@ const AddPurchaseQuotation = () => {
               </View>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Postal Code</Text>
-                <View style={[inputStyles.box]}>
+                <View style={[inputStyles.box]} pointerEvents="box-none">
                   <TextInput
-                    style={[inputStyles.input]}
+                    style={[inputStyles.input, { flex: 1 }]}
                     value={billingForm.postalCode}
                     onChangeText={v =>
                       setBillingForm(s => ({ ...s, postalCode: v }))
@@ -662,7 +730,7 @@ const AddPurchaseQuotation = () => {
                 <Text style={inputStyles.label}>Country Name</Text>
                 <View style={{ zIndex: 9999, elevation: 20 }}>
                   <Dropdown
-                    placeholder="- Select Country -"
+                    placeholder="Select Country*"
                     value={billingForm.country}
                     options={countries}
                     getLabel={c => c}
@@ -678,12 +746,12 @@ const AddPurchaseQuotation = () => {
                 <Text style={inputStyles.label}>State Name</Text>
                  <View style={{ zIndex: 9999, elevation: 20 }}>
                   <Dropdown
-                    placeholder="- Select State -"
-                    value={billingForm.country}
+                    placeholder="Select State*"
+                    value={billingForm.state}
                     options={state}
                     getLabel={c => c}
                     getKey={c => c}
-                    onSelect={c => setBillingForm(s => ({ ...s, country: c }))}
+                    onSelect={c => setBillingForm(s => ({ ...s, state: c }))}
                     inputBoxStyle={inputStyles.box}
                     style={{ marginBottom: hp(1.6) }}
                     renderInModal={true}
@@ -714,10 +782,10 @@ const AddPurchaseQuotation = () => {
                   activeOpacity={0.8}
                   style={styles.checkboxRow}
                   onPress={() => {
-                    copyBillingToShipping();
+                    toggleCopyBillingToShipping();
                   }}
                 >
-                  <View style={styles.checkboxBox}>
+                  <View style={[styles.checkboxBox, isShippingSame && styles.checkboxBoxChecked]}>
                     {isShippingSame ? (
                       <Icon name="check" size={rf(3)} color="#fff" />
                     ) : null}
@@ -735,10 +803,10 @@ const AddPurchaseQuotation = () => {
                 </TouchableOpacity>
               </View>
             </View>
-          </AccordionSection> */}
+          </AccordionSection>
 
           {/* Section 3: Shipping Address */}
-          {/* <AccordionSection
+          <AccordionSection
             id={3}
             title="Shipping Address"
             expanded={expandedId === 3}
@@ -747,9 +815,9 @@ const AddPurchaseQuotation = () => {
             <View style={styles.row}>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Building No.</Text>
-                <View style={[inputStyles.box]}>
+                <View style={[inputStyles.box]} pointerEvents="box-none">
                   <TextInput
-                    style={[inputStyles.input]}
+                    style={[inputStyles.input, { flex: 1 }]}
                     value={shippingForm.buildingNo}
                     onChangeText={v =>
                       setShippingForm(s => ({ ...s, buildingNo: v }))
@@ -761,9 +829,9 @@ const AddPurchaseQuotation = () => {
               </View>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Street 1</Text>
-                <View style={[inputStyles.box]}>
+                <View style={[inputStyles.box]} pointerEvents="box-none">
                   <TextInput
-                    style={[inputStyles.input]}
+                    style={[inputStyles.input, { flex: 1 }]}
                     value={shippingForm.street1}
                     onChangeText={v =>
                       setShippingForm(s => ({ ...s, street1: v }))
@@ -778,9 +846,9 @@ const AddPurchaseQuotation = () => {
             <View style={styles.row}>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Street 2</Text>
-                <View style={[inputStyles.box]}>
+                <View style={[inputStyles.box]} pointerEvents="box-none">
                   <TextInput
-                    style={[inputStyles.input]}
+                    style={[inputStyles.input, { flex: 1 }]}
                     value={shippingForm.street2}
                     onChangeText={v =>
                       setShippingForm(s => ({ ...s, street2: v }))
@@ -792,9 +860,9 @@ const AddPurchaseQuotation = () => {
               </View>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Postal Code</Text>
-                <View style={[inputStyles.box]}>
+                <View style={[inputStyles.box]} pointerEvents="box-none">
                   <TextInput
-                    style={[inputStyles.input]}
+                    style={[inputStyles.input, { flex: 1 }]}
                     value={shippingForm.postalCode}
                     onChangeText={v =>
                       setShippingForm(s => ({ ...s, postalCode: v }))
@@ -863,7 +931,7 @@ const AddPurchaseQuotation = () => {
               </View>
               <View style={styles.col} />
             </View>
-          </AccordionSection> */}
+          </AccordionSection>
 
           {/* Section 4: Create Order */}
           <AccordionSection
@@ -1062,7 +1130,7 @@ const AddPurchaseQuotation = () => {
 
                 {/* Shipping Charges */}
                 <View style={styles.rowInput}>
-                  <Text style={styles.label}>Discount:</Text>
+                  <Text style={styles.label}>Shipping Charges :</Text>
 
                   <View style={styles.inputRightGroup}>
                     <TextInput
@@ -1073,7 +1141,41 @@ const AddPurchaseQuotation = () => {
                     />
 
                     {/* Question Icon with Tooltip */}
-                    
+                    <View style={styles.helpIconWrapper}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setShowShippingTip(!showShippingTip);
+                          setShowAdjustmentTip(false);
+                        }}
+                        style={styles.helpIconContainer}
+                      >
+                        <Text style={styles.helpIcon}>?</Text>
+                      </TouchableOpacity>
+
+                      {/* Tooltip */}
+                      {showShippingTip && (
+                        <>
+                          <Modal
+                            transparent
+                            visible={showShippingTip}
+                            animationType="none"
+                            onRequestClose={() => setShowShippingTip(false)}
+                          >
+                            <TouchableWithoutFeedback
+                              onPress={() => setShowShippingTip(false)}
+                            >
+                              <View style={styles.modalOverlay} />
+                            </TouchableWithoutFeedback>
+                          </Modal>
+                          <View style={styles.tooltipBox}>
+                            <Text style={styles.tooltipText}>
+                              Amount spent on shipping the goods.
+                            </Text>
+                            <View style={styles.tooltipArrow} />
+                          </View>
+                        </>
+                      )}
+                    </View>
                   </View>
 
                   <Text style={styles.value}>
@@ -1081,7 +1183,65 @@ const AddPurchaseQuotation = () => {
                   </Text>
                 </View>
 
-                
+                {/* Adjustments */}
+                <View style={styles.rowInput}>
+                  <TextInput
+                    value={adjustmentLabel}
+                    onChangeText={setAdjustmentLabel}
+                    underlineColorAndroid="transparent"
+                    style={styles.labelInput}
+                  />
+
+                  <View style={styles.inputRightGroup}>
+                    <TextInput
+                      value={String(adjustments)}
+                      onChangeText={setAdjustments}
+                      keyboardType="numeric"
+                      style={styles.inputBox}
+                    />
+                    {/* Question Icon with Tooltip */}
+                    <View style={styles.helpIconWrapper}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setShowAdjustmentTip(!showAdjustmentTip);
+                          setShowShippingTip(false);
+                        }}
+                        style={styles.helpIconContainer}
+                      >
+                        <Text style={styles.helpIcon}>?</Text>
+                      </TouchableOpacity>
+
+                      {/* Tooltip */}
+                      {showAdjustmentTip && (
+                        <>
+                          <Modal
+                            transparent
+                            visible={showAdjustmentTip}
+                            animationType="none"
+                            onRequestClose={() => setShowAdjustmentTip(false)}
+                          >
+                            <TouchableWithoutFeedback
+                              onPress={() => setShowAdjustmentTip(false)}
+                            >
+                              <View style={styles.modalOverlay} />
+                            </TouchableWithoutFeedback>
+                          </Modal>
+                          <View style={styles.tooltipBox}>
+                            <Text style={styles.tooltipText}>
+                              Additional charges or discounts applied to the
+                              order.
+                            </Text>
+                            <View style={styles.tooltipArrow} />
+                          </View>
+                        </>
+                      )}
+                    </View>
+                  </View>
+
+                  <Text style={styles.value}>
+                    ₹{parseFloat(adjustments || 0).toFixed(2)}
+                  </Text>
+                </View>
 
                 {/* Total Tax */}
                 <View style={styles.row}>
@@ -1114,22 +1274,20 @@ const AddPurchaseQuotation = () => {
                     style={styles.noteBox}
                     multiline
                     numberOfLines={4}
-                    value={terms}
-                    onChangeText={setTerms}
-                    placeholder="Add any Terms & Condition..."
+                    value={notes}
+                    onChangeText={setNotes}
+                    placeholder="Add any remarks..."
                     placeholderTextColor={COLORS.textLight}
                   />
                 </View>
-
-
-                 <View style={styles.notesCol}>
+                <View style={styles.notesCol}>
                   <Text style={inputStyles.label}>Terms & Conditions</Text>
                   <TextInput
                     style={styles.noteBox}
                     multiline
                     numberOfLines={4}
-                    value={notes}
-                    onChangeText={setNotes}
+                    value={terms}
+                    onChangeText={setTerms}
                     placeholder="Terms & Conditions..."
                     placeholderTextColor={COLORS.textLight}
                   />
@@ -1186,14 +1344,8 @@ const AddPurchaseQuotation = () => {
                             <TextInput style={styles.noteBox} multiline numberOfLines={4} value={notes} onChangeText={setNotes} placeholder="Add any remarks..." placeholderTextColor={COLORS.textLight} />
                         </AccordionSection> */}
         </ScrollView>
-        <DatePickerBottomSheet
-          isVisible={openDatePicker}
-          onClose={closeDatePicker}
-          selectedDate={datePickerSelectedDate}
-          onDateSelect={handleDateSelect}
-          title="Select Date"
-        />
 
+                        
         <View style={styles.footerBar}>
           <View
             style={[
@@ -1229,17 +1381,25 @@ const AddPurchaseQuotation = () => {
                         <Text style={styles.primaryButtonText}>Submit</Text>
                     </TouchableOpacity> */}
         </View>
+        <DatePickerBottomSheet
+          isVisible={openDatePicker}
+          onClose={closeDatePicker}
+          selectedDate={datePickerSelectedDate}
+          onDateSelect={handleDateSelect}
+          title="Select Date"
+        />
+
       </View>
     </>
   );
 };
 
-export default AddPurchaseQuotation;
+export default ManageSalesOrder;
 
 const styles = StyleSheet.create({
   container: {
     padding: wp(3.5),
-    paddingBottom: hp(6),
+    // paddingBottom: hp(6),
     backgroundColor: '#fff',
   },
   line: {
@@ -1351,6 +1511,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  checkboxBoxChecked: {
+    backgroundColor: '#F97316',
+    borderColor: '#F97316',
   },
   smallInput: {
     width: wp(12),
@@ -1631,6 +1795,8 @@ const styles = StyleSheet.create({
     width: wp(90.5),
     flex: 1,
     paddingRight: wp(2),
+    marginTop: hp(0.8),
+
   },
   attachCol: {
     width: wp(88.5),
@@ -1730,8 +1896,10 @@ const styles = StyleSheet.create({
   table: { minWidth: wp(180) },
 
   /* ── COMMON ── */
-    thead: { backgroundColor: '#f1f1f1' },
-  tr: { flexDirection: 'row' },
+ thead: {
+        backgroundColor: '#f1f1f1',
+    },
+      tr: { flexDirection: 'row' },
 
   /* ── TH (header) ── */
   th: {

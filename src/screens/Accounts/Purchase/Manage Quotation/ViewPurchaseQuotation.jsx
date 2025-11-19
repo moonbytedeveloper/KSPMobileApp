@@ -1,13 +1,13 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import AppHeader from '../../components/common/AppHeader';
+import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
-import AccordionItem from '../../components/common/AccordionItem';
-import Dropdown from '../../components/common/Dropdown';
+import AccordionItem from '../../../../components/common/AccordionItem';
+import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { wp, hp, rf } from '../../utils/responsive';
-import { COLORS, TYPOGRAPHY, RADIUS } from '../styles/styles';
+import { wp, hp, rf } from '../../../../utils/responsive';
+import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 
 const SALES_ORDERS = [
     {

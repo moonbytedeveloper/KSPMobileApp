@@ -1,74 +1,42 @@
-
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import AppHeader from '../../components/common/AppHeader';
+import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
-import AccordionItem from '../../components/common/AccordionItem';
-import Dropdown from '../../components/common/Dropdown';
+import AccordionItem from '../../../../components/common/AccordionItem';
+import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { wp, hp, rf } from '../../utils/responsive';
-import { COLORS, TYPOGRAPHY, RADIUS } from '../styles/styles';
+import { wp, hp, rf } from '../../../../utils/responsive';
+import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 
-const SALES_ORDERS = [
+const PURCHASE_ORDERS = [
     {
-        id: 'KP1524',
-        salesOrderNumber: 'KP1524',
-        customerName: 'Moonbyte',
-        deliveryDate: '15-12-24',
-        dueDate: '15-12-24',
-        salesInvoiceNumber: 'OR.002',
-     
+        id: 'PO001',
+        vendorName: 'MoonByte',
+        projectName: 'Ksp',
+        deliveryDate: '01/01/25',
+        item: {
+            itemType: 'Furniture',
+            name: 'Chair'
+        },
+        quantity: 10
     },
     {
-        id: 'KP1525',
-        salesOrderNumber: 'KP1525',
-        customerName: 'Northwind Retail',
-        deliveryDate: '04-01-25',
-        dueDate: '20-12-24',
-        salesInvoiceNumber: 'OR.002',
-       
-    },
-    {
-        id: 'KP1526',
-        salesOrderNumber: 'KP1526',
-        customerName: 'Creative Labs',
-        deliveryDate: '22-12-24',
-        dueDate: '18-12-24',
-        salesInvoiceNumber: 'OR.002',
-        
-    },
-    {
-        id: 'KP1527',
-        salesOrderNumber: 'KP1527',
-        customerName: 'BlueStone Pvt Ltd',
-        deliveryDate: '11-01-25',
-        dueDate: '28-12-24',
-        salesInvoiceNumber: 'OR.002',
-     
-    },
-    {
-        id: 'KP1528',
-        salesOrderNumber: 'KP1528',
-        customerName: 'Aero Technologies',
-        deliveryDate: '29-12-24',
-        dueDate: '24-12-24',
-        salesInvoiceNumber: 'OR.002',
-       
-    },
-    {
-        id: 'KP1529',
-        salesOrderNumber: 'KP1529',
-        customerName: 'UrbanNest Homes',
-        deliveryDate: '05-02-25',
-        dueDate: '12-01-25',
-        salesInvoiceNumber: '₹1,85,300',
-        
-    },
+        id: 'PO002',
+        vendorName: 'Northwind Retail',
+        projectName: 'ABC Tower',
+        deliveryDate: '04/01/25',
+        item: {
+            itemType: 'Electronics',
+            name: 'LED Panel'
+        },
+        quantity: 25
+    }
 ];
+
 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 
-const ManageSalesInvoice = () => {
+const ViewPurchaseOrder = () => {
     const navigation = useNavigation();
     const [activeOrderId, setActiveOrderId] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -77,9 +45,9 @@ const ManageSalesInvoice = () => {
 
     const filteredOrders = useMemo(() => {
         const query = searchQuery.trim().toLowerCase();
-        if (!query) return SALES_ORDERS;
-        return SALES_ORDERS.filter((order) => {
-            const haystack = `${order.salesOrderNumber} ${order.customerName} ${order.contactPerson} ${order.status}`.toLowerCase();
+        if (!query) return PURCHASE_ORDERS;
+        return PURCHASE_ORDERS.filter((order) => {
+            const haystack = `${order.purchaseOrderNumber} ${order.vendorName} ${order.projectName} ${order.deliveryDate} ${order.item.itemType} ${order.item.name} ${order.quantity}`.toLowerCase();
             return haystack.includes(query);
         });
     }, [searchQuery]);
@@ -108,7 +76,7 @@ const ManageSalesInvoice = () => {
     const rangeEnd = filteredOrders.length === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, filteredOrders.length);
 
     const handleQuickAction = (order, actionLabel) => {
-        Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber}`);
+        Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.purchaseOrderNumber}`);
     };
 
     const renderFooterActions = (order) => {
@@ -117,7 +85,7 @@ const ManageSalesInvoice = () => {
             { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6', action: 'Download' },
             { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280', action: 'Forward' },
             { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E', action: 'View' },
-            { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316', action: 'Update Status'  },
+            { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316', action: 'Update Status' },
         ];
 
         return (
@@ -126,7 +94,7 @@ const ManageSalesInvoice = () => {
                     <TouchableOpacity
                         key={`${order.id}-${btn.icon}`}
                         activeOpacity={0.85}
-                        style={[styles.cardActionBtn , { backgroundColor: btn.bg, borderColor: btn.border }]}
+                        style={[styles.cardActionBtn, { backgroundColor: btn.bg, borderColor: btn.border }]}
                         onPress={() => handleQuickAction(order, btn.action)}
                     >
                         <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
@@ -160,11 +128,11 @@ const ManageSalesInvoice = () => {
 
     return (
         <View style={styles.screen}>
-                <AppHeader
-                title="Manage Sales Invoice"
+            <AppHeader
+                title="View Purchase Order"
                 onLeftPress={() => navigation.goBack()}
-                onRightPress={() => navigation.navigate('AddSalesInvoice')}
-                rightButtonLabel="Add sales Invoice"
+                onRightPress={() => navigation.navigate('ManagePurchaseOrder')}
+                rightButtonLabel="Add Purchase Order"
                 showRight
             />
             <View style={styles.headerSeparator} />
@@ -211,28 +179,35 @@ const ManageSalesInvoice = () => {
                     <AccordionItem
                         key={order.id}
                         item={{
-                            soleExpenseCode: order.id,
-                            expenseName: order.salesOrderNumber,
-                            amount: order.salesInvoiceNumber,
+                            headerTitle: order.vendorName,        // LEFT SIDE
+                            headerValue: order.projectName,       // RIGHT SIDE
                         }}
+
                         isActive={activeOrderId === order.id}
-                        onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
+                        onToggle={() => setActiveOrderId(prev => prev === order.id ? null : order.id)}
+
                         customRows={[
-                            { label: 'Customer Name', value: order.customerName },
-                            { label: 'Sales Invoice Number', value: order.salesInvoiceNumber },
-                            { label: 'Delivery Date', value: order.deliveryDate },
-                            // { label: 'Due Date', value: order.dueDate },
-                        ]} 
-                        headerLeftLabel="Sales Order Number"
-                        headerRightLabel="Sales Invoice Number"
+                            { label: "Vendor Name", value: order.vendorName },
+                            { label: "Project Name", value: order.projectName },
+                            { label: "Delivery Date", value: order.deliveryDate },
+                            {
+                                label: "Item",
+                                value: `Item Type: ${order.item.itemType}\nName: ${order.item.name}`
+                            },
+                            { label: "Quantity", value: order.quantity }
+                        ]}
+
+                        headerLeftLabel="Vendor Name"
+                        headerRightLabel="Project Name"
                         footerComponent={renderFooterActions(order)}
                         headerRightContainerStyle={styles.headerRightContainer}
                     />
+
                 ))}
 
                 {paginatedOrders.length === 0 && (
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyStateTitle}>No sales orders found</Text>
+                        <Text style={styles.emptyStateTitle}>No purchase orders found</Text>
                         <Text style={styles.emptyStateSubtitle}>
                             Try adjusting your search keyword or create a new sales order.
                         </Text>
@@ -472,4 +447,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default ManageSalesInvoice;
+export default ViewPurchaseOrder;

@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import { wp, hp, rf } from '../../utils/responsive';
-import Dropdown from '../../components/common/Dropdown';
+import { wp, hp, rf } from '../../../../utils/responsive';
+import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { COLORS, TYPOGRAPHY, inputStyles } from '../styles/styles';
-import AppHeader from '../../components/common/AppHeader';
+import { COLORS, TYPOGRAPHY, inputStyles } from '../../../styles/styles';
+import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import { formStyles } from '../styles/styles';
-import DatePickerBottomSheet from '../../components/common/CustomDatePicker';
-
+import DatePickerBottomSheet from '../../components/common/CustomDatePicker'; 
+import { addSalesInquiry } from '../../api/authServices';
+import { getUUID } from '../../api/tokenStorage';
+import { uiDateToApiDate } from '../../utils/dateUtils';
+import BottomSheetConfirm from '../../components/common/BottomSheetConfirm';
+ 
 const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyle }) => {
     return (
         <View style={[styles.sectionWrapper, wrapperStyle]}>
@@ -22,7 +26,7 @@ const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyl
     );
 };
 
-const ManagePurchaseInquiry = () => {
+const AddSalesInquiry = () => {
     const [expandedId, setExpandedId] = useState(1);
     const navigation = useNavigation();
     const toggleSection = (id) => setExpandedId((prev) => (prev === id ? null : id));
@@ -31,7 +35,7 @@ const ManagePurchaseInquiry = () => {
     const currencyTypes = ['- Select Currency -', 'USD', 'INR', 'EUR', 'GBP'];
     const itemTypes = ['- Select Item -', 'Furniture', 'Electronics', 'Office Supplies', 'Equipment'];
     const itemNames = ['- Select Item -', 'Chair', 'Table', 'Desk', 'Cabinet'];
-    const CustomerType = ['- Select Customer -', 'Abhinav','Raj',];
+    const CustomerType = ['- Select Customer -', 'Abhinav', 'Raj',];
     const countries = ['- Select Country -', 'India', 'United States', 'United Kingdom', 'Australia', 'Germany'];
     const units = ['- Select Unit -', 'Pcs', 'Box', 'Set', 'Unit', 'failed'];
 
@@ -45,7 +49,10 @@ const ManagePurchaseInquiry = () => {
     const [projectName, setProjectName] = useState('');
     const [inquiryNo, setInquiryNo] = useState('');
     const [country, setCountry] = useState('');
-    
+    const [loading, setLoading] = useState(false);
+    const [successSheetVisible, setSuccessSheetVisible] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
+
     // Line items state
     const [lineItems, setLineItems] = useState([]);
     const [currentItem, setCurrentItem] = useState({
@@ -54,7 +61,7 @@ const ManagePurchaseInquiry = () => {
         quantity: '',
         unit: ''
     });
-    const [editItemId, setEditItemId] = useState(null);
+    const [editLineItemId, setEditLineItemId] = useState(null);
 
     // Date picker state
     const [openDatePicker, setOpenDatePicker] = useState(false);
@@ -74,6 +81,7 @@ const ManagePurchaseInquiry = () => {
         }
     };
 
+    
     const openDatePickerFor = (field) => {
         let initial = new Date();
         if (field === 'requested' && requestedDate) {
@@ -108,19 +116,23 @@ const ManagePurchaseInquiry = () => {
             return;
         }
 
-        // If editing an existing item, update it
-        if (editItemId !== null) {
-            setLineItems((prev) => prev.map((it) => (it.id === editItemId ? { ...it, ...currentItem } : it)));
-            // reset edit state
-            setEditItemId(null);
+        // If editing, update the existing item
+        if (editLineItemId) {
+            setLineItems(prev => prev.map(it => it.id === editLineItemId ? {
+                ...it,
+                itemType: currentItem.itemType,
+                itemName: currentItem.itemName,
+                quantity: currentItem.quantity,
+                unit: currentItem.unit
+            } : it));
+            // reset editor
+            setEditLineItemId(null);
             setCurrentItem({ itemType: '', itemName: '', quantity: '', unit: '' });
             return;
         }
 
-        // Add new item
-        const newId = lineItems.length > 0 ? Math.max(...lineItems.map((i) => i.id)) + 1 : 1;
         const newItem = {
-            id: newId,
+            id: lineItems.length ? Math.max(...lineItems.map(i => i.id)) + 1 : 1,
             itemType: currentItem.itemType,
             itemName: currentItem.itemName,
             quantity: currentItem.quantity,
@@ -128,43 +140,71 @@ const ManagePurchaseInquiry = () => {
         };
 
         setLineItems([...lineItems, newItem]);
-        setCurrentItem({
-            itemType: '',
-            itemName: '',
-            quantity: '',
-            unit: ''
-        });
+        setCurrentItem({ itemType: '', itemName: '', quantity: '', unit: '' });
     };
 
     const handleEditItem = (id) => {
-        const item = lineItems.find((i) => i.id === id);
+        const item = lineItems.find(i => i.id === id);
         if (item) {
-            // populate the fields and set edit mode (do NOT delete yet)
             setCurrentItem({
                 itemType: item.itemType,
                 itemName: item.itemName,
                 quantity: item.quantity,
-                unit: item.unit,
+                unit: item.unit
             });
-            setEditItemId(id);
+            setEditLineItemId(id);
+            // Expand LINE section so editor is visible (optional)
+            setExpandedId(2);
         }
+    };
+
+    const cancelEdit = () => {
+        setEditLineItemId(null);
+        setCurrentItem({ itemType: '', itemName: '', quantity: '', unit: '' });
     };
 
     const handleDeleteItem = (id) => {
         setLineItems(lineItems.filter(item => item.id !== id));
     };
 
-    const handleSubmit = () => {
-        const payload = {
-            uuid,
-            currencyType,
-            requestTitle,
-            requestedDate,
-            expectedPurchaseDate,
-            lineItems
-        };
-        console.log('Submit payload:', payload);
-        Alert.alert('Success', 'Inquiry submitted successfully');
+    const handleSubmit = async () => {
+        try {
+            setLoading(true);
+            const userUuid = await getUUID();
+            if (!userUuid) {
+                Alert.alert('Authentication', 'User not logged in');
+                setLoading(false);
+                return;
+            }
+
+            const payload = {
+                projectName,
+                customerUUID: 'db3a2f1c-6e23-4b9a-a5e3-0d53078e',
+                requestedDate: uiDateToApiDate(requestedDate),
+                expectedPurchaseDate: uiDateToApiDate(expectedPurchaseDate),
+                lineItems: lineItems.map((item, index) => ({
+                    srNo: index + 1,
+                    ItemType_UUID: '0bb9ebdc-9a5a-486d-9846-da862a98',
+                    ItemName_UUID: 'b3ff3735-5821-4701-b28c-b6b230ac',
+                    quantity: item.quantity,
+                    Unit_UUID: '7941bfd0-f1d9-42a4-913b-463bc261',
+                }))
+            };
+
+            console.log('Final Payload:', payload);
+
+            const resp = await addSalesInquiry(payload);
+            console.log('Final SALES INQUIRY resp:', resp);
+            // Use sensible response message fallbacks
+            const message = resp?.Message || resp?.message || resp?.Data?.Message || 'Sales inquiry submitted successfully';
+            setSuccessMessage(String(message));
+            setSuccessSheetVisible(true);
+        } catch (e) {
+            console.log('Error Message:', e && e.message ? e.message : e);
+            Alert.alert('Error', e && e.message ? e.message : 'Failed to submit sales inquiry');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleCancel = () => {
@@ -175,7 +215,7 @@ const ManagePurchaseInquiry = () => {
         <>
             <View style={{ flex: 1, backgroundColor: '#fff' }}>
                 <AppHeader
-                    title="Add Purchase Inquiry"
+                    title="Add Sales Inquiry"
                     onLeftPress={() => {
                         navigation.goBack();
                     }}
@@ -185,7 +225,7 @@ const ManagePurchaseInquiry = () => {
                     {/* Section 1: HEADER */}
                     <AccordionSection id={1} title="HEADER" expanded={expandedId === 1} onToggle={toggleSection}>
                         <View style={styles.row}>
-                            <View style={styles.col}>
+                            {/* <View style={styles.col}>
                                 <Text style={inputStyles.label}>UUID*</Text>
                                 <View style={[inputStyles.box]}>
                                     <TextInput
@@ -199,8 +239,55 @@ const ManagePurchaseInquiry = () => {
                                         editable={false}
                                     />
                                 </View>
+                            </View> */}
+                            <View style={styles.col}>
+                                <Text style={inputStyles.label}>Project Name*</Text>
+                                <View style={[inputStyles.box]}>
+                                    <TextInput
+                                        style={[inputStyles.input, { color: COLORS.text }]}
+                                        value={projectName}
+                                        onChangeText={setProjectName}
+                                        placeholder="eg. Ksp"
+                                        placeholderTextColor={COLORS.textLight}
+                                    />
+                                </View>
                             </View>
-                          <View style={styles.col}>
+                            <View style={styles.col}>
+                                <Text style={inputStyles.label}>Customer Name*</Text>
+                                <View style={{ zIndex: 9999, elevation: 20 }}>
+                                    <Dropdown
+                                        placeholder="- Select Customer -"
+                                        value={customerName}
+                                        options={CustomerType}
+                                        getLabel={(c) => c}
+                                        getKey={(c) => c}
+                                        onSelect={(v) => setCustomerName(v)}
+                                        renderInModal={true}
+                                        inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                                        textStyle={inputStyles.input}
+                                    />
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* <View style={[styles.row, { marginTop: hp(1.5) }]}>
+                            <View style={styles.col}>
+                                <Text style={inputStyles.label}>Country Name*</Text>
+                               <View style={{ zIndex: 9999, elevation: 20 }}>
+                                    <Dropdown
+                                        placeholder="- Select Country -"
+                                        value={country}
+                                        options={countries}
+                                        getLabel={(c) => c}
+                                        getKey={(c) => c}
+                                        onSelect={(v) => setCountry(v)}
+                                        renderInModal={true}
+                                        inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                                        textStyle={inputStyles.input}
+                                    />
+                                </View>
+                            </View>
+                               <View style={styles.col}>
                                 <Text style={inputStyles.label}>Currency Type*</Text>
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
@@ -216,57 +303,41 @@ const ManagePurchaseInquiry = () => {
                                     />
                                 </View>
                             </View>
-                        </View>
+                            <View style={styles.col} />
+                        </View> */}
 
-                    
-                        
+
 
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
-                        <View style={styles.col}>
-                                <Text style={inputStyles.label}>Requested Title*</Text>
-                                <View style={[inputStyles.box]}>
-                                    <TextInput
-                                        style={[inputStyles.input, { color: COLORS.text }]}
-                                        value={projectName}
-                                        onChangeText={setProjectName}
-                                        placeholder="eg."
-                                        placeholderTextColor={COLORS.textLight}
-                                    />
-                                </View>
-                            </View>
                             <View style={styles.col}>
-                                    <Text style={inputStyles.label}>Requested Date*</Text>
-                                    <TouchableOpacity
-                                        activeOpacity={0.7}
-                                        onPress={() => openDatePickerFor('requested')}
-                                        style={{ marginTop: hp(0.8) }}
-                                    >
-                                        <View style={[inputStyles.box, styles.innerFieldBox, styles.datePickerBox, { alignItems: 'center' }]}>
-                                            <Text style={[
-                                                inputStyles.input,
-                                                styles.datePickerText,
-                                                !requestedDate && { color: COLORS.textLight, fontFamily: TYPOGRAPHY.fontFamilyRegular },
-                                                requestedDate && { color: COLORS.text, fontFamily: TYPOGRAPHY.fontFamilyMedium }
-                                            ]}>
-                                                {requestedDate || 'mm/dd/yyyy'}
-                                            </Text>
-                                            <View style={[
-                                                styles.calendarIconContainer,
-                                                requestedDate && styles.calendarIconContainerSelected
-                                            ]}>
-                                                <Icon
-                                                    name="calendar-today"
-                                                    size={rf(3.2)}
-                                                    color={requestedDate ? COLORS.primary : COLORS.textLight}
-                                                />
-                                            </View>
+                                <Text style={inputStyles.label}>Requested Date*</Text>
+                                <TouchableOpacity
+                                    activeOpacity={0.7}
+                                    onPress={() => openDatePickerFor('requested')}
+                                    style={{ marginTop: hp(0.8) }}
+                                >
+                                    <View style={[inputStyles.box, styles.innerFieldBox, styles.datePickerBox, { alignItems: 'center' }]}>
+                                        <Text style={[
+                                            inputStyles.input,
+                                            styles.datePickerText,
+                                            !requestedDate && { color: COLORS.textLight, fontFamily: TYPOGRAPHY.fontFamilyRegular },
+                                            requestedDate && { color: COLORS.text, fontFamily: TYPOGRAPHY.fontFamilyMedium }
+                                        ]}>
+                                            {requestedDate || 'mm/dd/yyyy'}
+                                        </Text>
+                                        <View style={[
+                                            styles.calendarIconContainer,
+                                            requestedDate && styles.calendarIconContainerSelected
+                                        ]}>
+                                            <Icon
+                                                name="calendar-today"
+                                                size={rf(3.2)}
+                                                color={requestedDate ? COLORS.primary : COLORS.textLight}
+                                            />
                                         </View>
-                                    </TouchableOpacity>
-                                </View>
-                            
-                        </View>
-
-                        <View style={[styles.row, { marginTop: hp(1.5) }]}> 
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>Expected Purchase Date*</Text>
                                 <TouchableOpacity
@@ -296,6 +367,23 @@ const ManagePurchaseInquiry = () => {
                                     </View>
                                 </TouchableOpacity>
                             </View>
+
+                        </View>
+
+                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
+
+                            {/* <View style={styles.col}>
+                                <Text style={inputStyles.label}>Inquiry No.*</Text>
+                                <View style={[inputStyles.box]}>
+                                    <TextInput
+                                        style={[inputStyles.input, { color: COLORS.text }]}
+                                        value={inquiryNo}
+                                        onChangeText={setInquiryNo}
+                                        placeholder="eg. ksp500"
+                                        placeholderTextColor={COLORS.textLight}
+                                    />
+                                </View>
+                            </View> */}
                         </View>
                     </AccordionSection>
 
@@ -329,7 +417,7 @@ const ManagePurchaseInquiry = () => {
                                         getKey={(item) => item}
                                         onSelect={(v) => setCurrentItem({ ...currentItem, itemName: v })}
                                         renderInModal={true}
-                                      inputBoxStyle={[inputStyles.box, { minHeight: hp(4.6), paddingVertical: 0, marginTop: hp(0.5) }]}
+                                        inputBoxStyle={[inputStyles.box, { minHeight: hp(4.6), paddingVertical: 0, marginTop: hp(0.5) }]}
                                         textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
                                     />
                                 </View>
@@ -339,7 +427,7 @@ const ManagePurchaseInquiry = () => {
                         <View style={[styles.row, { marginTop: hp(1.5), alignItems: 'flex-end' }]}>
                             <View style={styles.colSmall}>
                                 <Text style={inputStyles.label}>Quantity*</Text>
-                                <View style={[inputStyles.box, { marginTop: hp(0.5) }]}> 
+                                <View style={[inputStyles.box, { marginTop: hp(0.5) }]}>
                                     <TextInput
                                         style={[inputStyles.input, { flex: 1, fontSize: rf(3.4), color: COLORS.text }]}
                                         value={currentItem.quantity}
@@ -366,7 +454,7 @@ const ManagePurchaseInquiry = () => {
                                     />
                                 </View>
                             </View>
-                          
+
                         </View>
                           <View style={styles.addButtonWrapper}>
                                 <TouchableOpacity
@@ -374,12 +462,12 @@ const ManagePurchaseInquiry = () => {
                                     style={styles.addButton}
                                     onPress={handleAddItem}
                                 >
-                                    <Text style={styles.addButtonText}>{editItemId !== null ? 'Update' : 'Add'}</Text>
+                                    <Text style={styles.addButtonText}>Add</Text>
                                 </TouchableOpacity>
                             </View>
                     </AccordionSection>
 
-                    
+
 
                     {/* Line Items Table */}
                     {lineItems.length > 0 && (
@@ -393,49 +481,49 @@ const ManagePurchaseInquiry = () => {
                                     directionalLockEnabled={true}
                                 >
                                     <View style={styles.table}>
-                                    {/* Table Header */}
-                                    <View style={styles.thead}>
-                                        <View style={styles.tr}>
-                                            <Text style={[styles.th, { width: wp(15) }]}>Sr.No</Text>
-                                            <Text style={[styles.th, { width: wp(50) }]}>Item</Text>
-                                            <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
-                                            <Text style={[styles.th, { width: wp(25) }]}>Action</Text>
-                                        </View>
-                                    </View>
-
-                                    
-
-                                    {/* Table Body */}
-                                    <View style={styles.tbody}>
-                                        {lineItems.map((item, index) => (
-                                            <View key={item.id} style={styles.tr}>
-                                                <View style={[styles.td, { width: wp(15) }]}>
-                                                    <Text style={styles.tdText}>{index + 1}</Text>
-                                                </View>
-                                                <View style={[styles.td, { width: wp(50), alignItems: 'flex-start', paddingLeft: wp(2) }]}>
-                                                    <Text style={styles.tdText}>• Item Type: {item.itemType}</Text>
-                                                    <Text style={styles.tdText}>• Name: {item.itemName}</Text>
-                                                </View>
-                                                <View style={[styles.td, { width: wp(20) }]}>
-                                                    <Text style={styles.tdText}>{item.quantity}</Text>
-                                                </View>
-                                                <View style={[styles.tdAction, { width: wp(25) }]}>
-                                                    <TouchableOpacity
-                                                        style={styles.actionButton}
-                                                        onPress={() => handleEditItem(item.id)}
-                                                    >
-                                                        <Text style={styles.actionButtonText}>Edit</Text>
-                                                    </TouchableOpacity>
-                                                    <TouchableOpacity
-                                                        style={[styles.actionButton, { marginLeft: wp(2) }]}
-                                                        onPress={() => handleDeleteItem(item.id)}
-                                                    >
-                                                        <Text style={styles.actionButtonText}>Delete</Text>
-                                                    </TouchableOpacity>
-                                                </View>
+                                        {/* Table Header */}
+                                        <View style={styles.thead}>
+                                            <View style={styles.tr}>
+                                                <Text style={[styles.th, { width: wp(15) }]}>Sr.No</Text>
+                                                <Text style={[styles.th, { width: wp(50) }]}>Item</Text>
+                                                <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
+                                                <Text style={[styles.th, { width: wp(25) }]}>Action</Text>
                                             </View>
-                                        ))}
-                                    </View>
+                                        </View>
+
+
+
+                                        {/* Table Body */}
+                                        <View style={styles.tbody}>
+                                            {lineItems.map((item, index) => (
+                                                <View key={item.id} style={styles.tr}>
+                                                    <View style={[styles.td, { width: wp(15) }]}>
+                                                        <Text style={styles.tdText}>{index + 1}</Text>
+                                                    </View>
+                                                    <View style={[styles.td, { width: wp(50), alignItems: 'flex-start', paddingLeft: wp(2) }]}>
+                                                        <Text style={styles.tdText}>• Item Type: {item.itemType}</Text>
+                                                        <Text style={styles.tdText}>• Name: {item.itemName}</Text>
+                                                    </View>
+                                                    <View style={[styles.td, { width: wp(20) }]}>
+                                                        <Text style={styles.tdText}>{item.quantity}</Text>
+                                                    </View>
+                                                    <View style={[styles.tdAction, { width: wp(25) }]}>
+                                                        <TouchableOpacity
+                                                            style={styles.actionButton}
+                                                            onPress={() => handleEditItem(item.id)}
+                                                        >
+                                                            <Text style={styles.actionButtonText}>Edit</Text>
+                                                        </TouchableOpacity>
+                                                        <TouchableOpacity
+                                                            style={[styles.actionButton, { marginLeft: wp(2) }]}
+                                                            onPress={() => handleDeleteItem(item.id)}
+                                                        >
+                                                            <Text style={styles.actionButtonText}>Delete</Text>
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                </View>
+                                            ))}
+                                        </View>
                                     </View>
                                 </ScrollView>
                             </View>
@@ -443,7 +531,7 @@ const ManagePurchaseInquiry = () => {
                     )}
                 </ScrollView>
 
-                
+
 
                 <DatePickerBottomSheet
                     isVisible={openDatePicker}
@@ -451,6 +539,28 @@ const ManagePurchaseInquiry = () => {
                     selectedDate={datePickerSelectedDate}
                     onDateSelect={handleDateSelect}
                     title="Select Date"
+                />
+
+                <BottomSheetConfirm
+                    visible={successSheetVisible}
+                    title="Success"
+                    message={successMessage}
+                    confirmText="OK"
+                    cancelText={null}
+                    onConfirm={() => {
+                        // Clear form data when confirming
+                        setProjectName('');
+                        setCustomerName('');
+                        setRequestedDate('');
+                        setExpectedPurchaseDate('');
+                        setLineItems([]);
+                        setCurrentItem({ itemType: '', itemName: '', quantity: '', unit: '' });
+                        setInquiryNo('');
+                        setCountry('');
+                        setCurrencyType('');
+                        setSuccessSheetVisible(false);
+                    }}
+                    onCancel={() => setSuccessSheetVisible(false)}
                 />
 
                 <View style={styles.footerBar}>
@@ -464,19 +574,21 @@ const ManagePurchaseInquiry = () => {
                         </TouchableOpacity>
                         <TouchableOpacity
                             activeOpacity={0.85}
-                            style={styles.submitButton}
+                            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
                             onPress={handleSubmit}
+                            disabled={loading}
                         >
-                            <Text style={styles.submitButtonText}>Submit</Text>
+                            <Text style={styles.submitButtonText}>{loading ? 'Submitting...' : 'Submit'}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
-        </View>
+            </View>
         </>
     );
 };
 
-export default ManagePurchaseInquiry;
+export default AddSalesInquiry;
+
 
 const styles = StyleSheet.create({
     container: {
@@ -593,7 +705,7 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     thead: {
-        backgroundColor: 're',
+        backgroundColor: '#f1f1f1',
     },
     tbody: {
         backgroundColor: '#fff',
@@ -680,6 +792,9 @@ const styles = StyleSheet.create({
         borderRadius: wp(1.5),
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    submitButtonDisabled: {
+        opacity: 0.6,
     },
     submitButtonText: {
         color: '#fff',

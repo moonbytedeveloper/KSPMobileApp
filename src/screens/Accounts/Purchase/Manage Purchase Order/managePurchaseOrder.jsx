@@ -13,14 +13,14 @@ import {
   Modal,
   TouchableWithoutFeedback,
 } from 'react-native';
-import { wp, hp, rf } from '../../utils/responsive';
-import Dropdown from '../../components/common/Dropdown';
+import { wp, hp, rf } from '../../../../utils/responsive';
+import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { COLORS, TYPOGRAPHY, inputStyles, SPACING } from '../styles/styles';
-import AppHeader from '../../components/common/AppHeader';
+import { COLORS, TYPOGRAPHY, inputStyles, SPACING } from '../../../styles/styles';
+import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
-import { formStyles } from '../styles/styles';
-import DatePickerBottomSheet from '../../components/common/CustomDatePicker';
+import { formStyles } from '../../../styles/styles';
+import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 
 const COL_WIDTHS = {
@@ -78,7 +78,7 @@ const ManageSalesOrder = () => {
   const toggleSection = id => setExpandedId(prev => (prev === id ? null : id));
 
   // Demo options for dropdowns
-  const paymentTerms = ['- Payment Term -', 'Net 7', 'Net 15', 'Net 30'];
+  const paymentTerms = ['Net 7', 'Net 15', 'Net 30'];
   const taxOptions = ['IGST', 'CGST', 'SGST', 'No Tax'];
   const countries = ['India', 'United States', 'United Kingdom'];
   const salesInquiries = ['- Select Inquiry -', 'SI-1001', 'SI-1002'];
@@ -95,6 +95,23 @@ const ManageSalesOrder = () => {
     'Mobile App Development',
     
   ];
+
+
+   const Vendor = [
+    '- Select vendor -',
+    'Vendorna',
+  ];
+
+  const projects = ['- Select Project -', 'Mobile App Development', 'Website Revamp'];
+
+  const PaymentTerm = [
+    'Net 7',
+    'Net 15',
+    'Net 30',
+  ];
+
+  
+
 
   // Master items (would come from API normally)
   const masterItems = [
@@ -138,6 +155,11 @@ const ManageSalesOrder = () => {
     state: '',
     city: '',
   });
+  // separate selection state for billing country to avoid collisions
+  const [billingCountrySel, setBillingCountrySel] = useState('');
+  // separate selection states for billing state and city
+  const [billingStateSel, setBillingStateSel] = useState('');
+  const [billingCitySel, setBillingCitySel] = useState('');
   const [shippingForm, setShippingForm] = useState({
     buildingNo: '',
     street1: '',
@@ -169,9 +191,10 @@ const ManageSalesOrder = () => {
   const [datePickerSelectedDate, setDatePickerSelectedDate] = useState(
     new Date(),
   );
-  const [paymentTerm, setPaymentTerm] = useState(paymentTerms[0]);
+  const [paymentTerm, setPaymentTerm] = useState('');
   const [notes, setNotes] = useState('');
-  const [project, setProject] = useState('');
+  const [projectName, setProjectName] = useState('');
+  const [vendor, setVendor] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [shippingCharges, setShippingCharges] = useState('0');
   const [adjustments, setAdjustments] = useState('0');
@@ -408,9 +431,9 @@ const ManageSalesOrder = () => {
 
   return (
     <>
-      <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      <View style={{ flex: 1, backgroundColor: '#fff'}}>
         <AppHeader
-          title="Manage Sales Order"
+          title="Add Purchase Order"
           onLeftPress={() => {
             navigation.goBack();
           }}
@@ -428,45 +451,8 @@ const ManageSalesOrder = () => {
             onToggle={toggleSection}
           >
             <View style={styles.row}>
-              <View style={styles.col}>
-                                <Text style={inputStyles.label}>Sales Inquiry No.</Text>
-
-                {/* <Text style={[inputStyles.label, { fontWeight: '600' }]}>Sales Inquiry No.</Text> */}
-                <Dropdown
-                  placeholder="Sales Inquiry No."
-                  value={headerForm.companyName}
-                  options={salesInquiries}
-                  getLabel={s => s}
-                  getKey={s => s}
-                  onSelect={v => setHeaderForm(s => ({ ...s, companyName: v }))}
-                  inputBoxStyle={inputStyles.box}
-                  textStyle={inputStyles.input}
-                />
-              </View>
-
-              
-              <View style={styles.col}>
-             <Text style={inputStyles.label}>Customer Name* </Text>
-
-                {/* <Text style={inputStyles.label}>Customer Name*</Text> */}
-                <Dropdown
-                  placeholder="Customer Name*"
-                  value={headerForm.opportunityTitle}
-                  options={customers}
-                  getLabel={c => c}
-                  getKey={c => c}
-                  onSelect={v =>
-                    setHeaderForm(s => ({ ...s, opportunityTitle: v }))
-                  }
-                  inputBoxStyle={inputStyles.box}
-                  textStyle={inputStyles.input}
-                />
-              </View>
-            </View>
-
-            <View style={[styles.row, { marginTop: hp(1.5) }]}>
-              <View style={styles.col}>
-         <Text style={inputStyles.label}>Sales Order Number* </Text>
+             <View style={styles.col}>
+         <Text style={inputStyles.label}>Purchase Order Number*</Text>
 
                 {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
                 <View style={[inputStyles.box]}>
@@ -476,8 +462,44 @@ const ManageSalesOrder = () => {
                     onChangeText={v =>
                       setHeaderForm(s => ({ ...s, clientName: v }))
                     }
-                    placeholder="Sales Order Number*"
+                    placeholder="eg."
                     placeholderTextColor={COLORS.textLight}
+                  />
+                </View>
+              </View>
+            <View style={styles.col}>
+                <Text style={inputStyles.label}>Purchase Inquiry No.</Text>
+
+                {/* <Text style={[inputStyles.label, { fontWeight: '600' }]}>Sales Inquiry No.</Text> */}
+                <Dropdown
+                  placeholder="select Purchase Inquiry"
+                  value={headerForm.companyName}
+                  options={salesInquiries}
+                  getLabel={s => s}
+                  getKey={s => s}
+                  onSelect={v => setHeaderForm(s => ({ ...s, companyName: v }))}
+                  inputBoxStyle={inputStyles.box}
+                  textStyle={inputStyles.input}
+                />
+              </View>
+            </View>
+
+            <View style={[styles.row, { marginTop: hp(1.5) }]}>
+              <View style={styles.col}>
+         <Text style={inputStyles.label}> Vendor Name*  </Text>
+
+                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
+               <View style={{ zIndex: 9998, elevation: 20 }}>
+                  <Dropdown
+                    placeholder="-Select Vendor-"
+                    value={vendor}
+                    options={Vendor}
+                    getLabel={p => p}
+                    getKey={p => p}
+                    onSelect={v => setVendor(v)}
+                    renderInModal={true}
+                    inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                    textStyle={inputStyles.input}
                   />
                 </View>
               </View>
@@ -488,11 +510,11 @@ const ManageSalesOrder = () => {
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
                     placeholder="-Select Project-"
-                    value={project}
-                    options={paymentMethods}
+                    value={projectName}
+                    options={projects}
                     getLabel={p => p}
                     getKey={p => p}
-                    onSelect={v => setProject(v)}
+                    onSelect={v => setProjectName(v)}
                     renderInModal={true}
                     inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                     textStyle={inputStyles.input}
@@ -503,14 +525,14 @@ const ManageSalesOrder = () => {
 
             <View style={[styles.row, { marginTop: hp(1.5) }]}>
             
-              <View style={styles.col}>
-                         <Text style={inputStyles.label}>payment Tearm* </Text>
+           <View style={styles.col}>
+                                         <Text style={inputStyles.label}>Payment Term* </Text>
 
-                <View style={{ zIndex: 9999, elevation: 20 }}>
+                <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
-                    placeholder="Payment Term*"
+                    placeholder="Select Payment Term"
                     value={paymentTerm}
-                    options={paymentTerms}
+                    options={PaymentTerm}
                     getLabel={p => p}
                     getKey={p => p}
                     onSelect={v => setPaymentTerm(v)}
@@ -545,7 +567,7 @@ const ManageSalesOrder = () => {
                   onPress={() => openDatePickerFor('invoice')}
                   style={{ marginTop: hp(0.8) }}
                 >
-                <Text style={inputStyles.label}>Order Date* </Text>
+                <Text style={inputStyles.label}> Delivery Date* </Text>
 
                   <View
                     style={[
@@ -712,11 +734,14 @@ const ManageSalesOrder = () => {
                 <View style={{ zIndex: 9999, elevation: 20 }}>
                   <Dropdown
                     placeholder="- Select Country -"
-                    value={billingForm.country}
+                    value={billingCountrySel || billingForm.country}
                     options={countries}
                     getLabel={c => c}
                     getKey={c => c}
-                    onSelect={c => setBillingForm(s => ({ ...s, country: c }))}
+                    onSelect={c => {
+                      setBillingCountrySel(c);
+                      setBillingForm(s => ({ ...s, country: c }));
+                    }}
                     inputBoxStyle={inputStyles.box}
                     style={{ marginBottom: hp(1.6) }}
                     renderInModal={true}
@@ -728,11 +753,14 @@ const ManageSalesOrder = () => {
                  <View style={{ zIndex: 9999, elevation: 20 }}>
                   <Dropdown
                     placeholder="- Select State -"
-                    value={billingForm.state}
+                    value={billingStateSel || billingForm.state}
                     options={state}
                     getLabel={c => c}
                     getKey={c => c}
-                    onSelect={c => setBillingForm(s => ({ ...s, state: c }))}
+                    onSelect={c => {
+                      setBillingStateSel(c);
+                      setBillingForm(s => ({ ...s, state: c }));
+                    }}
                     inputBoxStyle={inputStyles.box}
                     style={{ marginBottom: hp(1.6) }}
                     renderInModal={true}
@@ -747,11 +775,14 @@ const ManageSalesOrder = () => {
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
                     placeholder="- Select City -"
-                    value={billingForm.city}
+                    value={billingCitySel || billingForm.city}
                     options={city}
                     getLabel={c => c}
                     getKey={c => c}
-                    onSelect={c => setBillingForm(s => ({ ...s, city: c }))}
+                    onSelect={c => {
+                      setBillingCitySel(c);
+                      setBillingForm(s => ({ ...s, city: c }));
+                    }}
                     inputBoxStyle={inputStyles.box}
                     style={{ marginBottom: hp(1.6) }}
                     renderInModal={true}
@@ -1111,7 +1142,7 @@ const ManageSalesOrder = () => {
 
                 {/* Shipping Charges */}
                 <View style={styles.rowInput}>
-                  <Text style={styles.label}>Shipping Charges :</Text>
+                  <Text style={styles.label}>Discount:</Text>
 
                   <View style={styles.inputRightGroup}>
                     <TextInput
@@ -1164,65 +1195,7 @@ const ManageSalesOrder = () => {
                   </Text>
                 </View>
 
-                {/* Adjustments */}
-                <View style={styles.rowInput}>
-                  <TextInput
-                    value={adjustmentLabel}
-                    onChangeText={setAdjustmentLabel}
-                    underlineColorAndroid="transparent"
-                    style={styles.labelInput}
-                  />
-
-                  <View style={styles.inputRightGroup}>
-                    <TextInput
-                      value={String(adjustments)}
-                      onChangeText={setAdjustments}
-                      keyboardType="numeric"
-                      style={styles.inputBox}
-                    />
-                    {/* Question Icon with Tooltip */}
-                    <View style={styles.helpIconWrapper}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          setShowAdjustmentTip(!showAdjustmentTip);
-                          setShowShippingTip(false);
-                        }}
-                        style={styles.helpIconContainer}
-                      >
-                        <Text style={styles.helpIcon}>?</Text>
-                      </TouchableOpacity>
-
-                      {/* Tooltip */}
-                      {showAdjustmentTip && (
-                        <>
-                          <Modal
-                            transparent
-                            visible={showAdjustmentTip}
-                            animationType="none"
-                            onRequestClose={() => setShowAdjustmentTip(false)}
-                          >
-                            <TouchableWithoutFeedback
-                              onPress={() => setShowAdjustmentTip(false)}
-                            >
-                              <View style={styles.modalOverlay} />
-                            </TouchableWithoutFeedback>
-                          </Modal>
-                          <View style={styles.tooltipBox}>
-                            <Text style={styles.tooltipText}>
-                              Additional charges or discounts applied to the
-                              order.
-                            </Text>
-                            <View style={styles.tooltipArrow} />
-                          </View>
-                        </>
-                      )}
-                    </View>
-                  </View>
-
-                  <Text style={styles.value}>
-                    ₹{parseFloat(adjustments || 0).toFixed(2)}
-                  </Text>
-                </View>
+                
 
                 {/* Total Tax */}
                 <View style={styles.row}>

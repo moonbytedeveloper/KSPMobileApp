@@ -1,13 +1,12 @@
-
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import AppHeader from '../../components/common/AppHeader';
+import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
-import AccordionItem from '../../components/common/AccordionItem';
-import Dropdown from '../../components/common/Dropdown';
+import AccordionItem from '../../../../components/common/AccordionItem';
+import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { wp, hp, rf } from '../../utils/responsive';
-import { COLORS, TYPOGRAPHY, RADIUS } from '../styles/styles';
+import { wp, hp, rf } from '../../../../utils/responsive';
+import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 
 const SALES_ORDERS = [
     {
@@ -16,7 +15,7 @@ const SALES_ORDERS = [
         customerName: 'Moonbyte',
         deliveryDate: '15-12-24',
         dueDate: '15-12-24',
-        salesInvoiceNumber: 'OR.002',
+        amount: 'KP1524',
      
     },
     {
@@ -25,7 +24,7 @@ const SALES_ORDERS = [
         customerName: 'Northwind Retail',
         deliveryDate: '04-01-25',
         dueDate: '20-12-24',
-        salesInvoiceNumber: 'OR.002',
+        amount: 'KP1524',
        
     },
     {
@@ -34,7 +33,7 @@ const SALES_ORDERS = [
         customerName: 'Creative Labs',
         deliveryDate: '22-12-24',
         dueDate: '18-12-24',
-        salesInvoiceNumber: 'OR.002',
+        amount: 'KP1524',
         
     },
     {
@@ -43,7 +42,7 @@ const SALES_ORDERS = [
         customerName: 'BlueStone Pvt Ltd',
         deliveryDate: '11-01-25',
         dueDate: '28-12-24',
-        salesInvoiceNumber: 'OR.002',
+        amount: 'KP1524',
      
     },
     {
@@ -52,7 +51,8 @@ const SALES_ORDERS = [
         customerName: 'Aero Technologies',
         deliveryDate: '29-12-24',
         dueDate: '24-12-24',
-        salesInvoiceNumber: 'OR.002',
+        amount: 'KP1524',
+        status: 'Approved',
        
     },
     {
@@ -61,14 +61,14 @@ const SALES_ORDERS = [
         customerName: 'UrbanNest Homes',
         deliveryDate: '05-02-25',
         dueDate: '12-01-25',
-        salesInvoiceNumber: '₹1,85,300',
+        amount: 'KP1524',
         
     },
 ];
 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 
-const ManagePurchaseInvoice = () => {
+const ViewPerfomaPurchaseInvoice = () => {
     const navigation = useNavigation();
     const [activeOrderId, setActiveOrderId] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -115,9 +115,9 @@ const ManagePurchaseInvoice = () => {
         const buttons = [
             { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444', action: 'Delete' },
             { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6', action: 'Download' },
-            { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280', action: 'Forward' },
+            // { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280', action: 'Forward' },
             { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E', action: 'View' },
-            { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316', action: 'Update Status'  },
+            // { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316', action: 'Update Status'  },
         ];
 
         return (
@@ -161,10 +161,10 @@ const ManagePurchaseInvoice = () => {
     return (
         <View style={styles.screen}>
                 <AppHeader
-                title="Manage Purchase Invoice"
+                    title="View Perfoma Purchase Invoice"
                 onLeftPress={() => navigation.goBack()}
-                onRightPress={() => navigation.navigate('AddPurchaseInvoice')}
-                rightButtonLabel="Add Purchase Invoice"
+                onRightPress={() => navigation.navigate('AddPerfomaPurchaseInvoice')}
+                    rightButtonLabel="Add Perfoma In"
                 showRight
             />
             <View style={styles.headerSeparator} />
@@ -213,18 +213,18 @@ const ManagePurchaseInvoice = () => {
                         item={{
                             soleExpenseCode: order.id,
                             expenseName: order.salesOrderNumber,
-                            amount: order.salesInvoiceNumber,
+                            amount: order.amount,
                         }}
                         isActive={activeOrderId === order.id}
                         onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
                         customRows={[
-                            { label: 'Customer Name', value: order.customerName },
-                            { label: 'Purchase Invoice Number', value: order.salesInvoiceNumber },
+                            { label: 'Vendor Name', value: order.customerName },
+                            { label: 'Purchase Order', value: order.amount },
+                            { label: 'Tax Invoice', value: 'Kalpesh' },
                             { label: 'Delivery Date', value: order.deliveryDate },
-                            // { label: 'Due Date', value: order.dueDate },
                         ]} 
-                        headerLeftLabel="Purchase Order Number"
-                        headerRightLabel="Purchase Invoice Number"
+                        headerLeftLabel="Purchase Order"
+                        headerRightLabel="Perfoma Invoice No."
                         footerComponent={renderFooterActions(order)}
                         headerRightContainerStyle={styles.headerRightContainer}
                     />
@@ -232,9 +232,9 @@ const ManagePurchaseInvoice = () => {
 
                 {paginatedOrders.length === 0 && (
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyStateTitle}>No Purchase orders found</Text>
+                        <Text style={styles.emptyStateTitle}>No sales orders found</Text>
                         <Text style={styles.emptyStateSubtitle}>
-                            Try adjusting your search keyword or create a new Purchase order.
+                            Try adjusting your search keyword or create a new sales order.
                         </Text>
                     </View>
                 )}
@@ -472,4 +472,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default ManagePurchaseInvoice;
+export default ViewPerfomaPurchaseInvoice;

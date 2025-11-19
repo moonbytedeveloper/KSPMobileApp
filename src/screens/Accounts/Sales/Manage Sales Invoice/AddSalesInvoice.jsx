@@ -13,14 +13,14 @@ import {
     Modal,
     TouchableWithoutFeedback,
 } from 'react-native';
-import { wp, hp, rf } from '../../utils/responsive';
-import Dropdown from '../../components/common/Dropdown';
+import { wp, hp, rf } from '../../../../utils/responsive';
+import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { COLORS, TYPOGRAPHY, inputStyles, SPACING } from '../styles/styles';
-import AppHeader from '../../components/common/AppHeader';
+import { COLORS, TYPOGRAPHY, inputStyles, SPACING } from '../../../styles/styles';
+import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
-import { formStyles } from '../styles/styles';
-import DatePickerBottomSheet from '../../components/common/CustomDatePicker';
+import { formStyles } from '../../../styles/styles';
+import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 
 const COL_WIDTHS = {
@@ -72,7 +72,7 @@ const AccordionSection = ({
     );
 };
 
-const AddPurchaseInvoice = () => {
+const AddSalesInvoice = () => {
     const [expandedId, setExpandedId] = useState(1);
     const navigation = useNavigation();
     const toggleSection = id => setExpandedId(prev => (prev === id ? null : id));
@@ -410,7 +410,7 @@ const AddPurchaseInvoice = () => {
         <>
             <View style={{ flex: 1, backgroundColor: '#fff' }}>
                 <AppHeader
-                    title="Manage Purchase Invoice"
+                    title="Manage Sales Invoice"
                     onLeftPress={() => {
                         navigation.goBack();
                     }}
@@ -429,7 +429,7 @@ const AddPurchaseInvoice = () => {
                     >
                         <View style={styles.row}>
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Purchase Invoice Number*</Text>
+                                <Text style={inputStyles.label}>Sales Invoice Number*</Text>
                                 <View style={[inputStyles.box]}>
                                     <TextInput
                                         style={[inputStyles.input]}
@@ -437,15 +437,15 @@ const AddPurchaseInvoice = () => {
                                         onChangeText={v =>
                                             setHeaderForm(s => ({ ...s, clientName: v }))
                                         }
-                                        placeholder="Purchase Invoice Number*"
+                                        placeholder="Sales Invoice Number*"
                                         placeholderTextColor={COLORS.textLight}
                                     />
                                 </View>
                             </View>
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Purchase Inquiry No. </Text>
+                                <Text style={inputStyles.label}>Sales Inquiry No. </Text>
                                 <Dropdown
-                                    placeholder="Purchase Inquiry No.-"
+                                    placeholder="Sales Inquiry No.-"
                                     value={headerForm.opportunityTitle}
                                     options={customers}
                                     getLabel={c => c}
@@ -462,7 +462,7 @@ const AddPurchaseInvoice = () => {
 
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Purchase Order Number* </Text>
+                                <Text style={inputStyles.label}>Sales Order Number* </Text>
 
                                 {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
                                 <View style={[inputStyles.box]}>
@@ -472,7 +472,7 @@ const AddPurchaseInvoice = () => {
                                         onChangeText={v =>
                                             setHeaderForm(s => ({ ...s, clientName: v }))
                                         }
-                                        placeholder="Purchase Order Number*"
+                                        placeholder="Sales Order Number*"
                                         placeholderTextColor={COLORS.textLight}
                                     />
                                 </View>
@@ -1343,7 +1343,7 @@ const AddPurchaseInvoice = () => {
     );
 };
 
-export default AddPurchaseInvoice;
+export default AddSalesInvoice;
 
 const styles = StyleSheet.create({
     container: {

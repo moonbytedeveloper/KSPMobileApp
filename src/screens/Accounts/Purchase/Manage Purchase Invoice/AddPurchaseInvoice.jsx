@@ -13,14 +13,14 @@ import {
     Modal,
     TouchableWithoutFeedback,
 } from 'react-native';
-import { wp, hp, rf } from '../../utils/responsive';
-import Dropdown from '../../components/common/Dropdown';
+import { wp, hp, rf } from '../../../../utils/responsive';
+import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { COLORS, TYPOGRAPHY, inputStyles, SPACING } from '../styles/styles';
-import AppHeader from '../../components/common/AppHeader';
+import { COLORS, TYPOGRAPHY, inputStyles, SPACING } from '../../../styles/styles';
+import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
-import { formStyles } from '../styles/styles';
-import DatePickerBottomSheet from '../../components/common/CustomDatePicker';
+import { formStyles } from '../../../styles/styles';
+import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 
 const COL_WIDTHS = {
@@ -72,20 +72,21 @@ const AccordionSection = ({
     );
 };
 
-const AddSalesPerfomaInvoice = () => {
+const AddPurchaseInvoice = () => {
     const [expandedId, setExpandedId] = useState(1);
     const navigation = useNavigation();
     const toggleSection = id => setExpandedId(prev => (prev === id ? null : id));
 
     // Demo options for dropdowns
-    const paymentTerms = ['- Payment Term -', 'Monthly'];
-    const projects = ['- Select Project -', 'Mobile App',];
+    const paymentTerms = ['- Payment Term -', 'Net 7', 'Net 15', 'Net 30'];
     const taxOptions = ['IGST', 'CGST', 'SGST', 'No Tax'];
     const countries = ['India', 'United States', 'United Kingdom'];
-    const salesInquiries = ['- Select Order No -', 'KSPIN002', 'KSPIN005'];
+    const salesInquiries = ['- Select Inquiry -', 'SI-1001', 'SI-1002'];
     const customers = ['- Select Customer -', 'Acme Corp', 'Beta Ltd'];
     const state = ['- Select state -', 'Gujarat', 'Delhi', 'Mumbai'];
     const city = ['- Select city -', 'vadodara', 'surat',];
+
+
 
     const paymentMethods = [
         '- Select Method -',
@@ -124,8 +125,6 @@ const AddSalesPerfomaInvoice = () => {
     const [headerForm, setHeaderForm] = useState({
         companyName: '',
         opportunityTitle: '',
-        salesInquiryText: '',
-        salesInquiry: '',
         clientName: '',
         phone: '',
         email: '',
@@ -170,8 +169,7 @@ const AddSalesPerfomaInvoice = () => {
     const [datePickerSelectedDate, setDatePickerSelectedDate] = useState(
         new Date(),
     );
-    // keep initial value empty so Dropdown shows the `placeholder` prop
-    const [paymentTerm, setPaymentTerm] = useState('');
+    const [paymentTerm, setPaymentTerm] = useState(paymentTerms[0]);
     const [notes, setNotes] = useState('');
     const [project, setProject] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('');
@@ -412,7 +410,7 @@ const AddSalesPerfomaInvoice = () => {
         <>
             <View style={{ flex: 1, backgroundColor: '#fff' }}>
                 <AppHeader
-                    title="Add Sales Perfoma Invoice"
+                    title="Manage Purchase Invoice"
                     onLeftPress={() => {
                         navigation.goBack();
                     }}
@@ -431,24 +429,23 @@ const AddSalesPerfomaInvoice = () => {
                     >
                         <View style={styles.row}>
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Sales Inquiry No.</Text>
-
+                                <Text style={inputStyles.label}>Purchase Invoice Number*</Text>
                                 <View style={[inputStyles.box]}>
                                     <TextInput
                                         style={[inputStyles.input]}
-                                        value={headerForm.salesInquiryText}
-                                        onChangeText={v => setHeaderForm(s => ({ ...s, salesInquiryText: v }))}
-                                        placeholder="eg."
+                                        value={headerForm.clientName}
+                                        onChangeText={v =>
+                                            setHeaderForm(s => ({ ...s, clientName: v }))
+                                        }
+                                        placeholder="Purchase Invoice Number*"
                                         placeholderTextColor={COLORS.textLight}
                                     />
                                 </View>
                             </View>
-                            {/* <View style={styles.col}> */}
-                                {/* <Text style={inputStyles.label}>Customer Name* </Text> */}
-
-                                {/* <Text style={inputStyles.label}>Customer Name*</Text> */}
-                                {/* <Dropdown
-                                    placeholder="Customer Name*"
+                            <View style={styles.col}>
+                                <Text style={inputStyles.label}>Purchase Inquiry No. </Text>
+                                <Dropdown
+                                    placeholder="Purchase Inquiry No.-"
                                     value={headerForm.opportunityTitle}
                                     options={customers}
                                     getLabel={c => c}
@@ -458,47 +455,30 @@ const AddSalesPerfomaInvoice = () => {
                                     }
                                     inputBoxStyle={inputStyles.box}
                                     textStyle={inputStyles.input}
-                                /> */}
-                            {/* </View> */}
-                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Sales Inquiry No.</Text>
-
-                                {/* <Text style={[inputStyles.label, { fontWeight: '600' }]}>Sales Inquiry No.</Text> */}
-                                <Dropdown
-                                    placeholder="Sales Inquiry No."
-                                    value={headerForm.salesInquiry}
-                                    options={salesInquiries}
-                                    getLabel={s => s}
-                                    getKey={s => s}
-                                    onSelect={v => setHeaderForm(s => ({ ...s, salesInquiry: v }))}
-                                    inputBoxStyle={inputStyles.box}
-                                    textStyle={inputStyles.input}
                                 />
+
                             </View>
                         </View>
 
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Sales Order Number* </Text>
+                                <Text style={inputStyles.label}>Purchase Order Number* </Text>
 
-                                <View style={{ zIndex: 9999, elevation: 20 }}>
-                                    <Dropdown
-                                        placeholder="Sales Order Number*"
+                                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
+                                <View style={[inputStyles.box]}>
+                                    <TextInput
+                                        style={[inputStyles.input]}
                                         value={headerForm.clientName}
-                                        options={salesInquiries}
-                                        getLabel={s => s}
-                                        getKey={s => s}
-                                        onSelect={v => setHeaderForm(s => ({ ...s, clientName: v }))}
-                                        renderInModal={true}
-                                        inputBoxStyle={inputStyles.box}
-                                        textStyle={inputStyles.input}
+                                        onChangeText={v =>
+                                            setHeaderForm(s => ({ ...s, clientName: v }))
+                                        }
+                                        placeholder="Purchase Order Number*"
+                                        placeholderTextColor={COLORS.textLight}
                                     />
                                 </View>
                             </View>
-
-                               <View style={styles.col}>
+                            <View style={styles.col}>
                                 <Text style={inputStyles.label}>Customer Name* </Text>
-
                                 <Dropdown
                                     placeholder="Customer Name*"
                                     value={headerForm.opportunityTitle}
@@ -511,22 +491,20 @@ const AddSalesPerfomaInvoice = () => {
                                     inputBoxStyle={inputStyles.box}
                                     textStyle={inputStyles.input}
                                 />
-                            </View>
 
-                            
-                        
+                            </View>
                         </View>
 
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
 
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Project Name* </Text>
+                                <Text style={inputStyles.label}>Project Name </Text>
 
-                                <View style={{ zIndex: 9999, elevation: 20 }}>
+                                <View style={{ zIndex: 9998, elevation: 20 }}>
                                     <Dropdown
-                                        placeholder="Select Project*"
+                                        placeholder="-Select Project-"
                                         value={project}
-                                        options={projects}
+                                        options={paymentMethods}
                                         getLabel={p => p}
                                         getKey={p => p}
                                         onSelect={v => setProject(v)}
@@ -535,9 +513,9 @@ const AddSalesPerfomaInvoice = () => {
                                         textStyle={inputStyles.input}
                                     />
                                 </View>
-                            </View>
 
-                              <View style={styles.col}>
+                            </View>
+                            <View style={styles.col}>
                                 <Text style={inputStyles.label}>payment Tearm* </Text>
 
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
@@ -553,11 +531,11 @@ const AddSalesPerfomaInvoice = () => {
                                         textStyle={inputStyles.input}
                                     />
                                 </View>
+
                             </View>
-                           
                         </View>
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
-                             <View style={styles.col}>
+                            <View style={styles.col}>
                                 <Text style={inputStyles.label}>payment Method* </Text>
 
                                 <View style={{ zIndex: 9998, elevation: 20 }}>
@@ -573,12 +551,13 @@ const AddSalesPerfomaInvoice = () => {
                                         textStyle={inputStyles.input}
                                     />
                                 </View>
+
                             </View>
 
                             <View style={styles.col}>
                                 <TouchableOpacity
                                     activeOpacity={0.7}
-                                    onPress={() => openDatePickerFor('due')}
+                                    onPress={() => openDatePickerFor('invoice')}
                                     style={{ marginTop: hp(0.8) }}
                                 >
                                     <Text style={inputStyles.label}>Order Date* </Text>
@@ -595,28 +574,28 @@ const AddSalesPerfomaInvoice = () => {
                                             style={[
                                                 inputStyles.input,
                                                 styles.datePickerText,
-                                                !dueDate && {
+                                                !invoiceDate && {
                                                     color: COLORS.textLight,
                                                     fontFamily: TYPOGRAPHY.fontFamilyRegular,
                                                 },
-                                                dueDate && {
+                                                invoiceDate && {
                                                     color: COLORS.text,
                                                     fontFamily: TYPOGRAPHY.fontFamilyMedium,
                                                 },
                                             ]}
                                         >
-                                            {dueDate || 'Due Date*'}
+                                            {invoiceDate || 'Order Date*'}
                                         </Text>
                                         <View
                                             style={[
                                                 styles.calendarIconContainer,
-                                                dueDate && styles.calendarIconContainerSelected,
+                                                invoiceDate && styles.calendarIconContainerSelected,
                                             ]}
                                         >
                                             <Icon
                                                 name="calendar-today"
                                                 size={rf(3.2)}
-                                                color={dueDate ? COLORS.primary : COLORS.textLight}
+                                                color={invoiceDate ? COLORS.primary : COLORS.textLight}
                                             />
                                         </View>
                                     </View>
@@ -1234,7 +1213,22 @@ const AddSalesPerfomaInvoice = () => {
                                     </Text>
                                 </View>
                             </View>
-
+                            {/* {customer Notes} */}
+                            <View style={styles.notesAttachRow}>
+                                <View style={styles.notesCol}>
+                                    <Text style={inputStyles.label}>Customer Notes</Text>
+                                    <TextInput
+                                        style={styles.noteBox}
+                                        multiline
+                                        numberOfLines={4}
+                                        value={notes}
+                                        onChangeText={setNotes}
+                                        placeholder="Add any Remark..."
+                                        placeholderTextColor={COLORS.textLight}
+                                    />
+                                </View>
+                               
+                            </View>
                             {/* Notes + Attach file inline */}
                             <View style={styles.notesAttachRow}>
                                 <View style={styles.notesCol}>
@@ -1327,8 +1321,8 @@ const AddSalesPerfomaInvoice = () => {
                             disabled={false}
                         >
                             <Text style={formStyles.primaryBtnText}>
-                                Save & Send
-                                {/* {isSubmitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Save & Send')} */}
+                                Submit
+                                {/* {isSubmitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Submit')} */}
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -1341,7 +1335,7 @@ const AddSalesPerfomaInvoice = () => {
                     </View>
                     {/* <View style={styles.centerButtonContainer}>
                     <TouchableOpacity style={styles.primaryButton} onPress={handleCreateOrder}>
-                        <Text style={styles.primaryButtonText}>Save & Send</Text>
+                        <Text style={styles.primaryButtonText}>Submit</Text>
                     </TouchableOpacity> */}
                 </View>
             </View>
@@ -1349,7 +1343,7 @@ const AddSalesPerfomaInvoice = () => {
     );
 };
 
-export default AddSalesPerfomaInvoice;
+export default AddPurchaseInvoice;
 
 const styles = StyleSheet.create({
     container: {
