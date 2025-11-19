@@ -78,20 +78,17 @@ const AddSalesInvoice = () => {
     const toggleSection = id => setExpandedId(prev => (prev === id ? null : id));
 
     // Demo options for dropdowns
-    const paymentTerms = ['- Payment Term -', 'Net 7', 'Net 15', 'Net 30'];
+    const paymentTerms = [ 'Net 7', 'Net 15', 'Net 30'];
     const taxOptions = ['IGST', 'CGST', 'SGST', 'No Tax'];
     const countries = ['India', 'United States', 'United Kingdom'];
-    const salesInquiries = ['- Select Inquiry -', 'SI-1001', 'SI-1002'];
-    const customers = ['- Select Customer -', 'Acme Corp', 'Beta Ltd'];
-    const state = ['- Select state -', 'Gujarat', 'Delhi', 'Mumbai'];
-    const city = ['- Select city -', 'vadodara', 'surat',];
+    const salesInquiries = ['SI-1001', 'SI-1002'];
+    const customers = [ 'Acme Corp', 'Beta Ltd'];
+    const state = [ 'Gujarat', 'Delhi', 'Mumbai'];
+    const city = [ 'vadodara', 'surat',];
 
 
 
     const paymentMethods = [
-        '- Select Method -',
-        'Cash',
-        'Bank Transfer',
         'Mobile App Development',
 
     ];
@@ -126,6 +123,10 @@ const AddSalesInvoice = () => {
         companyName: '',
         opportunityTitle: '',
         clientName: '',
+        salesInquiryNo: '',
+        customerName: '',
+        salesInvoiceNumber: '',
+        salesOrderNumber: '',
         phone: '',
         email: '',
     });
@@ -169,9 +170,13 @@ const AddSalesInvoice = () => {
     const [datePickerSelectedDate, setDatePickerSelectedDate] = useState(
         new Date(),
     );
-    const [paymentTerm, setPaymentTerm] = useState(paymentTerms[0]);
+    // keep initial value empty so Dropdown shows the `placeholder` prop
+    const [paymentTerm, setPaymentTerm] = useState('');
     const [notes, setNotes] = useState('');
+    const [terms, setTerms] = useState('');
     const [project, setProject] = useState('');
+    // track which dropdown is currently open (so only one opens at a time)
+    const [openDropdownId, setOpenDropdownId] = useState(null);
     const [paymentMethod, setPaymentMethod] = useState('');
     const [shippingCharges, setShippingCharges] = useState('0');
     const [adjustments, setAdjustments] = useState('0');
@@ -429,15 +434,15 @@ const AddSalesInvoice = () => {
                     >
                         <View style={styles.row}>
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Sales Invoice Number*</Text>
-                                <View style={[inputStyles.box]}>
+                                <Text style={inputStyles.label}>Sales Invoice No*</Text>
+                                <View style={[inputStyles.box]} pointerEvents="box-none">
                                     <TextInput
-                                        style={[inputStyles.input]}
-                                        value={headerForm.clientName}
+                                        style={[inputStyles.input, { flex: 1, color: '#000000' }]}
+                                        value={headerForm.salesInvoiceNumber}
                                         onChangeText={v =>
-                                            setHeaderForm(s => ({ ...s, clientName: v }))
+                                            setHeaderForm(s => ({ ...s, salesInvoiceNumber: v }))
                                         }
-                                        placeholder="Sales Invoice Number*"
+                                        placeholder="Sales Invoice No*"
                                         placeholderTextColor={COLORS.textLight}
                                     />
                                 </View>
@@ -445,14 +450,16 @@ const AddSalesInvoice = () => {
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>Sales Inquiry No. </Text>
                                 <Dropdown
-                                    placeholder="Sales Inquiry No.-"
-                                    value={headerForm.opportunityTitle}
+                                    placeholder="Sales Inquiry No."
+                                    value={headerForm.salesInquiryNo}
                                     options={customers}
                                     getLabel={c => c}
                                     getKey={c => c}
                                     onSelect={v =>
-                                        setHeaderForm(s => ({ ...s, opportunityTitle: v }))
+                                        setHeaderForm(s => ({ ...s, salesInquiryNo: v }))
                                     }
+                                    isOpen={openDropdownId === 'salesInquiry'}
+                                    onOpenChange={open => setOpenDropdownId(open ? 'salesInquiry' : null)}
                                     inputBoxStyle={inputStyles.box}
                                     textStyle={inputStyles.input}
                                 />
@@ -462,17 +469,17 @@ const AddSalesInvoice = () => {
 
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Sales Order Number* </Text>
+                                <Text style={inputStyles.label}>Sales Order No* </Text>
 
                                 {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
-                                <View style={[inputStyles.box]}>
+                                <View style={[inputStyles.box]} pointerEvents="box-none">
                                     <TextInput
-                                        style={[inputStyles.input]}
-                                        value={headerForm.clientName}
+                                        style={[inputStyles.input, { flex: 1, color: '#000000' }]}
+                                        value={headerForm.salesOrderNumber}
                                         onChangeText={v =>
-                                            setHeaderForm(s => ({ ...s, clientName: v }))
+                                            setHeaderForm(s => ({ ...s, salesOrderNumber: v }))
                                         }
-                                        placeholder="Sales Order Number*"
+                                        placeholder="Sales Order No*"
                                         placeholderTextColor={COLORS.textLight}
                                     />
                                 </View>
@@ -481,13 +488,15 @@ const AddSalesInvoice = () => {
                                 <Text style={inputStyles.label}>Customer Name* </Text>
                                 <Dropdown
                                     placeholder="Customer Name*"
-                                    value={headerForm.opportunityTitle}
+                                    value={headerForm.customerName}
                                     options={customers}
                                     getLabel={c => c}
                                     getKey={c => c}
                                     onSelect={v =>
-                                        setHeaderForm(s => ({ ...s, opportunityTitle: v }))
+                                        setHeaderForm(s => ({ ...s, customerName: v }))
                                     }
+                                    isOpen={openDropdownId === 'customerName'}
+                                    onOpenChange={open => setOpenDropdownId(open ? 'customerName' : null)}
                                     inputBoxStyle={inputStyles.box}
                                     textStyle={inputStyles.input}
                                 />
@@ -498,25 +507,26 @@ const AddSalesInvoice = () => {
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
 
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Project Name </Text>
-
-                                <View style={{ zIndex: 9998, elevation: 20 }}>
+                                <Text style={inputStyles.label}>Project Name* </Text>
+                                <View>
                                     <Dropdown
-                                        placeholder="-Select Project-"
+                                        placeholder="Project Name*"
                                         value={project}
                                         options={paymentMethods}
                                         getLabel={p => p}
                                         getKey={p => p}
                                         onSelect={v => setProject(v)}
+                                        isOpen={openDropdownId === 'project'}
+                                        onOpenChange={open => setOpenDropdownId(open ? 'project' : null)}
                                         renderInModal={true}
-                                        inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                                        inputBoxStyle={inputStyles.box}
                                         textStyle={inputStyles.input}
                                     />
                                 </View>
 
                             </View>
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>payment Tearm* </Text>
+                                <Text style={inputStyles.label}>payment Term* </Text>
 
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
@@ -538,9 +548,9 @@ const AddSalesInvoice = () => {
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>payment Method* </Text>
 
-                                <View style={{ zIndex: 9998, elevation: 20 }}>
+                                <View >
                                     <Dropdown
-                                        placeholder="Payment Method"
+                                        placeholder="Select Method"
                                         value={paymentMethod}
                                         options={paymentMethods}
                                         getLabel={p => p}
@@ -614,9 +624,9 @@ const AddSalesInvoice = () => {
                         <View style={styles.row}>
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>Building No.</Text>
-                                <View style={[inputStyles.box]}>
+                                <View style={[inputStyles.box]} pointerEvents="box-none">
                                     <TextInput
-                                        style={[inputStyles.input]}
+                                        style={[inputStyles.input, { flex: 1, color: '#000000' }]}
                                         value={billingForm.buildingNo}
                                         onChangeText={v =>
                                             setBillingForm(s => ({ ...s, buildingNo: v }))
@@ -628,9 +638,9 @@ const AddSalesInvoice = () => {
                             </View>
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>Street 1</Text>
-                                <View style={[inputStyles.box]}>
+                                <View style={[inputStyles.box]} pointerEvents="box-none">
                                     <TextInput
-                                        style={[inputStyles.input]}
+                                        style={[inputStyles.input, { flex: 1, color: '#000000' }]}
                                         value={billingForm.street1}
                                         onChangeText={v =>
                                             setBillingForm(s => ({ ...s, street1: v }))
@@ -645,9 +655,9 @@ const AddSalesInvoice = () => {
                         <View style={styles.row}>
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>Street 2</Text>
-                                <View style={[inputStyles.box]}>
+                                <View style={[inputStyles.box]} pointerEvents="box-none">
                                     <TextInput
-                                        style={[inputStyles.input]}
+                                        style={[inputStyles.input, { flex: 1, color: '#000000' }]}
                                         value={billingForm.street2}
                                         onChangeText={v =>
                                             setBillingForm(s => ({ ...s, street2: v }))
@@ -659,9 +669,9 @@ const AddSalesInvoice = () => {
                             </View>
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>Postal Code</Text>
-                                <View style={[inputStyles.box]}>
+                                <View style={[inputStyles.box]} pointerEvents="box-none">
                                     <TextInput
-                                        style={[inputStyles.input]}
+                                        style={[inputStyles.input, { flex: 1, color: '#000000' }]}
                                         value={billingForm.postalCode}
                                         onChangeText={v =>
                                             setBillingForm(s => ({ ...s, postalCode: v }))
@@ -1010,7 +1020,7 @@ const AddSalesInvoice = () => {
                                                     {/* QUANTITY */}
                                                     <View style={[styles.td, { width: COL_WIDTHS.QTY }]}>
                                                         <TextInput
-                                                            style={styles.input}
+                                                            style={[styles.input, { color: '#000000' }]}
                                                             keyboardType="numeric"
                                                             value={String(row.qty ?? '')}
                                                             onChangeText={v =>
@@ -1022,7 +1032,7 @@ const AddSalesInvoice = () => {
                                                     {/* RATE */}
                                                     <View style={[styles.td, { width: COL_WIDTHS.RATE }]}>
                                                         <TextInput
-                                                            style={styles.input}
+                                                            style={[styles.input, { color: '#000000' }]}
                                                             keyboardType="numeric"
                                                             value={String(row.rate ?? '')}
                                                             onChangeText={v =>
@@ -1137,7 +1147,7 @@ const AddSalesInvoice = () => {
                                         value={adjustmentLabel}
                                         onChangeText={setAdjustmentLabel}
                                         underlineColorAndroid="transparent"
-                                        style={styles.labelInput}
+                                        style={[styles.labelInput, { color: '#000000' }]}
                                     />
 
                                     <View style={styles.inputRightGroup}>
@@ -1145,7 +1155,7 @@ const AddSalesInvoice = () => {
                                             value={String(adjustments)}
                                             onChangeText={setAdjustments}
                                             keyboardType="numeric"
-                                            style={styles.inputBox}
+                                            style={[styles.inputBox, { color: '#000000' }]}
                                         />
                                         {/* Question Icon with Tooltip */}
                                         <View style={styles.helpIconWrapper}>
@@ -1218,7 +1228,7 @@ const AddSalesInvoice = () => {
                                 <View style={styles.notesCol}>
                                     <Text style={inputStyles.label}>Customer Notes</Text>
                                     <TextInput
-                                        style={styles.noteBox}
+                                        style={[styles.noteBox, { color: '#000000' }]}
                                         multiline
                                         numberOfLines={4}
                                         value={notes}
@@ -1234,11 +1244,11 @@ const AddSalesInvoice = () => {
                                 <View style={styles.notesCol}>
                                     <Text style={inputStyles.label}>Terms & Conditions</Text>
                                     <TextInput
-                                        style={styles.noteBox}
+                                        style={[styles.noteBox, { color: '#000000' }]}
                                         multiline
                                         numberOfLines={4}
-                                        value={notes}
-                                        onChangeText={setNotes}
+                                        value={terms}
+                                        onChangeText={setTerms}
                                         placeholder="Add any Terms & Condition..."
                                         placeholderTextColor={COLORS.textLight}
                                     />
@@ -1253,7 +1263,7 @@ const AddSalesInvoice = () => {
                                         ]}
                                     >
                                         <TextInput
-                                            style={[inputStyles.input, { fontSize: rf(4.2) }]}
+                                            style={[inputStyles.input, { fontSize: rf(4.2), color: '#000000' }]}
                                             placeholder="Attach file"
                                             placeholderTextColor="#9ca3af"
                                             value={file?.name || ''}
@@ -1292,7 +1302,7 @@ const AddSalesInvoice = () => {
                     {/* Section 5: Notes (full width) */}
                     {/* <AccordionSection id={5} title="Notes" expanded={expandedId === 5} onToggle={toggleSection}>
                             <Text style={inputStyles.label}>Notes</Text>
-                            <TextInput style={styles.noteBox} multiline numberOfLines={4} value={notes} onChangeText={setNotes} placeholder="Add any remarks..." placeholderTextColor={COLORS.textLight} />
+                            <TextInput style={[styles.noteBox, { color: '#000000' }]} multiline numberOfLines={4} value={notes} onChangeText={setNotes} placeholder="Add any remarks..." placeholderTextColor={COLORS.textLight} />
                         </AccordionSection> */}
                 </ScrollView>
                 <DatePickerBottomSheet

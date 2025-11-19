@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import Dropdown from '../../../../components/common/Dropdown';
@@ -12,12 +12,14 @@ import DatePickerBottomSheet from '../../../../components/common/CustomDatePicke
 const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyle }) => {
     return (
         <View style={[styles.sectionWrapper, wrapperStyle]}>
-            <TouchableOpacity activeOpacity={0.8} style={styles.sectionHeader} onPress={() => onToggle(id)}>
-                <Text style={styles.sectionTitle}>{title}</Text>
-                <Icon name={expanded ? 'expand-less' : 'expand-more'} size={rf(4.2)} color={COLORS.text} />
-            </TouchableOpacity>
-            {expanded && <View style={styles.line} />}
-            {expanded && <View style={styles.sectionBody}>{children}</View>}
+            <View style={styles.sectionContent}>
+                <TouchableOpacity activeOpacity={0.8} style={styles.sectionHeader} onPress={() => onToggle(id)}>
+                    <Text style={styles.sectionTitle}>{title}</Text>
+                    <Icon name={expanded ? 'expand-less' : 'expand-more'} size={rf(4.2)} color={COLORS.text} />
+                </TouchableOpacity>
+                {expanded && <View style={styles.line} />}
+                {expanded && <View style={styles.sectionBody}>{children}</View>}
+            </View>
         </View>
     );
 };
@@ -28,12 +30,12 @@ const ManagePurchaseInquiry = () => {
     const toggleSection = (id) => setExpandedId((prev) => (prev === id ? null : id));
 
     // Demo options for dropdowns
-    const currencyTypes = ['- Select Currency -', 'USD', 'INR', 'EUR', 'GBP'];
-    const itemTypes = ['- Select Item -', 'Furniture', 'Electronics', 'Office Supplies', 'Equipment'];
-    const itemNames = ['- Select Item -', 'Chair', 'Table', 'Desk', 'Cabinet'];
-    const CustomerType = ['- Select Customer -', 'Abhinav','Raj',];
-    const countries = ['- Select Country -', 'India', 'United States', 'United Kingdom', 'Australia', 'Germany'];
-    const units = ['- Select Unit -', 'Pcs', 'Box', 'Set', 'Unit', 'failed'];
+    const currencyTypes = ['USD', 'INR', 'EUR', 'GBP'];
+    const itemTypes = ['Furniture', 'Electronics', 'Office Supplies', 'Equipment'];
+    const itemNames = [ 'Chair', 'Table', 'Desk', 'Cabinet'];
+    const CustomerType = [ 'Abhinav','Raj',];
+    const countries = [ 'India', 'United States', 'United Kingdom', 'Australia', 'Germany'];
+    const units = [ 'Pcs', 'Box', 'Set', 'Unit', 'failed'];
 
     // Form state
     const [uuid, setUuid] = useState('0e073e1b-3b3f-4ae2-8f77-5');
@@ -167,6 +169,12 @@ const ManagePurchaseInquiry = () => {
         Alert.alert('Success', 'Inquiry submitted successfully');
     };
 
+    // Refs and focus state for clickable input boxes
+    const projectNameRef = useRef(null);
+    const quantityRef = useRef(null);
+    const [focusedProjectName, setFocusedProjectName] = useState(false);
+    const [focusedQuantity, setFocusedQuantity] = useState(false);
+
     const handleCancel = () => {
         navigation.goBack();
     };
@@ -177,7 +185,11 @@ const ManagePurchaseInquiry = () => {
                 <AppHeader
                     title="Add Purchase Inquiry"
                     onLeftPress={() => {
-                        navigation.goBack();
+                        try {
+                            navigation.navigate('ViewPurchaseInquiry');
+                        } catch (e) {
+                            navigation.goBack();
+                        }
                     }}
                 />
                 <View style={styles.headerSeparator} />
@@ -204,7 +216,7 @@ const ManagePurchaseInquiry = () => {
                                 <Text style={inputStyles.label}>Currency Type*</Text>
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
-                                        placeholder="- Select Currency -"
+                                        placeholder="Select Currency"
                                         value={currencyType}
                                         options={currencyTypes}
                                         getLabel={(c) => c}
@@ -224,9 +236,19 @@ const ManagePurchaseInquiry = () => {
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
                         <View style={styles.col}>
                                 <Text style={inputStyles.label}>Requested Title*</Text>
-                                <View style={[inputStyles.box]}>
+                                <View
+                                    style={[inputStyles.box]}
+                                    onStartShouldSetResponder={() => true}
+                                    onResponderGrant={() => projectNameRef.current?.focus()}
+                                >
                                     <TextInput
-                                        style={[inputStyles.input, { color: COLORS.text }]}
+                                        ref={projectNameRef}
+                                        onFocus={() => setFocusedProjectName(true)}
+                                        onBlur={() => setFocusedProjectName(false)}
+                                        style={[
+                                            inputStyles.input,
+                                            { color: focusedProjectName ? '#000000' : COLORS.text }
+                                        ]}
                                         value={projectName}
                                         onChangeText={setProjectName}
                                         placeholder="eg."
@@ -306,7 +328,7 @@ const ManagePurchaseInquiry = () => {
                                 <Text style={inputStyles.label}>Item Type*</Text>
                                 <View style={{ zIndex: 9998, elevation: 20 }}>
                                     <Dropdown
-                                        placeholder="- Select Item -"
+                                        placeholder="Select Item"
                                         value={currentItem.itemType}
                                         options={itemTypes}
                                         getLabel={(it) => it}
@@ -322,7 +344,7 @@ const ManagePurchaseInquiry = () => {
                                 <Text style={inputStyles.label}>Item Name*</Text>
                                 <View style={{ zIndex: 9997, elevation: 20 }}>
                                     <Dropdown
-                                        placeholder="- Select Item -"
+                                        placeholder="Select Item"
                                         value={currentItem.itemName}
                                         options={itemNames}
                                         getLabel={(item) => item}
@@ -339,9 +361,19 @@ const ManagePurchaseInquiry = () => {
                         <View style={[styles.row, { marginTop: hp(1.5), alignItems: 'flex-end' }]}>
                             <View style={styles.colSmall}>
                                 <Text style={inputStyles.label}>Quantity*</Text>
-                                <View style={[inputStyles.box, { marginTop: hp(0.5) }]}> 
+                                <View
+                                    style={[inputStyles.box, { marginTop: hp(0.5) }]}
+                                    onStartShouldSetResponder={() => true}
+                                    onResponderGrant={() => quantityRef.current?.focus()}
+                                > 
                                     <TextInput
-                                        style={[inputStyles.input, { flex: 1, fontSize: rf(3.4), color: COLORS.text }]}
+                                        ref={quantityRef}
+                                        onFocus={() => setFocusedQuantity(true)}
+                                        onBlur={() => setFocusedQuantity(false)}
+                                        style={[
+                                            inputStyles.input,
+                                            { flex: 1, fontSize: rf(3.4), color: focusedQuantity ? '#000000' : COLORS.text }
+                                        ]}
                                         value={currentItem.quantity}
                                         onChangeText={(v) => setCurrentItem({ ...currentItem, quantity: v })}
                                         placeholder="eg. Auto fill"
@@ -354,7 +386,7 @@ const ManagePurchaseInquiry = () => {
                                 <Text style={inputStyles.label}>Unit*</Text>
                                 <View style={{ zIndex: 9996, elevation: 20 }}>
                                     <Dropdown
-                                        placeholder="- Select Unit -"
+                                        placeholder="Select Unit"
                                         value={currentItem.unit}
                                         options={units}
                                         getLabel={(u) => u}
@@ -454,20 +486,30 @@ const ManagePurchaseInquiry = () => {
                 />
 
                 <View style={styles.footerBar}>
-                    <View style={styles.footerButtonsRow}>
+                    <View
+                        style={[
+                            formStyles.actionsRow,
+                            {
+                                justifyContent: 'space-between',
+                                paddingHorizontal: wp(3.5),
+                                paddingVertical: hp(1),
+                            },
+                        ]}
+                    >
                         <TouchableOpacity
                             activeOpacity={0.85}
-                            style={styles.cancelButton}
-                            onPress={handleCancel}
+                            style={[formStyles.primaryBtn, { paddingVertical: hp(1.4) }]}
+                            onPress={handleSubmit}
+                            disabled={false}
                         >
-                            <Text style={styles.cancelButtonText}>Cancel</Text>
+                            <Text style={formStyles.primaryBtnText}>Submit</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             activeOpacity={0.85}
-                            style={styles.submitButton}
-                            onPress={handleSubmit}
+                            style={formStyles.cancelBtn}
+                            onPress={handleCancel}
                         >
-                            <Text style={styles.submitButtonText}>Submit</Text>
+                            <Text style={formStyles.cancelBtnText}>Cancel</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -496,14 +538,18 @@ const styles = StyleSheet.create({
         marginBottom: hp(1.8),
         borderRadius: wp(2.5),
         overflow: 'visible',
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        backgroundColor: COLORS.bg,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 6,
         elevation: 2,
+    },
+    sectionContent: {
+        borderRadius: wp(2.5),
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        backgroundColor: COLORS.bg,
     },
     sectionHeader: {
         flexDirection: 'row',
@@ -593,7 +639,7 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     thead: {
-        backgroundColor: 're',
+        backgroundColor: '#f1f1f1',
     },
     tbody: {
         backgroundColor: '#fff',

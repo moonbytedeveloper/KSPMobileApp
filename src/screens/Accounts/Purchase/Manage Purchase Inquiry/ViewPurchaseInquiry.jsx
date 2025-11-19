@@ -53,6 +53,10 @@ const ViewPurchaseInquiry = () => {
                 inquiryNo: record?.InquiryNo || 'N/A',
                 title: record?.Title || 'N/A',
                 requestDate: record?.RequestDate || '—',
+                // prefer explicit PurchaseDate, fall back to ExpectedPurchaseDate or '—'
+                expectedPurchaseDate: record?.PurchaseDate || record?.ExpectedPurchaseDate || '—',
+                // normalize currency fields from possible API keys
+                currency: record?.CurrencyName || record?.Currency || record?.Currency_Name || '—',
                 status: record?.Status || 'Visible',
                 raw: record,
 
@@ -172,6 +176,10 @@ const ViewPurchaseInquiry = () => {
                             }
                         }}
                         hideSearch
+                        getLabel={v => String(v)}
+                        getKey={(v, i) => String(v) + '-' + i}
+                        renderInModal={true}
+                        dropdownListStyle={{ width: wp(18) }}
                         inputBoxStyle={styles.dropdownInput}
                         style={styles.dropdownWrapper}
                     />
@@ -212,6 +220,8 @@ const ViewPurchaseInquiry = () => {
                             { label: "Inquiry No.", value: item.inquiryNo },
                             { label: "Request Title", value: item.title },
                             { label: "Request Date", value: item.requestDate },
+                            { label: "Expected Purchase Date", value: item.expectedPurchaseDate },
+                            { label: "Currency", value: item.currency },
                             { label: "Status", value: item.status, isStatus: true }
                         ]}
 

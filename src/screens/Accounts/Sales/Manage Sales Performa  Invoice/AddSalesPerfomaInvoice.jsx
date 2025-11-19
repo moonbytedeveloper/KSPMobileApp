@@ -78,17 +78,16 @@ const AddSalesPerfomaInvoice = () => {
     const toggleSection = id => setExpandedId(prev => (prev === id ? null : id));
 
     // Demo options for dropdowns
-    const paymentTerms = ['- Payment Term -', 'Monthly'];
-    const projects = ['- Select Project -', 'Mobile App',];
+    const paymentTerms = [ 'Monthly'];
+    const projects = ['Mobile App',];
     const taxOptions = ['IGST', 'CGST', 'SGST', 'No Tax'];
     const countries = ['India', 'United States', 'United Kingdom'];
-    const salesInquiries = ['- Select Order No -', 'KSPIN002', 'KSPIN005'];
-    const customers = ['- Select Customer -', 'Acme Corp', 'Beta Ltd'];
-    const state = ['- Select state -', 'Gujarat', 'Delhi', 'Mumbai'];
-    const city = ['- Select city -', 'vadodara', 'surat',];
+    const salesInquiries = ['KSPIN002', 'KSPIN005'];
+    const customers = ['Acme Corp', 'Beta Ltd'];
+    const state = [ 'Gujarat', 'Delhi', 'Mumbai'];
+    const city = ['vadodara', 'surat',];
 
     const paymentMethods = [
-        '- Select Method -',
         'Cash',
         'Bank Transfer',
         'Mobile App Development',
@@ -173,6 +172,8 @@ const AddSalesPerfomaInvoice = () => {
     // keep initial value empty so Dropdown shows the `placeholder` prop
     const [paymentTerm, setPaymentTerm] = useState('');
     const [notes, setNotes] = useState('');
+    // Separate state for Terms & Conditions so it doesn't share the `notes` field
+    const [terms, setTerms] = useState('');
     const [project, setProject] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('');
     const [shippingCharges, setShippingCharges] = useState('0');
@@ -431,11 +432,11 @@ const AddSalesPerfomaInvoice = () => {
                     >
                         <View style={styles.row}>
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Sales Inquiry No.</Text>
+                                <Text style={inputStyles.label}>Sales Invoice Number.</Text>
 
-                                <View style={[inputStyles.box]}>
+                                <View style={[inputStyles.box]} pointerEvents="box-none">
                                     <TextInput
-                                        style={[inputStyles.input]}
+                                        style={[inputStyles.input, { flex: 1, color: '#000000' }]}
                                         value={headerForm.salesInquiryText}
                                         onChangeText={v => setHeaderForm(s => ({ ...s, salesInquiryText: v }))}
                                         placeholder="eg."
@@ -483,7 +484,7 @@ const AddSalesPerfomaInvoice = () => {
 
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
-                                        placeholder="Sales Order Number*"
+                                        placeholder="Sales Order No*"
                                         value={headerForm.clientName}
                                         options={salesInquiries}
                                         getLabel={s => s}
@@ -637,7 +638,7 @@ const AddSalesPerfomaInvoice = () => {
                                 <Text style={inputStyles.label}>Building No.</Text>
                                 <View style={[inputStyles.box]}>
                                     <TextInput
-                                        style={[inputStyles.input]}
+                                        style={[inputStyles.input, { color: '#000000' }]}
                                         value={billingForm.buildingNo}
                                         onChangeText={v =>
                                             setBillingForm(s => ({ ...s, buildingNo: v }))
@@ -651,7 +652,7 @@ const AddSalesPerfomaInvoice = () => {
                                 <Text style={inputStyles.label}>Street 1</Text>
                                 <View style={[inputStyles.box]}>
                                     <TextInput
-                                        style={[inputStyles.input]}
+                                        style={[inputStyles.input, { color: '#000000' }]}
                                         value={billingForm.street1}
                                         onChangeText={v =>
                                             setBillingForm(s => ({ ...s, street1: v }))
@@ -668,7 +669,7 @@ const AddSalesPerfomaInvoice = () => {
                                 <Text style={inputStyles.label}>Street 2</Text>
                                 <View style={[inputStyles.box]}>
                                     <TextInput
-                                        style={[inputStyles.input]}
+                                        style={[inputStyles.input, { color: '#000000' }]}
                                         value={billingForm.street2}
                                         onChangeText={v =>
                                             setBillingForm(s => ({ ...s, street2: v }))
@@ -682,7 +683,7 @@ const AddSalesPerfomaInvoice = () => {
                                 <Text style={inputStyles.label}>Postal Code</Text>
                                 <View style={[inputStyles.box]}>
                                     <TextInput
-                                        style={[inputStyles.input]}
+                                        style={[inputStyles.input, { color: '#000000' }]}
                                         value={billingForm.postalCode}
                                         onChangeText={v =>
                                             setBillingForm(s => ({ ...s, postalCode: v }))
@@ -786,7 +787,7 @@ const AddSalesPerfomaInvoice = () => {
                                 <Text style={inputStyles.label}>Building No.</Text>
                                 <View style={[inputStyles.box]}>
                                     <TextInput
-                                        style={[inputStyles.input]}
+                                        style={[inputStyles.input, { color: '#000000' }]}
                                         value={shippingForm.buildingNo}
                                         onChangeText={v =>
                                             setShippingForm(s => ({ ...s, buildingNo: v }))
@@ -800,7 +801,7 @@ const AddSalesPerfomaInvoice = () => {
                                 <Text style={inputStyles.label}>Street 1</Text>
                                 <View style={[inputStyles.box]}>
                                     <TextInput
-                                        style={[inputStyles.input]}
+                                        style={[inputStyles.input, { color: '#000000' }]}
                                         value={shippingForm.street1}
                                         onChangeText={v =>
                                             setShippingForm(s => ({ ...s, street1: v }))
@@ -817,7 +818,7 @@ const AddSalesPerfomaInvoice = () => {
                                 <Text style={inputStyles.label}>Street 2</Text>
                                 <View style={[inputStyles.box]}>
                                     <TextInput
-                                        style={[inputStyles.input]}
+                                        style={[inputStyles.input, { color: '#000000' }]}
                                         value={shippingForm.street2}
                                         onChangeText={v =>
                                             setShippingForm(s => ({ ...s, street2: v }))
@@ -831,7 +832,7 @@ const AddSalesPerfomaInvoice = () => {
                                 <Text style={inputStyles.label}>Postal Code</Text>
                                 <View style={[inputStyles.box]}>
                                     <TextInput
-                                        style={[inputStyles.input]}
+                                        style={[inputStyles.input, { color: '#000000' }]}
                                         value={shippingForm.postalCode}
                                         onChangeText={v =>
                                             setShippingForm(s => ({ ...s, postalCode: v }))
@@ -1031,7 +1032,7 @@ const AddSalesPerfomaInvoice = () => {
                                                     {/* QUANTITY */}
                                                     <View style={[styles.td, { width: COL_WIDTHS.QTY }]}>
                                                         <TextInput
-                                                            style={styles.input}
+                                                            style={[styles.input, { color: '#000000' }]}
                                                             keyboardType="numeric"
                                                             value={String(row.qty ?? '')}
                                                             onChangeText={v =>
@@ -1043,7 +1044,7 @@ const AddSalesPerfomaInvoice = () => {
                                                     {/* RATE */}
                                                     <View style={[styles.td, { width: COL_WIDTHS.RATE }]}>
                                                         <TextInput
-                                                            style={styles.input}
+                                                            style={[styles.input, { color: '#000000' }]}
                                                             keyboardType="numeric"
                                                             value={String(row.rate ?? '')}
                                                             onChangeText={v =>
@@ -1158,7 +1159,7 @@ const AddSalesPerfomaInvoice = () => {
                                         value={adjustmentLabel}
                                         onChangeText={setAdjustmentLabel}
                                         underlineColorAndroid="transparent"
-                                        style={styles.labelInput}
+                                        style={[styles.labelInput, { color: '#000000' }]}
                                     />
 
                                     <View style={styles.inputRightGroup}>
@@ -1166,7 +1167,7 @@ const AddSalesPerfomaInvoice = () => {
                                             value={String(adjustments)}
                                             onChangeText={setAdjustments}
                                             keyboardType="numeric"
-                                            style={styles.inputBox}
+                                            style={[styles.inputBox, { color: '#000000' }]}
                                         />
                                         {/* Question Icon with Tooltip */}
                                         <View style={styles.helpIconWrapper}>
@@ -1238,13 +1239,25 @@ const AddSalesPerfomaInvoice = () => {
                             {/* Notes + Attach file inline */}
                             <View style={styles.notesAttachRow}>
                                 <View style={styles.notesCol}>
-                                    <Text style={inputStyles.label}>Terms & Conditions</Text>
+                                    <Text style={inputStyles.label}>Customer Notes</Text>
                                     <TextInput
-                                        style={styles.noteBox}
+                                        style={[styles.noteBox, { color: '#000000' }]}
                                         multiline
                                         numberOfLines={4}
                                         value={notes}
                                         onChangeText={setNotes}
+                                        placeholder="Add any Remarks..."
+                                        placeholderTextColor={COLORS.textLight}
+                                    />
+                                </View>
+                                <View style={styles.notesCol}>
+                                    <Text style={inputStyles.label}>Terms & Conditions</Text>
+                                    <TextInput
+                                        style={[styles.noteBox, { color: '#000000' }]}
+                                        multiline
+                                        numberOfLines={4}
+                                        value={terms}
+                                        onChangeText={setTerms}
                                         placeholder="Add any Terms & Condition..."
                                         placeholderTextColor={COLORS.textLight}
                                     />
@@ -1259,7 +1272,7 @@ const AddSalesPerfomaInvoice = () => {
                                         ]}
                                     >
                                         <TextInput
-                                            style={[inputStyles.input, { fontSize: rf(4.2) }]}
+                                            style={[inputStyles.input, { fontSize: rf(4.2), color: '#000000' }]}
                                             placeholder="Attach file"
                                             placeholderTextColor="#9ca3af"
                                             value={file?.name || ''}
@@ -1327,7 +1340,7 @@ const AddSalesPerfomaInvoice = () => {
                             disabled={false}
                         >
                             <Text style={formStyles.primaryBtnText}>
-                                Save & Send
+                                Submit
                                 {/* {isSubmitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Save & Send')} */}
                             </Text>
                         </TouchableOpacity>
