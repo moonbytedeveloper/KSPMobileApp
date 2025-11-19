@@ -7,7 +7,7 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
-import { getPurchaseHeaderInquiries, deleteSalesHeader } from '../../../../api/authServices';
+import { deleteSalesHeader } from '../../../../api/authServices';
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 
@@ -38,36 +38,32 @@ const SalesPerfomaInvoice = () => {
     }, [totalPages, currentPage]);
 
     const fetchPurchaseInquiries = useCallback(async () => {
+        // Replace network call with static dummy data for local/dev usage
         try {
             setLoading(true);
             setError(null);
-            const response = await getPurchaseHeaderInquiries({
-                start: currentPage * itemsPerPage,
-                length: itemsPerPage,
-                searchValue: searchQuery.trim(),
-            });
-            console.log(response, 'viewpurchaseinquiry')
-            const records = response?.Data?.Records || [];
-            const normalized = records.map((record, idx) => ({
-                id: record?.UUID || record?.InquiryNo || `row-${idx}`,
-                inquiryNo: record?.InquiryNo || 'N/A',
-                title: record?.Title || 'N/A',
-                requestDate: record?.RequestDate || '—',
-                status: record?.Status || 'Visible',
-                raw: record,
 
-            }));
-            setInquiries(normalized);
-            setTotalRecords(typeof response?.Data?.TotalCount === 'number' ? response.Data.TotalCount : normalized.length);
+            const dummy = [
+                { id: 'pi-1', inquiryNo: 'PI-1001', title: '234', requestDate: '01-Jan-2025', TaxInvoice:'TaxInvoice1',customerName: 'MoonByte', status: 'Pending', raw: {} },
+                { id: 'pi-2', inquiryNo: 'PI-1002', title: '211', requestDate: '05-Feb-2025',TaxInvoice:'TaxInvoice2', customerName: 'Rajat', status: 'Approved', raw: {} },
+                { id: 'pi-3', inquiryNo: 'PI-1003', title: '250', requestDate: '12-Mar-2025',TaxInvoice:'TaxInvoice3', customerName: 'Manav', status: 'Draft', raw: {} },
+            ];
+
+            // Optionally apply a simple client-side search filter
+            const filtered = searchQuery && String(searchQuery).trim()
+                ? dummy.filter(d => (d.inquiryNo + ' ' + d.title).toLowerCase().includes(String(searchQuery).toLowerCase()))
+                : dummy;
+
+            setInquiries(filtered);
+            setTotalRecords(filtered.length);
         } catch (err) {
-            console.error('Failed to fetch purchase inquiries', err);
-            setError('Failed to fetch purchase inquiries. Please try again.');
+            setError('Failed to load inquiries.');
             setInquiries([]);
             setTotalRecords(0);
         } finally {
             setLoading(false);
         }
-    }, [currentPage, itemsPerPage, searchQuery]);
+    }, [searchQuery]);
 
     useEffect(() => {
         fetchPurchaseInquiries();
@@ -212,14 +208,18 @@ const SalesPerfomaInvoice = () => {
                         onToggle={() => setActiveOrderId(prev => prev === item.id ? null : item.id)}
 
                         customRows={[
-                            { label: "Inquiry No.", value: item.inquiryNo },
-                            { label: "Request Title", value: item.title },
-                            { label: "Request Date", value: item.requestDate },
+                            { label: "Sales Order", value: item.inquiryNo },
+                            { label: "Performa Invoice No", value: item.title },
+                            { label: "Customer Name", value: item.customerName },
+                            { label: "Delivery Date", value: item.requestDate },
+                            { label: "Tax Invoice", value: item.TaxInvoice },
+
+
                             { label: "Status", value: item.status, isStatus: true }
                         ]}
 
-                        headerLeftLabel="Inquiry No."
-                        headerRightLabel="Request Title"
+                        headerLeftLabel="Sales Order"
+                        headerRightLabel="Performa Invoice No"
 
                         footerComponent={renderFooterActions(item)}
                         headerRightContainerStyle={styles.headerRightContainer}

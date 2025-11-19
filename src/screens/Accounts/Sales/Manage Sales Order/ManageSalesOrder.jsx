@@ -430,7 +430,11 @@ const ManageSalesOrder = () => {
         <AppHeader
           title="Manage Sales Order"
           onLeftPress={() => {
-            navigation.goBack();
+            try {
+              navigation.navigate('ViewSalesOrder');
+            } catch (e) {
+              navigation.goBack();
+            }
           }}
         />
         <View style={styles.headerSeparator} />

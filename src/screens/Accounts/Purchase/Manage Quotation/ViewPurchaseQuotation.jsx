@@ -218,13 +218,14 @@ const ViewPurchaseQuotation = () => {
                         isActive={activeOrderId === order.id}
                         onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
                         customRows={[
-                            { label: 'Customer Name', value: order.customerName },
-                            { label: 'Sales Invoice Number', value: order.salesInvoiceNumber },
-                            { label: 'Delivery Date', value: order.deliveryDate },
+                            { label: 'Vendor Name', value: order.customerName },
+                            { label: 'Purchase Request Number', value: order.salesInvoiceNumber },
+                            { label: 'Quotation Title', value: 'Title' },
+                            { label: 'Status', value: order.status, isStatus: true },
                             // { label: 'Due Date', value: order.dueDate },
                         ]} 
-                        headerLeftLabel="Sales Order Number"
-                        headerRightLabel="Sales Invoice Number"
+                        headerLeftLabel="Vendor Name"
+                        headerRightLabel="Purchase Request No."
                         footerComponent={renderFooterActions(order)}
                         headerRightContainerStyle={styles.headerRightContainer}
                     />

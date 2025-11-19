@@ -12,20 +12,20 @@ import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 const SALES_ORDERS = [
     {
         id: 'KP1524',
-        salesOrderNumber: 'KP1524',
+        salesOrderNumber: 'OR.002',
         customerName: 'Moonbyte',
         deliveryDate: '15-12-24',
         dueDate: '15-12-24',
-        salesInvoiceNumber: 'OR.002',
+        salesInvoiceNumber: 'SIn120',
      
     },
     {
         id: 'KP1525',
-        salesOrderNumber: 'KP1525',
+        salesOrderNumber: 'OR.003',
         customerName: 'Northwind Retail',
         deliveryDate: '04-01-25',
         dueDate: '20-12-24',
-        salesInvoiceNumber: 'OR.002',
+        salesInvoiceNumber: 'SIn121',
        
     },
     {
@@ -220,7 +220,9 @@ const ManageSalesInvoice = () => {
                         customRows={[
                             { label: 'Customer Name', value: order.customerName },
                             { label: 'Sales Invoice Number', value: order.salesInvoiceNumber },
+                            { label: 'Sales Order Number', value: order.salesOrderNumber },
                             { label: 'Delivery Date', value: order.deliveryDate },
+
                             // { label: 'Due Date', value: order.dueDate },
                         ]} 
                         headerLeftLabel="Sales Order Number"

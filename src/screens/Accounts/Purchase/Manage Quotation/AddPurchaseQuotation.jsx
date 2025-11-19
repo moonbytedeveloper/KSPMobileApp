@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -66,18 +66,17 @@ const AddPurchaseQuotation = () => {
   const toggleSection = id => setExpandedId(prev => (prev === id ? null : id));
 
   // Demo options for dropdowns
-  const paymentTerms = ['- Payment Term -', 'Net 7', 'Net 15', 'Net 30'];
+  const paymentTerms = [ 'Net 7', 'Net 15', 'Net 30'];
   const taxOptions = ['IGST', 'CGST', 'SGST', 'No Tax'];
   const countries = ['India', 'United States', 'United Kingdom'];
-  const salesInquiries = ['- Select Inquiry -', 'SI-1001', 'SI-1002'];
-  const customers = ['- Select Customer -', 'Acme Corp', 'Beta Ltd'];
-  const state = ['- Select state -', 'Gujarat', 'Delhi', 'Mumbai'];
-  const city = ['- Select city -', 'vadodara', 'surat', ];
+  const salesInquiries = [ 'SI-1001', 'SI-1002'];
+  const customers = ['Acme Corp', 'Beta Ltd'];
+  const state = [ 'Gujarat', 'Delhi', 'Mumbai'];
+  const city = ['vadodara', 'surat', ];
 
 
 
   const paymentMethods = [
-    '- Select Method -',
     'Cash',
     'Bank Transfer',
     'Mobile App Development',
@@ -86,11 +85,10 @@ const AddPurchaseQuotation = () => {
 
 
    const Vendor = [
-    '- Select vendor -',
     'Vendorna',
   ];
 
-  const projects = ['- Select Project -', 'Mobile App Development', 'Website Revamp'];
+  const projects = [ 'Mobile App Development', 'Website Revamp'];
 
   const PaymentTerm = [
     'Monthly',
@@ -186,6 +184,19 @@ const AddPurchaseQuotation = () => {
   const [file, setFile] = useState(null);
   const [showShippingTip, setShowShippingTip] = useState(false);
   const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
+
+  // Refs + focused state so tapping the whole box focuses the TextInput
+  const purchaseOrderRef = useRef(null);
+  const quotationTitleRef = useRef(null);
+  const discountRef = useRef(null);
+  const termsRef = useRef(null);
+  const notesRef = useRef(null);
+
+  const [focusedPurchaseOrder, setFocusedPurchaseOrder] = useState(false);
+  const [focusedQuotationTitle, setFocusedQuotationTitle] = useState(false);
+  const [focusedDiscount, setFocusedDiscount] = useState(false);
+  const [focusedTerms, setFocusedTerms] = useState(false);
+  const [focusedNotes, setFocusedNotes] = useState(false);
 
   // Permission handling for Android
   const requestStoragePermissionAndroid = async () => {
@@ -436,12 +447,22 @@ const AddPurchaseQuotation = () => {
           >
             <View style={styles.row}>
              <View style={styles.col}>
-         <Text style={inputStyles.label}>Purchase Quotation Number*</Text>
+         <Text style={inputStyles.label}>Purchase Quotation No*</Text>
 
                 {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
-                <View style={[inputStyles.box]}>
+                <View
+                  style={[inputStyles.box]}
+                  onStartShouldSetResponder={() => true}
+                  onResponderGrant={() => purchaseOrderRef.current?.focus()}
+                >
                   <TextInput
-                    style={[inputStyles.input]}
+                    ref={purchaseOrderRef}
+                    onFocus={() => setFocusedPurchaseOrder(true)}
+                    onBlur={() => setFocusedPurchaseOrder(false)}
+                    style={[
+                      inputStyles.input,
+                      { color: focusedPurchaseOrder ? '#000000' : COLORS.text, textShadowColor: focusedPurchaseOrder ? '#000000' : 'transparent' },
+                    ]}
                     value={headerForm.purchaseOrderNumber}
                     onChangeText={v =>
                       setHeaderForm(s => ({ ...s, purchaseOrderNumber: v }))
@@ -491,9 +512,19 @@ const AddPurchaseQuotation = () => {
          <Text style={inputStyles.label}>Quotation Title*</Text>
 
                 {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
-                <View style={[inputStyles.box]}>
+                <View
+                  style={[inputStyles.box]}
+                  onStartShouldSetResponder={() => true}
+                  onResponderGrant={() => quotationTitleRef.current?.focus()}
+                >
                   <TextInput
-                    style={[inputStyles.input]}
+                    ref={quotationTitleRef}
+                    onFocus={() => setFocusedQuotationTitle(true)}
+                    onBlur={() => setFocusedQuotationTitle(false)}
+                    style={[
+                      inputStyles.input,
+                      { color: focusedQuotationTitle ? '#000000' : COLORS.text, textShadowColor: focusedQuotationTitle ? '#000000' : 'transparent' },
+                    ]}
                     value={headerForm.quotationTitle}
                     onChangeText={v =>
                       setHeaderForm(s => ({ ...s, quotationTitle: v }))
@@ -1065,12 +1096,24 @@ const AddPurchaseQuotation = () => {
                   <Text style={styles.label}>Discount:</Text>
 
                   <View style={styles.inputRightGroup}>
-                    <TextInput
-                      value={String(shippingCharges)}
-                      onChangeText={setShippingCharges}
-                      keyboardType="numeric"
-                      style={[styles.inputBox, { color: '#000000' }]}
-                    />
+                    <View
+                      onStartShouldSetResponder={() => true}
+                      onResponderGrant={() => discountRef.current?.focus()}
+                      style={{ flex: 1 }}
+                    >
+                      <TextInput
+                        ref={discountRef}
+                        onFocus={() => setFocusedDiscount(true)}
+                        onBlur={() => setFocusedDiscount(false)}
+                        value={String(shippingCharges)}
+                        onChangeText={setShippingCharges}
+                        keyboardType="numeric"
+                        style={[
+                          styles.inputBox,
+                          { color: focusedDiscount ? '#000000' : COLORS.text, textShadowColor: focusedDiscount ? '#000000' : 'transparent' },
+                        ]}
+                      />
+                    </View>
 
                     {/* Question Icon with Tooltip */}
                     
@@ -1110,29 +1153,51 @@ const AddPurchaseQuotation = () => {
               <View style={styles.notesAttachRow}>
                 <View style={styles.notesCol}>
                   <Text style={inputStyles.label}>Notes</Text>
-                  <TextInput
-                    style={styles.noteBox}
-                    multiline
-                    numberOfLines={4}
-                    value={terms}
-                    onChangeText={setTerms}
-                    placeholder="Add any Terms & Condition..."
-                    placeholderTextColor={COLORS.textLight}
-                  />
+                  <View
+                    onStartShouldSetResponder={() => true}
+                    onResponderGrant={() => termsRef.current?.focus()}
+                  >
+                    <TextInput
+                      ref={termsRef}
+                      onFocus={() => setFocusedTerms(true)}
+                      onBlur={() => setFocusedTerms(false)}
+                      style={[
+                        styles.noteBox,
+                        { color: focusedTerms ? '#000000' : COLORS.text, textShadowColor: focusedTerms ? '#000000' : 'transparent' },
+                      ]}
+                      multiline
+                      numberOfLines={4}
+                      value={terms}
+                      onChangeText={setTerms}
+                      placeholder="Add any Terms & Condition..."
+                      placeholderTextColor={COLORS.textLight}
+                    />
+                  </View>
                 </View>
 
 
                  <View style={styles.notesCol}>
                   <Text style={inputStyles.label}>Terms & Conditions</Text>
-                  <TextInput
-                    style={styles.noteBox}
-                    multiline
-                    numberOfLines={4}
-                    value={notes}
-                    onChangeText={setNotes}
-                    placeholder="Terms & Conditions..."
-                    placeholderTextColor={COLORS.textLight}
-                  />
+                  <View
+                    onStartShouldSetResponder={() => true}
+                    onResponderGrant={() => notesRef.current?.focus()}
+                  >
+                    <TextInput
+                      ref={notesRef}
+                      onFocus={() => setFocusedNotes(true)}
+                      onBlur={() => setFocusedNotes(false)}
+                      style={[
+                        styles.noteBox,
+                        { color: focusedNotes ? '#000000' : COLORS.text, textShadowColor: focusedNotes ? '#000000' : 'transparent' },
+                      ]}
+                      multiline
+                      numberOfLines={4}
+                      value={notes}
+                      onChangeText={setNotes}
+                      placeholder="Terms & Conditions..."
+                      placeholderTextColor={COLORS.textLight}
+                    />
+                  </View>
                 </View>
                 <View style={styles.attachCol}>
                   <Text style={inputStyles.label}>Attach file</Text>

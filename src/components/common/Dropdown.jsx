@@ -63,23 +63,49 @@ const Dropdown = ({
     }
   };
 
+  // promise-based measure so callers can wait until coords are set
+  const measureAsync = () => {
+    return new Promise(resolve => {
+      try {
+        const node = findNodeHandle(inputRef.current);
+        if (!node) return resolve(null);
+        UIManager.measureInWindow(node, (x, y, width, height) => {
+          const c = { x, y, width, height };
+          setCoords(c);
+          resolve(c);
+        });
+      } catch (e) {
+        resolve(null);
+      }
+    });
+  };
+
   return (
     <View style={[styles.dropdownWrapper, isOpen && styles.dropdownWrapperOpen, style]}>
       <TouchableOpacity
         ref={inputRef}
         activeOpacity={0.8}
         style={[styles.inputBox, isOpen && styles.inputFocused, disabled && { opacity: 0.6 }, inputBoxStyle]}
-        onPress={() => {
+        onPress={async () => {
           if (disabled) return;
           const next = !isOpen;
+
+          // If we need to render in a modal, measure first so the modal opens
+          // at the correct coordinates and doesn't briefly render at (0,0).
+          if (renderInModal && next) {
+            const measured = await measureAsync();
+            // if uncontrolled, open after measuring
+            if (controlledIsOpen === undefined) {
+              setUncontrolledIsOpen(true);
+            }
+            onOpenChange && onOpenChange(true);
+            return;
+          }
+
           if (controlledIsOpen === undefined) {
             setUncontrolledIsOpen(next);
           }
           onOpenChange && onOpenChange(next);
-          if (renderInModal && next) {
-            // measure after a short delay so layout stabilizes
-            setTimeout(() => measure(), 40);
-          }
         }}
         disabled={disabled}
       >
