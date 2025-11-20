@@ -119,6 +119,12 @@ const PATHS = {
     getSalesHeader: Config.API_GET_SALES_HEADER_PATH || '/api/Account/GetSalesHeader',
     getSalesLines: Config.API_GET_SALES_LINES_PATH || '/api/Account/GetSalesLines',
     getSalesOrderHeaders: Config.API_GET_SALES_ORDER_HEADERS_PATH || '/api/Account/GetSalesOrderHeaders',
+    termsOfPayment: Config.API_TERMS_OF_PAYMENT_PATH || '/api/Account/termsofpayment',
+    modeOfPayment: Config.API_MODE_OF_PAYMENT_PATH || '/api/Account/modeofpayment',
+    // getProjects: Config.API_PROJECTS_PATH || '/api/Projects/GetProjects',
+    addSalesOrder: Config.API_ADD_SALES_ORDER_PATH || '/api/Account/AddSalesOrder',
+    updateSalesOrder: Config.API_UPDATE_SALES_ORDER_PATH || '/api/Account/UpdateSalesOrder',
+    getAllInquiryNumbers: Config.API_GET_ALL_INQUIRY_NUMBERS_PATH || '/api/Account/GetAllInquiryNumbers',
 
 
 };
@@ -588,6 +594,61 @@ export async function getSalesOrderHeaders({ cmpUuid, envUuid, start = 0, length
     const resp = await api.get(PATHS.getSalesOrderHeaders, { params });
     console.log('[authServices] getSalesOrderHeaders response ->', resp && resp.status);
     return resp.data;
+}
+
+// Get payment terms
+export async function getPaymentTerms({ cmpUuid, envUuid } = {}) {
+    if (!cmpUuid || !envUuid) {
+        const [c, e] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID()]);
+        cmpUuid = c; envUuid = e;
+    }
+    const params = { cmpUuid, envUuid };
+    const resp = await api.get(PATHS.termsOfPayment, { params });
+    return resp.data;
+}
+
+// Get payment methods
+export async function getPaymentMethods({ cmpUuid, envUuid } = {}) {
+    if (!cmpUuid || !envUuid) {
+        const [c, e] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID()]);
+        cmpUuid = c; envUuid = e;
+    }
+    const params = { cmpUuid, envUuid };
+    const resp = await api.get(PATHS.modeOfPayment, { params });
+    return resp.data;
+}
+ 
+
+// Add Sales Order (header)
+export async function addSalesOrder(payload = {}, { cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+        const params = { cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] addSalesOrder params ->', params);
+        console.log('[authServices] addSalesOrder payload ->', payload);
+        const resp = await api.post(PATHS.addSalesOrder, payload, { params });
+        console.log('[authServices] addSalesOrder response ->', resp?.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] addSalesOrder error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Update Sales Order (header)
+export async function updateSalesOrder(payload = {}, { cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+        const params = { cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] updateSalesOrder params ->', params);
+        console.log('[authServices] updateSalesOrder payload ->', payload);
+        const resp = await api.post(PATHS.updateSalesOrder, payload, { params });
+        console.log('[authServices] updateSalesOrder response ->', resp?.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] updateSalesOrder error ->', err && (err.message || err));
+        throw err;
+    }
 }
 
 export async function deleteSalesHeader({ headerUuid, overrides = {} } = {}) {
@@ -1911,6 +1972,22 @@ export async function getEmployees({ companyUuid, envUuid } = {}) {
     const resp = await api.get(PATHS.getEmployees, { params });
     console.log('Get Employees response:', resp);
 
+    return resp.data;
+}
+
+// Account: Get All Inquiry Numbers (for dropdowns)
+export async function getAllInquiryNumbers({ cmpUuid, envUuid } = {}) {
+    if (!cmpUuid || !envUuid) {
+        const [c, e] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID()]);
+        cmpUuid = c; envUuid = e;
+    }
+    if (!cmpUuid) throw new Error('Missing company UUID');
+    if (!envUuid) throw new Error('Missing environment UUID');
+
+    const params = { cmpUuid, envUuid };
+    const resp = await api.get(PATHS.getAllInquiryNumbers, { params });
+    console.log('Get All Inquiry Numbers response:', resp.data);
+    
     return resp.data;
 }
 

@@ -19,7 +19,7 @@ const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyl
                 <Text style={styles.sectionTitle}>{title}</Text>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    
+
                     {rightActions ? (
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: wp(2) }}>
                             {rightActions}
@@ -327,6 +327,22 @@ const AddSalesInquiry = () => {
         }
     };
 
+    // Always load lookup lists on mount so new entries have dropdowns populated
+    React.useEffect(() => {
+        (async () => {
+            try {
+                await Promise.all([
+                    fetchCustomers(),
+                    fetchItemTypes(),
+                    fetchItemMasters(null),
+                    fetchUnits(),
+                ]);
+            } catch (e) {
+                console.log('Initial lookup fetch error ->', e?.message || e);
+            }
+        })();
+    }, []);
+
     const route = useRoute();
 
     React.useEffect(() => {
@@ -341,8 +357,16 @@ const AddSalesInquiry = () => {
     React.useEffect(() => {
         (async () => {
             const headerUuidParam = route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.headerUUID || route?.params?.uuid || route?.params?.headerRaw?.UUID || route?.params?.headerRaw?.Id;
-            console.log('AddSalesInquiry prefill effect - headerUuidParam ->', headerUuidParam);
-            if (!headerUuidParam) return; // nothing to prefill
+            // Only warn if route params were explicitly provided but header uuid is missing
+            const hasRouteParams = !!route?.params && Object.keys(route.params).length > 0;
+            if (!headerUuidParam) {
+                if (hasRouteParams) {
+                    console.warn('AddSalesInquiry prefill requested but header UUID missing in route params');
+                    Alert.alert('Prefill error', 'Header identifier missing. Cannot prefill for edit.');
+                }
+                // nothing to prefill for a fresh add — lookups are already loaded
+                return;
+            }
 
             // fetch lookup lists first (capture returned lists for immediate lookup)
             let customersList = [];
@@ -407,9 +431,18 @@ const AddSalesInquiry = () => {
                 setLineItems(mapped);
             } catch (e) {
                 console.log('Prefill error ->', e?.message || e);
+            } finally {
+                // Clear route params after handling prefill so stale header UUIDs don't persist
+                try {
+                    if (navigation && navigation.setParams) {
+                        navigation.setParams({});
+                    }
+                } catch (e) {
+                    // ignore
+                }
             }
         })();
-    }, [route?.params?.headerUuid, route?.params?.HeaderUUID, route?.params?.headerUUID, route?.params?.uuid, route?.params?.headerRaw]);
+    }, [route?.params]);
 
     const handleEditItem = (id) => {
         const item = lineItems.find(i => i.id === id);
@@ -587,17 +620,17 @@ const AddSalesInquiry = () => {
     return (
         <>
             <View style={{ flex: 1, backgroundColor: '#fff' }}>
-               
-                 <AppHeader
-          title="Add Sales Inquiry"
-          onLeftPress={() => {
-            try {
-              navigation.navigate('ManageInquiry');
-            } catch (e) {
-              navigation.goBack();
-            }
-          }}
-        />
+
+                <AppHeader
+                    title="Add Sales Inquiry"
+                    onLeftPress={() => {
+                        try {
+                            navigation.navigate('ManageInquiry');
+                        } catch (e) {
+                            navigation.goBack();
+                        }
+                    }}
+                />
                 <View style={styles.headerSeparator} />
                 <ScrollView contentContainerStyle={[styles.container]} showsVerticalScrollIndicator={false}>
                     {/* Section 1: HEADER */}
@@ -607,7 +640,7 @@ const AddSalesInquiry = () => {
                         expanded={expandedId === 1}
                         onToggle={handleHeaderToggle}
                         rightActions={
-                                headerSaved ? (
+                            headerSaved ? (
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
                                     <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
                                     <TouchableOpacity onPress={() => { setHeaderEditing(true); setExpandedId(1); }}>
