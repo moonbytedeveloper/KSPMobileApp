@@ -31,6 +31,45 @@ const COL_WIDTHS = {
   AMOUNT: wp(35), // 30%
   ACTION: wp(35), // 30%
 };
+// Small wrapper input that makes the whole box tappable and applies
+// focused text color + text shadow when the input is focused.
+const FocusableTextInput = React.forwardRef((props, ref) => {
+  const innerRef = React.useRef(null);
+  const [focused, setFocused] = useState(false);
+
+  React.useImperativeHandle(ref, () => ({
+    focus: () => innerRef.current && innerRef.current.focus(),
+    blur: () => innerRef.current && innerRef.current.blur(),
+  }));
+
+  const { style, onFocus, onBlur, value, ...rest } = props;
+
+  const showBlack = focused || (value != null && String(value).length > 0);
+
+  return (
+    <View
+      onStartShouldSetResponder={() => true}
+      onResponderGrant={() => innerRef.current && innerRef.current.focus()}
+      style={{ width: '100%' }}
+    >
+      <TextInput
+        ref={innerRef}
+        {...rest}
+        value={value}
+        onFocus={e => {
+          setFocused(true);
+          onFocus && onFocus(e);
+        }}
+        onBlur={e => {
+          setFocused(false);
+          onBlur && onBlur(e);
+        }}
+        style={[style, showBlack && { color: '#000000', textShadowColor: '#000000' }]}
+      />
+    </View>
+  );
+});
+
 const AccordionSection = ({
   id,
   title,
@@ -81,15 +120,14 @@ const ManageSalesOrder = () => {
   const paymentTerms = ['Net 7', 'Net 15', 'Net 30'];
   const taxOptions = ['IGST', 'CGST', 'SGST', 'No Tax'];
   const countries = ['India', 'United States', 'United Kingdom'];
-  const salesInquiries = ['- Select Inquiry -', 'SI-1001', 'SI-1002'];
-  const customers = ['- Select Customer -', 'Acme Corp', 'Beta Ltd'];
-  const state = ['- Select state -', 'Gujarat', 'Delhi', 'Mumbai'];
-  const city = ['- Select city -', 'vadodara', 'surat', ];
+  const salesInquiries = [ 'SI-1001', 'SI-1002'];
+  const customers = ['Acme Corp', 'Beta Ltd'];
+  const state = [ 'Gujarat', 'Delhi', 'Mumbai'];
+  const city = ['vadodara', 'surat', ];
 
 
 
   const paymentMethods = [
-    '- Select Method -',
     'Cash',
     'Bank Transfer',
     'Mobile App Development',
@@ -98,11 +136,10 @@ const ManageSalesOrder = () => {
 
 
    const Vendor = [
-    '- Select vendor -',
     'Vendorna',
   ];
 
-  const projects = ['- Select Project -', 'Mobile App Development', 'Website Revamp'];
+  const projects = [ 'Mobile App Development', 'Website Revamp'];
 
   const PaymentTerm = [
     'Net 7',
@@ -193,6 +230,7 @@ const ManageSalesOrder = () => {
   );
   const [paymentTerm, setPaymentTerm] = useState('');
   const [notes, setNotes] = useState('');
+  const [terms, setTerms] = useState('');
   const [projectName, setProjectName] = useState('');
   const [vendor, setVendor] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
@@ -456,7 +494,7 @@ const ManageSalesOrder = () => {
 
                 {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
                 <View style={[inputStyles.box]}>
-                  <TextInput
+                  <FocusableTextInput
                     style={[inputStyles.input]}
                     value={headerForm.clientName}
                     onChangeText={v =>
@@ -476,6 +514,8 @@ const ManageSalesOrder = () => {
                   value={headerForm.companyName}
                   options={salesInquiries}
                   getLabel={s => s}
+
+      
                   getKey={s => s}
                   onSelect={v => setHeaderForm(s => ({ ...s, companyName: v }))}
                   inputBoxStyle={inputStyles.box}
@@ -670,7 +710,7 @@ const ManageSalesOrder = () => {
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Building No.</Text>
                 <View style={[inputStyles.box]}>
-                  <TextInput
+                  <FocusableTextInput
                     style={[inputStyles.input]}
                     value={billingForm.buildingNo}
                     onChangeText={v =>
@@ -684,7 +724,7 @@ const ManageSalesOrder = () => {
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Street 1</Text>
                 <View style={[inputStyles.box]}>
-                  <TextInput
+                  <FocusableTextInput
                     style={[inputStyles.input]}
                     value={billingForm.street1}
                     onChangeText={v =>
@@ -701,7 +741,7 @@ const ManageSalesOrder = () => {
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Street 2</Text>
                 <View style={[inputStyles.box]}>
-                  <TextInput
+                  <FocusableTextInput
                     style={[inputStyles.input]}
                     value={billingForm.street2}
                     onChangeText={v =>
@@ -715,7 +755,7 @@ const ManageSalesOrder = () => {
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Postal Code</Text>
                 <View style={[inputStyles.box]}>
-                  <TextInput
+                  <FocusableTextInput
                     style={[inputStyles.input]}
                     value={billingForm.postalCode}
                     onChangeText={v =>
@@ -733,7 +773,7 @@ const ManageSalesOrder = () => {
                 <Text style={inputStyles.label}>Country Name</Text>
                 <View style={{ zIndex: 9999, elevation: 20 }}>
                   <Dropdown
-                    placeholder="- Select Country -"
+                    placeholder="Select Country"
                     value={billingCountrySel || billingForm.country}
                     options={countries}
                     getLabel={c => c}
@@ -752,7 +792,7 @@ const ManageSalesOrder = () => {
                 <Text style={inputStyles.label}>State Name</Text>
                  <View style={{ zIndex: 9999, elevation: 20 }}>
                   <Dropdown
-                    placeholder="- Select State -"
+                    placeholder="Select State"
                     value={billingStateSel || billingForm.state}
                     options={state}
                     getLabel={c => c}
@@ -774,7 +814,7 @@ const ManageSalesOrder = () => {
                 <Text style={inputStyles.label}>City Name</Text>
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
-                    placeholder="- Select City -"
+                    placeholder="Select City"
                     value={billingCitySel || billingForm.city}
                     options={city}
                     getLabel={c => c}
@@ -797,7 +837,7 @@ const ManageSalesOrder = () => {
                     copyBillingToShipping();
                   }}
                 >
-                  <View style={styles.checkboxBox}>
+                  <View style={[styles.checkboxBox, isShippingSame && styles.checkboxBoxChecked]}>
                     {isShippingSame ? (
                       <Icon name="check" size={rf(3)} color="#fff" />
                     ) : null}
@@ -828,7 +868,7 @@ const ManageSalesOrder = () => {
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Building No.</Text>
                 <View style={[inputStyles.box]}>
-                  <TextInput
+                  <FocusableTextInput
                     style={[inputStyles.input]}
                     value={shippingForm.buildingNo}
                     onChangeText={v =>
@@ -842,7 +882,7 @@ const ManageSalesOrder = () => {
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Street 1</Text>
                 <View style={[inputStyles.box]}>
-                  <TextInput
+                  <FocusableTextInput
                     style={[inputStyles.input]}
                     value={shippingForm.street1}
                     onChangeText={v =>
@@ -859,7 +899,7 @@ const ManageSalesOrder = () => {
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Street 2</Text>
                 <View style={[inputStyles.box]}>
-                  <TextInput
+                  <FocusableTextInput
                     style={[inputStyles.input]}
                     value={shippingForm.street2}
                     onChangeText={v =>
@@ -873,7 +913,7 @@ const ManageSalesOrder = () => {
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Postal Code</Text>
                 <View style={[inputStyles.box]}>
-                  <TextInput
+                  <FocusableTextInput
                     style={[inputStyles.input]}
                     value={shippingForm.postalCode}
                     onChangeText={v =>
@@ -891,7 +931,7 @@ const ManageSalesOrder = () => {
                 <Text style={inputStyles.label}>Country Name</Text>
                 <View style={{ zIndex: 9999, elevation: 20 }}>
                   <Dropdown
-                    placeholder="- Select Country -"
+                    placeholder="Select Country*"
                     value={shippingForm.country}
                     options={countries}
                     getLabel={c => c}
@@ -908,7 +948,7 @@ const ManageSalesOrder = () => {
                 <Text style={inputStyles.label}>State Name</Text>
                 <View style={{ zIndex: 9999, elevation: 20 }}>
                   <Dropdown
-                    placeholder="- Select State -"
+                    placeholder="Select State*"
                     value={shippingForm.state}
                     options={state}
                     getLabel={c => c}
@@ -928,7 +968,7 @@ const ManageSalesOrder = () => {
                 <Text style={inputStyles.label}>City Name</Text>
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
-                    placeholder="- Select City -"
+                    placeholder="Select City*"
                     value={shippingForm.city}
                     options={city}
                     getLabel={c => c}
@@ -1073,7 +1113,7 @@ const ManageSalesOrder = () => {
 
                           {/* QUANTITY */}
                           <View style={[styles.td, { width: COL_WIDTHS.QTY }]}>
-                            <TextInput
+                            <FocusableTextInput
                               style={styles.input}
                               keyboardType="numeric"
                               value={String(row.qty ?? '')}
@@ -1085,7 +1125,7 @@ const ManageSalesOrder = () => {
 
                           {/* RATE */}
                           <View style={[styles.td, { width: COL_WIDTHS.RATE }]}>
-                            <TextInput
+                            <FocusableTextInput
                               style={styles.input}
                               keyboardType="numeric"
                               value={String(row.rate ?? '')}
@@ -1145,7 +1185,7 @@ const ManageSalesOrder = () => {
                   <Text style={styles.label}>Discount:</Text>
 
                   <View style={styles.inputRightGroup}>
-                    <TextInput
+                    <FocusableTextInput
                       value={String(shippingCharges)}
                       onChangeText={setShippingCharges}
                       keyboardType="numeric"
@@ -1153,7 +1193,7 @@ const ManageSalesOrder = () => {
                     />
 
                     {/* Question Icon with Tooltip */}
-                    <View style={styles.helpIconWrapper}>
+                    {/* <View style={styles.helpIconWrapper}>
                       <TouchableOpacity
                         onPress={() => {
                           setShowShippingTip(!showShippingTip);
@@ -1162,10 +1202,10 @@ const ManageSalesOrder = () => {
                         style={styles.helpIconContainer}
                       >
                         <Text style={styles.helpIcon}>?</Text>
-                      </TouchableOpacity>
+                      </TouchableOpacity> */}
 
                       {/* Tooltip */}
-                      {showShippingTip && (
+                      {/* {showShippingTip && (
                         <>
                           <Modal
                             transparent
@@ -1177,8 +1217,8 @@ const ManageSalesOrder = () => {
                               onPress={() => setShowShippingTip(false)}
                             >
                               <View style={styles.modalOverlay} />
-                            </TouchableWithoutFeedback>
-                          </Modal>
+                            </TouchableWithoutFeedback> */}
+                          {/* </Modal>
                           <View style={styles.tooltipBox}>
                             <Text style={styles.tooltipText}>
                               Amount spent on shipping the goods.
@@ -1187,7 +1227,7 @@ const ManageSalesOrder = () => {
                           </View>
                         </>
                       )}
-                    </View>
+                    </View> */}
                   </View>
 
                   <Text style={styles.value}>
@@ -1224,13 +1264,26 @@ const ManageSalesOrder = () => {
               <View style={styles.notesAttachRow}>
                 <View style={styles.notesCol}>
                   <Text style={inputStyles.label}>Notes</Text>
-                  <TextInput
+                  <FocusableTextInput
                     style={styles.noteBox}
                     multiline
                     numberOfLines={4}
                     value={notes}
                     onChangeText={setNotes}
                     placeholder="Add any remarks..."
+                    placeholderTextColor={COLORS.textLight}
+                  />
+                </View>
+
+                <View style={styles.notesCol}>
+                  <Text style={inputStyles.label}>Terms & Conditions</Text>
+                  <FocusableTextInput
+                    style={styles.noteBox}
+                    multiline
+                    numberOfLines={4}
+                    value={terms}
+                    onChangeText={setTerms}
+                    placeholder="Terms & Conditions..."
                     placeholderTextColor={COLORS.textLight}
                   />
                 </View>
@@ -1243,7 +1296,7 @@ const ManageSalesOrder = () => {
                       styles.fileInputBox,
                     ]}
                   >
-                    <TextInput
+                    <FocusableTextInput
                       style={[inputStyles.input, { fontSize: rf(4.2) }]}
                       placeholder="Attach file"
                       placeholderTextColor="#9ca3af"
@@ -1451,6 +1504,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  checkboxBoxChecked: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   smallInput: {
     width: wp(12),
@@ -1831,16 +1888,26 @@ const styles = StyleSheet.create({
 
   /* ── COMMON ── */
     thead: { backgroundColor: '#f1f1f1' },
-  tr: { flexDirection: 'row' },
+    tbody: { backgroundColor: '#fff' },
+    tr: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#E0E0E0' },
 
   /* ── TH (header) ── */
   th: {
     paddingVertical: hp(1.4),
+    paddingHorizontal: wp(2),
     textAlign: 'center',
     fontWeight: '700',
     fontSize: wp(3),
     borderRightWidth: 1,
     borderRightColor: '#CFCFCF',
+    color: COLORS.text,
+    fontFamily: TYPOGRAPHY.fontFamilyMedium,
+  },
+
+  tdText: {
+    fontSize: wp(3),
+    color: COLORS.text,
+    fontFamily: TYPOGRAPHY.fontFamilyRegular,
   },
 
   /* ── TD (body) ── */

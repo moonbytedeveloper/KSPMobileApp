@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -72,29 +72,90 @@ const AccordionSection = ({
     );
 };
 
-const AddPurchaseInvoice = () => {
+// Tappable container that focuses the underlying TextInput when pressed
+const FocusableTextInput = React.forwardRef(({
+    style,
+    containerStyle,
+    value,
+    onChangeText,
+    placeholder,
+    placeholderTextColor,
+    multiline,
+    numberOfLines,
+    keyboardType,
+    editable = true,
+    ...rest
+}, ref) => {
+    const innerRef = useRef(null);
+    const [focused, setFocused] = useState(false);
+
+    useEffect(() => {
+        if (!ref) return;
+        if (typeof ref === 'function') ref(innerRef.current);
+        else ref.current = innerRef.current;
+    }, [ref]);
+
+    const showActiveStyle = focused || (value !== undefined && value !== null && String(value).length > 0);
+
+    return (
+        <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => {
+                if (!editable) return;
+                innerRef.current && innerRef.current.focus();
+            }}
+            style={containerStyle}
+        >
+            <TextInput
+                ref={innerRef}
+                style={[
+                    style,
+                    showActiveStyle && { color: '#000000', textShadowColor: '#000000' },
+                ]}
+                value={value}
+                onChangeText={onChangeText}
+                placeholder={placeholder}
+                placeholderTextColor={placeholderTextColor}
+                multiline={multiline}
+                numberOfLines={numberOfLines}
+                keyboardType={keyboardType}
+                editable={editable}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                {...rest}
+            />
+        </TouchableOpacity>
+    );
+});
+
+const AddPerfomaPurchaseInvoice = () => {
     const [expandedId, setExpandedId] = useState(1);
     const navigation = useNavigation();
     const toggleSection = id => setExpandedId(prev => (prev === id ? null : id));
 
     // Demo options for dropdowns
-    const paymentTerms = ['- Payment Term -', 'Net 7', 'Net 15', 'Net 30'];
+    const paymentTerms = [ 'Net 7', 'Net 15', 'Net 30'];
     const taxOptions = ['IGST', 'CGST', 'SGST', 'No Tax'];
     const countries = ['India', 'United States', 'United Kingdom'];
-    const salesInquiries = ['- Select Inquiry -', 'SI-1001', 'SI-1002'];
-    const customers = ['- Select Customer -', 'Acme Corp', 'Beta Ltd'];
-    const state = ['- Select state -', 'Gujarat', 'Delhi', 'Mumbai'];
-    const city = ['- Select city -', 'vadodara', 'surat',];
+    const salesInquiries = [ 'SI-1001', 'SI-1002'];
+    const customers = [ 'Acme Corp', 'Beta Ltd'];
+    const state = [ 'Gujarat', 'Delhi', 'Mumbai'];
+    const city = [ 'vadodara', 'surat',];
 
 
 
     const paymentMethods = [
-        '- Select Method -',
         'Cash',
         'Bank Transfer',
         'Mobile App Development',
 
     ];
+
+    // Vendor / Purchase Order demo options (shown in Purchase Order No dropdown)
+    const [vendorOptions, setVendorOptions] = useState([
+        'KSPII1',
+        'KSPNII2',
+    ]);
 
     // Master items (would come from API normally)
     const masterItems = [
@@ -126,6 +187,7 @@ const AddPurchaseInvoice = () => {
         companyName: '',
         opportunityTitle: '',
         clientName: '',
+        purchaseOrderNumber: '',
         phone: '',
         email: '',
     });
@@ -169,8 +231,10 @@ const AddPurchaseInvoice = () => {
     const [datePickerSelectedDate, setDatePickerSelectedDate] = useState(
         new Date(),
     );
-    const [paymentTerm, setPaymentTerm] = useState(paymentTerms[0]);
+    // start empty so Dropdown shows the `placeholder` text
+    const [paymentTerm, setPaymentTerm] = useState('');
     const [notes, setNotes] = useState('');
+    const [termsConditions, setTermsConditions] = useState('');
     const [project, setProject] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('');
     const [shippingCharges, setShippingCharges] = useState('0');
@@ -410,7 +474,7 @@ const AddPurchaseInvoice = () => {
         <>
             <View style={{ flex: 1, backgroundColor: '#fff' }}>
                 <AppHeader
-                    title="Manage Purchase Invoice"
+                    title="Add Purchase Invoice"
                     onLeftPress={() => {
                         navigation.goBack();
                     }}
@@ -429,23 +493,28 @@ const AddPurchaseInvoice = () => {
                     >
                         <View style={styles.row}>
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Purchase Invoice Number*</Text>
+                                <Text style={inputStyles.label}>Purchase Invoice No* </Text>
+
+                                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Purchase Order Number*</Text> */}
                                 <View style={[inputStyles.box]}>
-                                    <TextInput
+                                    <FocusableTextInput
                                         style={[inputStyles.input]}
+                                        containerStyle={{ width: '100%' }}
                                         value={headerForm.clientName}
                                         onChangeText={v =>
                                             setHeaderForm(s => ({ ...s, clientName: v }))
                                         }
-                                        placeholder="Purchase Invoice Number*"
+                                        placeholder="eg."
                                         placeholderTextColor={COLORS.textLight}
                                     />
                                 </View>
                             </View>
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Purchase Inquiry No. </Text>
+                                <Text style={inputStyles.label}>Purchase Inquiry No.* </Text>
+
+                                {/* <Text style={inputStyles.label}>Vendor Name*</Text> */}
                                 <Dropdown
-                                    placeholder="Purchase Inquiry No.-"
+                                    placeholder="Purchase Inquiry No."
                                     value={headerForm.opportunityTitle}
                                     options={customers}
                                     getLabel={c => c}
@@ -456,7 +525,6 @@ const AddPurchaseInvoice = () => {
                                     inputBoxStyle={inputStyles.box}
                                     textStyle={inputStyles.input}
                                 />
-
                             </View>
                         </View>
 
@@ -464,34 +532,41 @@ const AddPurchaseInvoice = () => {
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>Purchase Order Number* </Text>
 
-                                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
-                                <View style={[inputStyles.box]}>
-                                    <TextInput
-                                        style={[inputStyles.input]}
-                                        value={headerForm.clientName}
-                                        onChangeText={v =>
-                                            setHeaderForm(s => ({ ...s, clientName: v }))
+                                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Purchase Order Number*</Text> */}
+                                <View style={{ zIndex: 9998, elevation: 20 }}>
+                                    <Dropdown
+                                        placeholder="Purchase Order No"
+                                        value={headerForm.vendorName}
+                                        options={vendorOptions}
+                                        getLabel={c => c}
+                                        getKey={c => c}
+                                        onSelect={v =>
+                                            setHeaderForm(s => ({ ...s, vendorName: v }))
                                         }
-                                        placeholder="Purchase Order Number*"
-                                        placeholderTextColor={COLORS.textLight}
+                                        renderInModal={true}
+                                        inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                                        textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Customer Name* </Text>
-                                <Dropdown
-                                    placeholder="Customer Name*"
-                                    value={headerForm.opportunityTitle}
-                                    options={customers}
-                                    getLabel={c => c}
-                                    getKey={c => c}
-                                    onSelect={v =>
-                                        setHeaderForm(s => ({ ...s, opportunityTitle: v }))
-                                    }
-                                    inputBoxStyle={inputStyles.box}
-                                    textStyle={inputStyles.input}
-                                />
+                                <Text style={inputStyles.label}>Select Vendor </Text>
 
+                                <View style={{ zIndex: 9998, elevation: 20 }}>
+                                    <Dropdown
+                                        placeholder=" Select Vendor"
+                                        value={headerForm.vendorName}
+                                        options={customers}
+                                        getLabel={c => c}
+                                        getKey={c => c}
+                                        onSelect={v =>
+                                            setHeaderForm(s => ({ ...s, vendorName: v }))
+                                        }
+                                        renderInModal={true}
+                                        inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                                        textStyle={inputStyles.input}
+                                    />
+                                </View>
                             </View>
                         </View>
 
@@ -500,9 +575,9 @@ const AddPurchaseInvoice = () => {
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>Project Name </Text>
 
-                                <View style={{ zIndex: 9998, elevation: 20 }}>
+                                <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
-                                        placeholder="-Select Project-"
+                                        placeholder="Select Project"
                                         value={project}
                                         options={paymentMethods}
                                         getLabel={p => p}
@@ -513,10 +588,10 @@ const AddPurchaseInvoice = () => {
                                         textStyle={inputStyles.input}
                                     />
                                 </View>
-
                             </View>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>payment Tearm* </Text>
+                              <View style={styles.col}>
+
+                                <Text style={inputStyles.label}>payment Term* </Text>
 
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
@@ -531,7 +606,6 @@ const AddPurchaseInvoice = () => {
                                         textStyle={inputStyles.input}
                                     />
                                 </View>
-
                             </View>
                         </View>
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
@@ -550,8 +624,8 @@ const AddPurchaseInvoice = () => {
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                                         textStyle={inputStyles.input}
                                     />
-                                </View>
 
+                                </View>
                             </View>
 
                             <View style={styles.col}>
@@ -1009,8 +1083,9 @@ const AddPurchaseInvoice = () => {
 
                                                     {/* QUANTITY */}
                                                     <View style={[styles.td, { width: COL_WIDTHS.QTY }]}>
-                                                        <TextInput
+                                                        <FocusableTextInput
                                                             style={styles.input}
+                                                            containerStyle={{ width: '100%' }}
                                                             keyboardType="numeric"
                                                             value={String(row.qty ?? '')}
                                                             onChangeText={v =>
@@ -1021,8 +1096,9 @@ const AddPurchaseInvoice = () => {
 
                                                     {/* RATE */}
                                                     <View style={[styles.td, { width: COL_WIDTHS.RATE }]}>
-                                                        <TextInput
+                                                        <FocusableTextInput
                                                             style={styles.input}
+                                                            containerStyle={{ width: '100%' }}
                                                             keyboardType="numeric"
                                                             value={String(row.rate ?? '')}
                                                             onChangeText={v =>
@@ -1081,11 +1157,12 @@ const AddPurchaseInvoice = () => {
                                     <Text style={styles.label}>Shipping Charges :</Text>
 
                                     <View style={styles.inputRightGroup}>
-                                        <TextInput
+                                        <FocusableTextInput
                                             value={String(shippingCharges)}
                                             onChangeText={setShippingCharges}
                                             keyboardType="numeric"
                                             style={[styles.inputBox, { color: '#000000' }]}
+                                            containerStyle={{ width: '100%' }}
                                         />
 
                                         {/* Question Icon with Tooltip */}
@@ -1133,19 +1210,21 @@ const AddPurchaseInvoice = () => {
 
                                 {/* Adjustments */}
                                 <View style={styles.rowInput}>
-                                    <TextInput
+                                    <FocusableTextInput
                                         value={adjustmentLabel}
                                         onChangeText={setAdjustmentLabel}
                                         underlineColorAndroid="transparent"
                                         style={styles.labelInput}
+                                        containerStyle={{ width: '35%' }}
                                     />
 
                                     <View style={styles.inputRightGroup}>
-                                        <TextInput
+                                        <FocusableTextInput
                                             value={String(adjustments)}
                                             onChangeText={setAdjustments}
                                             keyboardType="numeric"
                                             style={styles.inputBox}
+                                            containerStyle={{ width: '100%' }}
                                         />
                                         {/* Question Icon with Tooltip */}
                                         <View style={styles.helpIconWrapper}>
@@ -1213,34 +1292,22 @@ const AddPurchaseInvoice = () => {
                                     </Text>
                                 </View>
                             </View>
-                            {/* {customer Notes} */}
-                            <View style={styles.notesAttachRow}>
-                                <View style={styles.notesCol}>
-                                    <Text style={inputStyles.label}>Customer Notes</Text>
-                                    <TextInput
-                                        style={styles.noteBox}
-                                        multiline
-                                        numberOfLines={4}
-                                        value={notes}
-                                        onChangeText={setNotes}
-                                        placeholder="Add any Remark..."
-                                        placeholderTextColor={COLORS.textLight}
-                                    />
-                                </View>
-                               
-                            </View>
+
                             {/* Notes + Attach file inline */}
                             <View style={styles.notesAttachRow}>
+                              
+
                                 <View style={styles.notesCol}>
                                     <Text style={inputStyles.label}>Terms & Conditions</Text>
-                                    <TextInput
+                                    <FocusableTextInput
                                         style={styles.noteBox}
                                         multiline
                                         numberOfLines={4}
-                                        value={notes}
-                                        onChangeText={setNotes}
-                                        placeholder="Add any Terms & Condition..."
+                                        value={termsConditions}
+                                        onChangeText={setTermsConditions}
+                                        placeholder="Add any Terms & Conditions..."
                                         placeholderTextColor={COLORS.textLight}
+                                        containerStyle={{ width: '100%' }}
                                     />
                                 </View>
                                 <View style={styles.attachCol}>
@@ -1252,12 +1319,13 @@ const AddPurchaseInvoice = () => {
                                             styles.fileInputBox,
                                         ]}
                                     >
-                                        <TextInput
+                                        <FocusableTextInput
                                             style={[inputStyles.input, { fontSize: rf(4.2) }]}
                                             placeholder="Attach file"
                                             placeholderTextColor="#9ca3af"
                                             value={file?.name || ''}
                                             editable={false}
+                                            containerStyle={{ flex: 1 }}
                                         />
                                         {file ? (
                                             <TouchableOpacity
@@ -1343,7 +1411,7 @@ const AddPurchaseInvoice = () => {
     );
 };
 
-export default AddPurchaseInvoice;
+export default AddPerfomaPurchaseInvoice;
 
 const styles = StyleSheet.create({
     container: {
@@ -1840,7 +1908,7 @@ const styles = StyleSheet.create({
 
     /* ── COMMON ── */
     thead: { backgroundColor: '#f1f1f1' },
-    tr: { flexDirection: 'row' },
+    tr: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#E0E0E0' },
 
     /* ── TH (header) ── */
     th: {
@@ -1850,6 +1918,8 @@ const styles = StyleSheet.create({
         fontSize: wp(3),
         borderRightWidth: 1,
         borderRightColor: '#CFCFCF',
+        color: COLORS.text,
+        fontFamily: TYPOGRAPHY.fontFamilyMedium,
     },
 
     /* ── TD (body) ── */
@@ -1974,7 +2044,7 @@ const styles = StyleSheet.create({
     inputRightGroup: {
         flexDirection: 'row',
         alignItems: 'center',
-        width: '35%',
+        width: '25%',
         justifyContent: 'flex-end',
         position: 'relative',
         zIndex: 1,
@@ -1994,7 +2064,7 @@ const styles = StyleSheet.create({
     labelInput: {
         fontSize: 14,
         color: '#000000',
-        width: '35%',
+        width: '80%',
         height: 35,
         borderWidth: 1,
         borderColor: '#ccc',

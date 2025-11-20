@@ -17,6 +17,7 @@ const SALES_ORDERS = [
         deliveryDate: '15-12-24',
         dueDate: '15-12-24',
         salesInvoiceNumber: 'OR.002',
+        parchase: 'Kalpesh',
      
     },
     {
@@ -26,7 +27,8 @@ const SALES_ORDERS = [
         deliveryDate: '04-01-25',
         dueDate: '20-12-24',
         salesInvoiceNumber: 'OR.002',
-       
+        parchase: 'Kalpesh',
+
     },
     {
         id: 'KP1526',
@@ -35,7 +37,8 @@ const SALES_ORDERS = [
         deliveryDate: '22-12-24',
         dueDate: '18-12-24',
         salesInvoiceNumber: 'OR.002',
-        
+        parchase: 'Kalpesh',
+
     },
     {
         id: 'KP1527',
@@ -44,7 +47,7 @@ const SALES_ORDERS = [
         deliveryDate: '11-01-25',
         dueDate: '28-12-24',
         salesInvoiceNumber: 'OR.002',
-     
+        parchase: 'Kalpesh',
     },
     {
         id: 'KP1528',
@@ -53,7 +56,7 @@ const SALES_ORDERS = [
         deliveryDate: '29-12-24',
         dueDate: '24-12-24',
         salesInvoiceNumber: 'OR.002',
-       
+        parchase: 'Kalpesh',
     },
     {
         id: 'KP1529',
@@ -62,7 +65,7 @@ const SALES_ORDERS = [
         deliveryDate: '05-02-25',
         dueDate: '12-01-25',
         salesInvoiceNumber: '₹1,85,300',
-        
+        parchase: 'Kalpesh',
     },
 ];
 
@@ -218,12 +221,14 @@ const ManagePurchaseInvoice = () => {
                         isActive={activeOrderId === order.id}
                         onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
                         customRows={[
-                            { label: 'Customer Name', value: order.customerName },
+                            { label: 'Vendor Name', value: order.customerName },
                             { label: 'Purchase Invoice Number', value: order.salesInvoiceNumber },
                             { label: 'Delivery Date', value: order.deliveryDate },
+                            { label: 'Purchase Order', value: order.parchase },
+
                             // { label: 'Due Date', value: order.dueDate },
                         ]} 
-                        headerLeftLabel="Purchase Order Number"
+                        headerLeftLabel="Purchase Order"
                         headerRightLabel="Purchase Invoice Number"
                         footerComponent={renderFooterActions(order)}
                         headerRightContainerStyle={styles.headerRightContainer}

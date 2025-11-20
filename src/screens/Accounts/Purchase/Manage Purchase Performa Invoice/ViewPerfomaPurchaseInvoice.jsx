@@ -16,6 +16,7 @@ const SALES_ORDERS = [
         deliveryDate: '15-12-24',
         dueDate: '15-12-24',
         amount: 'KP1524',
+        performaInvoiceNumber: 'KSP',
      
     },
     {
@@ -25,6 +26,7 @@ const SALES_ORDERS = [
         deliveryDate: '04-01-25',
         dueDate: '20-12-24',
         amount: 'KP1524',
+        performaInvoiceNumber: 'Moon',
        
     },
     {
@@ -34,6 +36,7 @@ const SALES_ORDERS = [
         deliveryDate: '22-12-24',
         dueDate: '18-12-24',
         amount: 'KP1524',
+        performaInvoiceNumber: 'KSP',
         
     },
     {
@@ -43,6 +46,7 @@ const SALES_ORDERS = [
         deliveryDate: '11-01-25',
         dueDate: '28-12-24',
         amount: 'KP1524',
+        performaInvoiceNumber: 'BlueStone',
      
     },
     {
@@ -53,6 +57,7 @@ const SALES_ORDERS = [
         dueDate: '24-12-24',
         amount: 'KP1524',
         status: 'Approved',
+        performaInvoiceNumber: 'KSP',
        
     },
     {
@@ -62,6 +67,7 @@ const SALES_ORDERS = [
         deliveryDate: '05-02-25',
         dueDate: '12-01-25',
         amount: 'KP1524',
+        performaInvoiceNumber: 'UrbanNest',
         
     },
 ];
@@ -222,6 +228,8 @@ const ViewPerfomaPurchaseInvoice = () => {
                             { label: 'Purchase Order', value: order.amount },
                             { label: 'Tax Invoice', value: 'Kalpesh' },
                             { label: 'Delivery Date', value: order.deliveryDate },
+                            { label: 'Performa Invoice Number', value: order.performaInvoiceNumber },
+
                         ]} 
                         headerLeftLabel="Purchase Order"
                         headerRightLabel="Perfoma Invoice No."

@@ -1796,7 +1796,7 @@ const styles = StyleSheet.create({
 
   /* ── COMMON ── */
     thead: { backgroundColor: '#f1f1f1' },
-  tr: { flexDirection: 'row' },
+  tr: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#E0E0E0' },
 
   /* ── TH (header) ── */
   th: {
@@ -1806,6 +1806,8 @@ const styles = StyleSheet.create({
     fontSize: wp(3),
     borderRightWidth: 1,
     borderRightColor: '#CFCFCF',
+    color: COLORS.text,
+    fontFamily: TYPOGRAPHY.fontFamilyMedium,
   },
 
   /* ── TD (body) ── */
