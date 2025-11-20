@@ -28,16 +28,21 @@ const Dropdown = ({
   const [uncontrolledIsOpen, setUncontrolledIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const inputRef = useRef(null);
+  const wrapperRef = useRef(null);
   const [coords, setCoords] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
   // Use controlled state if provided, otherwise use internal state
   const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : uncontrolledIsOpen;
 
   const filteredOptions = useMemo(() => {
-    const source = options || [];
+    // Defensive: ensure `options` is an array
+    if (!Array.isArray(options)) {
+      console.warn('Dropdown: expected `options` to be an array but received:', options);
+    }
+    const source = Array.isArray(options) ? options : [];
     const q = query.trim().toLowerCase();
     if (!q || hideSearch) return source;
-    return source.filter((opt) => getLabel(opt).toLowerCase().includes(q));
+    return source.filter((opt) => String(getLabel(opt)).toLowerCase().includes(q));
   }, [query, options, getLabel, hideSearch]);
 
   const handleChoose = (item) => {
@@ -49,11 +54,27 @@ const Dropdown = ({
     setQuery('');
   };
 
-  const displayValue = value ?? '';
+  // Compute a safe display value for the selected value. If `value` is
+  // an object (some callers store selected item object), try to render
+  // a friendly label using `getLabel`. Otherwise coerce to string.
+  let displayValue = '';
+  try {
+    if (value === null || value === undefined) displayValue = '';
+    else if (typeof value === 'object') {
+      const lbl = getLabel(value);
+      displayValue = typeof lbl === 'string' ? lbl : String(lbl ?? JSON.stringify(value));
+    } else {
+      displayValue = String(value);
+    }
+  } catch (e) {
+    console.warn('Dropdown: error computing displayValue', e);
+    displayValue = '';
+  }
 
   const measure = () => {
     try {
-      const node = findNodeHandle(inputRef.current);
+      const target = wrapperRef.current || inputRef.current;
+      const node = findNodeHandle(target);
       if (!node) return;
       UIManager.measureInWindow(node, (x, y, width, height) => {
         setCoords({ x, y, width, height });
@@ -67,7 +88,8 @@ const Dropdown = ({
   const measureAsync = () => {
     return new Promise(resolve => {
       try {
-        const node = findNodeHandle(inputRef.current);
+        const target = wrapperRef.current || inputRef.current;
+        const node = findNodeHandle(target);
         if (!node) return resolve(null);
         UIManager.measureInWindow(node, (x, y, width, height) => {
           const c = { x, y, width, height };
@@ -82,8 +104,8 @@ const Dropdown = ({
 
   return (
     <View style={[styles.dropdownWrapper, isOpen && styles.dropdownWrapperOpen, style]}>
+      <View ref={wrapperRef} collapsable={false}>
       <TouchableOpacity
-        ref={inputRef}
         activeOpacity={0.8}
         style={[styles.inputBox, isOpen && styles.inputFocused, disabled && { opacity: 0.6 }, inputBoxStyle]}
         onPress={async () => {
@@ -119,6 +141,7 @@ const Dropdown = ({
         </Text>
         <Icon name={isOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={rf(5)} color="#8e8e93" />
       </TouchableOpacity>
+      </View>
       {isOpen && !renderInModal && (
         <View style={styles.dropdownPanel}>
           {!hideSearch && (
@@ -147,9 +170,12 @@ const Dropdown = ({
               </View>
             ) : null}
             {filteredOptions.map((item, index) => {
-              const label = getLabel(item);
+              const label = String(getLabel(item));
               const key = getKey(item, index);
-              const isActive = label === value;
+              // Determine active state by comparing keys first, then labels
+              const itemKeyStr = String(key ?? index);
+              const valueKeyStr = typeof value === 'object' ? String(getKey(value, 0) ?? '') : String(value ?? '');
+              const isActive = itemKeyStr === valueKeyStr || label === displayValue;
               return (
                 <TouchableOpacity
                   key={key}

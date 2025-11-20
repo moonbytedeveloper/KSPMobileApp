@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
 import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons'; 
@@ -37,7 +37,9 @@ const ManageInquiry = () => {
         }
     }, [totalPages, currentPage]);
 
-    const fetchInquiries = useCallback(async () => {
+    const isFocused = useIsFocused();
+
+    async function fetchInquiries() {
         try {
             setLoading(true);
             setError(null);
@@ -65,11 +67,12 @@ const ManageInquiry = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, itemsPerPage, searchQuery]);
+    }
 
+    // Refresh when screen is focused or when pagination/search changes
     useEffect(() => {
-        fetchInquiries();
-    }, [fetchInquiries]);
+        if (isFocused) fetchInquiries();
+    }, [isFocused, currentPage, itemsPerPage, searchQuery]);
 
     const rangeStart = totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1;
     const rangeEnd = totalRecords === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, totalRecords);
@@ -168,7 +171,7 @@ const ManageInquiry = () => {
             <AppHeader
                 title="View Sales Inquiry"
                 onLeftPress={() => navigation.goBack()}
-                onRightPress={() => navigation.navigate('AddSalesInquiry')}
+                onRightPress={() => navigation.push('AddSalesInquiry')}
                 rightButtonLabel="Add Sales Inquiry"
                 showRight
             />

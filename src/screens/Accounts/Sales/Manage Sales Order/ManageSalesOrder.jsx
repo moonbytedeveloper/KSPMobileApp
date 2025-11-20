@@ -21,6 +21,8 @@ import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
+import { addSalesOrder, updateSalesOrder, getCustomers, getCountries, getStates, getCities, getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers } from '../../../../api/authServices';
+import { getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 
 const COL_WIDTHS = {
@@ -38,6 +40,7 @@ const AccordionSection = ({
   onToggle,
   children,
   wrapperStyle,
+  rightActions,
 }) => {
   return (
     <View style={[styles.sectionWrapper, wrapperStyle]}>
@@ -60,11 +63,14 @@ const AccordionSection = ({
         onPress={() => onToggle(id)}
       >
         <Text style={styles.sectionTitle}>{title}</Text>
-        <Icon
-          name={expanded ? 'expand-less' : 'expand-more'}
-          size={rf(4.2)}
-          color={COLORS.text}
-        />
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {rightActions}
+          <Icon
+            name={expanded ? 'expand-less' : 'expand-more'}
+            size={rf(4.2)}
+            color={COLORS.text}
+          />
+        </View>
       </TouchableOpacity>
       {expanded && <View style={styles.line} />}
       {expanded && <View style={styles.sectionBody}>{children}</View>}
@@ -78,21 +84,21 @@ const ManageSalesOrder = () => {
   const toggleSection = id => setExpandedId(prev => (prev === id ? null : id));
 
   // Demo options for dropdowns
-  const paymentTerms = [ 'Net 7', 'Net 15', 'Net 30'];
-  const taxOptions = ['IGST', 'CGST', 'SGST', 'No Tax'];
-  const countries = ['India', 'United States', 'United Kingdom'];
-  const salesInquiries = [ 'SI-1001', 'SI-1002'];
-  const customers = [ 'Acme Corp', 'Beta Ltd'];
-  const state = [ 'Gujarat', 'Delhi', 'Mumbai'];
-  const city = ['vadodara', 'surat', ];
+  // const paymentTerms = ['Net 7', 'Net 15', 'Net 30'];
+  // const taxOptions = ['IGST', 'CGST', 'SGST', 'No Tax'];
+  // const countries = ['India', 'United States', 'United Kingdom'];
+  // const salesInquiries = ['SI-1001', 'SI-1002'];
+  // const customers = ['Acme Corp', 'Beta Ltd'];
+  // const state = ['Gujarat', 'Delhi', 'Mumbai'];
+  // const city = ['vadodara', 'surat',];
 
 
 
   const paymentMethods = [
-  
+
     'Bank Transfer',
     'Mobile App Development',
-    
+
   ];
 
   // Master items (would come from API normally)
@@ -119,14 +125,12 @@ const ManageSalesOrder = () => {
       hsn: '847522',
     },
   ];
-
+const [SalesInquiryNo, setSalesInquiry] = useState('');
   // Form state
   const [headerForm, setHeaderForm] = useState({
-    companyName: '',
-    opportunityTitle: '',
-    clientName: '',
-    phone: '',
-    email: '',
+    SalesInquiryUUID: '',
+    CustomerUUID: '',
+    SalesOrderNo: '',
   });
   const [billingForm, setBillingForm] = useState({
     buildingNo: '',
@@ -168,17 +172,41 @@ const ManageSalesOrder = () => {
   const [datePickerSelectedDate, setDatePickerSelectedDate] = useState(
     new Date(),
   );
-  const [paymentTerm, setPaymentTerm] = useState(paymentTerms[0]);
+  const [paymentTerm, setPaymentTerm] = useState('');
+  const [paymentTermUuid, setPaymentTermUuid] = useState(null);
   const [notes, setNotes] = useState('');
   const [terms, setTerms] = useState('');
   const [project, setProject] = useState('');
+  const [projectUUID, setProjectUUID] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
+  const [paymentMethodUUID, setPaymentMethodUUID] = useState('');
   const [shippingCharges, setShippingCharges] = useState('0');
   const [adjustments, setAdjustments] = useState('0');
   const [adjustmentLabel, setAdjustmentLabel] = useState('Adjustments');
   const [file, setFile] = useState(null);
   const [showShippingTip, setShowShippingTip] = useState(false);
   const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
+  const [headerSaved, setHeaderSaved] = useState(false);
+  const [headerResponse, setHeaderResponse] = useState(null);
+  const [isSavingHeader, setIsSavingHeader] = useState(false);
+  const [isEditingHeader, setIsEditingHeader] = useState(false);
+  const [customersOptions, setCustomersOptions] = useState([]);
+  const [paymentTermsOptions, setPaymentTermsOptions] = useState([]);
+  const [paymentMethodsOptions, setPaymentMethodsOptions] = useState([]);
+  const [projectsOptions, setProjectsOptions] = useState([]);
+  const [countriesOptions, setCountriesOptions] = useState([]);
+  const [SalesInquiryNosOptions, setSalesInquiryNosOptions] = useState([]);
+  const [statesOptions, setStatesOptions] = useState([]);
+  const [citiesOptions, setCitiesOptions] = useState([]);
+  const [shippingStatesOptions, setShippingStatesOptions] = useState([]);
+  const [shippingCitiesOptions, setShippingCitiesOptions] = useState([]);
+  // Selected objects for billing/shipping dropdowns (LeadForm pattern)
+  const [selectedBillingCountry, setSelectedBillingCountry] = useState(null);
+  const [selectedBillingState, setSelectedBillingState] = useState(null);
+  const [selectedBillingCity, setSelectedBillingCity] = useState(null);
+  const [selectedShippingCountry, setSelectedShippingCountry] = useState(null);
+  const [selectedShippingState, setSelectedShippingState] = useState(null);
+  const [selectedShippingCity, setSelectedShippingCity] = useState(null);
 
   // Permission handling for Android
   const requestStoragePermissionAndroid = async () => {
@@ -204,6 +232,9 @@ const ManageSalesOrder = () => {
 
   const copyBillingToShipping = () => {
     setShippingForm({ ...billingForm });
+    setSelectedShippingCountry(selectedBillingCountry);
+    setSelectedShippingState(selectedBillingState);
+    setSelectedShippingCity(selectedBillingCity);
     setIsShippingSame(true);
   };
 
@@ -211,6 +242,9 @@ const ManageSalesOrder = () => {
   const toggleCopyBillingToShipping = () => {
     if (!isShippingSame) {
       setShippingForm({ ...billingForm });
+      setSelectedShippingCountry(selectedBillingCountry);
+      setSelectedShippingState(selectedBillingState);
+      setSelectedShippingCity(selectedBillingCity);
       setIsShippingSame(true);
     } else {
       setShippingForm({
@@ -222,6 +256,9 @@ const ManageSalesOrder = () => {
         state: '',
         city: '',
       });
+      setSelectedShippingCountry(null);
+      setSelectedShippingState(null);
+      setSelectedShippingCity(null);
       setIsShippingSame(false);
     }
   };
@@ -249,6 +286,84 @@ const ManageSalesOrder = () => {
       return `${dd}-${mmm}-${yyyy}`;
     } catch (e) {
       return '';
+    }
+  };
+
+  const uiDateToApiDate = uiDateStr => {
+    if (!uiDateStr) return '';
+    try {
+      const parts = uiDateStr.split('-');
+      if (parts.length !== 3) return '';
+      const [dd, mmm, yyyy] = parts;
+      const months = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
+      const mm = months[mmm] || '01';
+      return `${yyyy}-${mm}-${dd}`;
+    } catch (e) {
+      return '';
+    }
+  };
+
+  const hasHeaderData = () => {
+    const headerFilled = Object.values(headerForm || {}).some(v => v && String(v).trim() !== '');
+    const billingFilled = Object.values(billingForm || {}).some(v => v && String(v).trim() !== '');
+    const shippingFilled = Object.values(shippingForm || {}).some(v => v && String(v).trim() !== '');
+    return headerFilled || billingFilled || shippingFilled;
+  };
+
+  const saveHeader = async () => {
+    setIsSavingHeader(true);
+    try {
+      const payload = {
+        UUID: headerResponse?.UUID || '',
+        SalesOrderNo: headerForm.SalesOrderNo || '',
+        SalesInquiryUUID: headerForm.SalesInquiryUUID || '',
+        CustomerUUID: headerForm.CustomerUUID || '',
+        ProjectUUID: projectUUID || '',
+        PaymentTermUUID: paymentTermUuid || '',
+        PaymentMethodUUID: paymentMethodUUID || '',
+        OrderDate: uiDateToApiDate(invoiceDate),
+        DueDate: uiDateToApiDate(dueDate),
+        Notes: notes || '',
+        BillingBuildingNo: billingForm.buildingNo || '',
+        BillingStreet1: billingForm.street1 || '',
+        BillingStreet2: billingForm.street2 || '',
+        BillingPostalCode: billingForm.postalCode || '',
+        BillingCountryUUID: billingForm.country || '',
+        BillingStateUUID: billingForm.state || '',
+        BillingCityUUID: billingForm.city.Uuid || '',
+        IsShipAddrSame: !!isShippingSame,
+        ShippingBuildingNo: shippingForm.buildingNo || '',
+        ShippingStreet1: shippingForm.street1 || '',
+        ShippingStreet2: shippingForm.street2 || '',
+        ShippingPostalCode: shippingForm.postalCode || '',
+        ShippingCountryUUID: shippingForm.country || '',
+        ShippingStateUUID: shippingForm.state || '',
+        ShippingCityUUID: shippingForm.city || '',
+        ShippingCharges: parseFloat(shippingCharges) || 0,
+        AdjustmentField: adjustmentLabel || '',
+        AdjustmentPrice: parseFloat(adjustments) || 0,
+      };
+
+      console.log('saveHeader payload ->', payload, 'isEditing:', isEditingHeader);
+      let resp;
+      if (isEditingHeader && headerResponse?.UUID) {
+        resp = await updateSalesOrder(payload);
+      } else {
+        resp = await addSalesOrder(payload);
+      }
+
+      console.log('saveHeader resp ->', resp);
+      const data = resp?.Data || resp || {};
+      setHeaderResponse(data);
+      setHeaderSaved(true);
+      setIsEditingHeader(false);
+      setExpandedId(1);
+      Alert.alert('Success', 'Header saved successfully');
+    } catch (err) {
+      console.error('saveHeader error ->', err);
+      Alert.alert('Error', err?.message || 'Unable to save header');
+    } finally {
+      setIsSavingHeader(false);
     }
   };
 
@@ -285,6 +400,215 @@ const ManageSalesOrder = () => {
     const r = parseFloat(rate) || 0;
     return (q * r).toFixed(2);
   };
+
+  // Fetch lookups on mount
+  // Helper to extract array from various response shapes
+  const extractArray = (resp) => {
+    const d = resp?.Data ?? resp;
+    if (Array.isArray(d)) return d;
+    if (Array.isArray(d?.List)) return d.List;
+    if (Array.isArray(d?.Records)) return d.Records;
+    if (Array.isArray(d?.Items)) return d.Items;
+    return [];
+  };
+
+  // Fetch lookups on mount
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const [custResp, termsResp, methodsResp, countriesResp, projectsResp, inquiriesResp] = await Promise.all([
+          getCustomers(),
+          getPaymentTerms(),
+          getPaymentMethods(),
+          getCountries(),
+          fetchProjects(),
+          getAllInquiryNumbers(),
+        ]);
+
+        const custList = extractArray(custResp);
+        const termsList = extractArray(termsResp);
+        const methodsList = extractArray(methodsResp);
+        const countriesList = extractArray(countriesResp);
+        const projectsList = extractArray(projectsResp);
+        const inquiriesList = extractArray(inquiriesResp);
+
+        setCustomersOptions(custList);
+        setPaymentTermsOptions(termsList);
+        setPaymentMethodsOptions(methodsList);
+        setCountriesOptions(countriesList);
+        setProjectsOptions(projectsList);
+        setSalesInquiryNosOptions(inquiriesList);
+
+        console.log('[ManageSalesOrder] lookup counts ->', {
+          customers: Array.isArray(custList) ? custList.length : 0,
+          paymentTerms: Array.isArray(termsList) ? termsList.length : 0,
+          paymentMethods: Array.isArray(methodsList) ? methodsList.length : 0,
+          countries: Array.isArray(countriesList) ? countriesList.length : 0,
+          projects: Array.isArray(projectsList) ? projectsList.length : 0,
+          inquiries: Array.isArray(inquiriesList) ? inquiriesList.length : 0,
+        });
+      } catch (e) {
+        console.warn('Lookup fetch error', e?.message || e);
+      }
+    })();
+  }, []);
+
+
+  const loadStatesForCountry = async (countryUuid, target = 'billing') => {
+    try {
+      const [cmpUuid, envUuid] = await Promise.all([getCMPUUID(), getENVUUID()]);
+      const resp = await getStates({ cmpUuid, countryUuid, envUuid });
+      const list = resp?.Data && Array.isArray(resp.Data) ? resp.Data : extractArray(resp);
+      if (target === 'billing') setStatesOptions(list);
+      else setShippingStatesOptions(list);
+    } catch (e) {
+      console.warn('Error loading states', e?.message || e);
+      if (target === 'billing') setStatesOptions([]);
+      else setShippingStatesOptions([]);
+    }
+  };
+
+  const loadCitiesForState = async (stateUuid, target = 'billing') => {
+    try {
+      const [cmpUuid, envUuid] = await Promise.all([getCMPUUID(), getENVUUID()]);
+      const resp = await getCities({ stateUuid, cmpUuid, envUuid });
+      const list = resp?.Data && Array.isArray(resp.Data) ? resp.Data : extractArray(resp);
+      if (target === 'billing') setCitiesOptions(list);
+      else setShippingCitiesOptions(list);
+    } catch (e) {
+      console.warn('Error loading cities', e?.message || e);
+      if (target === 'billing') setCitiesOptions([]);
+      else setShippingCitiesOptions([]);
+    }
+  };
+  
+  const handleBillingCountrySelect = (selected) => {
+    setSelectedBillingCountry(selected);
+    setSelectedBillingState(null);
+    setSelectedBillingCity(null);
+    setStatesOptions([]);
+    setCitiesOptions([]);
+    const countryUuid = selected?.Uuid || selected?.UUID || selected?.CountryUuid || selected?.Id || (typeof selected === 'string' ? selected : null);
+    setBillingForm(s => ({ ...s, country: countryUuid || '' , state: '', city: '' }));
+    if (countryUuid) loadStatesForCountry(countryUuid, 'billing');
+  };
+
+  const handleBillingStateSelect = (selected) => {
+    setSelectedBillingState(selected);
+    setSelectedBillingCity(null);
+    setCitiesOptions([]);
+    const stateUuid = selected?.Uuid || selected?.UUID || selected?.StateUuid || selected?.Id || (typeof selected === 'string' ? selected : null);
+    setBillingForm(s => ({ ...s, state: stateUuid || '', city: '' }));
+    if (stateUuid) loadCitiesForState(stateUuid, 'billing');
+  };
+
+  const handleShippingCountrySelect = (selected) => {
+    setSelectedShippingCountry(selected);
+    setSelectedShippingState(null);
+    setSelectedShippingCity(null);
+    setShippingStatesOptions([]);
+    setShippingCitiesOptions([]);
+    const countryUuid = selected?.Uuid || selected?.UUID || selected?.CountryUuid || selected?.Id || (typeof selected === 'string' ? selected : null);
+    setShippingForm(s => ({ ...s, country: countryUuid || '', state: '', city: '' }));
+    if (countryUuid) loadStatesForCountry(countryUuid, 'shipping');
+  };
+
+  const handleShippingStateSelect = (selected) => {
+    setSelectedShippingState(selected);
+    setSelectedShippingCity(null);
+    setShippingCitiesOptions([]);
+    const stateUuid = selected?.Uuid || selected?.UUID || selected?.StateUuid || selected?.Id || (typeof selected === 'string' ? selected : null);
+    setShippingForm(s => ({ ...s, state: stateUuid || '', city: '' }));
+    if (stateUuid) loadCitiesForState(stateUuid, 'shipping');
+  };
+
+  // Fetch states when billing country changes
+  React.useEffect(() => {
+    (async () => {
+      try {
+        // compute countryUuid safely (in case billingForm.country holds an object)
+        let countryUuid = null;
+        const cVal = billingForm.country;
+        if (!cVal) countryUuid = null;
+        else if (typeof cVal === 'string') countryUuid = cVal;
+        else if (typeof cVal === 'object') countryUuid = cVal?.UUID || cVal?.Id || cVal?.CountryUuid || cVal?.CountryId || null;
+        if (countryUuid) {
+          const resp = await getStates({ countryUuid });
+          const data = resp?.Data || resp || [];
+          const list = Array.isArray(data) ? data : (data?.List || data?.Records || []);
+          setStatesOptions(list);
+        }
+      } catch (e) {
+        console.warn('Get states error', e?.message || e);
+      }
+    })();
+  }, [billingForm.country]);
+
+  // Fetch cities when billing state changes
+  React.useEffect(() => {
+    (async () => {
+      try {
+        // compute stateUuid safely
+        let stateUuid = null;
+        const sVal = billingForm.state;
+        if (!sVal) stateUuid = null;
+        else if (typeof sVal === 'string') stateUuid = sVal;
+        else if (typeof sVal === 'object') stateUuid = sVal?.UUID || sVal?.Id || sVal?.StateUuid || sVal?.StateId || null;
+        if (stateUuid) {
+          const resp = await getCities({ stateUuid });
+          const data = resp?.Data || resp || [];
+          const list = Array.isArray(data) ? data : (data?.List || data?.Records || []);
+          setCitiesOptions(list);
+        }
+      } catch (e) {
+        console.warn('Get cities error', e?.message || e);
+      }
+    })();
+  }, [billingForm.state]);
+
+  // Fetch states when shipping country changes
+  React.useEffect(() => {
+    (async () => {
+      try {
+        // compute countryUuid safely for shipping
+        let countryUuid = null;
+        const cVal = shippingForm.country;
+        if (!cVal) countryUuid = null;
+        else if (typeof cVal === 'string') countryUuid = cVal;
+        else if (typeof cVal === 'object') countryUuid = cVal?.UUID || cVal?.Id || cVal?.CountryUuid || cVal?.CountryId || null;
+        if (countryUuid) {
+          const resp = await getStates({ countryUuid });
+          const data = resp?.Data || resp || [];
+          const list = Array.isArray(data) ? data : (data?.List || data?.Records || []);
+          setShippingStatesOptions(list);
+        }
+      } catch (e) {
+        console.warn('Get shipping states error', e?.message || e);
+      }
+    })();
+  }, [shippingForm.country]);
+
+  // Fetch cities when shipping state changes
+  React.useEffect(() => {
+    (async () => {
+      try {
+        // compute stateUuid safely for shipping
+        let stateUuid = null;
+        const sVal = shippingForm.state;
+        if (!sVal) stateUuid = null;
+        else if (typeof sVal === 'string') stateUuid = sVal;
+        else if (typeof sVal === 'object') stateUuid = sVal?.UUID || sVal?.Id || sVal?.StateUuid || sVal?.StateId || null;
+        if (stateUuid) {
+          const resp = await getCities({ stateUuid });
+          const data = resp?.Data || resp || [];
+          const list = Array.isArray(data) ? data : (data?.List || data?.Records || []);
+          setShippingCitiesOptions(list);
+        }
+      } catch (e) {
+        console.warn('Get shipping cities error', e?.message || e);
+      }
+    })();
+  }, [shippingForm.state]);
 
   const computeSubtotal = () => {
     const sum = items.reduce((acc, r) => acc + (parseFloat(r.amount) || 0), 0);
@@ -362,7 +686,7 @@ const ManageSalesOrder = () => {
     console.log('Create Order payload:', payload);
     Alert.alert('Create Order', 'Order payload logged to console');
   };
-  const onCancel = () => {};
+  const onCancel = () => { };
 
   // File attachment functions
   const pickFile = async () => {
@@ -448,38 +772,49 @@ const ManageSalesOrder = () => {
             title="Header"
             expanded={expandedId === 1}
             onToggle={toggleSection}
+            rightActions={headerSaved ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: wp(2) }}>
+                <TouchableOpacity onPress={() => { /* no-op check */ }} style={{ marginRight: wp(3) }}>
+                  <Icon name="check-circle" size={rf(4)} color={COLORS.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setIsEditingHeader(true); setHeaderSaved(false); setExpandedId(1); }}>
+                  <Icon name="edit" size={rf(4)} color={COLORS.text} />
+                </TouchableOpacity>
+              </View>
+            ) : null}
           >
             <View style={styles.row}>
               <View style={styles.col}>
-                                <Text style={inputStyles.label}>Sales Inquiry No.</Text>
+                <Text style={inputStyles.label}>Sales Inquiry No.</Text>
 
                 {/* <Text style={[inputStyles.label, { fontWeight: '600' }]}>Sales Inquiry No.</Text> */}
                 <Dropdown
                   placeholder="Sales Inquiry No."
-                  value={headerForm.companyName}
-                  options={salesInquiries}
-                  getLabel={s => s}
-                  getKey={s => s}
-                  onSelect={v => setHeaderForm(s => ({ ...s, companyName: v }))}
+                  value={SalesInquiryNo}
+                  options={SalesInquiryNosOptions}
+                  getLabel={c => (c?.InquiryNo || c?.Name || String(c))}
+                  getKey={c => (c?.UUID || c?.Id || c)}
+                  onSelect={v => {
+                    setSalesInquiry(v?.InquiryNo || String(v));
+                    setHeaderForm(s => ({ ...s, SalesInquiryUUID: v?.UUID || v }));
+                  }}
                   inputBoxStyle={inputStyles.box}
                   textStyle={inputStyles.input}
                 />
               </View>
 
-              
+
               <View style={styles.col}>
-             <Text style={inputStyles.label}>Customer Name* </Text>
+                <Text style={inputStyles.label}>Customer Name* </Text>
 
                 {/* <Text style={inputStyles.label}>Customer Name*</Text> */}
                 <Dropdown
                   placeholder="Customer Name*"
-                  value={headerForm.opportunityTitle}
-                  options={customers}
-                  getLabel={c => c}
-                  getKey={c => c}
-                  onSelect={v =>
-                    setHeaderForm(s => ({ ...s, opportunityTitle: v }))
-                  }
+                  value={headerForm.CustomerName}
+                  options={customersOptions}
+                  getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
+                  getKey={c => (c?.UUID || c?.Id || c)}
+                  onSelect={v => setHeaderForm(s => ({ ...s, CustomerName: v?.CustomerName || v }))}
                   inputBoxStyle={inputStyles.box}
                   textStyle={inputStyles.input}
                 />
@@ -488,7 +823,7 @@ const ManageSalesOrder = () => {
 
             <View style={[styles.row, { marginTop: hp(1.5) }]}>
               <View style={styles.col}>
-         <Text style={inputStyles.label}>Sales Order Number* </Text>
+                <Text style={inputStyles.label}>Sales Order Number* </Text>
 
                 {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
                 <View style={[inputStyles.box]} pointerEvents="box-none">
@@ -504,17 +839,17 @@ const ManageSalesOrder = () => {
                 </View>
               </View>
               <View style={styles.col}>
-                         <Text style={inputStyles.label}>Project Name </Text>
+                <Text style={inputStyles.label}>Project Name </Text>
 
                 {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
                     placeholder="Select Project*"
                     value={project}
-                    options={paymentMethods}
-                    getLabel={p => p}
-                    getKey={p => p}
-                    onSelect={v => setProject(v)}
+                    options={projectsOptions}
+                    getLabel={p => (p?.Name || p?.ProjectTitle || String(p))}
+                    getKey={p => (p?.Uuid || p?.Id || p)}
+                    onSelect={v => {setProject(v?.ProjectTitle || v), setProjectUUID(v?.Uuid || v);}}
                     renderInModal={true}
                     inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                     textStyle={inputStyles.input}
@@ -524,19 +859,19 @@ const ManageSalesOrder = () => {
             </View>
 
             <View style={[styles.row, { marginTop: hp(1.5) }]}>
-            
-           <View style={styles.col}>
-                         <Text style={inputStyles.label}>Payment Term </Text>
+
+              <View style={styles.col}>
+                <Text style={inputStyles.label}>Payment Term </Text>
 
                 {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
                     placeholder="Select Payment Term*"
                     value={paymentTerm}
-                    options={paymentTerms}
-                    getLabel={p => p}
-                    getKey={p => p}
-                    onSelect={v => setPaymentTerm(v)}
+                    options={paymentTermsOptions}
+                    getLabel={p => (p?.Name || p?.Term || String(p))}
+                    getKey={p => (p?.UUID || p?.Id || p)}
+                    onSelect={v => { setPaymentTerm(v?.Name || v), setPaymentTermUuid(v?.UUID || v) }}
                     renderInModal={true}
                     inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                     textStyle={inputStyles.input}
@@ -544,16 +879,16 @@ const ManageSalesOrder = () => {
                 </View>
               </View>
               <View style={styles.col}>
-                                         <Text style={inputStyles.label}>payment Method* </Text>
+                <Text style={inputStyles.label}>payment Method* </Text>
 
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
                     placeholder="Payment Method"
                     value={paymentMethod}
-                    options={paymentMethods}
-                    getLabel={p => p}
-                    getKey={p => p}
-                    onSelect={v => setPaymentMethod(v)}
+                    options={paymentMethodsOptions}
+                    getLabel={p => (p?.Name || p?.Mode || String(p))}
+                    getKey={p => (p?.UUID || p?.Id || p)}
+                    onSelect={v => {setPaymentMethod(v?.Name || v) , setPaymentMethodUUID(v?.UUID || v)}}
                     renderInModal={true}
                     inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                     textStyle={inputStyles.input}
@@ -568,7 +903,7 @@ const ManageSalesOrder = () => {
                   onPress={() => openDatePickerFor('invoice')}
                   style={{ marginTop: hp(0.8) }}
                 >
-                <Text style={inputStyles.label}>Order Date* </Text>
+                  <Text style={inputStyles.label}>Order Date* </Text>
 
                   <View
                     style={[
@@ -616,7 +951,7 @@ const ManageSalesOrder = () => {
                   onPress={() => openDatePickerFor('due')}
                   style={{ marginTop: hp(0.8) }}
                 >
-                                    <Text style={inputStyles.label}>Due Date* </Text>
+                  <Text style={inputStyles.label}>Due Date* </Text>
 
                   <View
                     style={[
@@ -661,686 +996,714 @@ const ManageSalesOrder = () => {
           </AccordionSection>
 
           {/* Section 2: Billing Address */}
-          <AccordionSection
-            id={2}
-            title="Billing Address"
-            expanded={expandedId === 2}
-            onToggle={toggleSection}
-          >
-            <View style={styles.row}>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Building No.</Text>
-                <View style={[inputStyles.box]} pointerEvents="box-none">
-                  <TextInput
-                    style={[inputStyles.input, { flex: 1 }]}
-                    value={billingForm.buildingNo}
-                    onChangeText={v =>
-                      setBillingForm(s => ({ ...s, buildingNo: v }))
-                    }
-                    placeholder="eg."
-                    placeholderTextColor={COLORS.textLight}
-                  />
-                </View>
-              </View>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Street 1</Text>
-                <View style={[inputStyles.box]} pointerEvents="box-none">
-                  <TextInput
-                    style={[inputStyles.input, { flex: 1 }]}
-                    value={billingForm.street1}
-                    onChangeText={v =>
-                      setBillingForm(s => ({ ...s, street1: v }))
-                    }
-                    placeholder="eg."
-                    placeholderTextColor={COLORS.textLight}
-                  />
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.row}>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Street 2</Text>
-                <View style={[inputStyles.box]} pointerEvents="box-none">
-                  <TextInput
-                    style={[inputStyles.input, { flex: 1 }]}
-                    value={billingForm.street2}
-                    onChangeText={v =>
-                      setBillingForm(s => ({ ...s, street2: v }))
-                    }
-                    placeholder="eg."
-                    placeholderTextColor={COLORS.textLight}
-                  />
-                </View>
-              </View>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Postal Code</Text>
-                <View style={[inputStyles.box]} pointerEvents="box-none">
-                  <TextInput
-                    style={[inputStyles.input, { flex: 1 }]}
-                    value={billingForm.postalCode}
-                    onChangeText={v =>
-                      setBillingForm(s => ({ ...s, postalCode: v }))
-                    }
-                    placeholder="eg."
-                    placeholderTextColor={COLORS.textLight}
-                  />
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.row}>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Country Name</Text>
-                <View style={{ zIndex: 9999, elevation: 20 }}>
-                  <Dropdown
-                    placeholder="Select Country*"
-                    value={billingForm.country}
-                    options={countries}
-                    getLabel={c => c}
-                    getKey={c => c}
-                    onSelect={c => setBillingForm(s => ({ ...s, country: c }))}
-                    inputBoxStyle={inputStyles.box}
-                    style={{ marginBottom: hp(1.6) }}
-                    renderInModal={true}
-                  />
-                </View>
-              </View>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>State Name</Text>
-                 <View style={{ zIndex: 9999, elevation: 20 }}>
-                  <Dropdown
-                    placeholder="Select State*"
-                    value={billingForm.state}
-                    options={state}
-                    getLabel={c => c}
-                    getKey={c => c}
-                    onSelect={c => setBillingForm(s => ({ ...s, state: c }))}
-                    inputBoxStyle={inputStyles.box}
-                    style={{ marginBottom: hp(1.6) }}
-                    renderInModal={true}
-                  />
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.row}>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>City Name</Text>
-                <View style={{ zIndex: 9998, elevation: 20 }}>
-                  <Dropdown
-                    placeholder="- Select City -"
-                    value={billingForm.city}
-                    options={city}
-                    getLabel={c => c}
-                    getKey={c => c}
-                    onSelect={c => setBillingForm(s => ({ ...s, city: c }))}
-                    inputBoxStyle={inputStyles.box}
-                    style={{ marginBottom: hp(1.6) }}
-                    renderInModal={true}
-                  />
-                </View>
-              </View>
-              <View style={[styles.col, styles.checkboxCol]}>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  style={styles.checkboxRow}
-                  onPress={() => {
-                    toggleCopyBillingToShipping();
-                  }}
-                >
-                  <View style={[styles.checkboxBox, isShippingSame && styles.checkboxBoxChecked]}>
-                    {isShippingSame ? (
-                      <Icon name="check" size={rf(3)} color="#fff" />
-                    ) : null}
+          {!(headerSaved && !isEditingHeader) && (
+            <AccordionSection
+              id={2}
+              title="Billing Address"
+              expanded={expandedId === 2}
+              onToggle={toggleSection}
+            >
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={inputStyles.label}>Building No.</Text>
+                  <View style={[inputStyles.box]} pointerEvents="box-none">
+                    <TextInput
+                      style={[inputStyles.input, { flex: 1 }]}
+                      value={billingForm.buildingNo}
+                      onChangeText={v =>
+                        setBillingForm(s => ({ ...s, buildingNo: v }))
+                      }
+                      placeholder="eg."
+                      placeholderTextColor={COLORS.textLight}
+                    />
                   </View>
-                  <View style={{ width: '80%' }}>
-                    <Text
-                      style={[
-                        inputStyles.label,
-                        { marginLeft: wp(2), marginTop: 0 },
-                      ]}
-                    >
-                      Is Shipping Address Same
-                    </Text>
+                </View>
+                <View style={styles.col}>
+                  <Text style={inputStyles.label}>Street 1</Text>
+                  <View style={[inputStyles.box]} pointerEvents="box-none">
+                    <TextInput
+                      style={[inputStyles.input, { flex: 1 }]}
+                      value={billingForm.street1}
+                      onChangeText={v =>
+                        setBillingForm(s => ({ ...s, street1: v }))
+                      }
+                      placeholder="eg."
+                      placeholderTextColor={COLORS.textLight}
+                    />
                   </View>
-                </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          </AccordionSection>
+
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={inputStyles.label}>Street 2</Text>
+                  <View style={[inputStyles.box]} pointerEvents="box-none">
+                    <TextInput
+                      style={[inputStyles.input, { flex: 1 }]}
+                      value={billingForm.street2}
+                      onChangeText={v =>
+                        setBillingForm(s => ({ ...s, street2: v }))
+                      }
+                      placeholder="eg."
+                      placeholderTextColor={COLORS.textLight}
+                    />
+                  </View>
+                </View>
+                <View style={styles.col}>
+                  <Text style={inputStyles.label}>Postal Code</Text>
+                  <View style={[inputStyles.box]} pointerEvents="box-none">
+                    <TextInput
+                      style={[inputStyles.input, { flex: 1 }]}
+                      value={billingForm.postalCode}
+                      onChangeText={v =>
+                        setBillingForm(s => ({ ...s, postalCode: v }))
+                      }
+                      placeholder="eg."
+                      placeholderTextColor={COLORS.textLight}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={inputStyles.label}>Country Name</Text>
+                  <View style={{ zIndex: 9999, elevation: 20 }}>
+                    <Dropdown
+                      placeholder="Select Country*"
+                      value={selectedBillingCountry}
+                      options={countriesOptions}
+                      getLabel={c => (c?.Name || c?.CountryName || c?.countryName || String(c))}
+                      getKey={c => (c?.UUID || c?.Id || c)}
+                      onSelect={(v) => { handleBillingCountrySelect(v); }}
+                      inputBoxStyle={inputStyles.box}
+                      style={{ marginBottom: hp(1.6) }}
+                      renderInModal={true}
+                    />
+                  </View>
+                </View>
+                <View style={styles.col}>
+                  <Text style={inputStyles.label}>State Name</Text>
+                  <View style={{ zIndex: 9999, elevation: 20 }}>
+                    <Dropdown
+                      placeholder="Select State*"
+                      value={selectedBillingState}
+                      options={statesOptions}
+                      getLabel={c => (c?.Name || c?.StateName || String(c))}
+                      getKey={c => (c?.UUID || c?.Id || c)}
+                      onSelect={handleBillingStateSelect}
+                      inputBoxStyle={inputStyles.box}
+                      style={{ marginBottom: hp(1.6) }}
+                      renderInModal={true}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={inputStyles.label}>City Name</Text>
+                  <View style={{ zIndex: 9998, elevation: 20 }}>
+                    <Dropdown
+                      placeholder="- Select City -"
+                      value={selectedBillingCity}
+                      options={citiesOptions}
+                      getLabel={c => (c?.Name || c?.CityName || String(c))}
+                      getKey={c => (c?.UUID || c?.Id || c)}
+                      onSelect={c => {
+                        setSelectedBillingCity(c);
+                        setBillingForm(s => ({ ...s, city: c?.UUID || c }));
+                      }}
+                      inputBoxStyle={inputStyles.box}
+                      style={{ marginBottom: hp(1.6) }}
+                      renderInModal={true}
+                    />
+                  </View>
+                </View>
+                <View style={[styles.col, styles.checkboxCol]}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={styles.checkboxRow}
+                    onPress={() => {
+                      toggleCopyBillingToShipping();
+                    }}
+                  >
+                    <View style={[styles.checkboxBox, isShippingSame && styles.checkboxBoxChecked]}>
+                      {isShippingSame ? (
+                        <Icon name="check" size={rf(3)} color="#fff" />
+                      ) : null}
+                    </View>
+                    <View style={{ width: '80%' }}>
+                      <Text
+                        style={[
+                          inputStyles.label,
+                          { marginLeft: wp(2), marginTop: 0 },
+                        ]}
+                      >
+                        Is Shipping Address Same
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </AccordionSection>
+          )}
 
           {/* Section 3: Shipping Address */}
-          <AccordionSection
-            id={3}
-            title="Shipping Address"
-            expanded={expandedId === 3}
-            onToggle={toggleSection}
-          >
-            <View style={styles.row}>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Building No.</Text>
-                <View style={[inputStyles.box]} pointerEvents="box-none">
-                  <TextInput
-                    style={[inputStyles.input, { flex: 1 }]}
-                    value={shippingForm.buildingNo}
-                    onChangeText={v =>
-                      setShippingForm(s => ({ ...s, buildingNo: v }))
-                    }
-                    placeholder="eg."
-                    placeholderTextColor={COLORS.textLight}
-                  />
+          {!(headerSaved && !isEditingHeader) && (
+            <AccordionSection
+              id={3}
+              title="Shipping Address"
+              expanded={expandedId === 3}
+              onToggle={toggleSection}
+            >
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={inputStyles.label}>Building No.</Text>
+                  <View style={[inputStyles.box]} pointerEvents="box-none">
+                    <TextInput
+                      style={[inputStyles.input, { flex: 1 }]}
+                      value={shippingForm.buildingNo}
+                      onChangeText={v =>
+                        setShippingForm(s => ({ ...s, buildingNo: v }))
+                      }
+                      placeholder="eg."
+                      placeholderTextColor={COLORS.textLight}
+                    />
+                  </View>
+                </View>
+                <View style={styles.col}>
+                  <Text style={inputStyles.label}>Street 1</Text>
+                  <View style={[inputStyles.box]} pointerEvents="box-none">
+                    <TextInput
+                      style={[inputStyles.input, { flex: 1 }]}
+                      value={shippingForm.street1}
+                      onChangeText={v =>
+                        setShippingForm(s => ({ ...s, street1: v }))
+                      }
+                      placeholder="eg."
+                      placeholderTextColor={COLORS.textLight}
+                    />
+                  </View>
                 </View>
               </View>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Street 1</Text>
-                <View style={[inputStyles.box]} pointerEvents="box-none">
-                  <TextInput
-                    style={[inputStyles.input, { flex: 1 }]}
-                    value={shippingForm.street1}
-                    onChangeText={v =>
-                      setShippingForm(s => ({ ...s, street1: v }))
-                    }
-                    placeholder="eg."
-                    placeholderTextColor={COLORS.textLight}
-                  />
-                </View>
-              </View>
-            </View>
 
-            <View style={styles.row}>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Street 2</Text>
-                <View style={[inputStyles.box]} pointerEvents="box-none">
-                  <TextInput
-                    style={[inputStyles.input, { flex: 1 }]}
-                    value={shippingForm.street2}
-                    onChangeText={v =>
-                      setShippingForm(s => ({ ...s, street2: v }))
-                    }
-                    placeholder="eg."
-                    placeholderTextColor={COLORS.textLight}
-                  />
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={inputStyles.label}>Street 2</Text>
+                  <View style={[inputStyles.box]} pointerEvents="box-none">
+                    <TextInput
+                      style={[inputStyles.input, { flex: 1 }]}
+                      value={shippingForm.street2}
+                      onChangeText={v =>
+                        setShippingForm(s => ({ ...s, street2: v }))
+                      }
+                      placeholder="eg."
+                      placeholderTextColor={COLORS.textLight}
+                    />
+                  </View>
+                </View>
+                <View style={styles.col}>
+                  <Text style={inputStyles.label}>Postal Code</Text>
+                  <View style={[inputStyles.box]} pointerEvents="box-none">
+                    <TextInput
+                      style={[inputStyles.input, { flex: 1 }]}
+                      value={shippingForm.postalCode}
+                      onChangeText={v =>
+                        setShippingForm(s => ({ ...s, postalCode: v }))
+                      }
+                      placeholder="eg."
+                      placeholderTextColor={COLORS.textLight}
+                    />
+                  </View>
                 </View>
               </View>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Postal Code</Text>
-                <View style={[inputStyles.box]} pointerEvents="box-none">
-                  <TextInput
-                    style={[inputStyles.input, { flex: 1 }]}
-                    value={shippingForm.postalCode}
-                    onChangeText={v =>
-                      setShippingForm(s => ({ ...s, postalCode: v }))
-                    }
-                    placeholder="eg."
-                    placeholderTextColor={COLORS.textLight}
-                  />
-                </View>
-              </View>
-            </View>
 
-            <View style={styles.row}>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Country Name</Text>
-                <View style={{ zIndex: 9999, elevation: 20 }}>
-                  <Dropdown
-                    placeholder="- Select Country -"
-                    value={shippingForm.country}
-                    options={countries}
-                    getLabel={c => c}
-                    getKey={c => c}
-                    onSelect={c => setShippingForm(s => ({ ...s, country: c }))}
-                    inputBoxStyle={inputStyles.box}
-                    textStyle={inputStyles.input}
-                    style={{ marginBottom: hp(1.6) }}
-                    renderInModal={true}
-                  />
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={inputStyles.label}>Country Name</Text>
+                  <View style={{ zIndex: 9999, elevation: 20 }}>
+                    <Dropdown
+                      placeholder="- Select Country -"
+                      value={selectedShippingCountry}
+                      options={countriesOptions}
+                      getLabel={c => (c?.Name || c?.CountryName || c?.countryName || String(c))}
+                      getKey={c => (c?.UUID || c?.Id || c)}
+                      onSelect={handleShippingCountrySelect}
+                      inputBoxStyle={inputStyles.box}
+                      textStyle={inputStyles.input}
+                      style={{ marginBottom: hp(1.6) }}
+                      renderInModal={true}
+                    />
+                  </View>
+                </View>
+                <View style={styles.col}>
+                  <Text style={inputStyles.label}>State Name</Text>
+                  <View style={{ zIndex: 9999, elevation: 20 }}>
+                    <Dropdown
+                      placeholder="- Select State -"
+                      value={selectedShippingState}
+                      options={shippingStatesOptions}
+                      getLabel={c => (c?.Name || c?.StateName || String(c))}
+                      getKey={c => (c?.UUID || c?.Id || c)}
+                      onSelect={handleShippingStateSelect}
+                      inputBoxStyle={inputStyles.box}
+                      textStyle={inputStyles.input}
+                      style={{ marginBottom: hp(1.6) }}
+                      renderInModal={true}
+                    />
+                  </View>
                 </View>
               </View>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>State Name</Text>
-                <View style={{ zIndex: 9999, elevation: 20 }}>
-                  <Dropdown
-                    placeholder="- Select State -"
-                    value={shippingForm.state}
-                    options={state}
-                    getLabel={c => c}
-                    getKey={c => c}
-                    onSelect={c => setShippingForm(s => ({ ...s, state: c }))}
-                    inputBoxStyle={inputStyles.box}
-                    textStyle={inputStyles.input}
-                    style={{ marginBottom: hp(1.6) }}
-                    renderInModal={true}
-                  />
-                </View>
-              </View>
-            </View>
 
-            <View style={styles.row}>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>City Name</Text>
-                <View style={{ zIndex: 9998, elevation: 20 }}>
-                  <Dropdown
-                    placeholder="- Select City -"
-                    value={shippingForm.city}
-                    options={city}
-                    getLabel={c => c}
-                    getKey={c => c}
-                    onSelect={c => setShippingForm(s => ({ ...s, city: c }))}
-                    inputBoxStyle={inputStyles.box}
-                    textStyle={inputStyles.input}
-                    style={{ marginBottom: hp(1.6) }}
-                    renderInModal={true}
-                  />
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={inputStyles.label}>City Name</Text>
+                  <View style={{ zIndex: 9998, elevation: 20 }}>
+                    <Dropdown
+                      placeholder="- Select City -"
+                      value={selectedShippingCity}
+                      options={shippingCitiesOptions}
+                      getLabel={c => (c?.Name || c?.CityName || String(c))}
+                      getKey={c => (c?.UUID || c?.Id || c)}
+                      onSelect={c => {
+                        setSelectedShippingCity(c);
+                        setShippingForm(s => ({ ...s, city: c?.UUID || c }));
+                      }}
+                      inputBoxStyle={inputStyles.box}
+                      textStyle={inputStyles.input}
+                      style={{ marginBottom: hp(1.6) }}
+                      renderInModal={true}
+                    />
+                  </View>
                 </View>
+                <View style={styles.col} />
               </View>
-              <View style={styles.col} />
-            </View>
-          </AccordionSection>
+
+              {/* Submit button inside Shipping section when header fields filled */}
+              <View style={{ marginTop: hp(1.2), alignItems: 'flex-end' }}>
+                {hasHeaderData() && !headerSaved ? (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    style={[formStyles.primaryBtn, { paddingVertical: hp(1), width: wp(36) }]}
+                    onPress={saveHeader}
+                    disabled={isSavingHeader}
+                  >
+                    <Text style={formStyles.primaryBtnText}>
+                      {isSavingHeader ? (isEditingHeader ? 'Updating...' : 'Saving...') : (isEditingHeader ? 'Update' : 'Submit')}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </AccordionSection>
+          )}
 
           {/* Section 4: Create Order */}
-          <AccordionSection
-            id={4}
-            title="Create Order"
-            expanded={expandedId === 4}
-            onToggle={toggleSection}
-            wrapperStyle={{ overflow: 'visible' }}
-          >
-            <View style={{ marginTop: hp(1) }}>
-              <Text
-                style={[
-                  styles.sectionTitle,
-                  {
-                    marginBottom: hp(1),
-                    color: COLORS.textMuted,
-                    fontWeight: '700',
-                    fontSize: wp(4.5),
-                  },
-                ]}
-              >
-                Item Details
-              </Text>
-
-              {/* ── TABLE CONTAINER ── */}
-              <View style={styles.tableWrapper}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={true}
-                  stickyHeaderIndices={[0]}
-                  contentContainerStyle={{ minWidth: wp(180) }}
+          {headerSaved && (
+            <AccordionSection
+              id={4}
+              title="Create Order"
+              expanded={expandedId === 4}
+              onToggle={toggleSection}
+              wrapperStyle={{ overflow: 'visible' }}
+            >
+              <View style={{ marginTop: hp(1) }}>
+                <Text
+                  style={[
+                    styles.sectionTitle,
+                    {
+                      marginBottom: hp(1),
+                      color: COLORS.textMuted,
+                      fontWeight: '700',
+                      fontSize: wp(4.5),
+                    },
+                  ]}
                 >
-                  <View style={styles.table}>
-                    {/* ── THEAD ── */}
-                    <View style={styles.thead}>
-                      <View style={styles.tr}>
-                        <Text style={[styles.th, { width: COL_WIDTHS.ITEM }]}>
-                          ITEM DETAILS
-                        </Text>
-                        <Text style={[styles.th, { width: COL_WIDTHS.QTY }]}>
-                          QUANTITY
-                        </Text>
-                        <Text style={[styles.th, { width: COL_WIDTHS.RATE }]}>
-                          RATE
-                        </Text>
-                        {/* TAX column removed */}
-                        <Text style={[styles.th, { width: COL_WIDTHS.AMOUNT }]}>
-                          AMOUNT
-                        </Text>
-                        <Text style={[styles.th, { width: COL_WIDTHS.ACTION }]}>
-                          ACTION
-                        </Text>
-                      </View>
-                    </View>
+                  Item Details
+                </Text>
 
-                    {/* ── TBODY ── */}
-                    <View style={styles.tbody}>
-                      {items.map(row => (
-                        <View key={row.id} style={styles.tr}>
-                          <View
-                            style={[
-                              styles.tableCellWide,
-                              {
-                                borderRightWidth: 1,
-                                borderColor: '#E0E0E0',
-                              },
-                            ]}
-                          >
-                            <View style={{ zIndex: 9999, elevation: 20 }}>
-                              <Dropdown
-                                placeholder="Select Item"
-                                value={
-                                  row.selectedItem ? row.selectedItem.name : ''
+                {/* ── TABLE CONTAINER ── */}
+                <View style={styles.tableWrapper}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={true}
+                    stickyHeaderIndices={[0]}
+                    contentContainerStyle={{ minWidth: wp(180) }}
+                  >
+                    <View style={styles.table}>
+                      {/* ── THEAD ── */}
+                      <View style={styles.thead}>
+                        <View style={styles.tr}>
+                          <Text style={[styles.th, { width: COL_WIDTHS.ITEM }]}>
+                            ITEM DETAILS
+                          </Text>
+                          <Text style={[styles.th, { width: COL_WIDTHS.QTY }]}>
+                            QUANTITY
+                          </Text>
+                          <Text style={[styles.th, { width: COL_WIDTHS.RATE }]}>
+                            RATE
+                          </Text>
+                          {/* TAX column removed */}
+                          <Text style={[styles.th, { width: COL_WIDTHS.AMOUNT }]}>
+                            AMOUNT
+                          </Text>
+                          <Text style={[styles.th, { width: COL_WIDTHS.ACTION }]}>
+                            ACTION
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* ── TBODY ── */}
+                      <View style={styles.tbody}>
+                        {items.map(row => (
+                          <View key={row.id} style={styles.tr}>
+                            <View
+                              style={[
+                                styles.tableCellWide,
+                                {
+                                  borderRightWidth: 1,
+                                  borderColor: '#E0E0E0',
+                                },
+                              ]}
+                            >
+                              <View style={{ zIndex: 9999, elevation: 20 }}>
+                                <Dropdown
+                                  placeholder="Select Item"
+                                  value={
+                                    row.selectedItem ? row.selectedItem.name : ''
+                                  }
+                                  options={masterItems}
+                                  getLabel={it =>
+                                    `${it.name} | ${it.sku} | ₹${it.rate}`
+                                  }
+                                  getKey={it => it.sku}
+                                  onSelect={it => selectMasterItem(row.id, it)}
+                                  renderInModal={true}
+                                  inputBoxStyle={{
+                                    ...inputStyles.box,
+                                    height: hp(6), // bigger height
+                                    borderWidth: 1,
+                                    backgroundColor: '#fff',
+                                    width: wp(48), // wider dropdown
+                                  }}
+                                  textStyle={[
+                                    inputStyles.input,
+                                    { fontSize: wp(3.2) },
+                                  ]}
+                                  dropdownListStyle={{
+                                    backgroundColor: '#fff',
+                                    elevation: 10,
+                                    zIndex: 9999,
+                                    borderWidth: 1,
+                                    borderColor: '#ccc',
+                                    width: wp(55),
+                                  }}
+                                />
+                              </View>
+
+                              {row.selectedItem ? (
+                                <View style={styles.selectedContainer}>
+                                  <View style={styles.itemHeader}>
+                                    <Text style={styles.itemName}>
+                                      {row.name}
+                                    </Text>
+                                    <Text style={styles.itemSku}>
+                                      SKU: {row.sku}
+                                    </Text>
+                                  </View>
+                                  <View style={styles.descInput}>
+                                    <Text style={{ color: COLORS.text }}>
+                                      {row.desc}
+                                    </Text>
+                                  </View>
+                                  {row.hsn ? (
+                                    <Text style={styles.hsnTag}>
+                                      HSN: {row.hsn}
+                                    </Text>
+                                  ) : null}
+                                </View>
+                              ) : null}
+                            </View>
+
+                            {/* QUANTITY */}
+                            <View style={[styles.td, { width: COL_WIDTHS.QTY }]}>
+                              <TextInput
+                                style={styles.input}
+                                keyboardType="numeric"
+                                value={String(row.qty ?? '')}
+                                onChangeText={v =>
+                                  updateItemField(row.id, 'qty', v)
                                 }
-                                options={masterItems}
-                                getLabel={it =>
-                                  `${it.name} | ${it.sku} | ₹${it.rate}`
-                                }
-                                getKey={it => it.sku}
-                                onSelect={it => selectMasterItem(row.id, it)}
-                                renderInModal={true}
-                                inputBoxStyle={{
-                                  ...inputStyles.box,
-                                  height: hp(6), // bigger height
-                                  borderWidth: 1,
-                                  backgroundColor: '#fff',
-                                  width: wp(48), // wider dropdown
-                                }}
-                                textStyle={[
-                                  inputStyles.input,
-                                  { fontSize: wp(3.2) },
-                                ]}
-                                dropdownListStyle={{
-                                  backgroundColor: '#fff',
-                                  elevation: 10,
-                                  zIndex: 9999,
-                                  borderWidth: 1,
-                                  borderColor: '#ccc',
-                                  width: wp(55),
-                                }}
                               />
                             </View>
 
-                            {row.selectedItem ? (
-                              <View style={styles.selectedContainer}>
-                                <View style={styles.itemHeader}>
-                                  <Text style={styles.itemName}>
-                                    {row.name}
-                                  </Text>
-                                  <Text style={styles.itemSku}>
-                                    SKU: {row.sku}
-                                  </Text>
-                                </View>
-                                <View style={styles.descInput}>
-                                  <Text style={{ color: COLORS.text }}>
-                                    {row.desc}
-                                  </Text>
-                                </View>
-                                {row.hsn ? (
-                                  <Text style={styles.hsnTag}>
-                                    HSN: {row.hsn}
-                                  </Text>
-                                ) : null}
-                              </View>
-                            ) : null}
-                          </View>
+                            {/* RATE */}
+                            <View style={[styles.td, { width: COL_WIDTHS.RATE }]}>
+                              <TextInput
+                                style={styles.input}
+                                keyboardType="numeric"
+                                value={String(row.rate ?? '')}
+                                onChangeText={v =>
+                                  updateItemField(row.id, 'rate', v)
+                                }
+                              />
+                            </View>
 
-                          {/* QUANTITY */}
-                          <View style={[styles.td, { width: COL_WIDTHS.QTY }]}>
-                            <TextInput
-                              style={styles.input}
-                              keyboardType="numeric"
-                              value={String(row.qty ?? '')}
-                              onChangeText={v =>
-                                updateItemField(row.id, 'qty', v)
-                              }
-                            />
-                          </View>
+                            {/* TAX column removed */}
 
-                          {/* RATE */}
-                          <View style={[styles.td, { width: COL_WIDTHS.RATE }]}>
-                            <TextInput
-                              style={styles.input}
-                              keyboardType="numeric"
-                              value={String(row.rate ?? '')}
-                              onChangeText={v =>
-                                updateItemField(row.id, 'rate', v)
-                              }
-                            />
-                          </View>
-
-                          {/* TAX column removed */}
-
-                          {/* AMOUNT */}
-                          <View
-                            style={[styles.td, { width: COL_WIDTHS.AMOUNT }]}
-                          >
-                            <Text style={[styles.input, { fontWeight: '600' }]}>
-                              ₹{row.amount ?? '0.00'}
-                            </Text>
-                          </View>
-
-                          {/* ACTION */}
-                          <View
-                            style={[
-                              styles.tdAction,
-                              { width: COL_WIDTHS.ACTION },
-                            ]}
-                          >
-                            <TouchableOpacity
-                              style={styles.deleteBtn}
-                              onPress={() => deleteItem(row.id)}
+                            {/* AMOUNT */}
+                            <View
+                              style={[styles.td, { width: COL_WIDTHS.AMOUNT }]}
                             >
-                              <Text style={styles.deleteBtnText}>Delete</Text>
-                            </TouchableOpacity>
+                              <Text style={[styles.input, { fontWeight: '600' }]}>
+                                ₹{row.amount ?? '0.00'}
+                              </Text>
+                            </View>
+
+                            {/* ACTION */}
+                            <View
+                              style={[
+                                styles.tdAction,
+                                { width: COL_WIDTHS.ACTION },
+                              ]}
+                            >
+                              <TouchableOpacity
+                                style={styles.deleteBtn}
+                                onPress={() => deleteItem(row.id)}
+                              >
+                                <Text style={styles.deleteBtnText}>Delete</Text>
+                              </TouchableOpacity>
+                            </View>
                           </View>
-                        </View>
-                      ))}
+                        ))}
+                      </View>
                     </View>
-                  </View>
-                </ScrollView>
-              </View>
-
-              {/* ADD ITEM */}
-              <TouchableOpacity style={styles.addBtn} onPress={addItem}>
-                <Text style={styles.addBtnText}>+ Add Item</Text>
-              </TouchableOpacity>
-
-              {/* Totals / Summary area */}
-              <View style={styles.billContainer}>
-                {/* Subtotal */}
-                <View style={styles.row}>
-                  <Text style={styles.labelBold}>Subtotal:</Text>
-                  <Text style={styles.valueBold}>₹{computeSubtotal()}</Text>
+                  </ScrollView>
                 </View>
 
-                {/* Shipping Charges */}
-                <View style={styles.rowInput}>
-                  <Text style={styles.label}>Shipping Charges :</Text>
+                {/* ADD ITEM */}
+                <TouchableOpacity style={styles.addBtn} onPress={addItem}>
+                  <Text style={styles.addBtnText}>+ Add Item</Text>
+                </TouchableOpacity>
 
-                  <View style={styles.inputRightGroup}>
+                {/* Totals / Summary area */}
+                <View style={styles.billContainer}>
+                  {/* Subtotal */}
+                  <View style={styles.row}>
+                    <Text style={styles.labelBold}>Subtotal:</Text>
+                    <Text style={styles.valueBold}>₹{computeSubtotal()}</Text>
+                  </View>
+
+                  {/* Shipping Charges */}
+                  <View style={styles.rowInput}>
+                    <Text style={styles.label}>Shipping Charges :</Text>
+
+                    <View style={styles.inputRightGroup}>
+                      <TextInput
+                        value={String(shippingCharges)}
+                        onChangeText={setShippingCharges}
+                        keyboardType="numeric"
+                        style={[styles.inputBox, { color: '#000000' }]}
+                      />
+
+                      {/* Question Icon with Tooltip */}
+                      <View style={styles.helpIconWrapper}>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setShowShippingTip(!showShippingTip);
+                            setShowAdjustmentTip(false);
+                          }}
+                          style={styles.helpIconContainer}
+                        >
+                          <Text style={styles.helpIcon}>?</Text>
+                        </TouchableOpacity>
+
+                        {/* Tooltip */}
+                        {showShippingTip && (
+                          <>
+                            <Modal
+                              transparent
+                              visible={showShippingTip}
+                              animationType="none"
+                              onRequestClose={() => setShowShippingTip(false)}
+                            >
+                              <TouchableWithoutFeedback
+                                onPress={() => setShowShippingTip(false)}
+                              >
+                                <View style={styles.modalOverlay} />
+                              </TouchableWithoutFeedback>
+                            </Modal>
+                            <View style={styles.tooltipBox}>
+                              <Text style={styles.tooltipText}>
+                                Amount spent on shipping the goods.
+                              </Text>
+                              <View style={styles.tooltipArrow} />
+                            </View>
+                          </>
+                        )}
+                      </View>
+                    </View>
+
+                    <Text style={styles.value}>
+                      ₹{parseFloat(shippingCharges || 0).toFixed(2)}
+                    </Text>
+                  </View>
+
+                  {/* Adjustments */}
+                  <View style={styles.rowInput}>
                     <TextInput
-                      value={String(shippingCharges)}
-                      onChangeText={setShippingCharges}
-                      keyboardType="numeric"
-                      style={[styles.inputBox, { color: '#000000' }]}
+                      value={adjustmentLabel}
+                      onChangeText={setAdjustmentLabel}
+                      underlineColorAndroid="transparent"
+                      style={styles.labelInput}
                     />
 
-                    {/* Question Icon with Tooltip */}
-                    <View style={styles.helpIconWrapper}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          setShowShippingTip(!showShippingTip);
-                          setShowAdjustmentTip(false);
-                        }}
-                        style={styles.helpIconContainer}
-                      >
-                        <Text style={styles.helpIcon}>?</Text>
-                      </TouchableOpacity>
+                    <View style={styles.inputRightGroup}>
+                      <TextInput
+                        value={String(adjustments)}
+                        onChangeText={setAdjustments}
+                        keyboardType="numeric"
+                        style={styles.inputBox}
+                      />
+                      {/* Question Icon with Tooltip */}
+                      <View style={styles.helpIconWrapper}>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setShowAdjustmentTip(!showAdjustmentTip);
+                            setShowShippingTip(false);
+                          }}
+                          style={styles.helpIconContainer}
+                        >
+                          <Text style={styles.helpIcon}>?</Text>
+                        </TouchableOpacity>
 
-                      {/* Tooltip */}
-                      {showShippingTip && (
-                        <>
-                          <Modal
-                            transparent
-                            visible={showShippingTip}
-                            animationType="none"
-                            onRequestClose={() => setShowShippingTip(false)}
-                          >
-                            <TouchableWithoutFeedback
-                              onPress={() => setShowShippingTip(false)}
+                        {/* Tooltip */}
+                        {showAdjustmentTip && (
+                          <>
+                            <Modal
+                              transparent
+                              visible={showAdjustmentTip}
+                              animationType="none"
+                              onRequestClose={() => setShowAdjustmentTip(false)}
                             >
-                              <View style={styles.modalOverlay} />
-                            </TouchableWithoutFeedback>
-                          </Modal>
-                          <View style={styles.tooltipBox}>
-                            <Text style={styles.tooltipText}>
-                              Amount spent on shipping the goods.
-                            </Text>
-                            <View style={styles.tooltipArrow} />
-                          </View>
-                        </>
+                              <TouchableWithoutFeedback
+                                onPress={() => setShowAdjustmentTip(false)}
+                              >
+                                <View style={styles.modalOverlay} />
+                              </TouchableWithoutFeedback>
+                            </Modal>
+                            <View style={styles.tooltipBox}>
+                              <Text style={styles.tooltipText}>
+                                Additional charges or discounts applied to the
+                                order.
+                              </Text>
+                              <View style={styles.tooltipArrow} />
+                            </View>
+                          </>
+                        )}
+                      </View>
+                    </View>
+
+                    <Text style={styles.value}>
+                      ₹{parseFloat(adjustments || 0).toFixed(2)}
+                    </Text>
+                  </View>
+
+                  {/* Total Tax */}
+                  <View style={styles.row}>
+                    <Text style={styles.label}>Total Tax:</Text>
+                    <Text style={styles.value}>₹0.00</Text>
+                  </View>
+
+                  {/* Divider */}
+                  <View style={styles.divider} />
+
+                  {/* Total Amount */}
+                  <View style={styles.row}>
+                    <Text style={styles.labelBold}>Total Amount:</Text>
+                    <Text style={styles.valueBold}>
+                      ₹
+                      {(
+                        parseFloat(computeSubtotal()) +
+                        parseFloat(shippingCharges || 0) +
+                        parseFloat(adjustments || 0)
+                      ).toFixed(2)}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Notes + Attach file inline */}
+                <View style={styles.notesAttachRow}>
+                  <View style={styles.notesCol}>
+                    <Text style={inputStyles.label}>Notes</Text>
+                    <TextInput
+                      style={styles.noteBox}
+                      multiline
+                      numberOfLines={4}
+                      value={notes}
+                      onChangeText={setNotes}
+                      placeholder="Add any remarks..."
+                      placeholderTextColor={COLORS.textLight}
+                    />
+                  </View>
+                  <View style={styles.notesCol}>
+                    <Text style={inputStyles.label}>Terms & Conditions</Text>
+                    <TextInput
+                      style={styles.noteBox}
+                      multiline
+                      numberOfLines={4}
+                      value={terms}
+                      onChangeText={setTerms}
+                      placeholder="Terms & Conditions..."
+                      placeholderTextColor={COLORS.textLight}
+                    />
+                  </View>
+                  <View style={styles.attachCol}>
+                    <Text style={inputStyles.label}>Attach file</Text>
+                    <View
+                      style={[
+                        inputStyles.box,
+                        { justifyContent: 'space-between' },
+                        styles.fileInputBox,
+                      ]}
+                    >
+                      <TextInput
+                        style={[inputStyles.input, { fontSize: rf(4.2) }]}
+                        placeholder="Attach file"
+                        placeholderTextColor="#9ca3af"
+                        value={file?.name || ''}
+                        editable={false}
+                      />
+                      {file ? (
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          onPress={removeFile}
+                        >
+                          <Icon
+                            name="close"
+                            size={rf(3.6)}
+                            color="#ef4444"
+                            style={{ marginRight: SPACING.sm }}
+                          />
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          style={[styles.uploadButton]}
+                          onPress={pickFile}
+                        >
+                          <Icon name="cloud-upload" size={rf(4)} color="#fff" />
+                        </TouchableOpacity>
                       )}
                     </View>
+                    <Text style={styles.uploadHint}>
+                      Allowed: PDF, PNG, JPG • Max size 10 MB
+                    </Text>
                   </View>
-
-                  <Text style={styles.value}>
-                    ₹{parseFloat(shippingCharges || 0).toFixed(2)}
-                  </Text>
-                </View>
-
-                {/* Adjustments */}
-                <View style={styles.rowInput}>
-                  <TextInput
-                    value={adjustmentLabel}
-                    onChangeText={setAdjustmentLabel}
-                    underlineColorAndroid="transparent"
-                    style={styles.labelInput}
-                  />
-
-                  <View style={styles.inputRightGroup}>
-                    <TextInput
-                      value={String(adjustments)}
-                      onChangeText={setAdjustments}
-                      keyboardType="numeric"
-                      style={styles.inputBox}
-                    />
-                    {/* Question Icon with Tooltip */}
-                    <View style={styles.helpIconWrapper}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          setShowAdjustmentTip(!showAdjustmentTip);
-                          setShowShippingTip(false);
-                        }}
-                        style={styles.helpIconContainer}
-                      >
-                        <Text style={styles.helpIcon}>?</Text>
-                      </TouchableOpacity>
-
-                      {/* Tooltip */}
-                      {showAdjustmentTip && (
-                        <>
-                          <Modal
-                            transparent
-                            visible={showAdjustmentTip}
-                            animationType="none"
-                            onRequestClose={() => setShowAdjustmentTip(false)}
-                          >
-                            <TouchableWithoutFeedback
-                              onPress={() => setShowAdjustmentTip(false)}
-                            >
-                              <View style={styles.modalOverlay} />
-                            </TouchableWithoutFeedback>
-                          </Modal>
-                          <View style={styles.tooltipBox}>
-                            <Text style={styles.tooltipText}>
-                              Additional charges or discounts applied to the
-                              order.
-                            </Text>
-                            <View style={styles.tooltipArrow} />
-                          </View>
-                        </>
-                      )}
-                    </View>
-                  </View>
-
-                  <Text style={styles.value}>
-                    ₹{parseFloat(adjustments || 0).toFixed(2)}
-                  </Text>
-                </View>
-
-                {/* Total Tax */}
-                <View style={styles.row}>
-                  <Text style={styles.label}>Total Tax:</Text>
-                  <Text style={styles.value}>₹0.00</Text>
-                </View>
-
-                {/* Divider */}
-                <View style={styles.divider} />
-
-                {/* Total Amount */}
-                <View style={styles.row}>
-                  <Text style={styles.labelBold}>Total Amount:</Text>
-                  <Text style={styles.valueBold}>
-                    ₹
-                    {(
-                      parseFloat(computeSubtotal()) +
-                      parseFloat(shippingCharges || 0) +
-                      parseFloat(adjustments || 0)
-                    ).toFixed(2)}
-                  </Text>
                 </View>
               </View>
-
-              {/* Notes + Attach file inline */}
-              <View style={styles.notesAttachRow}>
-                <View style={styles.notesCol}>
-                  <Text style={inputStyles.label}>Notes</Text>
-                  <TextInput
-                    style={styles.noteBox}
-                    multiline
-                    numberOfLines={4}
-                    value={notes}
-                    onChangeText={setNotes}
-                    placeholder="Add any remarks..."
-                    placeholderTextColor={COLORS.textLight}
-                  />
-                </View>
-                <View style={styles.notesCol}>
-                  <Text style={inputStyles.label}>Terms & Conditions</Text>
-                  <TextInput
-                    style={styles.noteBox}
-                    multiline
-                    numberOfLines={4}
-                    value={terms}
-                    onChangeText={setTerms}
-                    placeholder="Terms & Conditions..."
-                    placeholderTextColor={COLORS.textLight}
-                  />
-                </View>
-                <View style={styles.attachCol}>
-                  <Text style={inputStyles.label}>Attach file</Text>
-                  <View
-                    style={[
-                      inputStyles.box,
-                      { justifyContent: 'space-between' },
-                      styles.fileInputBox,
-                    ]}
-                  >
-                    <TextInput
-                      style={[inputStyles.input, { fontSize: rf(4.2) }]}
-                      placeholder="Attach file"
-                      placeholderTextColor="#9ca3af"
-                      value={file?.name || ''}
-                      editable={false}
-                    />
-                    {file ? (
-                      <TouchableOpacity
-                        activeOpacity={0.85}
-                        onPress={removeFile}
-                      >
-                        <Icon
-                          name="close"
-                          size={rf(3.6)}
-                          color="#ef4444"
-                          style={{ marginRight: SPACING.sm }}
-                        />
-                      </TouchableOpacity>
-                    ) : (
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        style={[styles.uploadButton]}
-                        onPress={pickFile}
-                      >
-                        <Icon name="cloud-upload" size={rf(4)} color="#fff" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                  <Text style={styles.uploadHint}>
-                    Allowed: PDF, PNG, JPG • Max size 10 MB
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </AccordionSection>
+            </AccordionSection>
+          )}
 
           {/* Section 5: Notes (full width) */}
           {/* <AccordionSection id={5} title="Notes" expanded={expandedId === 5} onToggle={toggleSection}>
@@ -1349,7 +1712,7 @@ const ManageSalesOrder = () => {
                         </AccordionSection> */}
         </ScrollView>
 
-                        
+
         <View style={styles.footerBar}>
           <View
             style={[
@@ -1900,10 +2263,10 @@ const styles = StyleSheet.create({
   table: { minWidth: wp(180) },
 
   /* ── COMMON ── */
- thead: {
-        backgroundColor: '#f1f1f1',
-    },
-      tr: { flexDirection: 'row' },
+  thead: {
+    backgroundColor: '#f1f1f1',
+  },
+  tr: { flexDirection: 'row' },
 
   /* ── TH (header) ── */
   th: {
