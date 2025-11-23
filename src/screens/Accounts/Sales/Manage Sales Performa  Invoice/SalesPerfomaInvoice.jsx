@@ -6,10 +6,10 @@ import AccordionItem from '../../../../components/common/AccordionItem';
 import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
-import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
-import { deleteSalesHeader } from '../../../../api/authServices';
+import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles'; 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
+import { getSalesPerformaInvoiceHeaders, deleteSalesPerformaInvoiceHeader } from '../../../../api/authServices';
 
 const SalesPerfomaInvoice = () => {
     const navigation = useNavigation();
@@ -37,36 +37,48 @@ const SalesPerfomaInvoice = () => {
         }
     }, [totalPages, currentPage]);
 
-    const fetchPurchaseInquiries = useCallback(async () => {
-        // Replace network call with static dummy data for local/dev usage
+    const fetchPurchaseInquiries = useCallback(async (page = 0, pageSize = itemsPerPage, q = searchQuery) => {
         try {
             setLoading(true);
             setError(null);
+            const cmp = await getCMPUUID();
+            const env = await getENVUUID();
+            const start = page * pageSize;
+            const resp = await getSalesPerformaInvoiceHeaders({ cmpUuid: cmp, envUuid: env, start, length: pageSize, searchValue: q });
+            const data = resp?.Data || resp || {};
+            const records = Array.isArray(data?.Records) ? data.Records : (Array.isArray(data) ? data : []);
+            // normalize server records into UI items
+            const normalized = records.map((r, idx) => ({
+                id: r?.UUID || r?.Id || `pi-${start + idx + 1}`,
+                // Prefer SalesOrderNo, fallback to SalesInqNo or other order/inquiry identifiers
+                inquiryNo: r?.SalesOrderNo || r?.SalesInqNo || r?.OrderNo || r?.InquiryNo || r?.SalesOrder || '',
+                // Bind performa/invoice number explicitly from SalesPerInvNo when present
+                title: r?.SalesPerInvNo || r?.PerformaInvoiceNo || r?.PerformaNo || r?.SalesPerformaNo || r?.DocumentNo || r?.Title || '',
+                // Amount may be present under different keys depending on backend. Try common fallbacks.
+                amount: r?.Amount || r?.TotalAmount || r?.NetAmount || r?.Total || r?.AmountPayable || null,
+                requestDate: r?.DeliveryDate || r?.OrderDate || r?.RequestDate || r?.PerformaDate || '',
+                TaxInvoice: r?.TaxInvoice || r?.TaxInvoiceNo || r?.TaxNo || '',
+                customerName: r?.CustomerName || r?.Customer || r?.CustomerDisplayName || r?.CustomerNameDisplay || '',
+                status: r?.Status || r?.State || 'Draft',
+                raw: r,
+            }));
 
-            const dummy = [
-                { id: 'pi-1', inquiryNo: 'PI-1001', title: '234', requestDate: '01-Jan-2025', TaxInvoice:'TaxInvoice1',customerName: 'MoonByte', status: 'Pending', raw: {} },
-                { id: 'pi-2', inquiryNo: 'PI-1002', title: '211', requestDate: '05-Feb-2025',TaxInvoice:'TaxInvoice2', customerName: 'Rajat', status: 'Approved', raw: {} },
-                { id: 'pi-3', inquiryNo: 'PI-1003', title: '250', requestDate: '12-Mar-2025',TaxInvoice:'TaxInvoice3', customerName: 'Manav', status: 'Draft', raw: {} },
-            ];
-
-            // Optionally apply a simple client-side search filter
-            const filtered = searchQuery && String(searchQuery).trim()
-                ? dummy.filter(d => (d.inquiryNo + ' ' + d.title).toLowerCase().includes(String(searchQuery).toLowerCase()))
-                : dummy;
-
-            setInquiries(filtered);
-            setTotalRecords(filtered.length);
+            setInquiries(normalized);
+            // total count fallback to Data.TotalRecords or Data?.Total or records length
+            const total = Number(data?.TotalRecords ?? data?.Total ?? resp?.TotalRecords ?? resp?.Total ?? records.length) || records.length;
+            setTotalRecords(total);
         } catch (err) {
-            setError('Failed to load inquiries.');
+            console.warn('getSalesPerformaInvoiceHeaders error', err?.message || err);
+            setError('Failed to load performa invoices');
             setInquiries([]);
             setTotalRecords(0);
         } finally {
             setLoading(false);
         }
-    }, [searchQuery]);
+    }, [itemsPerPage, searchQuery]);
 
     useEffect(() => {
-        fetchPurchaseInquiries();
+        fetchPurchaseInquiries(currentPage, itemsPerPage, searchQuery);
     }, [fetchPurchaseInquiries]);
 
     const rangeStart = totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1;
@@ -76,21 +88,46 @@ const SalesPerfomaInvoice = () => {
         // Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.inquiryNo}`);
         if (actionLabel == 'Delete') {
 
-            try {
-                const [cmpUuid, envUuid] = await Promise.all([getCMPUUID(), getENVUUID()]);
-                await deleteSalesHeader({
-                    overrides: {
-                        userUuid: takerUuid || (await getUUID()),
-                        cmpUuid,
-                        envUuid,
-                        UUID: headerUuid
+            Alert.alert(
+                'Delete Performa Invoice',
+                'Are you sure you want to delete this performa invoice header?',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Delete', style: 'destructive', onPress: async () => {
+                            try {
+                                setLoading(true);
+                                const headerUuid = order?.raw?.UUID || order?.id;
+                                if (!headerUuid) throw new Error('Header UUID not found');
+                                const resp = await deleteSalesPerformaInvoiceHeader({ headerUuid });
+                                console.log('deleteSalesPerformaInvoiceHeader resp ->', resp);
+                                // refresh list
+                                await fetchPurchaseInquiries(currentPage, itemsPerPage, searchQuery);
+                                Alert.alert('Success', 'Performa invoice deleted');
+                            } catch (err) {
+                                console.error('delete performa header error', err);
+                                Alert.alert('Error', err?.message || 'Unable to delete');
+                            } finally {
+                                setLoading(false);
+                            }
+                        }
                     }
-                });
-                // Refresh from API instead of local state update
+                ],
+                { cancelable: true }
+            );
+        }
+        if (actionLabel === 'Edit') {
+            // Navigate to AddSalesInvoice (invoice screen) with headerUuid for edit mode
+            try {
+                const headerUuid = order?.raw?.UUID || order?.UUID || order?.id || order?.Id;
+                if (headerUuid) {
+                    navigation.navigate('AddSalesInvoice', { headerUuid });
+                } else {
+                    // Fallback to prefillHeader if UUID not found (pass raw data)
+                    navigation.navigate('AddSalesInvoice', { prefillHeader: order.raw || order });
+                }
             } catch (e) {
-            } finally {
-                setDeleteConfirmVisible(false);
-                setFollowUpToDelete(null);
+                console.warn('navigate to edit performa invoice failed', e);
             }
         }
 
@@ -148,7 +185,7 @@ const SalesPerfomaInvoice = () => {
                 title="Sales Perfoma Invoice"
                 onLeftPress={() => navigation.goBack()}
                 onRightPress={() => navigation.navigate('AddSalesPerfomaInvoice')}
-                rightButtonLabel="Add Purchase Inquiry"
+                rightButtonLabel="Add Perfoma Invoice"
                 showRight
             />
             <View style={styles.headerSeparator} />
@@ -197,29 +234,27 @@ const SalesPerfomaInvoice = () => {
                     <AccordionItem
                         key={item.id}
 
-                        item={{
-                            soleExpenseCode: item.id,
-                            expenseName: item.inquiryNo,
-                            amount: item.title,
-                            status: item.status,
-                        }}
+                                item={{
+                                    soleExpenseCode: item.id,
+                                    // Show Performa Invoice No in the left header by using `title` here
+                                    expenseName: item.title,
+                                    // Show amount on the right header; prefer numeric amount if available
+                                    // Use a dummy amount '0.00' when the backend doesn't provide one
+                                    amount: item.amount != null ? item.amount : '0.00',
+                                    status: item.status,
+                                }}
 
                         isActive={activeOrderId === item.id}
                         onToggle={() => setActiveOrderId(prev => prev === item.id ? null : item.id)}
 
                         customRows={[
-                            { label: "Sales Order", value: item.inquiryNo },
-                            { label: "Performa Invoice No", value: item.title },
+                            { label: "Sales Inquiry No", value: item.inquiryNo },
                             { label: "Customer Name", value: item.customerName },
-                            { label: "Delivery Date", value: item.requestDate },
-                            { label: "Tax Invoice", value: item.TaxInvoice },
-
-
+                            { label: "Order Date", value: item.requestDate },
                             { label: "Status", value: item.status, isStatus: true }
                         ]}
-
-                        headerLeftLabel="Sales Order"
-                        headerRightLabel="Performa Invoice No"
+                        headerLeftLabel="Performa Invoice No"
+                        headerRightLabel="Amount"
 
                         footerComponent={renderFooterActions(item)}
                         headerRightContainerStyle={styles.headerRightContainer}

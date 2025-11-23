@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Modal, ActivityIndicator } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
@@ -7,7 +7,7 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
-import { getSalesOrderHeaders } from '../../../../api/authServices';
+import { getSalesOrderHeaders, getSalesHeader, deleteSalesOrderHeader } from '../../../../api/authServices';
 
 // sales orders will be fetched from API
 
@@ -22,6 +22,7 @@ const ViewSalesOrder = () => {
     const [orders, setOrders] = useState([]);
     const [totalRecords, setTotalRecords] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [isFetchingHeader, setIsFetchingHeader] = useState(false);
 
     const filteredOrders = useMemo(() => {
         const query = searchQuery.trim().toLowerCase();
@@ -92,6 +93,47 @@ const ViewSalesOrder = () => {
         fetchOrders({ start: currentPage * itemsPerPage, length: itemsPerPage, searchValue: searchQuery.trim() });
     }, [currentPage, itemsPerPage]);
 
+    const handleEditOrder = async (order) => {
+        setIsFetchingHeader(true);
+        try {
+            // navigate to ManageSalesOrder with headerUuid so that screen fetches and prefills itself
+            navigation.navigate('ManageSalesOrder', { headerUuid: order.id });
+        } catch (e) {
+            console.log('getSalesHeader error ->', e?.message || e);
+            Alert.alert('Error', 'Unable to fetch order details for editing.');
+        } finally {
+            setIsFetchingHeader(false);
+        }
+    };
+
+    const handleDeleteOrder = (order) => {
+        Alert.alert(
+            'Confirm Delete',
+            `Are you sure you want to delete ${order.salesOrderNumber || 'this order'}?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setLoading(true);
+                            await deleteSalesOrderHeader({ headerUuid: order.id });
+                            Alert.alert('Deleted', 'Sales order deleted successfully');
+                            // refresh list
+                            fetchOrders({ start: currentPage * itemsPerPage, length: itemsPerPage, searchValue: searchQuery.trim() });
+                        } catch (e) {
+                            console.error('deleteSalesOrderHeader error ->', e?.message || e);
+                            Alert.alert('Error', e?.message || 'Unable to delete sales order');
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const renderFooterActions = (order) => {
         const buttons = [
             { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444', action: 'Delete' },
@@ -108,7 +150,15 @@ const ViewSalesOrder = () => {
                         key={`${order.id}-${btn.icon}`}
                         activeOpacity={0.85}
                         style={[styles.cardActionBtn , { backgroundColor: btn.bg, borderColor: btn.border }]}
-                        onPress={() => handleQuickAction(order, btn.action)}
+                        onPress={() => {
+                            if (btn.icon === 'edit') {
+                                handleEditOrder(order);
+                            } else if (btn.icon === 'delete-outline') {
+                                handleDeleteOrder(order);
+                            } else {
+                                handleQuickAction(order, btn.action);
+                            }
+                        }}
                     >
                         <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
                     </TouchableOpacity>
@@ -194,26 +244,26 @@ const ViewSalesOrder = () => {
                     </View>
                 )}
                 {paginatedOrders.map((order) => (
-                    <AccordionItem
-                        key={order.id}
-                        item={{
-                            soleExpenseCode: order.id,
-                            expenseName: order.salesOrderNumber,
-                            amount: order.amount,
-                        }}
-                        isActive={activeOrderId === order.id}
-                        onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
+                        <AccordionItem
+                            key={order.id}
+                            item={{
+                                soleExpenseCode: order.id,
+                                expenseName: order.salesOrderNumber,
+                                amount: order.amount,
+                            }}
+                            isActive={activeOrderId === order.id}
+                            onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
                         customRows={[
                             { label: 'Customer Name', value: order.customerName },
                             { label: 'Amount', value: order.amount },
                             { label: 'Delivery Date', value: order.deliveryDate },
                             { label: 'Due Date', value: order.dueDate },
                         ]} 
-                        headerLeftLabel="Sales Order Number"
+                            headerLeftLabel="Sales Order Number"
                         headerRightLabel="Amount"
-                        footerComponent={renderFooterActions(order)}
-                        headerRightContainerStyle={styles.headerRightContainer}
-                    />
+                            footerComponent={renderFooterActions(order)}
+                            headerRightContainerStyle={styles.headerRightContainer}
+                        />
                 ))}
 
                 {paginatedOrders.length === 0 && (
@@ -225,6 +275,16 @@ const ViewSalesOrder = () => {
                     </View>
                 )}
             </ScrollView>
+
+            {/* Loading modal while fetching header for edit */}
+            <Modal transparent visible={isFetchingHeader} animationType="none">
+                <View style={{ flex: 1, backgroundColor: '#00000055', alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={{ padding: wp(4), backgroundColor: '#fff', borderRadius: 8, alignItems: 'center' }}>
+                        <ActivityIndicator size="large" color={COLORS.primary} />
+                        <Text style={{ marginTop: hp(1), fontSize: rf(3.2), color: COLORS.text }}>Loading order details...</Text>
+                    </View>
+                </View>
+            </Modal>
 
             {filteredOrders.length > 0 && (
                 <View style={styles.paginationContainer}>

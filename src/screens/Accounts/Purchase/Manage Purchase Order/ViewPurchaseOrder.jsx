@@ -76,16 +76,35 @@ const ViewPurchaseOrder = () => {
     const rangeEnd = filteredOrders.length === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, filteredOrders.length);
 
     const handleQuickAction = (order, actionLabel) => {
-        Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.purchaseOrderNumber}`);
+        switch (actionLabel) {
+            case 'Edit':
+                // Navigate to ManagePurchaseOrder and pass the header UUID for prefill
+                navigation.navigate('ManagePurchaseOrder', { headerUuid: order.id, HeaderUUID: order.id, UUID: order.id, origin: 'ViewPurchaseOrder' });
+                return;
+            case 'View':
+                navigation.navigate('ManagePurchaseOrder', { headerUuid: order.id, HeaderUUID: order.id, UUID: order.id, viewOnly: true, origin: 'ViewPurchaseOrder' });
+                return;
+            case 'Delete':
+                Alert.alert('Delete', `Delete clicked for ${order.purchaseOrderNumber}`);
+                return;
+            case 'Download':
+                Alert.alert('Download', `Download clicked for ${order.purchaseOrderNumber}`);
+                return;
+            case 'Forward':
+                Alert.alert('Forward', `Forward clicked for ${order.purchaseOrderNumber}`);
+                return;
+            default:
+                Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.purchaseOrderNumber}`);
+        }
     };
 
     const renderFooterActions = (order) => {
         const buttons = [
-            { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444', action: 'Delete' },
-            { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6', action: 'Download' },
-            { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280', action: 'Forward' },
-            { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E', action: 'View' },
-            { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316', action: 'Update Status' },
+            { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
+            { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
+            { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
+            { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
+            { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316' },
         ];
 
         return (

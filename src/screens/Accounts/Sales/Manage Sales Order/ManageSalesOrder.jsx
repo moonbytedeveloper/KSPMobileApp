@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,26 +12,27 @@ import {
   Platform,
   Modal,
   TouchableWithoutFeedback,
+  ActivityIndicator,
 } from 'react-native';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { COLORS, TYPOGRAPHY, inputStyles, SPACING } from '../../../styles/styles';
 import AppHeader from '../../../../components/common/AppHeader';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
-import { addSalesOrder, updateSalesOrder, getCustomers, getCountries, getStates, getCities, getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers } from '../../../../api/authServices';
+import { addSalesOrder, updateSalesOrder, addSalesOrderLine, updateSalesOrderLine, getCustomers, getCountries, getStates, getCities, getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getSalesOrderHeaderById, getItems, getSalesLines, getSalesOrderLines, deleteSalesOrderLine } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 
 const COL_WIDTHS = {
-  ITEM: wp(50), // 35%
-  QTY: wp(35), // 30%
-  RATE: wp(35), // 30%
-  TAX: wp(35), // 30%
-  AMOUNT: wp(35), // 30%
-  ACTION: wp(35), // 30%
+  ITEM: wp(40),
+  DESC: wp(50),
+  QTY: wp(30),
+  RATE: wp(30),
+  AMOUNT: wp(30),
+  ACTION: wp(30),
 };
 const AccordionSection = ({
   id,
@@ -79,16 +80,31 @@ const AccordionSection = ({
 };
 
 const ManageSalesOrder = () => {
-  const [expandedId, setExpandedId] = useState(1);
+  const [expandedIds, setExpandedIds] = useState([1]);
   const navigation = useNavigation();
-  const toggleSection = id => setExpandedId(prev => (prev === id ? null : id));
+  const toggleSection = id => setExpandedIds(prev => {
+    const has = Array.isArray(prev) ? prev.includes(id) : prev === id;
+    if (has) return (Array.isArray(prev) ? prev.filter(x => x !== id) : []);
+    return Array.isArray(prev) ? [...prev, id] : [id];
+  });
 
   // Demo options for dropdowns
-  // const paymentTerms = ['Net 7', 'Net 15', 'Net 30'];
-  // const taxOptions = ['IGST', 'CGST', 'SGST', 'No Tax'];
-  // const countries = ['India', 'United States', 'United Kingdom'];
-  // const salesInquiries = ['SI-1001', 'SI-1002'];
-  // const customers = ['Acme Corp', 'Beta Ltd'];
+                    <View style={styles.addButtonWrapperRow}>
+                      <TouchableOpacity activeOpacity={0.8} style={styles.addButton} onPress={handleAddLineItem}>
+                        <Text style={styles.addButtonText}>{editItemId ? 'Update' : 'Add'}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        style={[styles.addButton, { backgroundColor: '#6c757d', marginLeft: wp(3) }]}
+                        onPress={() => {
+                          // Cancel/clear current line editor
+                          setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
+                          setEditItemId(null);
+                        }}
+                      >
+                        <Text style={styles.addButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                    </View>
   // const state = ['Gujarat', 'Delhi', 'Mumbai'];
   // const city = ['vadodara', 'surat',];
 
@@ -101,31 +117,44 @@ const ManageSalesOrder = () => {
 
   ];
 
-  // Master items (would come from API normally)
-  const masterItems = [
-    {
-      name: 'Sofa',
-      sku: 'Item 1',
-      rate: 865,
-      desc: 'Comfortable sofa set.',
-      hsn: '998700',
-    },
-    {
-      name: 'Area Rug',
-      sku: 'Item 2',
-      rate: 3967,
-      desc: 'High quality area rug.',
-      hsn: '816505',
-    },
-    {
-      name: 'Dining Table',
-      sku: 'Item 5',
-      rate: 5138,
-      desc: 'Wooden dining table.',
-      hsn: '847522',
-    },
-  ];
-const [SalesInquiryNo, setSalesInquiry] = useState('');
+  // Master items (loaded from server)
+  const [masterItems, setMasterItems] = useState([]);
+  const [masterItemsLoading, setMasterItemsLoading] = useState(false);
+
+  // Load master items from API on mount
+  React.useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        setMasterItemsLoading(true);
+        const c = await getCMPUUID();
+        const e = await getENVUUID();
+        const resp = await getItems({ cmpUuid: c, envUuid: e });
+        const rawList = resp?.Data?.Records || resp?.Data || resp || [];
+        const list = Array.isArray(rawList) ? rawList : [];
+        const normalized = list.map(it => ({
+          name: it?.Name || it?.name || it?.ItemName || '',
+          sku: it?.SKU || it?.sku || it?.Sku || it?.ItemCode || '',
+          rate: (it?.Rate ?? it?.rate ?? it?.Price) || 0,
+          desc: it?.Description || it?.description || it?.Desc || '',
+          hsn: it?.HSNCode || it?.HSN || it?.hsn || '',
+          uuid: it?.UUID || it?.Uuid || it?.uuid || null,
+          raw: it,
+        }));
+        console.log(normalized,'get itemsss');
+        
+        if (mounted) setMasterItems(normalized);
+      } catch (err) {
+        console.warn('getItems failed', err);
+        if (mounted) setMasterItems([]);
+      } finally {
+        if (mounted) setMasterItemsLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, []);
+  const [SalesInquiryNo, setSalesInquiry] = useState('');
   // Form state
   const [headerForm, setHeaderForm] = useState({
     SalesInquiryUUID: '',
@@ -151,22 +180,10 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
     city: '',
   });
   const [isShippingSame, setIsShippingSame] = useState(false);
-  const [items, setItems] = useState([
-    {
-      id: 1,
-      selectedItem: null,
-      name: '',
-      sku: '',
-      rate: '0',
-      desc: '',
-      hsn: '',
-      qty: '1',
-      tax: 'IGST',
-      amount: '0.00',
-    },
-  ]);
+  const [items, setItems] = useState([]);
   const [invoiceDate, setInvoiceDate] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [headerHasDates, setHeaderHasDates] = useState(false);
   const [openDatePicker, setOpenDatePicker] = useState(false);
   const [datePickerField, setDatePickerField] = useState(null); // 'invoice' | 'due'
   const [datePickerSelectedDate, setDatePickerSelectedDate] = useState(
@@ -183,11 +200,15 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
   const [shippingCharges, setShippingCharges] = useState('0');
   const [adjustments, setAdjustments] = useState('0');
   const [adjustmentLabel, setAdjustmentLabel] = useState('Adjustments');
+  const [totalTax, setTotalTax] = useState('0');
+  const [serverTotalAmount, setServerTotalAmount] = useState('');
+  const [linesLoading, setLinesLoading] = useState(false);
   const [file, setFile] = useState(null);
   const [showShippingTip, setShowShippingTip] = useState(false);
   const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
   const [headerSaved, setHeaderSaved] = useState(false);
   const [headerResponse, setHeaderResponse] = useState(null);
+  const [isPrefilling, setIsPrefilling] = useState(false);
   const [isSavingHeader, setIsSavingHeader] = useState(false);
   const [isEditingHeader, setIsEditingHeader] = useState(false);
   const [customersOptions, setCustomersOptions] = useState([]);
@@ -207,6 +228,292 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
   const [selectedShippingCountry, setSelectedShippingCountry] = useState(null);
   const [selectedShippingState, setSelectedShippingState] = useState(null);
   const [selectedShippingCity, setSelectedShippingCity] = useState(null);
+  const route = useRoute();
+
+  // Helper to prefill header/billing/shipping from a server/object payload
+  const prefillFromData = (data) => {
+    if (!data) return;
+    try {
+      const resolveUuid = (val) => {
+        if (!val) return '';
+        if (typeof val === 'string') return val;
+        return val?.UUID || val?.Uuid || val?.Id || val?.Id || val?.CountryUuid || val?.CountryId || '';
+      };
+      // Prefill header fields (best-effort mapping)
+      setHeaderForm(s => ({
+        ...s,
+        SalesOrderNo: data?.SalesOrderNo || data?.SalesOrderNumber || data?.SalesOrder || s.SalesOrderNo || '',
+        SalesInquiryUUID: data?.SalesInquiryUUID || data?.SalesInquiryId || data?.SalesInquiry || s.SalesInquiryUUID || '',
+        CustomerUUID: data?.CustomerUUID || data?.CustomerId || data?.Customer || s.CustomerUUID || '',
+        CustomerName: data?.CustomerName || data?.Customer || data?.CustomerDisplayName || s.CustomerName || '',
+      }));
+
+      // Prefill billing (best-effort keys)
+      setBillingForm({
+        buildingNo: data?.BillingBuildingNo || data?.Billing?.buildingNo || data?.BillingBuilding || data?.BillBuilding || data?.BillingBuildingNo || '',
+        street1: data?.BillingStreet1 || data?.Billing?.street1 || data?.billingStreet1 || data?.Street1 || '',
+        street2: data?.BillingStreet2 || data?.Billing?.street2 || data?.billingStreet2 || '',
+        postalCode: data?.BillingPostalCode || data?.Billing?.postalCode || data?.PostalCode || data?.billingPostal || '',
+        country: resolveUuid(data?.BillingCountryUUID || data?.BillingCountry || data?.BillingCountryName || data?.Country),
+        state: resolveUuid(data?.BillingStateUUID || data?.BillingState || data?.State),
+        city: resolveUuid(data?.BillingCityUUID || data?.BillingCity || data?.City),
+      });
+
+      // Prefill shipping (best-effort keys)
+      setShippingForm({
+        buildingNo: data?.ShippingBuildingNo || data?.Shipping?.buildingNo || data?.ShipBuilding || '',
+        street1: data?.ShippingStreet1 || data?.Shipping?.street1 || data?.ShipStreet1 || '',
+        street2: data?.ShippingStreet2 || data?.Shipping?.street2 || data?.ShipStreet2 || '',
+        postalCode: data?.ShippingPostalCode || data?.Shipping?.postalCode || data?.ShipPostal || '',
+        country: resolveUuid(data?.ShippingCountryUUID || data?.ShippingCountry || data?.ShipCountry),
+        state: resolveUuid(data?.ShippingStateUUID || data?.ShippingState || data?.ShipState),
+        city: resolveUuid(data?.ShippingCityUUID || data?.ShippingCity || data?.ShipCity),
+      });
+
+      // Prefill IsShipAddrSame checkbox
+      const shipSame = data?.IsShipAddrSame === true || data?.IsShipAddrSame === 'true' || data?.IsShipAddrSame === 'True' || data?.IsShipAddrSame === 1 || data?.Is_ShipAddrSame === true || data?.IsShipAddrSame === 'Y' || data?.IsShipAddrSame === 'y';
+      if (shipSame) {
+        setIsShippingSame(true);
+        // copy billing into shipping selection state so dropdowns show values when available
+        setShippingForm(prev => ({ ...prev, buildingNo: data?.ShippingBuildingNo || data?.Shipping?.buildingNo || prev.buildingNo || '', street1: data?.ShippingStreet1 || data?.Shipping?.street1 || prev.street1 || '', street2: data?.ShippingStreet2 || data?.Shipping?.street2 || prev.street2 || '', postalCode: data?.ShippingPostalCode || data?.Shipping?.postalCode || prev.postalCode || '', country: resolveUuid(data?.BillingCountryUUID || data?.BillingCountry || data?.Country), state: resolveUuid(data?.BillingStateUUID || data?.BillingState || data?.State), city: resolveUuid(data?.BillingCityUUID || data?.BillingCity || data?.City) }));
+      }
+
+      // Prefill project / payment term / payment method / sales inquiry display + UUIDs
+      // Project
+      const projUuid = data?.ProjectUUID || data?.ProjectId || data?.Project || data?.ProjectUuid || data?.Project_Id || null;
+      if (projUuid) {
+        setProjectUUID(projUuid);
+        setProject(data?.ProjectTitle || data?.ProjectName || data?.Project || '');
+      }
+
+      // Payment term
+      const pTermUuid = data?.PaymentTermUUID || data?.PaymentTermId || data?.PaymentTerm || data?.PaymentTermUuid || null;
+      if (pTermUuid) {
+        setPaymentTermUuid(pTermUuid);
+        setPaymentTerm(data?.PaymentTermName || data?.PaymentTerm || data?.Term || '');
+      }
+
+      // Payment method
+      const pMethodUuid = data?.PaymentMethodUUID || data?.PaymentMethodId || data?.PaymentMethod || data?.PaymentMethodUuid || null;
+      if (pMethodUuid) {
+        setPaymentMethodUUID(pMethodUuid);
+        setPaymentMethod(data?.PaymentMethodName || data?.PaymentMethod || data?.Mode || '');
+      }
+
+      // Sales Inquiry display (support multiple key names and nested structures)
+      const sinqUuid = data?.SalesInquiryUUID || data?.SalesInquiryId || data?.SalesInquiry || data?.SalesInquiryUuid || data?.Header?.SalesInquiryUUID || data?.Header?.SalesInquiryId || null;
+      // immediate attempt to set SalesInquiry display value from many possible keys
+      const immediateInquiryNo = data?.SalesInquiryNo || data?.SalesInquiryNumber || data?.SalesInquiry || data?.InquiryNo || data?.InquiryNumber || data?.Inquiry || data?.Header?.SalesInquiryNo || data?.Header?.InquiryNo || data?.Header?.SalesInquiryNumber || null;
+      if (immediateInquiryNo) setSalesInquiry(immediateInquiryNo);
+      if (sinqUuid) {
+        setHeaderForm(s => ({ ...s, SalesInquiryUUID: sinqUuid }));
+      }
+
+      // Dates: robust parsing for various server date formats -> UI format dd-MMM-yyyy
+      const parseDateVal = (d) => {
+        if (!d && d !== 0) return null;
+        if (typeof d === 'number') return new Date(d);
+        if (typeof d === 'string') {
+          // MS JSON format: /Date(1234567890)/
+          const ms = d.match(/\/Date\((\d+)(?:[+-]\d+)?\)\//);
+          if (ms) return new Date(parseInt(ms[1], 10));
+          // plain numeric string
+          if (/^\d+$/.test(d)) return new Date(parseInt(d, 10));
+          // ISO or yyyy-mm-dd or yyyy/mm/dd
+          const iso = new Date(d);
+          if (!isNaN(iso)) return iso;
+          // try yyyy-mm-dd or yyyy/mm/dd fallback
+          const ymd = d.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+          if (ymd) return new Date(`${ymd[1]}-${ymd[2].padStart(2,'0')}-${ymd[3].padStart(2,'0')}T00:00:00Z`);
+        }
+        return null;
+      };
+      const formatForUi = (d) => {
+        try {
+          const parsed = parseDateVal(d);
+          if (!parsed || isNaN(parsed)) return '';
+          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          const dd = String(parsed.getDate()).padStart(2, '0');
+          const mmm = months[parsed.getMonth()];
+          const yyyy = String(parsed.getFullYear());
+          return `${dd}-${mmm}-${yyyy}`;
+        } catch (e) { return '' }
+      };
+
+      // If API already returns dates in dd-MMM-yyyy (e.g. "13-Nov-2025"), bind them directly
+      const simpleDatePattern = /^\d{1,2}-[A-Za-z]{3}-\d{4}$/;
+      if (typeof data?.OrderDate === 'string' && simpleDatePattern.test(data.OrderDate)) {
+        setInvoiceDate(data.OrderDate);
+        const parsed = parseDateVal(data.OrderDate);
+        if (parsed && !isNaN(parsed)) setDatePickerSelectedDate(parsed);
+        setHeaderHasDates(true);
+      }
+      if (typeof data?.DueDate === 'string' && simpleDatePattern.test(data.DueDate)) {
+        setDueDate(data.DueDate);
+        const parsed2 = parseDateVal(data.DueDate);
+        if (parsed2 && !isNaN(parsed2)) setDatePickerSelectedDate(parsed2);
+        setHeaderHasDates(true);
+      }
+
+      // try many candidate keys including nested Header/Order structures (fallback)
+      const orderCandidates = [
+        data?.OrderDate,
+        data?.Order_Date,
+        data?.DeliveryDate,
+        data?.OrderDateUTC,
+        data?.OrderDT,
+        data?.InvoiceDate,
+        data?.Invoice_Date,
+        data?.Header?.OrderDate,
+        data?.Header?.InvoiceDate,
+        data?.Order?.OrderDate,
+        data?.Header?.Order_Date,
+      ];
+      const dueCandidates = [
+        data?.DueDate,
+        data?.PaymentDueDate,
+        data?.Due_Date,
+        data?.PaymentDue,
+        data?.Header?.DueDate,
+        data?.Order?.DueDate,
+        data?.Header?.Due_Date,
+      ];
+
+      const firstOrder = orderCandidates.find(v => v !== undefined && v !== null);
+      const firstDue = dueCandidates.find(v => v !== undefined && v !== null);
+      if (firstOrder || firstDue) setHeaderHasDates(true);
+      if (!invoiceDate && firstOrder) {
+        const v = formatForUi(firstOrder);
+        if (v && v !== '') {
+          setInvoiceDate(v);
+          const pd = parseDateVal(firstOrder);
+          if (pd && !isNaN(pd)) setDatePickerSelectedDate(pd);
+        } else if (typeof firstOrder === 'string') {
+          // final fallback: show raw string if parsing failed
+          setInvoiceDate(firstOrder);
+        }
+      }
+      if (!dueDate && firstDue) {
+        const v2 = formatForUi(firstDue);
+        if (v2 && v2 !== '') {
+          setDueDate(v2);
+          const pd2 = parseDateVal(firstDue);
+          if (pd2 && !isNaN(pd2)) setDatePickerSelectedDate(pd2);
+        } else if (typeof firstDue === 'string') {
+          // final fallback: show raw string if parsing failed
+          setDueDate(firstDue);
+        }
+      }
+
+      // Focus header for editing; do not show Create Order until header is updated
+      // Also open Billing and Shipping sections for convenience
+      // Bind any header-level totals if present in the payload
+      try {
+        const headerTax = data?.TotalTax ?? data?.TaxAmount ?? data?.HeaderTotalTax ?? null;
+        const headerTotal = data?.TotalAmount ?? data?.NetAmount ?? data?.HeaderTotalAmount ?? null;
+        if (headerTax !== null && typeof headerTax !== 'undefined') setTotalTax(String(headerTax));
+        if (headerTotal !== null && typeof headerTotal !== 'undefined') setServerTotalAmount(String(headerTotal));
+      } catch (e) { /* ignore */ }
+
+      setIsEditingHeader(true);
+      setHeaderSaved(false);
+      setExpandedIds([1, 2, 3]);
+    } catch (e) {
+      console.log('Prefill error', e);
+    }
+  };
+
+  // If navigated here from ViewSalesOrder with prefillHeader param, populate header/billing/shipping
+  useEffect(() => {
+    const p = route?.params?.prefillHeader;
+    if (!p) return;
+    const data = p?.Data || p;
+    (async () => {
+      try {
+        setIsPrefilling(true);
+        prefillFromData(data);
+      } finally {
+        // small delay not required, but ensure UI unblocks after prefill
+        setIsPrefilling(false);
+      }
+    })();
+  }, [route?.params?.prefillHeader]);
+
+  // If navigated with headerUuid (or headerUuid + cmpUuid/envUuid), call server to fetch header
+  useEffect(() => {
+    const headerUuid = route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.UUID;
+    if (!headerUuid) return;
+    (async () => {
+      setIsPrefilling(true);
+      try {
+        const cmpUuid = route?.params?.cmpUuid || route?.params?.cmpUUID || route?.params?.cmp || undefined;
+        const envUuid = route?.params?.envUuid || route?.params?.envUUID || route?.params?.env || undefined;
+        const resp = await getSalesOrderHeaderById({ headerUuid, cmpUuid, envUuid });
+        console.log(resp,'33');
+        const data = resp?.Data || resp || null;
+        if (data) {
+          setHeaderResponse(data);
+          prefillFromData(data);
+          // load saved lines for this header
+          try { loadSalesOrderLines(data?.UUID || headerUuid); } catch (e) { /* ignore */ }
+        }
+      } catch (e) {
+        console.warn('Error loading sales order header by id', e?.message || e);
+      } finally {
+        // ensure loader hides after prefill attempt
+        setIsPrefilling(false);
+      }
+    })();
+  }, [route?.params?.headerUuid, route?.params?.cmpUuid, route?.params?.envUuid]);
+
+  // Current item being entered in the LINE form
+  const [currentItem, setCurrentItem] = useState({
+    itemType: '',
+    itemTypeUuid: null,
+    itemName: '',
+    itemNameUuid: null,
+    quantity: '',
+    unit: '',
+    unitUuid: null,
+    desc: '',
+    rate: '',
+  });
+  const [editItemId, setEditItemId] = useState(null);
+  // Table controls: search + pagination
+  const [tableSearch, setTableSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const pageSizes = [5, 10, 25, 50];
+
+  // Simple unit / itemType lists (can be replaced with server data)
+  const demoItemTypes = ['Furniture', 'Electronics', 'Accessories'];
+  const units = ['pcs', 'kg', 'meter', 'set'];
+
+  // Helper to safely render labels for values which may be objects or strings
+  const renderLabel = (val, keys = []) => {
+    try {
+      if (val === null || typeof val === 'undefined') return '';
+      if (typeof val === 'string' || typeof val === 'number') return String(val);
+      if (typeof val === 'object') {
+        for (let k of keys) {
+          if (val && (val[k] || val[k] === 0)) return String(val[k]);
+        }
+        // common fallbacks
+        if (val.Name) return String(val.Name);
+        if (val.CustomerName) return String(val.CustomerName);
+        if (val.DisplayName) return String(val.DisplayName);
+        if (val.InquiryNo) return String(val.InquiryNo);
+        if (val.ProjectTitle) return String(val.ProjectTitle);
+        if (val.Term) return String(val.Term);
+        if (val.Mode) return String(val.Mode);
+        if (val.UUID) return String(val.UUID);
+        return JSON.stringify(val);
+      }
+      return String(val);
+    } catch (e) {
+      return '';
+    }
+  };
 
   // Permission handling for Android
   const requestStoragePermissionAndroid = async () => {
@@ -256,6 +563,7 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
         state: '',
         city: '',
       });
+      
       setSelectedShippingCountry(null);
       setSelectedShippingState(null);
       setSelectedShippingCity(null);
@@ -313,6 +621,21 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
   const saveHeader = async () => {
     setIsSavingHeader(true);
     try {
+      const resolveCityUuid = (c) => {
+        if (!c) return '';
+        if (typeof c === 'string') return c;
+        return c?.UUID || c?.Uuid || c?.Id || '';
+      };
+
+      const subtotalNum = parseFloat(computeSubtotal()) || 0;
+      const totalTaxNum = parseFloat(totalTax) || 0;
+      // If server returned a TotalAmount, treat it as the header lines total and
+      // add shipping charges and adjustments on top of it for display/submission.
+      const serverNum = (serverTotalAmount !== null && serverTotalAmount !== undefined && String(serverTotalAmount).trim() !== '') ? parseFloat(serverTotalAmount) : NaN;
+      const totalAmountNum = (!isNaN(serverNum))
+        ? (serverNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0))
+        : (subtotalNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + totalTaxNum);
+
       const payload = {
         UUID: headerResponse?.UUID || '',
         SalesOrderNo: headerForm.SalesOrderNo || '',
@@ -324,13 +647,14 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
         OrderDate: uiDateToApiDate(invoiceDate),
         DueDate: uiDateToApiDate(dueDate),
         Notes: notes || '',
+        TermsConditions: terms || '',
         BillingBuildingNo: billingForm.buildingNo || '',
         BillingStreet1: billingForm.street1 || '',
         BillingStreet2: billingForm.street2 || '',
         BillingPostalCode: billingForm.postalCode || '',
         BillingCountryUUID: billingForm.country || '',
         BillingStateUUID: billingForm.state || '',
-        BillingCityUUID: billingForm.city.Uuid || '',
+        BillingCityUUID: resolveCityUuid(billingForm.city),
         IsShipAddrSame: !!isShippingSame,
         ShippingBuildingNo: shippingForm.buildingNo || '',
         ShippingStreet1: shippingForm.street1 || '',
@@ -338,7 +662,10 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
         ShippingPostalCode: shippingForm.postalCode || '',
         ShippingCountryUUID: shippingForm.country || '',
         ShippingStateUUID: shippingForm.state || '',
-        ShippingCityUUID: shippingForm.city || '',
+        ShippingCityUUID: resolveCityUuid(shippingForm.city),
+        SubTotal: subtotalNum,
+        TotalTax: totalTaxNum,
+        TotalAmount: totalAmountNum,
         ShippingCharges: parseFloat(shippingCharges) || 0,
         AdjustmentField: adjustmentLabel || '',
         AdjustmentPrice: parseFloat(adjustments) || 0,
@@ -357,7 +684,10 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
       setHeaderResponse(data);
       setHeaderSaved(true);
       setIsEditingHeader(false);
-      setExpandedId(1);
+      // collapse header section after successful save
+      setExpandedIds([]);
+      // load lines for this header now that header is saved
+      try { await loadSalesOrderLines(data?.UUID || data?.Id || data?.HeaderUUID || headerResponse?.UUID); } catch (e) { /* ignore */ }
       Alert.alert('Success', 'Header saved successfully');
     } catch (err) {
       console.error('saveHeader error ->', err);
@@ -368,14 +698,28 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
   };
 
   const openDatePickerFor = field => {
-    let initial = new Date();
+    let initial = datePickerSelectedDate || new Date();
+    const parseUiString = (s) => {
+      if (!s || typeof s !== 'string') return null;
+      const m = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+      if (m) {
+        const dd = parseInt(m[1], 10);
+        const months = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
+        const mm = months[m[2]];
+        if (typeof mm === 'number') return new Date(m[3], mm, dd);
+      }
+      const parsed = new Date(s);
+      if (!isNaN(parsed)) return parsed;
+      return null;
+    };
+
     if (field === 'invoice' && invoiceDate) {
-      const parsed = new Date(invoiceDate);
-      if (!isNaN(parsed)) initial = parsed;
+      const p = parseUiString(invoiceDate);
+      if (p) initial = p;
     }
     if (field === 'due' && dueDate) {
-      const parsed = new Date(dueDate);
-      if (!isNaN(parsed)) initial = parsed;
+      const p2 = parseUiString(dueDate);
+      if (p2) initial = p2;
     }
     setDatePickerSelectedDate(initial);
     setDatePickerField(field);
@@ -429,15 +773,26 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
         const termsList = extractArray(termsResp);
         const methodsList = extractArray(methodsResp);
         const countriesList = extractArray(countriesResp);
+        console.log(countriesList,'566');
+        
         const projectsList = extractArray(projectsResp);
         const inquiriesList = extractArray(inquiriesResp);
+
+        // Normalize inquiry entries so dropdowns/prefill mapping find display values instead of raw UUIDs
+        const normalizedInquiries = (Array.isArray(inquiriesList) ? inquiriesList : []).map((r, idx) => ({
+          UUID: r?.UUID || r?.Uuid || r?.Id || r?.Id || r?.InquiryUUID || r?.SalesInquiryUUID || null,
+          InquiryNo: r?.SalesInqNo || r?.SalesInquiryNo || r?.InquiryNo || r?.SalesOrderNo || r?.SalesOrder || r?.Name || r?.Title || String(r),
+          // include other helpful fields used elsewhere
+          SalesPerInvNo: r?.SalesPerInvNo || r?.PerformaNo || r?.PerformaInvoiceNo || null,
+          raw: r,
+        }));
 
         setCustomersOptions(custList);
         setPaymentTermsOptions(termsList);
         setPaymentMethodsOptions(methodsList);
         setCountriesOptions(countriesList);
         setProjectsOptions(projectsList);
-        setSalesInquiryNosOptions(inquiriesList);
+        setSalesInquiryNosOptions(normalizedInquiries);
 
         console.log('[ManageSalesOrder] lookup counts ->', {
           customers: Array.isArray(custList) ? custList.length : 0,
@@ -452,6 +807,75 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
       }
     })();
   }, []);
+
+  // Load saved sales order lines for a header and normalize them into `items`
+  const loadSalesOrderLines = async (headerUuid) => {
+    if (!headerUuid) return;
+    try {
+      setLinesLoading(true);
+      const c = await getCMPUUID();
+      const e = await getENVUUID();
+      let resp;
+      try {
+        // Prefer specialized GetSalesOrderLines if available on backend
+        if (typeof getSalesOrderLines === 'function') {
+          resp = await getSalesOrderLines({ headerUuid, cmpUuid: c, envUuid: e });
+        } else {
+          resp = await getSalesLines({ headerUuid, cmpUuid: c, envUuid: e });
+        }
+      } catch (e) {
+        // fallback to older endpoint name
+        resp = await getSalesLines({ headerUuid, cmpUuid: c, envUuid: e });
+      }
+      const raw = resp?.Data?.Records || resp?.Data || resp || [];
+      const list = Array.isArray(raw) ? raw : [];
+      // normalize server line objects to UI `items` shape
+      const normalized = list.map((r, idx) => {
+        const serverUuid = r?.UUID || r?.LineUUID || r?.Id || r?.Line_Id || null;
+        const itemUuid = r?.ItemUUID || r?.ItemUuid || r?.ItemId || r?.Item || r?.ItemId || null;
+        const name = r?.ItemName || r?.Name || r?.Item || r?.Description || '';
+        const sku = r?.SKU || r?.Sku || r?.ItemCode || '';
+        const rate = String(r?.Rate ?? r?.Price ?? r?.UnitPrice ?? 0);
+        const desc = r?.Description || r?.Desc || '';
+        const hsn = r?.HSNCode || r?.HSN || r?.hsn || '';
+        const qty = String(r?.Quantity ?? r?.Qty ?? r?.QuantityOrdered ?? 1);
+        const amtNum = Number(r?.Amount ?? r?.TotalAmount ?? r?.NetAmount ?? r?.LineAmount ?? 0) || 0;
+        const amount = amtNum.toFixed(2);
+        const tax = r?.TaxType || r?.Tax || 'IGST';
+        const unit = r?.Unit || '';
+        return {
+          id: idx + 1,
+          serverUuid,
+          itemUuid,
+          selectedItem: null,
+          name,
+          sku,
+          rate,
+          desc,
+          hsn,
+          qty,
+          tax,
+          amount,
+          unit,
+        };
+      });
+
+      setItems(normalized);
+
+      // if API returns header totals alongside lines, bind them
+      try {
+        const tot = resp?.Data?.TotalAmount ?? resp?.TotalAmount ?? resp?.Data?.NetAmount ?? resp?.NetAmount ?? null;
+        const tTax = resp?.Data?.TotalTax ?? resp?.TotalTax ?? null;
+        if (tTax !== null && typeof tTax !== 'undefined') setTotalTax(String(tTax));
+        if (tot !== null && typeof tot !== 'undefined') setServerTotalAmount(String(tot));
+      } catch (e) { /* ignore */ }
+    } catch (err) {
+      console.warn('loadSalesOrderLines error', err?.message || err);
+      setItems([]);
+    } finally {
+      setLinesLoading(false);
+    }
+  };
 
 
   const loadStatesForCountry = async (countryUuid, target = 'billing') => {
@@ -481,7 +905,7 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
       else setShippingCitiesOptions([]);
     }
   };
-  
+
   const handleBillingCountrySelect = (selected) => {
     setSelectedBillingCountry(selected);
     setSelectedBillingState(null);
@@ -489,7 +913,7 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
     setStatesOptions([]);
     setCitiesOptions([]);
     const countryUuid = selected?.Uuid || selected?.UUID || selected?.CountryUuid || selected?.Id || (typeof selected === 'string' ? selected : null);
-    setBillingForm(s => ({ ...s, country: countryUuid || '' , state: '', city: '' }));
+    setBillingForm(s => ({ ...s, country: countryUuid || '', state: '', city: '' }));
     if (countryUuid) loadStatesForCountry(countryUuid, 'billing');
   };
 
@@ -610,6 +1034,195 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
     })();
   }, [shippingForm.state]);
 
+  // Map billingForm.country/state/city UUIDs (strings) to selected objects when options are available
+  React.useEffect(() => {
+    // Map country
+    if (billingForm?.country && !selectedBillingCountry && Array.isArray(countriesOptions) && countriesOptions.length) {
+      const found = countriesOptions.find(c => (
+        c?.UUID === billingForm.country ||
+        c?.Uuid === billingForm.country ||
+        c?.Id === billingForm.country ||
+        c?.CountryUuid === billingForm.country ||
+        c?.CountryId === billingForm.country ||
+        String(c?.UUID) === String(billingForm.country)
+      ));
+      if (found) {
+        // use handler to ensure states are loaded
+        handleBillingCountrySelect(found);
+      }
+    }
+  }, [billingForm?.country, countriesOptions]);
+
+  React.useEffect(() => {
+    // Map state
+    if (billingForm?.state && !selectedBillingState && Array.isArray(statesOptions) && statesOptions.length) {
+      const found = statesOptions.find(s => (
+        s?.UUID === billingForm.state ||
+        s?.Uuid === billingForm.state ||
+        s?.Id === billingForm.state ||
+        s?.StateUuid === billingForm.state ||
+        s?.StateId === billingForm.state ||
+        String(s?.UUID) === String(billingForm.state)
+      ));
+      if (found) {
+        handleBillingStateSelect(found);
+      }
+    }
+  }, [billingForm?.state, statesOptions]);
+
+  React.useEffect(() => {
+    // Map city
+    if (billingForm?.city && !selectedBillingCity && Array.isArray(citiesOptions) && citiesOptions.length) {
+      const found = citiesOptions.find(ci => (
+        ci?.UUID === billingForm.city ||
+        ci?.Uuid === billingForm.city ||
+        ci?.Id === billingForm.city ||
+        ci?.CityUuid === billingForm.city ||
+        ci?.CityId === billingForm.city ||
+        String(ci?.UUID) === String(billingForm.city)
+      ));
+      if (found) {
+        setSelectedBillingCity(found);
+        setBillingForm(s => ({ ...s, city: found?.UUID || found }));
+      }
+    }
+  }, [billingForm?.city, citiesOptions]);
+
+  // Map shippingForm.country/state/city UUIDs to selected objects when options are available
+  React.useEffect(() => {
+    if (shippingForm?.country && !selectedShippingCountry && Array.isArray(countriesOptions) && countriesOptions.length) {
+      const found = countriesOptions.find(c => (
+        c?.UUID === shippingForm.country ||
+        c?.Uuid === shippingForm.country ||
+        c?.Id === shippingForm.country ||
+        c?.CountryUuid === shippingForm.country ||
+        c?.CountryId === shippingForm.country ||
+        String(c?.UUID) === String(shippingForm.country)
+      ));
+      if (found) {
+        handleShippingCountrySelect(found);
+      }
+    }
+  }, [shippingForm?.country, countriesOptions]);
+
+  React.useEffect(() => {
+    if (shippingForm?.state && !selectedShippingState && Array.isArray(shippingStatesOptions) && shippingStatesOptions.length) {
+      const found = shippingStatesOptions.find(s => (
+        s?.UUID === shippingForm.state ||
+        s?.Uuid === shippingForm.state ||
+        s?.Id === shippingForm.state ||
+        s?.StateUuid === shippingForm.state ||
+        s?.StateId === shippingForm.state ||
+        String(s?.UUID) === String(shippingForm.state)
+      ));
+      if (found) {
+        handleShippingStateSelect(found);
+      }
+    }
+  }, [shippingForm?.state, shippingStatesOptions]);
+
+  React.useEffect(() => {
+    if (shippingForm?.city && !selectedShippingCity && Array.isArray(shippingCitiesOptions) && shippingCitiesOptions.length) {
+      const found = shippingCitiesOptions.find(ci => (
+        ci?.UUID === shippingForm.city ||
+        ci?.Uuid === shippingForm.city ||
+        ci?.Id === shippingForm.city ||
+        ci?.CityUuid === shippingForm.city ||
+        ci?.CityId === shippingForm.city ||
+        String(ci?.UUID) === String(shippingForm.city)
+      ));
+      if (found) {
+        setSelectedShippingCity(found);
+        setShippingForm(s => ({ ...s, city: found?.UUID || found }));
+      }
+    }
+  }, [shippingForm?.city, shippingCitiesOptions]);
+
+  // Map project / payment term / payment method / sales inquiry when lookup options load
+  React.useEffect(() => {
+    // Project
+    if (!project && projectUUID && Array.isArray(projectsOptions) && projectsOptions.length) {
+      const found = projectsOptions.find(p => (
+        p?.Uuid === projectUUID || p?.UUID === projectUUID || p?.Id === projectUUID || String(p?.Uuid) === String(projectUUID)
+      ));
+      if (found) {
+        setProject(found?.ProjectTitle || found?.Name || found?.Project || String(found));
+        setProjectUUID(found?.Uuid || found?.UUID || found?.Id || projectUUID);
+      }
+    }
+
+    // Payment term
+    if ((!paymentTerm || !paymentTermUuid) && paymentTermUuid && Array.isArray(paymentTermsOptions) && paymentTermsOptions.length) {
+      const found = paymentTermsOptions.find(t => (
+        t?.UUID === paymentTermUuid || t?.Uuid === paymentTermUuid || t?.Id === paymentTermUuid || String(t?.UUID) === String(paymentTermUuid)
+      ));
+      if (found) {
+        setPaymentTerm(found?.Name || found?.Term || String(found));
+        setPaymentTermUuid(found?.UUID || found?.Uuid || found?.Id || paymentTermUuid);
+      }
+    }
+
+    // Payment method
+    if ((!paymentMethod || !paymentMethodUUID) && paymentMethodUUID && Array.isArray(paymentMethodsOptions) && paymentMethodsOptions.length) {
+      const found = paymentMethodsOptions.find(m => (
+        m?.UUID === paymentMethodUUID || m?.Uuid === paymentMethodUUID || m?.Id === paymentMethodUUID || String(m?.UUID) === String(paymentMethodUUID)
+      ));
+      if (found) {
+        setPaymentMethod(found?.Name || found?.Mode || String(found));
+        setPaymentMethodUUID(found?.UUID || found?.Uuid || found?.Id || paymentMethodUUID);
+      }
+    }
+
+    // Sales Inquiry
+    if ((!SalesInquiryNo || SalesInquiryNo === '') && headerForm?.SalesInquiryUUID && Array.isArray(SalesInquiryNosOptions) && SalesInquiryNosOptions.length) {
+      const found = SalesInquiryNosOptions.find(s => (
+        s?.UUID === headerForm.SalesInquiryUUID || s?.Uuid === headerForm.SalesInquiryUUID || s?.Id === headerForm.SalesInquiryUUID || String(s?.UUID) === String(headerForm.SalesInquiryUUID)
+      ));
+      if (found) {
+        setSalesInquiry(found?.InquiryNo || found?.Name || String(found));
+        setHeaderForm(s => ({ ...s, SalesInquiryUUID: found?.UUID || found?.Uuid || found?.Id || headerForm?.SalesInquiryUUID }));
+      }
+    }
+  }, [projectsOptions, paymentTermsOptions, paymentMethodsOptions, SalesInquiryNosOptions, projectUUID, paymentTermUuid, paymentMethodUUID, headerForm?.SalesInquiryUUID, project, paymentTerm, paymentMethod, SalesInquiryNo]);
+
+  // Keep loader until mapping of header -> lookup objects completes (or timeout)
+  React.useEffect(() => {
+    if (!isPrefilling) return;
+
+    const mappingReady = () => {
+      try {
+        // Billing mapping
+        if (billingForm?.country && !selectedBillingCountry) return false;
+        if (billingForm?.state && !selectedBillingState) return false;
+        if (billingForm?.city && !selectedBillingCity) return false;
+
+        // Shipping mapping
+        if (shippingForm?.country && !selectedShippingCountry) return false;
+        if (shippingForm?.state && !selectedShippingState) return false;
+        if (shippingForm?.city && !selectedShippingCity) return false;
+
+        // Project / payment / inquiry mapping (these are strings after mapping)
+        if (projectUUID && (!project || String(project).trim() === '')) return false;
+        if (paymentTermUuid && (!paymentTerm || String(paymentTerm).trim() === '')) return false;
+        if (paymentMethodUUID && (!paymentMethod || String(paymentMethod).trim() === '')) return false;
+        if (headerForm?.SalesInquiryUUID && (!SalesInquiryNo || String(SalesInquiryNo).trim() === '')) return false;
+
+        // Dates: if header contained dates then invoice/due should be non-empty
+        if (headerHasDates && (!invoiceDate || !dueDate)) return false;
+        return true;
+      } catch (e) { return true; }
+    };
+
+    if (mappingReady()) {
+      setIsPrefilling(false);
+      return undefined;
+    }
+
+    // wait up to 5s for lookups to arrive and mapping to complete
+    const timeout = setTimeout(() => setIsPrefilling(false), 5000);
+    return () => clearTimeout(timeout);
+  }, [isPrefilling, billingForm?.country, billingForm?.state, billingForm?.city, shippingForm?.country, shippingForm?.state, shippingForm?.city, selectedBillingCountry, selectedBillingState, selectedBillingCity, selectedShippingCountry, selectedShippingState, selectedShippingCity, projectUUID, project, paymentTermUuid, paymentTerm, paymentMethodUUID, paymentMethod, headerForm?.SalesInquiryUUID, SalesInquiryNo, headerHasDates, invoiceDate, dueDate]);
+
   const computeSubtotal = () => {
     const sum = items.reduce((acc, r) => acc + (parseFloat(r.amount) || 0), 0);
     return sum.toFixed(2);
@@ -637,7 +1250,51 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
   };
 
   const deleteItem = id => {
+    const it = items.find(x => x.id === id);
+    if (!it) return;
+    // if this line exists on server, confirm and call API
+    if (it.serverUuid) {
+      Alert.alert(
+        'Delete Line',
+        'Are you sure you want to delete this line?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', style: 'destructive', onPress: async () => {
+            try {
+              setLinesLoading(true);
+              await deleteSalesOrderLine({ lineUuid: it.serverUuid });
+              // Clear serverTotalAmount so UI recomputes totals from current items
+              // (in case backend doesn't return updated totals immediately).
+              setServerTotalAmount('');
+              // After deleting on server, reload lines (and header totals) from server
+              // so UI reflects updated totals (TotalAmount, TotalTax, etc.).
+              try {
+                const headerUuid = headerResponse?.UUID || headerResponse?.Id || headerResponse?.HeaderUUID || headerResponse?.Header_Id || null;
+                if (headerUuid) {
+                  await loadSalesOrderLines(headerUuid);
+                } else {
+                  // fallback: remove locally if header identifier not available
+                  setItems(prev => prev.filter(r => r.id !== id));
+                }
+              } catch (reloadErr) {
+                // still remove locally to keep UI consistent
+                console.warn('reload lines after delete failed', reloadErr?.message || reloadErr);
+                setItems(prev => prev.filter(r => r.id !== id));
+              }
+            } catch (e) {
+              console.error('deleteSalesOrderLine error ->', e?.message || e);
+              Alert.alert('Error', e?.message || 'Unable to delete line');
+            } finally {
+              setLinesLoading(false);
+            }
+          } }
+        ]
+      );
+      return;
+    }
+    // otherwise just remove locally and clear server total so UI recomputes
     setItems(prev => prev.filter(r => r.id !== id));
+    setServerTotalAmount('');
   };
 
   const selectMasterItem = (rowId, item) => {
@@ -672,19 +1329,234 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
     );
   };
 
-  const handleCreateOrder = () => {
-    const payload = {
-      header: headerForm,
-      billing: billingForm,
-      shipping: shippingForm,
-      items,
-      invoiceDate,
-      dueDate,
-      paymentTerm,
-      notes,
+  const [isAddingLine, setIsAddingLine] = useState(false);
+
+  // Add an item from the LINE form into the table
+  const handleAddLineItem = async () => {
+    const nextId = items.length ? items[items.length - 1].id + 1 : 1;
+    // try to find matching master item for rate/sku/desc
+    const master = masterItems.find(m => {
+      if (!m) return false;
+      return (
+        String(m.name || '').toLowerCase() === String(currentItem.itemName || '').toLowerCase() ||
+        String(m.sku || '').toLowerCase() === String(currentItem.itemNameUuid || '').toLowerCase()
+      );
+    });
+    // prefer manually entered rate, otherwise master rate
+    const rate = (currentItem.rate && String(currentItem.rate).trim() !== '') ? String(currentItem.rate) : (master ? String(master.rate || '0') : '0');
+    const qty = currentItem.quantity || '1';
+    const amount = computeAmount(qty, rate);
+
+    const newItem = {
+      id: nextId,
+      selectedItem: master || null,
+      name: currentItem.itemName || (master ? master.name : ''),
+      itemType: currentItem.itemType || '',
+      itemTypeUuid: currentItem.itemTypeUuid || null,
+      itemNameUuid: currentItem.itemNameUuid || currentItem.itemNameUuid || null,
+      sku: master ? master.sku : '',
+      rate: rate,
+      desc: currentItem.desc && currentItem.desc.length ? currentItem.desc : (master ? master.desc || '' : ''),
+      hsn: master ? master.hsn || '' : '',
+      qty: qty,
+      tax: 'IGST',
+      amount: amount,
+      unit: currentItem.unit || '',
     };
-    console.log('Create Order payload:', payload);
-    Alert.alert('Create Order', 'Order payload logged to console');
+
+    // If header has been saved to server (we have Header UUID), attempt to POST the line
+    if (headerSaved && headerResponse?.UUID) {
+      try {
+        setIsAddingLine(true);
+        const payload = {
+          HeaderUUID: headerResponse.UUID,
+          ItemUUID: (master && master.uuid) || currentItem.itemNameUuid || null,
+          Quantity: Number(qty) || 0,
+          Description: newItem.desc || '',
+          Rate: Number(rate) || 0,
+        };
+        console.log('Adding sales line payload ->', payload);
+        // If we are editing an existing line that exists on server, call update API instead
+        let resp;
+        if (editItemId) {
+          const existing = items.find(x => x.id === editItemId);
+          if (existing && existing.serverUuid) {
+            // include UUID in payload as required by update API
+            const upayload = {
+              UUID: existing.serverUuid,
+              HeaderUUID: headerResponse.UUID,
+              ItemUUID: (master && master.uuid) || currentItem.itemNameUuid || null,
+              Quantity: Number(qty) || 0,
+              Description: newItem.desc || '',
+              Rate: Number(rate) || 0,
+            };
+            console.log('Updating sales order line payload ->', upayload);
+            try {
+              resp = await updateSalesOrderLine(upayload);
+            } catch (e) {
+              console.error('updateSalesOrderLine error ->', e);
+              throw e;
+            }
+          } else {
+            resp = await addSalesOrderLine(payload);
+          }
+        } else {
+          resp = await addSalesOrderLine(payload);
+        }
+        console.log('addSalesOrderLine resp ->', resp);
+        const data = resp?.Data || resp || null;
+        // Prefer server-returned values when available
+        const serverItem = data && (Array.isArray(data) ? data[0] : data);
+        // Bind server-returned totals (Tax / Total) when API provides them
+        try {
+          const respTax = data?.TaxAmount ?? data?.TotalTax ?? serverItem?.TaxAmount ?? serverItem?.TotalTax ?? resp?.TaxAmount ?? resp?.TotalTax ?? null;
+          const respTotal = data?.TotalAmount ?? data?.NetAmount ?? serverItem?.TotalAmount ?? serverItem?.NetAmount ?? resp?.TotalAmount ?? resp?.NetAmount ?? null;
+          if (respTax !== null && typeof respTax !== 'undefined') setTotalTax(String(respTax));
+          if (respTotal !== null && typeof respTotal !== 'undefined') setServerTotalAmount(String(respTotal));
+        } catch (e) {
+          // ignore parsing errors
+        }
+        const itemToPush = {
+          ...newItem,
+          id: editItemId ? editItemId : nextId,
+          serverUuid: serverItem?.UUID || serverItem?.LineUUID || serverItem?.Id || null,
+          itemUuid: serverItem?.ItemUUID || serverItem?.ItemUuid || serverItem?.ItemId || newItem.itemNameUuid || null,
+          sku: serverItem?.SKU || newItem.sku,
+          rate: (serverItem && (serverItem?.Rate ?? serverItem?.rate)) ?? newItem.rate,
+          desc: serverItem?.Description ?? newItem.desc,
+        };
+        if (editItemId) {
+          setItems(prev => prev.map(it => it.id === editItemId ? { ...it, ...itemToPush, id: editItemId } : it));
+          setEditItemId(null);
+        } else {
+          setItems(prev => [...prev, itemToPush]);
+        }
+        // Refresh lines from server to ensure totals and canonical data
+        try {
+          await loadSalesOrderLines(headerResponse?.UUID || payload?.HeaderUUID || headerResponse?.Id);
+        } catch (e) { /* ignore */ }
+      } catch (err) {
+        console.error('addSalesOrderLine error ->', err);
+        Alert.alert('Error', err?.message || 'Unable to add line to server. Saved locally.');
+        // fallback: still add locally so user doesn't lose work
+        if (editItemId) {
+          setItems(prev => prev.map(it => it.id === editItemId ? { ...it, ...newItem, id: editItemId } : it));
+          setEditItemId(null);
+        } else {
+          setItems(prev => [...prev, newItem]);
+        }
+      } finally {
+        setIsAddingLine(false);
+      }
+    } else {
+      // not saved on server yet - keep local
+      if (editItemId) {
+        // update existing
+        setItems(prev => prev.map(it => it.id === editItemId ? { ...it, ...newItem, id: editItemId } : it));
+        setEditItemId(null);
+      } else {
+        setItems(prev => [...prev, newItem]);
+      }
+    }
+
+    // reset form
+    setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: 1, unit: '', unitUuid: null });
+  };
+
+  const handleEditItem = id => {
+    const it = items.find(i => i.id === id);
+    if (!it) return;
+    // Try to resolve the matching master item by uuid or sku/name so dropdown shows proper label
+    const matchedMaster = masterItems.find(m => (m.uuid && it.itemUuid && String(m.uuid) === String(it.itemUuid)) || (m.sku && it.sku && String(m.sku) === String(it.sku)) || (m.name && it.name && String(m.name).toLowerCase() === String(it.name).toLowerCase()));
+    setCurrentItem({
+      itemType: it.itemType || '',
+      itemTypeUuid: it.itemTypeUuid || null,
+      itemName: matchedMaster ? matchedMaster.name : (it.name || ''),
+      itemNameUuid: it.itemUuid || it.itemNameUuid || it.sku || (matchedMaster ? matchedMaster.uuid : null) || null,
+      quantity: it.qty || '',
+      unit: it.unit || '',
+      unitUuid: it.unitUuid || null,
+      desc: it.desc || it.desc || '',
+      rate: it.rate || '',
+    });
+    setEditItemId(id);
+    // scroll to top of create order section if needed by expanding it
+    setExpandedIds([4]);
+  };
+
+  const handleCreateOrder = async () => {
+    setIsSavingHeader(true);
+    try {
+      const resolveCityUuid = (c) => {
+        if (!c) return '';
+        if (typeof c === 'string') return c;
+        return c?.UUID || c?.Uuid || c?.Id || '';
+      };
+
+      const subtotalNum = parseFloat(computeSubtotal()) || 0;
+      const totalTaxNum = parseFloat(totalTax) || 0;
+      const serverNum = (serverTotalAmount !== null && serverTotalAmount !== undefined && String(serverTotalAmount).trim() !== '') ? parseFloat(serverTotalAmount) : NaN;
+      const totalAmountNum = (!isNaN(serverNum))
+        ? (serverNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0))
+        : (subtotalNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + totalTaxNum);
+
+      const payload = {
+        UUID: headerResponse?.UUID || '',
+        SalesOrderNo: headerForm.SalesOrderNo || '',
+        SalesInquiryUUID: headerForm.SalesInquiryUUID || '',
+        CustomerUUID: headerForm.CustomerUUID || '',
+        ProjectUUID: projectUUID || '',
+        PaymentTermUUID: paymentTermUuid || '',
+        PaymentMethodUUID: paymentMethodUUID || '',
+        OrderDate: uiDateToApiDate(invoiceDate),
+        DueDate: uiDateToApiDate(dueDate),
+        Notes: notes || '',
+        TermsConditions: terms || '',
+        BillingBuildingNo: billingForm.buildingNo || '',
+        BillingStreet1: billingForm.street1 || '',
+        BillingStreet2: billingForm.street2 || '',
+        BillingPostalCode: billingForm.postalCode || '',
+        BillingCountryUUID: billingForm.country || '',
+        BillingStateUUID: billingForm.state || '',
+        BillingCityUUID: resolveCityUuid(billingForm.city),
+        IsShipAddrSame: !!isShippingSame,
+        ShippingBuildingNo: shippingForm.buildingNo || '',
+        ShippingStreet1: shippingForm.street1 || '',
+        ShippingStreet2: shippingForm.street2 || '',
+        ShippingPostalCode: shippingForm.postalCode || '',
+        ShippingCountryUUID: shippingForm.country || '',
+        ShippingStateUUID: shippingForm.state || '',
+        ShippingCityUUID: resolveCityUuid(shippingForm.city),
+        SubTotal: subtotalNum,
+        TotalTax: totalTaxNum,
+        TotalAmount: totalAmountNum,
+        ShippingCharges: parseFloat(shippingCharges) || 0,
+        AdjustmentField: adjustmentLabel || '',
+        AdjustmentPrice: parseFloat(adjustments) || 0,
+      };
+
+      console.log('Final Submit payload ->', payload);
+      let resp;
+      if (headerResponse?.UUID) {
+        resp = await updateSalesOrder(payload);
+      } else {
+        // If header UUID not present, fallback to addSalesOrder
+        resp = await addSalesOrder(payload);
+      }
+
+      console.log('Final submit resp ->', resp);
+      const data = resp?.Data || resp || {};
+      setHeaderResponse(data);
+      setHeaderSaved(true);
+      Alert.alert('Success', 'Order submitted successfully');
+      // reload lines to ensure totals reflect server
+      try { await loadSalesOrderLines(data?.UUID || data?.Id || data?.HeaderUUID || headerResponse?.UUID); } catch (e) { /* ignore */ }
+    } catch (err) {
+      console.error('handleCreateOrder error ->', err);
+      Alert.alert('Error', err?.message || 'Unable to submit order');
+    } finally {
+      setIsSavingHeader(false);
+    }
   };
   const onCancel = () => { };
 
@@ -751,6 +1623,11 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
   return (
     <>
       <View style={{ flex: 1, backgroundColor: '#fff' }}>
+        {isPrefilling && (
+          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.75)', zIndex: 9999 }}>
+            <ActivityIndicator size="large" color={COLORS?.primary || '#000'} />
+          </View>
+        )}
         <AppHeader
           title="Manage Sales Order"
           onLeftPress={() => {
@@ -770,14 +1647,14 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
           <AccordionSection
             id={1}
             title="Header"
-            expanded={expandedId === 1}
-            onToggle={toggleSection}
+            expanded={Array.isArray(expandedIds) ? expandedIds.includes(1) : expandedIds === 1}
+            onToggle={() => { if (headerSaved && !isEditingHeader) return; toggleSection(1); }}
             rightActions={headerSaved ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: wp(2) }}>
                 <TouchableOpacity onPress={() => { /* no-op check */ }} style={{ marginRight: wp(3) }}>
                   <Icon name="check-circle" size={rf(4)} color={COLORS.primary} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setIsEditingHeader(true); setHeaderSaved(false); setExpandedId(1); }}>
+                <TouchableOpacity onPress={() => { setIsEditingHeader(true); setHeaderSaved(false); setExpandedIds([1]); }}>
                   <Icon name="edit" size={rf(4)} color={COLORS.text} />
                 </TouchableOpacity>
               </View>
@@ -788,19 +1665,25 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
                 <Text style={inputStyles.label}>Sales Inquiry No.</Text>
 
                 {/* <Text style={[inputStyles.label, { fontWeight: '600' }]}>Sales Inquiry No.</Text> */}
-                <Dropdown
-                  placeholder="Sales Inquiry No."
-                  value={SalesInquiryNo}
-                  options={SalesInquiryNosOptions}
-                  getLabel={c => (c?.InquiryNo || c?.Name || String(c))}
-                  getKey={c => (c?.UUID || c?.Id || c)}
-                  onSelect={v => {
-                    setSalesInquiry(v?.InquiryNo || String(v));
-                    setHeaderForm(s => ({ ...s, SalesInquiryUUID: v?.UUID || v }));
-                  }}
-                  inputBoxStyle={inputStyles.box}
-                  textStyle={inputStyles.input}
-                />
+                {headerSaved && !isEditingHeader ? (
+                  <View style={[inputStyles.box]}>
+                    <Text style={inputStyles.input}>{renderLabel(SalesInquiryNo || headerForm.SalesInquiryUUID, ['InquiryNo', 'Name'])}</Text>
+                  </View>
+                ) : (
+                  <Dropdown
+                    placeholder="Sales Inquiry No."
+                    value={SalesInquiryNo}
+                    options={SalesInquiryNosOptions}
+                    getLabel={c => (c?.InquiryNo || c?.Name || String(c))}
+                    getKey={c => (c?.UUID || c?.Id || c)}
+                    onSelect={v => {
+                      setSalesInquiry(v?.InquiryNo || String(v));
+                      setHeaderForm(s => ({ ...s, SalesInquiryUUID: v?.UUID || v }));
+                    }}
+                    inputBoxStyle={inputStyles.box}
+                    textStyle={inputStyles.input}
+                  />
+                )}
               </View>
 
 
@@ -808,16 +1691,26 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
                 <Text style={inputStyles.label}>Customer Name* </Text>
 
                 {/* <Text style={inputStyles.label}>Customer Name*</Text> */}
-                <Dropdown
-                  placeholder="Customer Name*"
-                  value={headerForm.CustomerName}
-                  options={customersOptions}
-                  getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
-                  getKey={c => (c?.UUID || c?.Id || c)}
-                  onSelect={v => setHeaderForm(s => ({ ...s, CustomerName: v?.CustomerName || v }))}
-                  inputBoxStyle={inputStyles.box}
-                  textStyle={inputStyles.input}
-                />
+                {headerSaved && !isEditingHeader ? (
+                  <View style={[inputStyles.box]}>
+                    <Text style={inputStyles.input}>{renderLabel(headerForm.CustomerName, ['CustomerName', 'Name', 'DisplayName'])}</Text>
+                  </View>
+                ) : (
+                  <Dropdown
+                    placeholder="Customer Name*"
+                    value={headerForm.CustomerName}
+                    options={customersOptions}
+                    getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
+                    getKey={c => (c?.UUID || c?.Id || c)}
+                    onSelect={v => setHeaderForm(s => ({
+                      ...s,
+                      CustomerName: v?.CustomerName || v,
+                      CustomerUUID: v?.UUID || v?.Id || (typeof v === 'string' ? v : ''),
+                    }))}
+                    inputBoxStyle={inputStyles.box}
+                    textStyle={inputStyles.input}
+                  />
+                )}
               </View>
             </View>
 
@@ -826,34 +1719,46 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
                 <Text style={inputStyles.label}>Sales Order Number* </Text>
 
                 {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
-                <View style={[inputStyles.box]} pointerEvents="box-none">
-                  <TextInput
-                    style={[inputStyles.input, { flex: 1 }]}
-                    value={headerForm.clientName}
-                    onChangeText={v =>
-                      setHeaderForm(s => ({ ...s, clientName: v }))
-                    }
-                    placeholder="eg."
-                    placeholderTextColor={COLORS.textLight}
-                  />
-                </View>
+                {headerSaved && !isEditingHeader ? (
+                  <View style={[inputStyles.box]} pointerEvents="none">
+                    <Text style={[inputStyles.input, { flex: 1 }]}>{renderLabel(headerForm.SalesOrderNo)}</Text>
+                  </View>
+                ) : (
+                  <View style={[inputStyles.box]} pointerEvents="box-none">
+                    <TextInput
+                      style={[inputStyles.input, { flex: 1 }]}
+                      value={headerForm.SalesOrderNo}
+                      onChangeText={v =>
+                        setHeaderForm(s => ({ ...s, SalesOrderNo: v }))
+                      }
+                      placeholder="eg."
+                      placeholderTextColor={COLORS.textLight}
+                    />
+                  </View>
+                )}
               </View>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Project Name </Text>
 
                 {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
                 <View style={{ zIndex: 9998, elevation: 20 }}>
+                {headerSaved && !isEditingHeader ? (
+                  <View style={[inputStyles.box]}>
+                    <Text style={inputStyles.input}>{renderLabel(project || projectUUID, ['ProjectTitle', 'Name'])}</Text>
+                  </View>
+                ) : (
                   <Dropdown
                     placeholder="Select Project*"
                     value={project}
                     options={projectsOptions}
                     getLabel={p => (p?.Name || p?.ProjectTitle || String(p))}
                     getKey={p => (p?.Uuid || p?.Id || p)}
-                    onSelect={v => {setProject(v?.ProjectTitle || v), setProjectUUID(v?.Uuid || v);}}
+                    onSelect={v => { setProject(v?.ProjectTitle || v), setProjectUUID(v?.Uuid || v); }}
                     renderInModal={true}
                     inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                     textStyle={inputStyles.input}
                   />
+                )}
                 </View>
               </View>
             </View>
@@ -865,6 +1770,11 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
 
                 {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
                 <View style={{ zIndex: 9998, elevation: 20 }}>
+                {headerSaved && !isEditingHeader ? (
+                  <View style={[inputStyles.box]}>
+                    <Text style={inputStyles.input}>{renderLabel(paymentTerm || paymentTermUuid, ['Name', 'Term'])}</Text>
+                  </View>
+                ) : (
                   <Dropdown
                     placeholder="Select Payment Term*"
                     value={paymentTerm}
@@ -876,23 +1786,30 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
                     inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                     textStyle={inputStyles.input}
                   />
+                )}
                 </View>
               </View>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>payment Method* </Text>
 
                 <View style={{ zIndex: 9998, elevation: 20 }}>
+                {headerSaved && !isEditingHeader ? (
+                  <View style={[inputStyles.box]}>
+                    <Text style={inputStyles.input}>{renderLabel(paymentMethod || paymentMethodUUID, ['Name', 'Mode'])}</Text>
+                  </View>
+                ) : (
                   <Dropdown
                     placeholder="Payment Method"
                     value={paymentMethod}
                     options={paymentMethodsOptions}
                     getLabel={p => (p?.Name || p?.Mode || String(p))}
                     getKey={p => (p?.UUID || p?.Id || p)}
-                    onSelect={v => {setPaymentMethod(v?.Name || v) , setPaymentMethodUUID(v?.UUID || v)}}
+                    onSelect={v => { setPaymentMethod(v?.Name || v), setPaymentMethodUUID(v?.UUID || v) }}
                     renderInModal={true}
                     inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                     textStyle={inputStyles.input}
                   />
+                )}
                 </View>
               </View>
             </View>
@@ -1000,7 +1917,7 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
             <AccordionSection
               id={2}
               title="Billing Address"
-              expanded={expandedId === 2}
+              expanded={Array.isArray(expandedIds) ? expandedIds.includes(2) : expandedIds === 2}
               onToggle={toggleSection}
             >
               <View style={styles.row}>
@@ -1154,7 +2071,7 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
             <AccordionSection
               id={3}
               title="Shipping Address"
-              expanded={expandedId === 3}
+              expanded={Array.isArray(expandedIds) ? expandedIds.includes(3) : expandedIds === 3}
               onToggle={toggleSection}
             >
               <View style={styles.row}>
@@ -1303,7 +2220,7 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
             <AccordionSection
               id={4}
               title="Create Order"
-              expanded={expandedId === 4}
+              expanded={Array.isArray(expandedIds) ? expandedIds.includes(4) : expandedIds === 4}
               onToggle={toggleSection}
               wrapperStyle={{ overflow: 'visible' }}
             >
@@ -1322,171 +2239,252 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
                   Item Details
                 </Text>
 
-                {/* ── TABLE CONTAINER ── */}
-                <View style={styles.tableWrapper}>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={true}
-                    stickyHeaderIndices={[0]}
-                    contentContainerStyle={{ minWidth: wp(180) }}
-                  >
-                    <View style={styles.table}>
-                      {/* ── THEAD ── */}
-                      <View style={styles.thead}>
-                        <View style={styles.tr}>
-                          <Text style={[styles.th, { width: COL_WIDTHS.ITEM }]}>
-                            ITEM DETAILS
-                          </Text>
-                          <Text style={[styles.th, { width: COL_WIDTHS.QTY }]}>
-                            QUANTITY
-                          </Text>
-                          <Text style={[styles.th, { width: COL_WIDTHS.RATE }]}>
-                            RATE
-                          </Text>
-                          {/* TAX column removed */}
-                          <Text style={[styles.th, { width: COL_WIDTHS.AMOUNT }]}>
-                            AMOUNT
-                          </Text>
-                          <Text style={[styles.th, { width: COL_WIDTHS.ACTION }]}>
-                            ACTION
-                          </Text>
-                        </View>
-                      </View>
+                {/* LINE form: Item | Description | Quantity | Rate | Amount */}
+                <View style={{ marginBottom: hp(1.5) }}>
+                  {/* Item dropdown full width */}
+                  <View style={{ width: '100%', marginBottom: hp(1) }}>
+                    <Text style={inputStyles.label}>Item*</Text>
+                    <View style={{ zIndex: 9999, elevation: 20 }}>
+                      <Dropdown
+                        placeholder="Select Item"
+                        value={currentItem.itemName}
+                        options={masterItems}
+                        getLabel={it => (it?.name || String(it))}
+                        getKey={it => (it?.sku || it)}
+                        onSelect={v => {
+                          if (v && typeof v === 'object') {
+                            setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.sku || v, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '' }));
+                          } else {
+                            setCurrentItem(ci => ({ ...ci, itemName: v, itemNameUuid: null }));
+                          }
+                        }}
+                        renderInModal={true}
+                        inputBoxStyle={[inputStyles.box, { width: '100%' }]}
+                        textStyle={inputStyles.input}
+                      />
+                    </View>
+                  </View>
 
-                      {/* ── TBODY ── */}
-                      <View style={styles.tbody}>
-                        {items.map(row => (
-                          <View key={row.id} style={styles.tr}>
-                            <View
-                              style={[
-                                styles.tableCellWide,
-                                {
-                                  borderRightWidth: 1,
-                                  borderColor: '#E0E0E0',
-                                },
-                              ]}
-                            >
-                              <View style={{ zIndex: 9999, elevation: 20 }}>
-                                <Dropdown
-                                  placeholder="Select Item"
-                                  value={
-                                    row.selectedItem ? row.selectedItem.name : ''
-                                  }
-                                  options={masterItems}
-                                  getLabel={it =>
-                                    `${it.name} | ${it.sku} | ₹${it.rate}`
-                                  }
-                                  getKey={it => it.sku}
-                                  onSelect={it => selectMasterItem(row.id, it)}
-                                  renderInModal={true}
-                                  inputBoxStyle={{
-                                    ...inputStyles.box,
-                                    height: hp(6), // bigger height
-                                    borderWidth: 1,
-                                    backgroundColor: '#fff',
-                                    width: wp(48), // wider dropdown
-                                  }}
-                                  textStyle={[
-                                    inputStyles.input,
-                                    { fontSize: wp(3.2) },
-                                  ]}
-                                  dropdownListStyle={{
-                                    backgroundColor: '#fff',
-                                    elevation: 10,
-                                    zIndex: 9999,
-                                    borderWidth: 1,
-                                    borderColor: '#ccc',
-                                    width: wp(55),
-                                  }}
-                                />
-                              </View>
+                  {/* Description full width */}
+                  <View style={{ width: '100%', marginBottom: hp(1) }}>
+                    <Text style={inputStyles.label}>Description</Text>
+                    <TextInput
+                      style={[styles.descInput, { minHeight: hp(10), width: '100%' }]}
+                      value={currentItem.desc || ''}
+                      onChangeText={t => setCurrentItem(ci => ({ ...ci, desc: t }))}
+                      placeholder="Enter description"
+                      placeholderTextColor={COLORS.textLight}
+                      multiline
+                      numberOfLines={3}
+                    />
+                  </View>
 
-                              {row.selectedItem ? (
-                                <View style={styles.selectedContainer}>
-                                  <View style={styles.itemHeader}>
-                                    <Text style={styles.itemName}>
-                                      {row.name}
-                                    </Text>
-                                    <Text style={styles.itemSku}>
-                                      SKU: {row.sku}
-                                    </Text>
-                                  </View>
-                                  <View style={styles.descInput}>
-                                    <Text style={{ color: COLORS.text }}>
-                                      {row.desc}
-                                    </Text>
-                                  </View>
-                                  {row.hsn ? (
-                                    <Text style={styles.hsnTag}>
-                                      HSN: {row.hsn}
-                                    </Text>
-                                  ) : null}
-                                </View>
-                              ) : null}
-                            </View>
-
-                            {/* QUANTITY */}
-                            <View style={[styles.td, { width: COL_WIDTHS.QTY }]}>
-                              <TextInput
-                                style={styles.input}
-                                keyboardType="numeric"
-                                value={String(row.qty ?? '')}
-                                onChangeText={v =>
-                                  updateItemField(row.id, 'qty', v)
-                                }
-                              />
-                            </View>
-
-                            {/* RATE */}
-                            <View style={[styles.td, { width: COL_WIDTHS.RATE }]}>
-                              <TextInput
-                                style={styles.input}
-                                keyboardType="numeric"
-                                value={String(row.rate ?? '')}
-                                onChangeText={v =>
-                                  updateItemField(row.id, 'rate', v)
-                                }
-                              />
-                            </View>
-
-                            {/* TAX column removed */}
-
-                            {/* AMOUNT */}
-                            <View
-                              style={[styles.td, { width: COL_WIDTHS.AMOUNT }]}
-                            >
-                              <Text style={[styles.input, { fontWeight: '600' }]}>
-                                ₹{row.amount ?? '0.00'}
-                              </Text>
-                            </View>
-
-                            {/* ACTION */}
-                            <View
-                              style={[
-                                styles.tdAction,
-                                { width: COL_WIDTHS.ACTION },
-                              ]}
-                            >
-                              <TouchableOpacity
-                                style={styles.deleteBtn}
-                                onPress={() => deleteItem(row.id)}
-                              >
-                                <Text style={styles.deleteBtnText}>Delete</Text>
-                              </TouchableOpacity>
-                            </View>
-                          </View>
-                        ))}
+                  {/* Two fields in one line: Quantity & Rate */}
+                  <View style={[styles.row, { justifyContent: 'space-between' }]}> 
+                    <View style={{ width: '48%' }}>
+                      <Text style={inputStyles.label}>Quantity*</Text>
+                      <View style={[inputStyles.box, { marginTop: hp(0.5), width: '100%' }]}>
+                        <TextInput
+                          style={[inputStyles.input, { textAlign: 'center' }]}
+                          value={String(currentItem.quantity || '')}
+                          onChangeText={v => setCurrentItem(ci => ({ ...ci, quantity: v }))}
+                          keyboardType="numeric"
+                          placeholder="1"
+                          placeholderTextColor={COLORS.textLight}
+                        />
                       </View>
                     </View>
-                  </ScrollView>
+
+                    <View style={{ width: '48%' }}>
+                      <Text style={inputStyles.label}>Rate*</Text>
+                      <View style={[inputStyles.box, { marginTop: hp(0.5), width: '100%' }]}>
+                        <TextInput
+                          style={[inputStyles.input, { textAlign: 'center' }]}
+                          value={String(currentItem.rate ?? '')}
+                          onChangeText={v => setCurrentItem(ci => ({ ...ci, rate: v }))}
+                          keyboardType="numeric"
+                          placeholder="0"
+                          placeholderTextColor={COLORS.textLight}
+                        />
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Amount display and action buttons */}
+                  <View style={[styles.row, { justifyContent: 'space-between', alignItems: 'center', marginTop: hp(1) }]}> 
+                    <View style={{ width: '40%' }}>
+                      <Text style={inputStyles.label}>Amount</Text>
+                      <View style={[inputStyles.box, { marginTop: hp(0.5), width: '60%' }]}>
+                        <Text style={[inputStyles.input, { textAlign: 'center', fontWeight: '600' }]}>₹{computeAmount(currentItem.quantity || 0, currentItem.rate || 0)}</Text>
+                      </View>
+                    </View>
+
+                    <View style={{ flexDirection: 'row' }}>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        style={[styles.addButton, { backgroundColor: COLORS.primary }]}
+                        onPress={handleAddLineItem}
+                        disabled={isAddingLine}
+                      >
+                        {isAddingLine ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <Text style={[styles.addButtonText, { color: '#fff' }]}>{editItemId ? 'Update' : 'Add'}</Text>
+                        )}
+                      </TouchableOpacity>
+                      {editItemId ? (
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          style={[styles.addButton, { backgroundColor: '#6c757d', marginLeft: wp(3) }]}
+                          onPress={() => { setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null, desc: '', rate: '' }); setEditItemId(null); }}
+                        >
+                          <Text style={styles.addButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  </View>
                 </View>
 
-                {/* ADD ITEM */}
-                <TouchableOpacity style={styles.addBtn} onPress={addItem}>
-                  <Text style={styles.addBtnText}>+ Add Item</Text>
-                </TouchableOpacity>
+                  
+                </View>
 
-                {/* Totals / Summary area */}
+                {/* Table container (search + pagination + table) */}
+                {linesLoading ? (
+                  <View style={{ paddingVertical: hp(4), alignItems: 'center' }}>
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                  </View>
+                ) : items.length > 0 && (
+                  <View>
+                    <View style={styles.tableControlsRow}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ marginRight: wp(2) }}>Show</Text>
+                        <Dropdown
+                          placeholder={String(pageSize)}
+                          value={String(pageSize)}
+                          options={pageSizes}
+                          getLabel={p => String(p)}
+                          getKey={p => String(p)}
+                          onSelect={v => { setPageSize(Number(v)); setPage(1); }}
+                          inputBoxStyle={{ width: wp(18) }}
+                          textStyle={inputStyles.input}
+                        />
+                        <Text style={{ marginLeft: wp(2) }}>entries</Text>
+                      </View>
+
+                      <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                        <TextInput
+                          style={[inputStyles.box, { width: wp(40), height: hp(5), paddingHorizontal: wp(2) }]}
+                          placeholder="Search..."
+                          value={tableSearch}
+                          onChangeText={t => { setTableSearch(t); setPage(1); }}
+                          placeholderTextColor={COLORS.textLight}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.tableWrapper}>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        nestedScrollEnabled={true}
+                        keyboardShouldPersistTaps="handled"
+                        directionalLockEnabled={true}
+                      >
+                        <View style={styles.table}>
+                          <View style={styles.thead}>
+                            <View style={styles.tr}>
+                              <Text style={[styles.th, { width: wp(10) }]}>Sr.No</Text>
+                              <Text style={[styles.th, { width: wp(30) }]}>Item Details</Text>
+                              <Text style={[styles.th, { width: wp(30) }]}>Description</Text>
+                              <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
+                              <Text style={[styles.th, { width: wp(20) }]}>Rate</Text>
+                              <Text style={[styles.th, { width: wp(20) }]}>Amount</Text>
+                              <Text style={[styles.th, { width: wp(40) }]}>Action</Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.tbody}>
+                            {(() => {
+                              const q = String(tableSearch || '').trim().toLowerCase();
+                              const filtered = q ? items.filter(it => {
+                                return (
+                                  String(it.name || '').toLowerCase().includes(q) ||
+                                  String(it.itemType || '').toLowerCase().includes(q) ||
+                                  String(it.desc || '').toLowerCase().includes(q)
+                                );
+                              }) : items;
+                              const total = filtered.length;
+                              const ps = Number(pageSize) || 10;
+                              const totalPages = Math.max(1, Math.ceil(total / ps));
+                              const currentPage = Math.min(Math.max(1, page), totalPages);
+                              const start = (currentPage - 1) * ps;
+                              const end = Math.min(start + ps, total);
+                              const visible = filtered.slice(start, end);
+
+                              return (
+                                <>
+                                  {visible.map((item, idx) => (
+                                    <View key={item.id} style={styles.tr}>
+                                      <View style={[styles.td, { width: wp(10)  }]}>
+                                        <Text style={styles.tdText}>{start + idx + 1}</Text>
+                                      </View>
+                                      <View style={[styles.td, { width: wp(30),   paddingLeft: wp(2) }]}>
+                                        <Text style={styles.tdText}>{item.name}</Text>
+                                      </View>
+                                       <View style={[styles.td, { width: wp(30) }]}>
+                                        <Text style={styles.tdText}>{item.desc}</Text>
+                                      </View>
+                                      <View style={[styles.td, { width: wp(20) }]}>
+                                        <Text style={styles.tdText}>{item.qty}</Text>
+                                      </View>
+                                      <View style={[styles.td, { width: wp(20) }]}>
+                                        <Text style={styles.tdText}>₹{item.rate}</Text>
+                                      </View>
+                                      <View style={[styles.td, { width: wp(20) }]}>
+                                        <Text style={[styles.tdText, { fontWeight: '600' }]}>₹{item.amount}</Text>
+                                      </View>
+                                      <View style={[styles.tdAction, { width: wp(40) } ,{flexDirection: 'row',paddingLeft: wp(2)}]}>
+                                        <TouchableOpacity style={styles.actionButton} onPress={() => handleEditItem(item.id)}>
+                                          <Icon name="edit" size={rf(3.6)} color="#fff" />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={[styles.actionButton, { marginLeft: wp(2) }]} onPress={() => deleteItem(item.id)}>
+                                          <Icon name="delete" size={rf(3.6)} color="#fff" />
+                                        </TouchableOpacity>
+                                      </View>
+                                    </View>
+                                  ))}
+
+                                  <View style={styles.paginationRow}>
+                                    <Text style={{ color: COLORS.textMuted }}>
+                                      Showing {total === 0 ? 0 : start + 1} to {end} of {total} entries
+                                    </Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                      <TouchableOpacity
+                                        style={[styles.pageButton, { marginRight: wp(2) }]}
+                                        disabled={currentPage <= 1}
+                                        onPress={() => setPage(p => Math.max(1, p - 1))}
+                                      >
+                                        <Text style={styles.pageButtonText}>Previous</Text>
+                                      </TouchableOpacity>
+                                      <Text style={{ marginHorizontal: wp(2) }}>{currentPage}</Text>
+                                      <TouchableOpacity
+                                        style={styles.pageButton}
+                                        disabled={currentPage >= totalPages}
+                                        onPress={() => setPage(p => Math.min(totalPages, p + 1))}
+                                      >
+                                        <Text style={styles.pageButtonText}>Next</Text>
+                                      </TouchableOpacity>
+                                    </View>
+                                  </View>
+                                </>
+                              );
+                            })()}
+                          </View>
+                        </View>
+                      </ScrollView>
+                    </View>
+                  </View>
+                )}
                 <View style={styles.billContainer}>
                   {/* Subtotal */}
                   <View style={styles.row}>
@@ -1612,7 +2610,7 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
                   {/* Total Tax */}
                   <View style={styles.row}>
                     <Text style={styles.label}>Total Tax:</Text>
-                    <Text style={styles.value}>₹0.00</Text>
+                    <Text style={styles.value}>₹{(parseFloat(totalTax) || 0).toFixed(2)}</Text>
                   </View>
 
                   {/* Divider */}
@@ -1623,11 +2621,13 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
                     <Text style={styles.labelBold}>Total Amount:</Text>
                     <Text style={styles.valueBold}>
                       ₹
-                      {(
-                        parseFloat(computeSubtotal()) +
-                        parseFloat(shippingCharges || 0) +
-                        parseFloat(adjustments || 0)
-                      ).toFixed(2)}
+                      {(() => {
+                        const serverNum = (serverTotalAmount !== null && serverTotalAmount !== undefined && String(serverTotalAmount).trim() !== '') ? parseFloat(serverTotalAmount) : NaN;
+                        const displayed = (!isNaN(serverNum))
+                          ? (serverNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0))
+                          : ((parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax || 0) || 0));
+                        return displayed.toFixed(2);
+                      })()}
                     </Text>
                   </View>
                 </View>
@@ -1701,7 +2701,6 @@ const [SalesInquiryNo, setSalesInquiry] = useState('');
                     </Text>
                   </View>
                 </View>
-              </View>
             </AccordionSection>
           )}
 
@@ -2260,13 +3259,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#fff',
   },
-  table: { minWidth: wp(180) },
+  table: { minWidth: wp(170) },
 
   /* ── COMMON ── */
   thead: {
     backgroundColor: '#f1f1f1',
   },
-  tr: { flexDirection: 'row' },
+  tr: { flexDirection: 'row', 
+   
+  },
 
   /* ── TH (header) ── */
   th: {
@@ -2287,6 +3288,61 @@ const styles = StyleSheet.create({
     borderRightColor: '#E0E0E0',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
+    paddingVertical: hp(1.2),
+  },
+  tdText: {
+    fontSize: wp(3),
+    color: COLORS.text,
+    fontFamily: TYPOGRAPHY.fontFamilyRegular,
+  },
+  actionButton: {
+    backgroundColor: '#6c757d',
+    paddingVertical: hp(0.5),
+    paddingHorizontal: wp(2),
+    borderRadius: wp(1),
+  },
+  addButtonWrapperRow: {
+    flexDirection: 'row',
+    marginTop: hp(1),
+    marginBottom: hp(1),
+  },
+  addButton: {
+    paddingVertical: hp(0.8),
+    paddingHorizontal: wp(3),
+    borderRadius: wp(1),
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: wp(18),
+  },
+  addButtonText: {
+    color: COLORS.text,
+    fontWeight: '700',
+    fontSize: wp(3.4),
+    textAlign: 'center',
+    fontFamily: TYPOGRAPHY.fontFamilyMedium,
+  },
+  tableControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: wp(2),
+  },
+  paginationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: wp(2),
+    width: '100%',
+  },
+  pageButton: {
+    backgroundColor: '#e5e7eb',
+    paddingVertical: hp(0.6),
+    paddingHorizontal: wp(3),
+    borderRadius: wp(0.8),
+  },
+  pageButtonText: {
+    color: COLORS.text,
+    fontWeight: '600',
   },
   tdAction: {
     justifyContent: 'center',
@@ -2294,7 +3350,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
-
   /* ── INPUT ── */
   input: {
     width: '100%',
@@ -2307,39 +3362,6 @@ const styles = StyleSheet.create({
     borderRadius: wp(1),
     backgroundColor: '#fff',
   },
-
-  /* ── ITEM CARD ── */
-  // itemCard: {
-  //     backgroundColor: '#fff',
-  //     padding: wp(2),
-  //     borderRadius: wp(1.5),
-  //     borderWidth: 1,
-  //     borderColor: '#ddd',
-  // },
-  // itemTitle: { fontWeight: 'bold', fontSize: wp(3.6), color: COLORS.text },
-  // itemSku: { fontSize: wp(3), color: COLORS.textLight, marginTop: hp(0.2) },
-  // itemDesc: {
-  //     marginTop: hp(0.6),
-  //     borderWidth: 1,
-  //     borderColor: '#ced4da',
-  //     borderRadius: wp(1),
-  //     padding: wp(1.5),
-  //     backgroundColor: '#fff',
-  //     minHeight: hp(6),
-  //     textAlignVertical: 'top',
-  //     fontSize: wp(3.2),
-  // },
-  // hsnBadge: {
-  //     marginTop: hp(0.8),
-  //     backgroundColor: '#17a2b8',
-  //     color: '#fff',
-  //     fontSize: wp(2.8),
-  //     paddingHorizontal: wp(2),
-  //     paddingVertical: hp(0.4),
-  //     borderRadius: wp(2),
-  //     alignSelf: 'flex-start',
-  // },
-
   /* ── BUTTONS ── */
   deleteBtn: {
     backgroundColor: COLORS.primary,
