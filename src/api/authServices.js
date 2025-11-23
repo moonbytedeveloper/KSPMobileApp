@@ -83,7 +83,7 @@ const PATHS = {
     submitTimesheetLine: Config.API_SUBMIT_TIMESHEET_LINE_PATH || '/api/TimeSheet/SubmitTimesheet',
     transferTimesheetTasks: Config.API_TRANSFER_TIMESHEET_TASKS_PATH || '/api/TimeSheet/transfer-tasks',
     attendanceSubmit: Config.API_ATTENDANCE_SUBMIT || '/api/HRA/ManageAttendance',
-    timesheetSlip : Config.API_TIMESHEET_SLIP || '/api/TimeSheet/api/timesheet/slip',
+    timesheetSlip: Config.API_TIMESHEET_SLIP || '/api/TimeSheet/api/timesheet/slip',
     // Timesheet eligibility check
     addTimesheetEligibility: Config.API_ADD_TIMESHEET_ELIGIBILITY_PATH || '/api/TimeSheet/AddTimesheet',
     employeeDashboard: Config.API_EMPLOYEE_DASHBOARD_PATH || '/api/DashBoard/employee/dashboard',
@@ -104,9 +104,10 @@ const PATHS = {
     totalEmployeeWorking: '/api/DashBoard/hr-dashboard/employees-status',
     // Account Sales 
     deleteSalesHeader: '/api/Account/DeleteSalesHeader',
+    deleteSalesOrderHeader: '/api/Account/DeleteSalesOrderHeader',
     getSalesHeaderInquiries: Config.API_GET_SALES_HEADER_INQUIRIES_PATH || '/api/Account/GetSalesHeaderInquiries',
     getPurchaseHeaderInquiries: Config.API_GET_PURCHASE_HEADER_INQUIRIES_PATH || '/api/Account/GetPurchaseHeaderInquiries',
-    addSalesInquiry : Config.ADD_SALES_INQUIRY || '/api/Account/AddCombinedSalesInquiry',
+    addSalesInquiry: Config.ADD_SALES_INQUIRY || '/api/Account/AddCombinedSalesInquiry',
     getCustomers: Config.API_GET_CUSTOMERS_PATH || '/api/Account/GetCustomers',
     getItemTypes: Config.API_GET_ITEM_TYPES_PATH || '/api/Account/ItemTypes',
     getItemMasters: Config.API_GET_ITEM_MASTERS_PATH || '/api/Account/ItemMasters',
@@ -115,17 +116,45 @@ const PATHS = {
     addSalesLine: Config.API_ADD_SALES_LINE_PATH || '/api/Account/AddSalesLine',
     updateSalesLine: Config.API_UPDATE_SALES_LINE_PATH || '/api/Account/UpdateSalesLine',
     deleteSalesLine: Config.API_DELETE_SALES_LINE_PATH || '/api/Account/DeleteSalesLine',
+    deleteSalesOrderLine: Config.API_DELETE_SALES_ORDER_LINE_PATH || '/api/Account/DeleteSalesOrderLine',
     updateSalesHeader: Config.API_UPDATE_SALES_HEADER_PATH || '/api/Account/UpdateSalesHeader',
     getSalesHeader: Config.API_GET_SALES_HEADER_PATH || '/api/Account/GetSalesHeader',
     getSalesLines: Config.API_GET_SALES_LINES_PATH || '/api/Account/GetSalesLines',
+    getPurchaseOrderLines: Config.API_GET_PURCHASE_ORDER_LINES_PATH || '/api/Account/purchaseorderline',
     getSalesOrderHeaders: Config.API_GET_SALES_ORDER_HEADERS_PATH || '/api/Account/GetSalesOrderHeaders',
+    getSalesOrderHeaderById: Config.API_GET_SALES_ORDER_HEADER_BY_ID_PATH || '/api/Account/GetSalesOrderHeaderById',
+    getPurchaseOrderHeaderById: Config.API_GET_PURCHASE_ORDER_HEADER_BY_ID_PATH || '/api/Account/GetPurchaseOrderHeaderById',
+    getItems: Config.API_GET_ITEMS_PATH || '/api/Account/GetItems',
     termsOfPayment: Config.API_TERMS_OF_PAYMENT_PATH || '/api/Account/termsofpayment',
     modeOfPayment: Config.API_MODE_OF_PAYMENT_PATH || '/api/Account/modeofpayment',
     // getProjects: Config.API_PROJECTS_PATH || '/api/Projects/GetProjects',
-    addSalesOrder: Config.API_ADD_SALES_ORDER_PATH || '/api/Account/AddSalesOrder',
-    updateSalesOrder: Config.API_UPDATE_SALES_ORDER_PATH || '/api/Account/UpdateSalesOrder',
+    addSalesOrder: Config.API_ADD_SALES_ORDER_PATH || '/api/Account/AddSalesOrderHeader',
+    addPurchaseOrder: Config.API_ADD_PURCHASE_ORDER_PATH || '/api/Account/purchaseorderheader',
+    updateSalesOrder: Config.API_UPDATE_SALES_ORDER_PATH || '/api/Account/UpdateSalesOrderHeader',
     getAllInquiryNumbers: Config.API_GET_ALL_INQUIRY_NUMBERS_PATH || '/api/Account/GetAllInquiryNumbers',
-
+    getSalesOrderNumbers: Config.API_GET_SALES_ORDER_NUMBERS_PATH || '/api/Account/GetSalesOrderNumbers',
+    addSalesOrderLine: Config.API_ADD_SALES_ORDER_LINE_PATH || '/api/Account/AddSalesOrderLine',
+    updateSalesOrderLine: Config.API_UPDATE_SALES_ORDER_LINE_PATH || '/api/Account/UpdateSalesOrderLine',
+    getSalesOrderLines: Config.API_GET_SALES_ORDER_LINES_PATH || '/api/Account/GetSalesOrderLines',
+    addSalesPerformaInvoiceHeader: Config.API_ADD_SALES_PERFORMA_INVOICE_HEADER_PATH || '/api/Account/AddSalesPerformaInvoiceHeader',
+    addSalesInvoiceHeader: Config.API_ADD_SALES__INVOICE_HEADER_PATH || '/api/Account/AddSalesInvoiceHeader',
+    addSalesPerformaInvoiceLine: Config.API_ADD_SALES_PERFORMA_INVOICE_LINE_PATH || '/api/Account/AddSalesPerformaInvoiceLine',
+    addSalesInvoiceLine: Config.API_ADD_SALES__INVOICE_LINE_PATH || '/api/Account/AddSalesInvoiceLine',
+    updateSalesPerformaInvoiceHeader: Config.API_UPDATE_SALES_PERFORMA_INVOICE_HEADER_PATH || '/api/Account/UpdateSalesPerformaInvoiceHeader',
+    getSalesPerformaInvoiceHeaders: Config.API_GET_SALES_PERFORMA_INVOICE_HEADERS_PATH || '/api/Account/GetSalesPerformaInvoiceHeaders',
+    getSalesPerformaInvoiceLines: Config.API_GET_SALES_PERFORMA_INVOICE_LINES_PATH || '/api/Account/GetSalesPerformaInvoiceLines',
+    updateSalesPerformaInvoiceLine: Config.API_UPDATE_SALES_PERFORMA_INVOICE_LINE_PATH || '/api/Account/UpdateSalesPerformaInvoiceLine',
+    updateSalesInvoiceLine: Config.API_UPDATE_SALES__INVOICE_LINE_PATH || '/api/Account/UpdateSalesInvoiceLine',
+    deleteSalesPerformaInvoiceLine: Config.API_DELETE_SALES_PERFORMA_INVOICE_LINE_PATH || '/api/Account/DeleteSalesPerformaInvoiceLine',
+    deleteSalesInvoiceLine: Config.API_DELETE_SALES_INVOICE_LINE_PATH || '/api/Account/DeleteSalesInvoiceLine',
+    getSalesPerformaInvoiceHeaderById: Config.API_GET_SALES_PERFORMA_INVOICE_HEADER_BY_ID_PATH || '/api/Account/GetSalesPerformaInvoiceHeaderById',
+    getSalesInvoiceHeaders: Config.API_GET_SALES_INVOICE_HEADERS_PATH || '/api/Account/GetSalesInvoiceHeaders',
+    getSalesInvoiceHeaderById: Config.API_GET_SALES_INVOICE_HEADER_BY_ID_PATH || '/api/Account/GetSalesInvoiceHeaderById',
+    getSalesInvoiceLines: Config.API_GET_SALES_INVOICE_LINES_PATH || '/api/Account/GetSalesInvoiceLines',
+    updateSalesInvoiceHeader: Config.API_UPDATE_SALES_INVOICE_HEADER_PATH || '/api/Account/UpdateSalesInvoiceHeader',
+    deleteSalesPerformaInvoiceHeader: Config.API_DELETE_SALES_PERFORMA_INVOICE_HEADER_PATH || '/api/Account/DeleteSalesPerformaInvoiceHeader',
+    updatePurchaseOrderHeader: Config.API_UPDATE_PURCHASE_ORDER_PATH || '/api/Account/Updatepurchaseorderheader',
+    updatePurchaseOrderline: Config.API_UPDATE_PURCHASE_ORDER_PATH || '/api/Account/Updatepurchaseorderline',
 
 };
 console.log(PATHS, 'PATHS');
@@ -415,7 +444,7 @@ export async function getCustomers({ cmpUuid, envUuid, userUuid } = {}) {
             cmpUuid || getCMPUUID(),
             envUuid || getENVUUID(),
         ]);
-        cmpUuid = c; envUuid = e; 
+        cmpUuid = c; envUuid = e;
     }
     const params = { cmpUuid, envUuid };
     // Allow callers to pass uuids or let interceptors / axios instance add defaults
@@ -432,9 +461,9 @@ export async function getItemTypes({ cmpUuid, envUuid, userUuid } = {}) {
             cmpUuid || getCMPUUID(),
             envUuid || getENVUUID(),
         ]);
-        cmpUuid = c; envUuid = e; 
+        cmpUuid = c; envUuid = e;
     }
-     const params = { cmpUuid, envUuid };
+    const params = { cmpUuid, envUuid };
     const resp = await api.get(PATHS.getItemTypes, {
         params
     });
@@ -448,6 +477,22 @@ export async function getItemMasters({ itemTypeUuid, cmpUuid, envUuid, userUuid 
     if (itemTypeUuid) params.ItemType_UUID = itemTypeUuid;
     const resp = await api.get(PATHS.getItemMasters, { params });
     return resp.data;
+}
+
+// Get items list (supports optional search / pagination)
+export async function getItems({ search, page, pageSize, cmpUuid, envUuid, userUuid } = {}) {
+    const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+    const params = { cmpUuid: c, envUuid: e, userUuid: u };
+    if (search) params.search = search;
+    if (page) params.page = page;
+    if (pageSize) params.pageSize = pageSize;
+    try {
+        const resp = await api.get(PATHS.getItems, { params });
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] getItems error ->', err && (err.message || err));
+        throw err;
+    }
 }
 
 // Get units list for dropdowns
@@ -478,6 +523,212 @@ export async function addSalesHeader(payload = {}, { cmpUuid, envUuid, userUuid 
         throw err;
     }
 }
+
+// Add Sales Performa Invoice Header
+export async function addSalesPerformaInvoiceHeader(payload = {}, { cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        const [c, e, u] = await Promise.all([
+            cmpUuid || getCMPUUID(),
+            envUuid || getENVUUID(),
+            userUuid || getUUID()
+        ]);
+        const params = { cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] addSalesPerformaInvoiceHeader params ->', params);
+
+        const resp = await api.post(PATHS.addSalesPerformaInvoiceHeader, payload, { params });
+        console.log('[authServices] addSalesPerformaInvoiceHeader response status ->', resp?.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] addSalesPerformaInvoiceHeader error ->', err && (err.message || err));
+        throw err;
+    }
+}
+// Add Sales Invoice Header
+export async function addSalesInvoiceHeader(payload = {}, { cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        const [c, e, u] = await Promise.all([
+            cmpUuid || getCMPUUID(),
+            envUuid || getENVUUID(),
+            userUuid || getUUID()
+        ]);
+        const params = { cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] addSalesInvoiceHeader params ->', params);
+
+        const resp = await api.post(PATHS.addSalesInvoiceHeader, payload, { params });
+        console.log('[authServices] addSalesInvoiceHeader response status ->', resp?.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] addSalesInvoiceHeader error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Add Sales Performa Invoice Line (line item)
+export async function addSalesPerformaInvoiceLine(payload = {}, { cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        const [c, e, u] = await Promise.all([
+            cmpUuid || getCMPUUID(),
+            envUuid || getENVUUID(),
+            userUuid || getUUID()
+        ]);
+        const params = { cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] addSalesPerformaInvoiceLine params ->', params);
+
+        const resp = await api.post(PATHS.addSalesPerformaInvoiceLine, payload, { params });
+        console.log('[authServices] addSalesPerformaInvoiceLine response status ->', resp?.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] addSalesPerformaInvoiceLine error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Add Sales  Invoice Line (line item)
+export async function addSalesInvoiceLine(payload = {}, { cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        const [c, e, u] = await Promise.all([
+            cmpUuid || getCMPUUID(),
+            envUuid || getENVUUID(),
+            userUuid || getUUID()
+        ]);
+        const params = { cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] addSalesInvoiceLine params ->', params);
+
+        const resp = await api.post(PATHS.addSalesInvoiceLine, payload, { params });
+        console.log('[authServices] addSalesInvoiceLine response status ->', resp?.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] addSalesInvoiceLine error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Update Sales Performa Invoice Line (line item)
+export async function updateSalesPerformaInvoiceLine(payload = {}, { cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        const [c, e, u] = await Promise.all([
+            cmpUuid || getCMPUUID(),
+            envUuid || getENVUUID(),
+            userUuid || getUUID()
+        ]);
+        const params = { cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] updateSalesPerformaInvoiceLine params ->', params);
+        console.log('[authServices] updateSalesPerformaInvoiceLine payload ->', payload);
+        const resp = await api.post(PATHS.updateSalesPerformaInvoiceLine, payload, { params });
+        console.log('[authServices] updateSalesPerformaInvoiceLine response status ->', resp?.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] updateSalesPerformaInvoiceLine error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Update Sales  Invoice Line (line item)
+export async function updateSalesInvoiceLine(payload = {}, { cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        const [c, e, u] = await Promise.all([
+            cmpUuid || getCMPUUID(),
+            envUuid || getENVUUID(),
+            userUuid || getUUID()
+        ]);
+        const params = { cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] updateSalesInvoiceLine params ->', params);
+        console.log('[authServices] updateSalesInvoiceLine payload ->', payload);
+        const resp = await api.post(PATHS.updateSalesInvoiceLine, payload, { params });
+        console.log('[authServices] updateSalesInvoiceLine response status ->', resp?.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] updateSalesInvoiceLine error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Delete Sales Performa Invoice Line
+export async function deleteSalesPerformaInvoiceLine({ lineUuid, overrides = {} } = {}) {
+    if (!lineUuid) throw new Error('lineUuid is required');
+    try {
+        let { userUuid, cmpUuid, envUuid } = overrides || {};
+        if (!userUuid || !cmpUuid || !envUuid) {
+            const [u, c, e] = await Promise.all([
+                userUuid || getUUID(),
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+            ]);
+            userUuid = u; cmpUuid = c; envUuid = e;
+        }
+        // Send multiple possible param names for compatibility with backend
+        const params = {
+            uuid: lineUuid,
+            UUID: lineUuid,
+            LineUUID: lineUuid,
+            lineUuid: lineUuid,
+            userUuid,
+            cmpUuid,
+            envUuid
+        };
+        console.log('[authServices] deleteSalesPerformaInvoiceLine params ->', params);
+        const resp = await api.delete(PATHS.deleteSalesPerformaInvoiceLine, { params });
+        console.log('[authServices] deleteSalesPerformaInvoiceLine response ->', resp && resp.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] deleteSalesPerformaInvoiceLine error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+export async function deleteSalesInvoiceLine({ lineUuid, overrides = {} } = {}) {
+    if (!lineUuid) throw new Error('lineUuid is required');
+    try {
+        let { userUuid, cmpUuid, envUuid } = overrides || {};
+        if (!userUuid || !cmpUuid || !envUuid) {
+            const [u, c, e] = await Promise.all([
+                userUuid || getUUID(),
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+            ]);
+            userUuid = u; cmpUuid = c; envUuid = e;
+        }
+        // Send multiple possible param names for compatibility with backend
+        const params = {
+            uuid: lineUuid,
+            UUID: lineUuid,
+            LineUUID: lineUuid,
+            lineUuid: lineUuid,
+            userUuid,
+            cmpUuid,
+            envUuid
+        };
+        console.log('[authServices] deleteSalesInvoiceLine params ->', params);
+        const resp = await api.delete(PATHS.deleteSalesInvoiceLine, { params });
+        console.log('[authServices] deleteSalesInvoiceLine response ->', resp && resp.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] deleteSalesInvoiceLine error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Update Sales Performa Invoice Header
+export async function updateSalesPerformaInvoiceHeader(payload = {}, { cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        const [c, e, u] = await Promise.all([
+            cmpUuid || getCMPUUID(),
+            envUuid || getENVUUID(),
+            userUuid || getUUID()
+        ]);
+        const params = { cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] updateSalesPerformaInvoiceHeader params ->', params);
+
+        const resp = await api.post(PATHS.updateSalesPerformaInvoiceHeader, payload, { params });
+        console.log('[authServices] updateSalesPerformaInvoiceHeader response status ->', resp?.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] updateSalesPerformaInvoiceHeader error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+
 
 // Update existing sales header
 export async function updateSalesHeader(payload = {}, { cmpUuid, envUuid, userUuid } = {}) {
@@ -522,6 +773,20 @@ export async function getSalesLines({ headerUuid, cmpUuid, envUuid, userUuid } =
     console.log('[authServices] getSalesLines resp ->', resp?.status);
     return resp.data;
 }
+
+// Get sales lines for a header
+export async function getPurchaseOrderLines({ headerUuid, cmpUuid, envUuid, userUuid } = {}) {
+    if (!headerUuid) throw new Error('headerUuid is required');
+    const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+    // include multiple key names for header uuid to handle backend naming differences
+    const params = { headerUuid, UUID: headerUuid, HeaderUUID: headerUuid, cmpUuid: c, envUuid: e, userUuid: u };
+    console.log('[authServices] getPurchaseOrderLines params ->', params);
+    const resp = await api.get(PATHS.getPurchaseOrderLines, { params });
+    console.log('[authServices] getPurchaseOrderLines resp ->', resp?.status);
+    return resp.data;
+}
+
+
 
 
 // Dashboard: Get employee projects with progress (server-side pagination)
@@ -596,6 +861,199 @@ export async function getSalesOrderHeaders({ cmpUuid, envUuid, start = 0, length
     return resp.data;
 }
 
+// Get sales performa/invoice lines (list) - supports pagination and search
+export async function getSalesPerformaInvoiceHeaders({  cmpUuid, envUuid, start = 0, length = 10, searchValue = '' } = {}) {
+    if (!cmpUuid || !envUuid) {
+        const [c, e] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID()]);
+        cmpUuid = c; envUuid = e; 
+    }
+    const params = { cmpUuid, envUuid, start, length, searchValue };
+    try {
+        const resp = await api.get(PATHS.getSalesPerformaInvoiceHeaders, { params });
+        console.log('[authServices] getSalesPerformaInvoiceHeaders resp ->', resp);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] getSalesPerformaInvoiceHeaders error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Get lines for a sales invoice header
+export async function getSalesInvoiceLines({ headerUuid, cmpUuid, envUuid, userUuid, start = 0, length = 100 } = {}) {
+    if (!headerUuid) throw new Error('headerUuid is required');
+    const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+    const params = { headerUuid, cmpUuid: c, envUuid: e, start, length };
+    console.log('[authServices] getSalesInvoiceLines params ->', params);
+    const resp = await api.get(PATHS.getSalesInvoiceLines, { params });
+    console.log('[authServices] getSalesInvoiceLines response ->', resp && resp.status);
+    return resp.data;
+}
+
+// Get sales invoice headers (list) - supports pagination and search
+export async function getSalesInvoiceHeaders({ cmpUuid, envUuid, start = 0, length = 10, searchValue = '' } = {}) {
+    if (!cmpUuid || !envUuid) {
+        const [c, e] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID()]);
+        cmpUuid = c; envUuid = e;
+    }
+    const params = { cmpUuid, envUuid, start, length, searchValue };
+    try {
+        const resp = await api.get(PATHS.getSalesInvoiceHeaders, { params });
+        console.log('[authServices] getSalesInvoiceHeaders resp ->', resp);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] getSalesInvoiceHeaders error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Get a single sales order header by header UUID (for prefilling billing/shipping)
+export async function getSalesOrderHeaderById({ headerUuid, cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        let { userUuid: u, cmpUuid: c, envUuid: e } = { userUuid, cmpUuid, envUuid } || {};
+        if (!u || !c || !e) {
+            const [uu, cc, ee] = await Promise.all([
+                userUuid || getUUID(),
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+            ]);
+            u = uu; c = cc; e = ee;
+        }
+
+        // Helper to detect if response contains meaningful data
+        const hasMeaningfulData = (respData) => {
+            if (!respData) return false;
+            const d = respData.Data ?? respData;
+            if (!d) return false;
+            if (Array.isArray(d)) return d.length > 0;
+            if (typeof d === 'object') {
+                if (Array.isArray(d?.Records) && d.Records.length > 0) return true;
+                if (Array.isArray(d?.List) && d.List.length > 0) return true;
+                if (Object.keys(d).length > 0) return true;
+            }
+            return false;
+        };
+
+        // Try a set of candidate query shapes - backend may expect different param names
+        // Also include shapes that represent searching by PurchaseOrder number (if a non-UUID is passed)
+        const candidateParams = [
+            { headerUuid, userUuid: u, cmpUuid: c, envUuid: e },
+            { uuid: headerUuid, userUuid: u, cmpUuid: c, envUuid: e },
+            { id: headerUuid, userUuid: u, cmpUuid: c, envUuid: e },
+            { HeaderUUID: headerUuid, userUuid: u, cmpUuid: c, envUuid: e },
+            { PurchaseOrderUUID: headerUuid, userUuid: u, cmpUuid: c, envUuid: e },
+            { purchaseHeaderUuid: headerUuid, userUuid: u, cmpUuid: c, envUuid: e },
+            { PurchaseOrderNo: headerUuid, userUuid: u, cmpUuid: c, envUuid: e },
+            { purchaseOrderNo: headerUuid, userUuid: u, cmpUuid: c, envUuid: e },
+            { PurchaseOrderNumber: headerUuid, userUuid: u, cmpUuid: c, envUuid: e },
+            { purchaseOrderNumber: headerUuid, userUuid: u, cmpUuid: c, envUuid: e },
+        ];
+
+        // Helper: basic UUID format detection (36-char hex with dashes)
+        const isUuidLike = (s) => typeof s === 'string' && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(s);
+
+        console.log('[authServices] getPurchaseOrderHeaderById headerUuid value ->', headerUuid, 'isUuidLike ->', isUuidLike(headerUuid));
+
+        let lastResp = null;
+        for (const params of candidateParams) {
+            try {
+                console.log('[authServices] getSalesOrderHeaderById trying params ->', params);
+                const resp = await api.get(PATHS.getSalesOrderHeaderById, { params });
+                console.log('[authServices] getSalesOrderHeaderById response status ->', resp && resp.status);
+                lastResp = resp;
+                const respData = resp?.data;
+                if (hasMeaningfulData(respData)) {
+                    return respData;
+                }
+                // If API returned a message indicating not found, log and continue
+                const msg = respData?.Message || respData?.message || '';
+                if (msg && /not found|no data|does not exist/i.test(String(msg))) {
+                    console.log('[authServices] getSalesOrderHeaderById response indicates no data ->', msg);
+                    // continue to next candidate
+                } else {
+                    // if response is 200 but empty Data, continue to try other param shapes
+                    console.log('[authServices] getSalesOrderHeaderById empty response for params, trying next');
+                }
+            } catch (err) {
+                console.warn('[authServices] getSalesOrderHeaderById request error for params ->', params, err && (err.message || err));
+                // continue to next candidate
+            }
+        }
+
+        // If we reach here, return the last response (may contain helpful message)
+        if (lastResp) return lastResp.data;
+        return { Message: 'No response from server' };
+    } catch (err) {
+        console.error('[authServices] getSalesOrderHeaderById error ->', err && (err.message || err));
+        throw err;
+    }
+    }
+
+// Get a single sales performa invoice header by header UUID (for prefilling performa header)
+export async function getSalesPerformaInvoiceHeaderById({ headerUuid, cmpUuid, envUuid, userUuid } = {}) {
+    if (!headerUuid) throw new Error('headerUuid is required');
+    const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+    const params = { headerUuid, cmpUuid: c, envUuid: e };
+    console.log('[authServices] getSalesPerformaInvoiceHeaderById params ->', params);
+    const resp = await api.get(PATHS.getSalesPerformaInvoiceHeaderById, { params });
+    console.log('[authServices] getSalesPerformaInvoiceHeaderById response ->', resp);
+    return resp.data;
+}
+ 
+
+export async function getPurchaseOrderHeaderById({ headerUuid, cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        let { userUuid: u, cmpUuid: c, envUuid: e } = { userUuid, cmpUuid, envUuid } || {};
+        if (!u || !c || !e) {
+            const [uu, cc, ee] = await Promise.all([
+                userUuid || getUUID(),
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+            ]);
+            u = uu; c = cc; e = ee;
+        }
+        const params = { headerUuid, cmpUuid: c, envUuid: e };
+        console.log('[authServices] getPurchaseOrderHeaderById params ->', params);
+        const resp = await api.get(PATHS.getPurchaseOrderHeaderById, { params });
+        console.log('[authServices] getPurchaseOrderHeaderById response ->', resp && resp.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] getPurchaseOrderHeaderById error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Get lines for a sales performa invoice header
+export async function getSalesPerformaInvoiceLines({ headerUuid, cmpUuid, envUuid, userUuid, start = 0, length = 100 } = {}) {
+    if (!headerUuid) throw new Error('headerUuid is required');
+    const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+    const params = { headerUuid, cmpUuid: c, envUuid: e, start, length };
+    console.log('[authServices] getSalesPerformaInvoiceLines params ->', params);
+    const resp = await api.get(PATHS.getSalesPerformaInvoiceLines, { params });
+    console.log('[authServices] getSalesPerformaInvoiceLines response ->', resp && resp.status);
+    return resp.data;
+} 
+
+// Update Sales Invoice Header
+export async function updateSalesInvoiceHeader(payload = {}, { cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        const [c, e, u] = await Promise.all([
+            cmpUuid || getCMPUUID(),
+            envUuid || getENVUUID(),
+            userUuid || getUUID()
+        ]);
+        const params = { cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] updateSalesInvoiceHeader params ->', params);
+        console.log('[authServices] updateSalesInvoiceHeader payload ->', payload);
+
+        const resp = await api.post(PATHS.updateSalesInvoiceHeader, payload, { params });
+        console.log('[authServices] updateSalesInvoiceHeader response status ->', resp?.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] updateSalesInvoiceHeader error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
 // Get payment terms
 export async function getPaymentTerms({ cmpUuid, envUuid } = {}) {
     if (!cmpUuid || !envUuid) {
@@ -617,7 +1075,7 @@ export async function getPaymentMethods({ cmpUuid, envUuid } = {}) {
     const resp = await api.get(PATHS.modeOfPayment, { params });
     return resp.data;
 }
- 
+
 
 // Add Sales Order (header)
 export async function addSalesOrder(payload = {}, { cmpUuid, envUuid, userUuid } = {}) {
@@ -630,7 +1088,28 @@ export async function addSalesOrder(payload = {}, { cmpUuid, envUuid, userUuid }
         console.log('[authServices] addSalesOrder response ->', resp?.status);
         return resp.data;
     } catch (err) {
-        console.error('[authServices] addSalesOrder error ->', err && (err.message || err));
+        console.log(err, '123');
+        console.log(err.message, '456');
+
+        console.log('[authServices] addSalesOrder error ->', err && (err.message || err));
+        throw err;
+    }
+}
+// Add Purchase Order (header)
+export async function addPurchaseOrder(payload = {}, { cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+        const params = { cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] addPurchaseOrder params ->', params);
+        console.log('[authServices] addPurchaseOrder payload ->', payload);
+        const resp = await api.post(PATHS.addPurchaseOrder, payload, { params });
+        console.log('[authServices] addPurchaseOrder response ->', resp?.status);
+        return resp.data;
+    } catch (err) {
+        console.log(err, '123');
+        console.log(err.message, '456');
+
+        console.log('[authServices] addPurchaseOrder error ->', err && (err.message || err));
         throw err;
     }
 }
@@ -650,6 +1129,20 @@ export async function updateSalesOrder(payload = {}, { cmpUuid, envUuid, userUui
         throw err;
     }
 }
+export async function updatePurchaseOrder(payload = {}, { cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+        const params = { cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] updatePurchaseOrder params ->', params);
+        console.log('[authServices] updatePurchaseOrder payload ->', payload);
+        const resp = await api.post(PATHS.updatePurchaseOrderHeader, payload, { params });
+        console.log('[authServices] updatePurchaseOrder response ->', resp?.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] updatePurchaseOrder error ->', err && (err.message || err));
+        throw err;
+    }
+}
 
 export async function deleteSalesHeader({ headerUuid, overrides = {} } = {}) {
     // uuid: header line uuid (primary), headerUuid: alternate naming
@@ -666,7 +1159,7 @@ export async function deleteSalesHeader({ headerUuid, overrides = {} } = {}) {
         }
 
         // send multiple param names to satisfy backend expectations
-        const headerId =   headerUuid;
+        const headerId = headerUuid;
         const params = {
             uuid: headerId,
             userUuid,
@@ -679,6 +1172,70 @@ export async function deleteSalesHeader({ headerUuid, overrides = {} } = {}) {
         return resp.data;
     } catch (err) {
         console.error('[authServices] deleteSalesHeader error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+export async function deleteSalesOrderHeader({ headerUuid, overrides = {} } = {}) {
+    // uuid: header line uuid (primary), headerUuid: alternate naming
+    if (!headerUuid) throw new Error('headerUuid (header UUID) is required');
+    try {
+        let { userUuid, cmpUuid, envUuid } = overrides || {};
+        if (!userUuid || !cmpUuid || !envUuid) {
+            const [u, c, e] = await Promise.all([
+                userUuid || getUUID(),
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+            ]);
+            userUuid = u; cmpUuid = c; envUuid = e;
+        }
+
+        // send multiple param names to satisfy backend expectations
+        const headerId = headerUuid;
+        const params = {
+            uuid: headerId,
+            userUuid,
+            cmpUuid,
+            envUuid,
+        };
+        console.log('[authServices] deleteSalesOrderHeader params ->', params);
+        const resp = await api.delete(PATHS.deleteSalesOrderHeader, { params });
+        console.log('[authServices] deleteSalesOrderHeader response ->', resp && resp.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] deleteSalesOrderHeader error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Delete Sales Performa Invoice Header
+export async function deleteSalesPerformaInvoiceHeader({ headerUuid, overrides = {} } = {}) {
+    if (!headerUuid) throw new Error('headerUuid (header UUID) is required');
+    try {
+        let { userUuid, cmpUuid, envUuid } = overrides || {};
+        if (!userUuid || !cmpUuid || !envUuid) {
+            const [u, c, e] = await Promise.all([
+                userUuid || getUUID(),
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+            ]);
+            userUuid = u; cmpUuid = c; envUuid = e;
+        }
+
+        // send multiple param names to satisfy backend expectations
+        const headerId = headerUuid;
+        const params = {
+            uuid: headerId,
+            userUuid,
+            cmpUuid,
+            envUuid,
+        };
+        console.log('[authServices] deleteSalesPerformaInvoiceHeader params ->', params);
+        const resp = await api.delete(PATHS.deleteSalesPerformaInvoiceHeader, { params });
+        console.log('[authServices] deleteSalesPerformaInvoiceHeader response ->', resp && resp.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] deleteSalesPerformaInvoiceHeader error ->', err && (err.message || err));
         throw err;
     }
 }
@@ -706,6 +1263,121 @@ export async function addSalesInquiry(payload, overrides = {}) {
     console.log('Save Manage Lead Opportunity response:', resp);
     return resp.data;
 }
+// Add sales Order line for a saved header
+export async function addSalesOrderLine(payload = {}, overrides = {}) {
+    try {
+        let { userUuid, cmpUuid, envUuid } = overrides || {};
+        if (!userUuid || !cmpUuid || !envUuid) {
+            const [u, c, e] = await Promise.all([
+                userUuid || getUUID(),
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+            ]);
+            userUuid = u; cmpUuid = c; envUuid = e;
+        }
+        const params = { userUuid, cmpUuid, envUuid };
+        console.log('[authServices] addSalesLine params ->', params);
+        console.log('[authServices] addSalesLine payload ->', payload);
+        const resp = await api.post(PATHS.addSalesOrderLine, payload, { params });
+        console.log('[authServices] addSalesLine response ->', resp && resp.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] addSalesLine error ->', err && (err.message || err));
+        throw err;
+    }
+}
+// Add sales Order line for a saved header
+export async function addPurchaseOrderLine(payload = {}, overrides = {}) {
+    try {
+        let { userUuid, cmpUuid, envUuid } = overrides || {};
+        if (!userUuid || !cmpUuid || !envUuid) {
+            const [u, c, e] = await Promise.all([
+                userUuid || getUUID(),
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+            ]);
+            userUuid = u; cmpUuid = c; envUuid = e;
+        }
+        const params = { userUuid, cmpUuid, envUuid };
+        console.log('[authServices] addPurchaseOrderLine params ->', params);
+        console.log('[authServices] addPurchaseOrderLine payload ->', payload);
+        const resp = await api.post(PATHS.getPurchaseOrderLines, payload, { params });
+        console.log('[authServices] addPurchaseOrderLine response ->', resp && resp.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] addPurchaseOrderLine error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Update an existing sales order line (order-specific endpoint)
+export async function updateSalesOrderLine(payload = {}, overrides = {}) {
+    try {
+        let { userUuid, cmpUuid, envUuid } = overrides || {};
+        if (!userUuid || !cmpUuid || !envUuid) {
+            const [u, c, e] = await Promise.all([
+                userUuid || getUUID(),
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+            ]);
+            userUuid = u; cmpUuid = c; envUuid = e;
+        }
+        const params = { userUuid, cmpUuid, envUuid };
+        console.log('[authServices] updateSalesOrderLine params ->', params);
+        console.log('[authServices] updateSalesOrderLine payload ->', payload);
+        const resp = await api.post(PATHS.addPurchaseOrder, payload, { params });
+        console.log('[authServices] updateSalesOrderLine response ->', resp && resp.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] updateSalesOrderLine error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Update an existing sales order line (order-specific endpoint)
+export async function updatePurchaseOrderLine(payload = {}, overrides = {}) {
+    try {
+        let { userUuid, cmpUuid, envUuid } = overrides || {};
+        if (!userUuid || !cmpUuid || !envUuid) {
+            const [u, c, e] = await Promise.all([
+                userUuid || getUUID(),
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+            ]);
+            userUuid = u; cmpUuid = c; envUuid = e;
+        }
+        const params = { userUuid, cmpUuid, envUuid };
+        console.log('[authServices] updatePurchaseOrderLine params ->', params);
+        console.log('[authServices] updatePurchaseOrderLine payload ->', payload);
+        const resp = await api.post(PATHS.updatePurchaseOrderline, payload, { params });
+        console.log('[authServices] updatePurchaseOrderLine response ->', resp && resp.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] updatePurchaseOrderLine error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+export async function getSalesOrderLines({ headerUuid, cmpUuid, envUuid, userUuid } = {}) {
+    if (!headerUuid) throw new Error('headerUuid is required');
+    const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+    // include multiple key names for header uuid to handle backend naming differences
+    const params = { headerUuid, UUID: headerUuid, HeaderUUID: headerUuid, cmpUuid: c, envUuid: e, userUuid: u };
+    console.log('[authServices] GetSalesOrderLine params ->', params);
+    const resp = await api.get(PATHS.getSalesOrderLines, { params });
+    console.log('[authServices] GetSalesOrderLine resp ->', resp);
+    return resp.data;
+}
+// export async function getPurchaseOrderLines({ headerUuid, cmpUuid, envUuid, userUuid } = {}) {
+//     if (!headerUuid) throw new Error('headerUuid is required');
+//     const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+//     // include multiple key names for header uuid to handle backend naming differences
+//     const params = { headerUuid, UUID: headerUuid, HeaderUUID: headerUuid, cmpUuid: c, envUuid: e, userUuid: u };
+//     console.log('[authServices] GetPurchaseOrderLine params ->', params);
+//     const resp = await api.get(PATHS.updateSalesOrderLine, { params });
+//     console.log('[authServices] GetPurchaseOrderLine resp ->', resp);
+//     return resp.data;
+// }
 
 // Add sales line for a saved header
 export async function addSalesLine(payload = {}, overrides = {}) {
@@ -759,8 +1431,8 @@ export async function updateSalesLine(payload = {}, overrides = {}) {
 export async function deleteSalesLine({ lineUuid, overrides = {} } = {}) {
     if (!lineUuid) throw new Error('lineUuid is required');
     try {
-            let { userUuid, cmpUuid, envUuid } = overrides || {};
-            if (!userUuid || !cmpUuid || !envUuid) {
+        let { userUuid, cmpUuid, envUuid } = overrides || {};
+        if (!userUuid || !cmpUuid || !envUuid) {
             const [u, c, e] = await Promise.all([
                 userUuid || getUUID(),
                 cmpUuid || getCMPUUID(),
@@ -770,13 +1442,13 @@ export async function deleteSalesLine({ lineUuid, overrides = {} } = {}) {
         }
         // Send multiple possible param names for compatibility with backend
         const params = {
-            UUID: lineUuid, 
+            UUID: lineUuid,
             userUuid,
             cmpUuid,
             envUuid
         };
         console.log('[authServices] deleteSalesLine params ->', params);
-        const resp = await api.post(PATHS.deleteSalesLine, {}, { params });
+        const resp = await api.delete(PATHS.deleteSalesLine, { params });
         console.log('[authServices] deleteSalesLine response ->', resp && resp.status);
         return resp.data;
     } catch (err) {
@@ -784,10 +1456,67 @@ export async function deleteSalesLine({ lineUuid, overrides = {} } = {}) {
         throw err;
     }
 }
+// Delete an existing sales line
+export async function deleteSalesOrderLine({ lineUuid, overrides = {} } = {}) {
+    if (!lineUuid) throw new Error('lineUuid is required');
+    try {
+        let { userUuid, cmpUuid, envUuid } = overrides || {};
+        if (!userUuid || !cmpUuid || !envUuid) {
+            const [u, c, e] = await Promise.all([
+                userUuid || getUUID(),
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+            ]);
+            userUuid = u; cmpUuid = c; envUuid = e;
+        }
+        // Send multiple possible param names for compatibility with backend
+        const params = {
+            UUID: lineUuid,
+            userUuid,
+            cmpUuid,
+            envUuid
+        };
+        console.log('[authServices] deleteSalesOrderLine params ->', params);
+        const resp = await api.delete(PATHS.deleteSalesOrderLine,   { params });
+        console.log('[authServices] deleteSalesOrderLine response ->', resp && resp.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] deleteSalesOrderLine error ->', err && (err.message || err));
+        throw err;
+    }
+}
+export async function deletePurchaseOrderLine({ lineUuid, overrides = {} } = {}) {
+    if (!lineUuid) throw new Error('lineUuid is required');
+    try {
+        let { userUuid, cmpUuid, envUuid } = overrides || {};
+        if (!userUuid || !cmpUuid || !envUuid) {
+            const [u, c, e] = await Promise.all([
+                userUuid || getUUID(),
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+            ]);
+            userUuid = u; cmpUuid = c; envUuid = e;
+        }
+        // Send multiple possible param names for compatibility with backend
+        const params = {
+            UUID: lineUuid,
+            userUuid,
+            cmpUuid,
+            envUuid
+        };
+        console.log('[authServices] deletePurchaseOrderLine params ->', params);
+        const resp = await api.delete(PATHS.getPurchaseOrderLines,   { params });
+        console.log('[authServices] deletePurchaseOrderLine response ->', resp && resp.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] deletePurchaseOrderLine error ->', err && (err.message || err));
+        throw err;
+    }
+}
 
 // Account Purchase
 
-export async function getPurchaseHeaderInquiries({ cmpUuid, envUuid,userUuid, start = 0, length = 10, searchValue = '' } = {}) {
+export async function getPurchaseHeaderInquiries({ cmpUuid, envUuid, userUuid, start = 0, length = 10, searchValue = '' } = {}) {
     if (!cmpUuid || !envUuid) {
         const [c, e, g] = await Promise.all([
             cmpUuid || getCMPUUID(),
@@ -809,11 +1538,11 @@ export async function getPurchaseHeaderInquiries({ cmpUuid, envUuid,userUuid, st
         length,
         searchValue,
     };
-     console.log(params, "purchase inquiry")
+    console.log(params, "purchase inquiry")
 
     const resp = await api.get(PATHS.getPurchaseHeaderInquiries, { params });
     console.log(resp);
-    
+
     return resp.data;
 }
 
@@ -1987,7 +2716,23 @@ export async function getAllInquiryNumbers({ cmpUuid, envUuid } = {}) {
     const params = { cmpUuid, envUuid };
     const resp = await api.get(PATHS.getAllInquiryNumbers, { params });
     console.log('Get All Inquiry Numbers response:', resp.data);
-    
+
+    return resp.data;
+}
+
+// Account: Get Sales Order Numbers (for Sales Order dropdowns)
+export async function getSalesOrderNumbers({ cmpUuid, envUuid } = {}) {
+    if (!cmpUuid || !envUuid) {
+        const [c, e] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID()]);
+        cmpUuid = c; envUuid = e;
+    }
+    if (!cmpUuid) throw new Error('Missing company UUID');
+    if (!envUuid) throw new Error('Missing environment UUID');
+
+    const params = { cmpUuid, envUuid };
+    const resp = await api.get(PATHS.getSalesOrderNumbers, { params });
+    console.log('Get Sales Order Numbers response:', resp.data);
+
     return resp.data;
 }
 

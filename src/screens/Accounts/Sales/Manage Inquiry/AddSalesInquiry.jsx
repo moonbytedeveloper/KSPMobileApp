@@ -623,12 +623,8 @@ const AddSalesInquiry = () => {
 
                 <AppHeader
                     title="Add Sales Inquiry"
-                    onLeftPress={() => {
-                        try {
-                            navigation.navigate('ManageInquiry');
-                        } catch (e) {
+                    onLeftPress={() => { 
                             navigation.goBack();
-                        }
                     }}
                 />
                 <View style={styles.headerSeparator} />

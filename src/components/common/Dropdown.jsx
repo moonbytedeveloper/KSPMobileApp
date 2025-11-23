@@ -57,6 +57,9 @@ const Dropdown = ({
   // Compute a safe display value for the selected value. If `value` is
   // an object (some callers store selected item object), try to render
   // a friendly label using `getLabel`. Otherwise coerce to string.
+  // If the `value` is a primitive (e.g. UUID key), attempt to resolve
+  // it against `options` via `getKey` so we display the human-friendly
+  // label instead of the raw key.
   let displayValue = '';
   try {
     if (value === null || value === undefined) displayValue = '';
@@ -64,7 +67,22 @@ const Dropdown = ({
       const lbl = getLabel(value);
       displayValue = typeof lbl === 'string' ? lbl : String(lbl ?? JSON.stringify(value));
     } else {
-      displayValue = String(value);
+      const keyStr = String(value);
+      let found = null;
+      if (Array.isArray(options)) {
+        for (let i = 0; i < options.length; i++) {
+          try {
+            const k = String(getKey(options[i], i));
+            if (k === keyStr) { found = options[i]; break; }
+          } catch (e) { /* ignore per-item errors */ }
+        }
+      }
+      if (found) {
+        const lbl = getLabel(found);
+        displayValue = typeof lbl === 'string' ? lbl : String(lbl ?? JSON.stringify(found));
+      } else {
+        displayValue = String(value);
+      }
     }
   } catch (e) {
     console.warn('Dropdown: error computing displayValue', e);

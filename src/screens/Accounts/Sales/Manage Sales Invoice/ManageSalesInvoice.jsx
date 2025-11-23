@@ -1,6 +1,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
@@ -8,63 +8,11 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
+import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
+import api from '../../../../api/axios';
+import { getSalesInvoiceHeaders } from '../../../../api/authServices';
 
-const SALES_ORDERS = [
-    {
-        id: 'KP1524',
-        salesOrderNumber: 'OR.002',
-        customerName: 'Moonbyte',
-        deliveryDate: '15-12-24',
-        dueDate: '15-12-24',
-        salesInvoiceNumber: 'SIn120',
-     
-    },
-    {
-        id: 'KP1525',
-        salesOrderNumber: 'OR.003',
-        customerName: 'Northwind Retail',
-        deliveryDate: '04-01-25',
-        dueDate: '20-12-24',
-        salesInvoiceNumber: 'SIn121',
-       
-    },
-    {
-        id: 'KP1526',
-        salesOrderNumber: 'KP1526',
-        customerName: 'Creative Labs',
-        deliveryDate: '22-12-24',
-        dueDate: '18-12-24',
-        salesInvoiceNumber: 'OR.002',
-        
-    },
-    {
-        id: 'KP1527',
-        salesOrderNumber: 'KP1527',
-        customerName: 'BlueStone Pvt Ltd',
-        deliveryDate: '11-01-25',
-        dueDate: '28-12-24',
-        salesInvoiceNumber: 'OR.002',
-     
-    },
-    {
-        id: 'KP1528',
-        salesOrderNumber: 'KP1528',
-        customerName: 'Aero Technologies',
-        deliveryDate: '29-12-24',
-        dueDate: '24-12-24',
-        salesInvoiceNumber: 'OR.002',
-       
-    },
-    {
-        id: 'KP1529',
-        salesOrderNumber: 'KP1529',
-        customerName: 'UrbanNest Homes',
-        deliveryDate: '05-02-25',
-        dueDate: '12-01-25',
-        salesInvoiceNumber: '₹1,85,300',
-        
-    },
-];
+// server-backed list state will be used instead of static sample data
 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 
@@ -75,19 +23,15 @@ const ManageSalesInvoice = () => {
     const [itemsPerPage, setItemsPerPage] = useState(Number(ITEMS_PER_PAGE_OPTIONS[1]));
     const [currentPage, setCurrentPage] = useState(0);
 
-    const filteredOrders = useMemo(() => {
-        const query = searchQuery.trim().toLowerCase();
-        if (!query) return SALES_ORDERS;
-        return SALES_ORDERS.filter((order) => {
-            const haystack = `${order.salesOrderNumber} ${order.customerName} ${order.contactPerson} ${order.status}`.toLowerCase();
-            return haystack.includes(query);
-        });
-    }, [searchQuery]);
+    const [invoices, setInvoices] = useState([]);
+    const [totalRecords, setTotalRecords] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
 
     const totalPages = useMemo(() => {
-        if (filteredOrders.length === 0) return 0;
-        return Math.ceil(filteredOrders.length / itemsPerPage);
-    }, [filteredOrders.length, itemsPerPage]);
+        if (totalRecords === 0) return 0;
+        return Math.ceil(totalRecords / itemsPerPage);
+    }, [totalRecords, itemsPerPage]);
 
     useEffect(() => {
         if (totalPages === 0) {
@@ -99,16 +43,139 @@ const ManageSalesInvoice = () => {
         }
     }, [totalPages, currentPage]);
 
-    const paginatedOrders = useMemo(() => {
-        const start = currentPage * itemsPerPage;
-        return filteredOrders.slice(start, start + itemsPerPage);
-    }, [filteredOrders, currentPage, itemsPerPage]);
+    const fetchSalesInvoices = async (page = 0, pageSize = itemsPerPage, q = searchQuery) => {
+        try {
+            setLoading(true);
+            setError(null);
+            const cmp = await getCMPUUID();
+            const env = await getENVUUID();
+            const start = page * pageSize;
+            const resp = await getSalesInvoiceHeaders({ cmpUuid: cmp, envUuid: env, start, length: pageSize, searchValue: q });
+            const data = resp?.Data || resp || {};
+            const records = Array.isArray(data?.Records) ? data.Records : (Array.isArray(data) ? data : []);
+            const normalized = records.map((r, idx) => ({
+                id: r?.UUID || r?.Id || `si-${start + idx + 1}`,
+                salesInvoiceNumber: r?.SalesInvoiceNo || r?.InvoiceNo || r?.SalesInvNo || r?.SalesPerInvNo || r?.SalesInvoiceNumber || '',
+                salesOrderNumber: r?.SalesOrderNo || r?.OrderNo || r?.SalesOrder || '',
+                // amount may be missing for now; bind common fallbacks and allow null so UI can show '0.00'
+                amount: r?.Amount || r?.TotalAmount || r?.NetAmount || r?.AmountPayable || null,
+                customerName: r?.CustomerName || r?.Customer || r?.CustomerDisplayName || '',
+                deliveryDate: r?.DeliveryDate || r?.InvoiceDate || r?.OrderDate || '',
+                dueDate: r?.DueDate || r?.PaymentDueDate || '',
+                contactPerson: r?.ContactPerson || r?.Contact || '',
+                status: r?.Status || r?.State || 'Draft',
+                raw: r,
+            }));
 
-    const rangeStart = filteredOrders.length === 0 ? 0 : currentPage * itemsPerPage + 1;
-    const rangeEnd = filteredOrders.length === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, filteredOrders.length);
+            setInvoices(normalized);
+            const total = Number(data?.TotalRecords ?? data?.Total ?? resp?.TotalRecords ?? resp?.Total ?? records.length) || records.length;
+            setTotalRecords(total);
+        } catch (err) {
+            console.warn('getSalesInvoiceHeaders error', err?.message || err);
+            setError('Failed to load sales invoices');
+            setInvoices([]);
+            setTotalRecords(0);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-    const handleQuickAction = (order, actionLabel) => {
-        Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber}`);
+    // Helper to extract server-side UUID from varied payload shapes
+    const extractServerUuid = (raw) => {
+        if (!raw) return '';
+        const keys = ['UUID','Uuid','uuid','Id','id','HeaderUUID','HeaderId','SalesInvoiceUUID','SalesInvoiceId','InvoiceUUID','InvoiceId','HeaderUuid','SalesInvUUID'];
+        for (const k of keys) {
+            if (raw[k]) return raw[k];
+        }
+        try {
+            for (const k in raw) {
+                const v = raw[k];
+                if (typeof v === 'string') {
+                    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) || /^[0-9a-f]{32}$/i.test(v)) return v;
+                }
+            }
+        } catch (e) { /* ignore */ }
+        return '';
+    };
+
+    useEffect(() => {
+        fetchSalesInvoices(currentPage, itemsPerPage, searchQuery);
+    }, [currentPage, itemsPerPage, searchQuery]);
+
+    const rangeStart = totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1;
+    const rangeEnd = totalRecords === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, totalRecords);
+
+    const handleQuickAction = async (order, actionLabel) => {
+        // prefer salesInvoiceNumber for messages
+        const idLabel = order?.salesInvoiceNumber || order?.id;
+        try {
+            if (actionLabel === 'Delete') {
+                Alert.alert(
+                    'Delete Sales Invoice',
+                    'Are you sure you want to delete this sales invoice?',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Delete', style: 'destructive', onPress: async () => {
+                            try {
+                                const headerUuidCandidate = extractServerUuid(order?.raw) || order?.UUID || order?.id || '';
+                                if (!headerUuidCandidate) {
+                                    Alert.alert('Error', 'Unable to determine sales invoice identifier');
+                                    return;
+                                }
+                                const cmp = await getCMPUUID();
+                                const env = await getENVUUID();
+                                const user = await getUUID();
+                                const params = { uuid: headerUuidCandidate, cmpUuid: cmp, envUuid: env, userUuid: user };
+                                const PATH = '/api/Account/DeleteSalesInvoiceHeader';
+                                const resp = await api.delete(PATH, { params });
+                                console.log('deleteSalesInvoiceHeader resp ->', resp && resp.status, resp?.data);
+                                // refresh the list after deletion
+                                await fetchSalesInvoices(currentPage, itemsPerPage, searchQuery);
+                                Alert.alert('Success', 'Sales invoice deleted');
+                            } catch (e) {
+                                console.warn('delete sales invoice header error', e);
+                                Alert.alert('Error', e?.message || 'Unable to delete sales invoice');
+                            }
+                        } }
+                    ],
+                    { cancelable: true }
+                );
+                return;
+            }
+
+            if (actionLabel === 'Edit' || actionLabel === 'Update') {
+                try {
+                    const headerUuidCandidate = extractServerUuid(order?.raw) || order?.UUID || order?.Uuid || order?.Id || order?.id || '';
+                    // Accept both hyphenated GUIDs and 32-hex UUID strings returned by some backends
+                    const isGuid = typeof headerUuidCandidate === 'string' && (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(headerUuidCandidate) || (/^[0-9a-f]{32}$/i.test(headerUuidCandidate)));
+                    console.log('ManageSalesInvoice: headerUuidCandidate ->', headerUuidCandidate, 'isGuid ->', isGuid);
+
+                    if (isGuid) {
+                        // navigate with headerUuid under multiple keys so AddSalesInvoice effect reliably picks it up
+                        navigation.navigate('AddSalesInvoice', { headerUuid: headerUuidCandidate, HeaderUUID: headerUuidCandidate, UUID: headerUuidCandidate });
+                    } else if (order?.raw) {
+                        // Log raw payload for diagnostics when UUID candidate isn't a valid GUID
+                        console.log('ManageSalesInvoice: order.raw (non-GUID candidate) ->', order.raw);
+                        // pass server payload when available so AddSalesInvoice can prefill without refetch
+                        // also pass the candidate under `candidateHeaderUuid` for further debugging/attempted use
+                        navigation.navigate('AddSalesInvoice', { prefillHeader: order.raw, candidateHeaderUuid: headerUuidCandidate });
+                    } else {
+                        // fallback: navigate and pass minimal fields + candidate uuid for debugging
+                        navigation.navigate('AddSalesInvoice', { prefillHeader: order, candidateHeaderUuid: headerUuidCandidate });
+                    }
+                } catch (e) {
+                    console.warn('navigate to edit sales invoice failed', e);
+                    Alert.alert('Error', 'Unable to open editor');
+                }
+                return;
+            }
+
+            // fallback debug message for other actions
+            Alert.alert('Action Triggered', `${actionLabel} clicked for ${idLabel}`);
+        } catch (err) {
+            console.warn('handleQuickAction error', err);
+            Alert.alert('Error', err?.message || 'Action failed');
+        }
     };
 
     const renderFooterActions = (order) => {
@@ -117,7 +184,7 @@ const ManageSalesInvoice = () => {
             { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6', action: 'Download' },
             { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280', action: 'Forward' },
             { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E', action: 'View' },
-            { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316', action: 'Update Status'  },
+            { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316'  },
         ];
 
         return (
@@ -161,7 +228,7 @@ const ManageSalesInvoice = () => {
     return (
         <View style={styles.screen}>
                 <AppHeader
-                title="Manage Sales "
+                title="View Sales Invoice"
                 onLeftPress={() => navigation.goBack()}
                 onRightPress={() => navigation.navigate('AddSalesInvoice')}
                 rightButtonLabel="Add sales Invoice"
@@ -207,45 +274,51 @@ const ManageSalesInvoice = () => {
             </View>
 
             <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-                {paginatedOrders.map((order) => (
+                {invoices.map((order) => (
                     <AccordionItem
                         key={order.id}
                         item={{
                             soleExpenseCode: order.id,
-                            expenseName: order.salesOrderNumber,
-                            amount: order.salesInvoiceNumber,
+                            // show Sales Invoice No on the left header
+                            expenseName: order.salesInvoiceNumber,
+                            // show amount on the right header; fall back to '0.00' when missing
+                            amount: order.amount != null ? order.amount : '0.00',
                         }}
                         isActive={activeOrderId === order.id}
                         onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
                         customRows={[
+                            { label: 'Sales Order', value: order.salesOrderNumber },
                             { label: 'Customer Name', value: order.customerName },
-                            { label: 'Sales Invoice Number', value: order.salesInvoiceNumber },
-                            { label: 'Sales Order Number', value: order.salesOrderNumber },
                             { label: 'Delivery Date', value: order.deliveryDate },
-
-                            // { label: 'Due Date', value: order.dueDate },
-                        ]} 
-                        headerLeftLabel="Sales Order Number"
-                        headerRightLabel="Sales Invoice Number"
+                            { label: 'Status', value: order.status, isStatus: true },
+                        ]}
+                        headerLeftLabel="Sales Invoice Number"
+                        headerRightLabel="Amount"
                         footerComponent={renderFooterActions(order)}
                         headerRightContainerStyle={styles.headerRightContainer}
                     />
                 ))}
 
-                {paginatedOrders.length === 0 && (
+                {!loading && invoices.length === 0 && (
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyStateTitle}>No sales orders found</Text>
+                        <Text style={styles.emptyStateTitle}>No sales invoices found</Text>
                         <Text style={styles.emptyStateSubtitle}>
-                            Try adjusting your search keyword or create a new sales order.
+                            Try adjusting your search keyword or create a new sales invoice.
                         </Text>
+                    </View>
+                )}
+                {loading && (
+                    <View style={{ paddingVertical: hp(4), alignItems: 'center' }}>
+                        <ActivityIndicator size="large" color={COLORS.primary} />
+                        <Text style={{ marginTop: hp(1), color: COLORS.textLight }}>Loading invoices...</Text>
                     </View>
                 )}
             </ScrollView>
 
-            {filteredOrders.length > 0 && (
+            {totalRecords > 0 && (
                 <View style={styles.paginationContainer}>
                     <Text style={styles.pageInfoText}>
-                        Showing {filteredOrders.length === 0 ? 0 : rangeStart} to {rangeEnd} of {filteredOrders.length} entries
+                        Showing {totalRecords === 0 ? 0 : rangeStart} to {rangeEnd} of {totalRecords} entries
                     </Text>
                     <View style={styles.paginationButtons}>
                         {pageItems.map((item, idx) => {
