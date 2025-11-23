@@ -104,6 +104,7 @@ const PATHS = {
     totalEmployeeWorking: '/api/DashBoard/hr-dashboard/employees-status',
     // Account Sales 
     deleteSalesHeader: '/api/Account/DeleteSalesHeader',
+    getSalesPerfomaInvoiceLines: Config.API_GET_SALES_PERFOMA_INVOICE_LINES || '/api/Account/GetSalesPerformaInvoiceLines',
     getSalesHeaderInquiries: Config.API_GET_SALES_HEADER_INQUIRIES_PATH || '/api/Account/GetSalesHeaderInquiries',
     getPurchaseHeaderInquiries: Config.API_GET_PURCHASE_HEADER_INQUIRIES_PATH || '/api/Account/GetPurchaseHeaderInquiries',
     addSalesInquiry : Config.ADD_SALES_INQUIRY || '/api/Account/AddCombinedSalesInquiry',
@@ -121,6 +122,10 @@ const PATHS = {
     getSalesOrderHeaders: Config.API_GET_SALES_ORDER_HEADERS_PATH || '/api/Account/GetSalesOrderHeaders',
     termsOfPayment: Config.API_TERMS_OF_PAYMENT_PATH || '/api/Account/termsofpayment',
     modeOfPayment: Config.API_MODE_OF_PAYMENT_PATH || '/api/Account/modeofpayment',
+    getpurchaseInquiryHeader: Config.API_GET_PURCHASE_INQUIRY_HEADER_PATH || 'api/Account/GetPurchaseInquiryHeader',
+    // Account Purchase
+    getCurrencies: Config.API_GET_CURRENCIES_PATH || '/api/Account/GetCurrencies',
+    getPurchaseItemTypes:Config.API_GET_PURCHASEITEMTYPE || '/api/Account/GetPurchaseItemTypes',
     // getProjects: Config.API_PROJECTS_PATH || '/api/Projects/GetProjects',
     addSalesOrder: Config.API_ADD_SALES_ORDER_PATH || '/api/Account/AddSalesOrder',
     updateSalesOrder: Config.API_UPDATE_SALES_ORDER_PATH || '/api/Account/UpdateSalesOrder',
@@ -438,6 +443,20 @@ export async function getItemTypes({ cmpUuid, envUuid, userUuid } = {}) {
     const resp = await api.get(PATHS.getItemTypes, {
         params
     });
+    return resp.data;
+}
+
+// Get purchase item types for purchase flows
+export async function getPurchaseItemTypes({ cmpUuid, envUuid, userUuid } = {}) {
+    const [c, e, u] = await Promise.all([
+        cmpUuid || getCMPUUID(),
+        envUuid || getENVUUID(),
+        userUuid || getUUID(),
+    ]);
+    const params = { cmpUuid: c || '', envUuid: e || '', userUuid: u || '' };
+    try { console.log('[authServices] getPurchaseItemTypes params ->', params); } catch (_) {}
+    const resp = await api.get(PATHS.getPurchaseItemTypes, { params });
+    try { console.log('[authServices] getPurchaseItemTypes resp ->', resp && resp.data); } catch (_) {}
     return resp.data;
 }
 
@@ -1764,6 +1783,16 @@ export async function fetchCurrencies({ countryUuid } = {}) {
             countryUuid: countryUuid,
         },
     });
+    return resp.data;
+}
+
+// Get currencies list (no countryUuid required) - wraps PATHS.getCurrencies
+export async function getCurrencies({ cmpUuid, envUuid, userUuid } = {}) {
+    const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+    const params = { cmpUuid: c || '', envUuid: e || '', userUuid: u || '' };
+    try { console.log('[authServices] getCurrencies params ->', params); } catch (_) {}
+    const resp = await api.get(PATHS.getCurrencies || PATHS.currencies, { params });
+    try { console.log('[authServices] getCurrencies resp ->', resp && resp.data); } catch (_) {}
     return resp.data;
 }
 
