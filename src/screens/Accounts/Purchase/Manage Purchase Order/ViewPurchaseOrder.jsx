@@ -7,31 +7,9 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
+import { getPurchaseOrderHeaders, deletePurchaseOrderHeader } from '../../../../api/authServices';
 
-const PURCHASE_ORDERS = [
-    {
-        id: 'PO001',
-        vendorName: 'MoonByte',
-        projectName: 'Ksp',
-        deliveryDate: '01/01/25',
-        item: {
-            itemType: 'Furniture',
-            name: 'Chair'
-        },
-        quantity: 10
-    },
-    {
-        id: 'PO002',
-        vendorName: 'Northwind Retail',
-        projectName: 'ABC Tower',
-        deliveryDate: '04/01/25',
-        item: {
-            itemType: 'Electronics',
-            name: 'LED Panel'
-        },
-        quantity: 25
-    }
-];
+// Will be loaded from server
 
 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
@@ -42,20 +20,15 @@ const ViewPurchaseOrder = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [itemsPerPage, setItemsPerPage] = useState(Number(ITEMS_PER_PAGE_OPTIONS[1]));
     const [currentPage, setCurrentPage] = useState(0);
+    const [orders, setOrders] = useState([]);
+    const [totalRecords, setTotalRecords] = useState(0);
+    const [loading, setLoading] = useState(false);
 
-    const filteredOrders = useMemo(() => {
-        const query = searchQuery.trim().toLowerCase();
-        if (!query) return PURCHASE_ORDERS;
-        return PURCHASE_ORDERS.filter((order) => {
-            const haystack = `${order.purchaseOrderNumber} ${order.vendorName} ${order.projectName} ${order.deliveryDate} ${order.item.itemType} ${order.item.name} ${order.quantity}`.toLowerCase();
-            return haystack.includes(query);
-        });
-    }, [searchQuery]);
-
+    // Server-backed paging: fetch whenever page, pageSize or search changes
     const totalPages = useMemo(() => {
-        if (filteredOrders.length === 0) return 0;
-        return Math.ceil(filteredOrders.length / itemsPerPage);
-    }, [filteredOrders.length, itemsPerPage]);
+        if (!totalRecords) return 0;
+        return Math.ceil(totalRecords / itemsPerPage);
+    }, [totalRecords, itemsPerPage]);
 
     useEffect(() => {
         if (totalPages === 0) {
@@ -67,13 +40,50 @@ const ViewPurchaseOrder = () => {
         }
     }, [totalPages, currentPage]);
 
-    const paginatedOrders = useMemo(() => {
-        const start = currentPage * itemsPerPage;
-        return filteredOrders.slice(start, start + itemsPerPage);
-    }, [filteredOrders, currentPage, itemsPerPage]);
+    const paginatedOrders = orders;
+    const rangeStart = totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1;
+    const rangeEnd = totalRecords === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, totalRecords);
 
-    const rangeStart = filteredOrders.length === 0 ? 0 : currentPage * itemsPerPage + 1;
-    const rangeEnd = filteredOrders.length === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, filteredOrders.length);
+    useEffect(() => {
+        let mounted = true;
+        const load = async () => {
+            try {
+                setLoading(true);
+                const start = currentPage * itemsPerPage;
+                const resp = await getPurchaseOrderHeaders({ start, length: itemsPerPage, searchValue: searchQuery });
+                console.log(resp,'response');
+                
+                const data = resp?.Data || resp || {};
+                const rawList = data?.Records || data?.List || data?.Items || data || [];
+                const list = Array.isArray(rawList) ? rawList : [];
+                console.log(list,'list11');
+                
+                const normalized = list.map(it => ({
+                    id: it?.UUID || it?.Id || it?.PurchaseOrderUUID || it?.PurchaseOrderId || it?.PurchaseOrderNo || String(Math.random()),
+                    purchaseOrderNumber: it?.PurchaseOrderNo || it?.PurchaseOrderNumber || it?.PurchaseOrder || it?.PurchaseOrderId || '',
+                    vendorName: it?.VendorName || it?.Vendor || it?.CustomerName || it?.Customer || '',
+                    projectName: it?.ProjectTitle || it?.ProjectName || it?.Project || '',
+                    deliveryDate: it?.DeliveryDate || it?.DeliveryDateUTC || it?.OrderDate || '',
+                    item: { itemType: '', name: '' },
+                    quantity: it?.LineCount || it?.TotalLines || 0,
+                    raw: it,
+                }));
+                if (!mounted) return;
+                setOrders(normalized);
+                const total = data?.TotalRecords ?? data?.total ?? data?.Total ?? list.length;
+                setTotalRecords(Number(total) || normalized.length);
+            } catch (err) {
+                console.warn('getPurchaseOrderHeaders failed', err?.message || err);
+                if (!mounted) return;
+                setOrders([]);
+                setTotalRecords(0);
+            } finally {
+                if (mounted) setLoading(false);
+            }
+        };
+        load();
+        return () => { mounted = false; };
+    }, [currentPage, itemsPerPage, searchQuery]);
 
     const handleQuickAction = (order, actionLabel) => {
         switch (actionLabel) {
@@ -85,7 +95,33 @@ const ViewPurchaseOrder = () => {
                 navigation.navigate('ManagePurchaseOrder', { headerUuid: order.id, HeaderUUID: order.id, UUID: order.id, viewOnly: true, origin: 'ViewPurchaseOrder' });
                 return;
             case 'Delete':
-                Alert.alert('Delete', `Delete clicked for ${order.purchaseOrderNumber}`);
+                Alert.alert(
+                    'Confirm Delete',
+                    `Are you sure you want to delete ${order.purchaseOrderNumber || 'this purchase order'}?`,
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                            text: 'Delete',
+                            style: 'destructive',
+                            onPress: async () => {
+                                try {
+                                    setLoading(true);
+                                    const resp = await deletePurchaseOrderHeader({ headerUuid: order.id });
+                                    console.log('deletePurchaseOrderHeader resp ->', resp);
+                                    // remove from local list
+                                    setOrders(prev => prev.filter(o => o.id !== order.id));
+                                    setTotalRecords(prev => Math.max(0, (Number(prev) || 0) - 1));
+                                    Alert.alert('Deleted', 'Purchase order deleted successfully');
+                                } catch (err) {
+                                    console.warn('deletePurchaseOrderHeader failed', err && (err.message || err));
+                                    Alert.alert('Error', err?.message || 'Unable to delete purchase order');
+                                } finally {
+                                    setLoading(false);
+                                }
+                            }
+                        }
+                    ],
+                );
                 return;
             case 'Download':
                 Alert.alert('Download', `Download clicked for ${order.purchaseOrderNumber}`);
@@ -209,10 +245,6 @@ const ViewPurchaseOrder = () => {
                             { label: "Vendor Name", value: order.vendorName },
                             { label: "Project Name", value: order.projectName },
                             { label: "Delivery Date", value: order.deliveryDate },
-                            {
-                                label: "Item",
-                                value: `Item Type: ${order.item.itemType}\nName: ${order.item.name}`
-                            },
                             { label: "Quantity", value: order.quantity }
                         ]}
 
@@ -228,16 +260,16 @@ const ViewPurchaseOrder = () => {
                     <View style={styles.emptyState}>
                         <Text style={styles.emptyStateTitle}>No purchase orders found</Text>
                         <Text style={styles.emptyStateSubtitle}>
-                            Try adjusting your search keyword or create a new sales order.
+                            Try adjusting your search keyword or create a new purchase order.
                         </Text>
                     </View>
                 )}
             </ScrollView>
 
-            {filteredOrders.length > 0 && (
+            {totalRecords > 0 && (
                 <View style={styles.paginationContainer}>
                     <Text style={styles.pageInfoText}>
-                        Showing {filteredOrders.length === 0 ? 0 : rangeStart} to {rangeEnd} of {filteredOrders.length} entries
+                        Showing {totalRecords === 0 ? 0 : rangeStart} to {rangeEnd} of {totalRecords} entries
                     </Text>
                     <View style={styles.paginationButtons}>
                         {pageItems.map((item, idx) => {
