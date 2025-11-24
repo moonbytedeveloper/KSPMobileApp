@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Platform,
   Modal,
   TouchableWithoutFeedback,
+  ActivityIndicator,
 } from 'react-native';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import Dropdown from '../../../../components/common/Dropdown';
@@ -21,7 +22,11 @@ import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
+import { getPurchasequotationVendor, getItems, addPurchaseOrder, updatePurchaseOrder, addPurchaseOrderLine, updatePurchaseOrderLine, deletePurchaseOrderLine, getPurchaseOrderLines } from '../../../../api/authServices';
+import { getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { pick, types, isCancel } from '@react-native-documents/picker';
+import { getpurchaseQuotationNumber } from '../../../../api/authServices';
+import { getPaymentTerms, getPaymentMethods } from '../../../../api/authServices';
 
 const COL_WIDTHS = {
   ITEM: wp(50), // 35%
@@ -69,7 +74,8 @@ const AddPurchaseQuotation = () => {
   const paymentTerms = [ 'Net 7', 'Net 15', 'Net 30'];
   const taxOptions = ['IGST', 'CGST', 'SGST', 'No Tax'];
   const countries = ['India', 'United States', 'United Kingdom'];
-  const salesInquiries = [ 'SI-1001', 'SI-1002'];
+  // Purchase quotation numbers (fetched from API)
+  const [purchaseQuotationNumbers, setPurchaseQuotationNumbers] = useState([]);
   const customers = ['Acme Corp', 'Beta Ltd'];
   const state = [ 'Gujarat', 'Delhi', 'Mumbai'];
   const city = ['vadodara', 'surat', ];
@@ -82,45 +88,22 @@ const AddPurchaseQuotation = () => {
     'Mobile App Development',
     
   ];
-
-
-   const Vendor = [
-    'Vendorna',
-  ];
+  // Vendor options (fetched from API)
+  const [vendorOptions, setVendorOptions] = useState([]);
+  // payment methods fetched from API
+  const [paymentMethodOptions, setPaymentMethodOptions] = useState([]);
 
   const projects = [ 'Mobile App Development', 'Website Revamp'];
 
-  const PaymentTerm = [
-    'Monthly',
-  ];
+  // payment terms fetched from API
+  const [paymentTermOptions, setPaymentTermOptions] = useState([]);
 
   
 
 
-  // Master items (would come from API normally)
-  const masterItems = [
-    {
-      name: 'Sofa',
-      sku: 'Item 1',
-      rate: 865,
-      desc: 'Comfortable sofa set.',
-      hsn: '998700',
-    },
-    {
-      name: 'Area Rug',
-      sku: 'Item 2',
-      rate: 3967,
-      desc: 'High quality area rug.',
-      hsn: '816505',
-    },
-    {
-      name: 'Dining Table',
-      sku: 'Item 5',
-      rate: 5138,
-      desc: 'Wooden dining table.',
-      hsn: '847522',
-    },
-  ];
+  // Master items (loaded from API)
+  const [masterItems, setMasterItems] = useState([]);
+  const [masterItemsLoading, setMasterItemsLoading] = useState(false);
 
   // Form state
   const [headerForm, setHeaderForm] = useState({
@@ -151,20 +134,28 @@ const AddPurchaseQuotation = () => {
     city: '',
   });
   const [isShippingSame, setIsShippingSame] = useState(false);
-  const [items, setItems] = useState([
-    {
-      id: 1,
-      selectedItem: null,
-      name: '',
-      sku: '',
-      rate: '0',
-      desc: '',
-      hsn: '',
-      qty: '1',
-      tax: 'IGST',
-      amount: '0.00',
-    },
-  ]);
+  const [items, setItems] = useState([]);
+  // LINE editor state (match ManageSalesOrder behaviour)
+  const [currentItem, setCurrentItem] = useState({
+    itemType: '',
+    itemTypeUuid: null,
+    itemName: '',
+    itemNameUuid: null,
+    quantity: '1',
+    unit: '',
+    unitUuid: null,
+    desc: '',
+    rate: '',
+  });
+  const [editItemId, setEditItemId] = useState(null);
+  const [isAddingLine, setIsAddingLine] = useState(false);
+  const [headerSaved, setHeaderSaved] = useState(false);
+  const [headerResponse, setHeaderResponse] = useState(null);
+  // Table controls
+  const [tableSearch, setTableSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const pageSizes = [5, 10, 25, 50];
   const [invoiceDate, setInvoiceDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [openDatePicker, setOpenDatePicker] = useState(false);
@@ -252,6 +243,20 @@ const AddPurchaseQuotation = () => {
     }
   };
 
+  const uiDateToApiDate = uiDateStr => {
+    if (!uiDateStr) return '';
+    try {
+      const parts = uiDateStr.split('-');
+      if (parts.length !== 3) return '';
+      const [dd, mmm, yyyy] = parts;
+      const months = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
+      const mm = months[mmm] || '01';
+      return `${yyyy}-${mm}-${dd}`;
+    } catch (e) {
+      return '';
+    }
+  };
+
   const openDatePickerFor = field => {
     let initial = new Date();
     if (field === 'invoice' && invoiceDate) {
@@ -291,6 +296,77 @@ const AddPurchaseQuotation = () => {
     return sum.toFixed(2);
   };
 
+  const [totalTax, setTotalTax] = useState('0');
+  const [serverTotalAmount, setServerTotalAmount] = useState('');
+  const [linesLoading, setLinesLoading] = useState(false);
+  const [isSavingHeader, setIsSavingHeader] = useState(false);
+  const [isEditingHeader, setIsEditingHeader] = useState(false);
+
+  // Helper to extract array from various response shapes
+  const extractArray = (resp) => {
+    const d = resp?.Data ?? resp;
+    if (Array.isArray(d)) return d;
+    if (Array.isArray(d?.List)) return d.List;
+    if (Array.isArray(d?.Records)) return d.Records;
+    if (Array.isArray(d?.Items)) return d.Items;
+    return [];
+  };
+
+  // Load saved purchase order lines for a header and normalize them into `items`
+  const loadPurchaseOrderLines = async (headerUuid) => {
+    if (!headerUuid) return;
+    try {
+      setLinesLoading(true);
+      const c = await getCMPUUID();
+      const e = await getENVUUID();
+      const resp = await getPurchaseOrderLines({ headerUuid, cmpUuid: c, envUuid: e });
+      const raw = resp?.Data?.Records || resp?.Data || resp || [];
+      const list = Array.isArray(raw) ? raw : [];
+      const normalized = list.map((r, idx) => {
+        const serverUuid = r?.UUID || r?.LineUUID || r?.Id || null;
+        const itemUuid = r?.ItemUUID || r?.ItemUuid || r?.ItemId || r?.Item || null;
+        const name = r?.ItemName || r?.Name || r?.Item || r?.Description || '';
+        const sku = r?.SKU || r?.Sku || r?.ItemCode || '';
+        const rate = String(r?.Rate ?? r?.Price ?? r?.UnitPrice ?? 0);
+        const desc = r?.Description || r?.Desc || '';
+        const hsn = r?.HSNCode || r?.HSN || r?.hsn || '';
+        const qty = String(r?.Quantity ?? r?.Qty ?? r?.QuantityOrdered ?? 1);
+        const amtNum = Number(r?.Amount ?? r?.TotalAmount ?? r?.NetAmount ?? r?.LineAmount ?? 0) || 0;
+        const amount = amtNum.toFixed(2);
+        const tax = r?.TaxType || r?.Tax || 'IGST';
+        const unit = r?.Unit || '';
+        return {
+          id: idx + 1,
+          serverUuid,
+          itemUuid,
+          selectedItem: null,
+          name,
+          sku,
+          rate,
+          desc,
+          hsn,
+          qty,
+          tax,
+          amount,
+          unit,
+        };
+      });
+
+      setItems(normalized);
+      try {
+        const tot = resp?.Data?.TotalAmount ?? resp?.TotalAmount ?? resp?.Data?.NetAmount ?? resp?.NetAmount ?? null;
+        const tTax = resp?.Data?.TotalTax ?? resp?.TotalTax ?? null;
+        if (tTax !== null && typeof tTax !== 'undefined') setTotalTax(String(tTax));
+        if (tot !== null && typeof tot !== 'undefined') setServerTotalAmount(String(tot));
+      } catch (e) { /* ignore */ }
+    } catch (err) {
+      console.warn('loadPurchaseOrderLines error', err?.message || err);
+      setItems([]);
+    } finally {
+      setLinesLoading(false);
+    }
+  };
+
   const addItem = () => {
     setItems(prev => {
       const nextId = prev.length ? prev[prev.length - 1].id + 1 : 1;
@@ -312,8 +388,23 @@ const AddPurchaseQuotation = () => {
     });
   };
 
-  const deleteItem = id => {
-    setItems(prev => prev.filter(r => r.id !== id));
+  const deleteItem = async id => {
+    try {
+      const toDelete = items.find(r => r.id === id);
+      // If header is saved and item exists on server, try deleting on server
+      if (headerSaved && toDelete && toDelete.serverUuid) {
+        try {
+          await deletePurchaseOrderLine({ lineUuid: toDelete.serverUuid });
+        } catch (e) {
+          console.error('deletePurchaseOrderLine error ->', e);
+          Alert.alert('Warning', 'Unable to delete line on server. Removed locally.');
+        }
+      }
+      // Remove locally regardless
+      setItems(prev => prev.filter(r => r.id !== id));
+    } catch (e) {
+      console.warn('deleteItem error', e);
+    }
   };
 
   const selectMasterItem = (rowId, item) => {
@@ -348,19 +439,210 @@ const AddPurchaseQuotation = () => {
     );
   };
 
-  const handleCreateOrder = () => {
-    const payload = {
-      header: headerForm,
-      billing: billingForm,
-      shipping: shippingForm,
-      items,
-      invoiceDate,
-      dueDate,
-      paymentTerm,
-      notes,
-    };
-    console.log('Create Order payload:', payload);
-    Alert.alert('Create Order', 'Order payload logged to console');
+  const handleEditItem = id => {
+    const it = items.find(i => i.id === id);
+    if (!it) return;
+    // Try to resolve the matching master item by uuid or sku/name so dropdown shows proper label
+    const matchedMaster = masterItems.find(m => (m.uuid && it.itemUuid && String(m.uuid) === String(it.itemUuid)) || (m.sku && it.sku && String(m.sku) === String(it.sku)) || (m.name && it.name && String(m.name).toLowerCase() === String(it.name).toLowerCase()));
+    setCurrentItem({
+      itemType: it.itemType || '',
+      itemTypeUuid: it.itemTypeUuid || null,
+      itemName: matchedMaster ? matchedMaster.name : (it.name || ''),
+      itemNameUuid: it.itemUuid || it.itemNameUuid || it.sku || (matchedMaster ? matchedMaster.uuid : null) || null,
+      quantity: it.qty || '1',
+      unit: it.unit || '',
+      unitUuid: it.unitUuid || null,
+      desc: it.desc || it.desc || '',
+      rate: it.rate || '',
+    });
+    setEditItemId(id);
+    // open create order section
+    setExpandedId(4);
+  };
+
+  const handleAddLineItem = async () => {
+    try {
+      setIsAddingLine(true);
+      const nextId = items.length ? items[items.length - 1].id + 1 : 1;
+      // try to find matching master item for defaults
+      const master = (masterItems || []).find(m => {
+        if (!m) return false;
+        return (
+          String(m.name || '').toLowerCase() === String(currentItem.itemName || '').toLowerCase() ||
+          String(m.sku || '').toLowerCase() === String(currentItem.itemNameUuid || '').toLowerCase() ||
+          String(m.uuid || '').toLowerCase() === String(currentItem.itemNameUuid || '').toLowerCase()
+        );
+      });
+
+      const rate = (currentItem.rate && String(currentItem.rate).trim() !== '') ? String(currentItem.rate) : (master ? String(master.rate || '0') : '0');
+      const qty = currentItem.quantity || '1';
+      const amount = computeAmount(qty, rate);
+
+      const newItem = {
+        id: editItemId || nextId,
+        selectedItem: master || null,
+        name: currentItem.itemName || (master ? master.name : ''),
+        itemType: currentItem.itemType || '',
+        itemTypeUuid: currentItem.itemTypeUuid || null,
+        itemNameUuid: currentItem.itemNameUuid || null,
+        sku: master ? master.sku : '',
+        rate: rate,
+        desc: currentItem.desc && currentItem.desc.length ? currentItem.desc : (master ? master.desc || '' : ''),
+        hsn: master ? master.hsn || '' : '',
+        qty: qty,
+        tax: 'IGST',
+        amount: amount,
+        unit: currentItem.unit || '',
+      };
+
+      // If header has been saved to server (we have Header UUID), attempt to POST the line
+      if (headerSaved && headerResponse?.UUID) {
+        try {
+          const payload = {
+            HeaderUUID: headerResponse.UUID,
+            ItemUUID: (master && master.uuid) || currentItem.itemNameUuid || null,
+            Quantity: Number(qty) || 0,
+            Description: newItem.desc || '',
+            Rate: Number(rate) || 0,
+          };
+          let resp;
+          if (editItemId) {
+            const existing = items.find(x => x.id === editItemId);
+            if (existing && existing.serverUuid) {
+              const upayload = {
+                UUID: existing.serverUuid,
+                HeaderUUID: headerResponse.UUID,
+                ItemUUID: (master && master.uuid) || currentItem.itemNameUuid || null,
+                Quantity: Number(qty) || 0,
+                Description: newItem.desc || '',
+                Rate: Number(rate) || 0,
+              };
+              resp = await updatePurchaseOrderLine(upayload);
+            } else {
+              resp = await addPurchaseOrderLine(payload);
+            }
+          } else {
+            resp = await addPurchaseOrderLine(payload);
+          }
+          const data = resp?.Data || resp || null;
+          const serverItem = data && (Array.isArray(data) ? data[0] : data);
+          const itemToPush = {
+            ...newItem,
+            id: editItemId ? editItemId : nextId,
+            serverUuid: serverItem?.UUID || serverItem?.LineUUID || serverItem?.Id || null,
+            itemUuid: serverItem?.ItemUUID || serverItem?.ItemUuid || serverItem?.ItemId || newItem.itemNameUuid || null,
+            sku: serverItem?.SKU || newItem.sku,
+            rate: (serverItem && (serverItem?.Rate ?? serverItem?.rate)) ?? newItem.rate,
+            desc: serverItem?.Description ?? newItem.desc,
+          };
+          if (editItemId) {
+            setItems(prev => prev.map(it => it.id === editItemId ? { ...it, ...itemToPush, id: editItemId } : it));
+            setEditItemId(null);
+          } else {
+            setItems(prev => [...prev, itemToPush]);
+          }
+        } catch (err) {
+          console.error('addPurchaseOrderLine error ->', err);
+          Alert.alert('Error', err?.message || 'Unable to add line to server. Saved locally.');
+          if (editItemId) {
+            setItems(prev => prev.map(it => it.id === editItemId ? { ...it, ...newItem, id: editItemId } : it));
+            setEditItemId(null);
+          } else {
+            setItems(prev => [...prev, newItem]);
+          }
+        } finally {
+          setIsAddingLine(false);
+        }
+      } else {
+        // not saved on server yet - keep local
+        if (editItemId) {
+          setItems(prev => prev.map(it => it.id === editItemId ? { ...it, ...newItem, id: editItemId } : it));
+          setEditItemId(null);
+        } else {
+          setItems(prev => [...prev, newItem]);
+        }
+        setIsAddingLine(false);
+      }
+
+      // reset editor
+      setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', rate: '' });
+    } catch (e) {
+      console.warn('handleAddLineItem error', e);
+      setIsAddingLine(false);
+    }
+  };
+
+  const handleCreateOrder = async () => {
+    setIsSavingHeader(true);
+    try {
+      const subtotalNum = parseFloat(computeSubtotal()) || 0;
+      const totalTaxNum = parseFloat(totalTax) || 0;
+      const serverNum = (serverTotalAmount !== null && serverTotalAmount !== undefined && String(serverTotalAmount).trim() !== '') ? parseFloat(serverTotalAmount) : NaN;
+      const totalAmountNum = (!isNaN(serverNum))
+        ? (serverNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0))
+        : (subtotalNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + totalTaxNum);
+
+      const resolveCityUuid = (c) => {
+        if (!c) return '';
+        if (typeof c === 'string') return c;
+        return c?.UUID || c?.Uuid || c?.Id || '';
+      };
+
+      const payload = {
+        UUID: headerResponse?.UUID || '',
+        PurchaseOrderNo: headerForm.purchaseOrderNumber || '',
+        Inquiry_No: headerForm.companyName || '',
+        Vendor_UUID: vendor || headerForm.clientName || '',
+        ProjectUUID: projectName || '',
+        PaymentTermUUID: paymentTerm || '',
+        PaymentMethodUUID: paymentMethod || '',
+        OrderDate: uiDateToApiDate(invoiceDate),
+        DueDate: uiDateToApiDate(dueDate),
+        Notes: notes || '',
+        TermsConditions: terms || '',
+        BillingBuildingNo: billingForm.buildingNo || '',
+        BillingStreet1: billingForm.street1 || '',
+        BillingStreet2: billingForm.street2 || '',
+        BillingPostalCode: billingForm.postalCode || '',
+        BillingCountryUUID: billingForm.country || '',
+        BillingStateUUID: billingForm.state || '',
+        BillingCityUUID: resolveCityUuid(billingForm.city),
+        IsShipAddrSame: !!isShippingSame,
+        ShippingBuildingNo: shippingForm.buildingNo || '',
+        ShippingStreet1: shippingForm.street1 || '',
+        ShippingStreet2: shippingForm.street2 || '',
+        ShippingPostalCode: shippingForm.postalCode || '',
+        ShippingCountryUUID: shippingForm.country || '',
+        ShippingStateUUID: shippingForm.state || '',
+        ShippingCityUUID: resolveCityUuid(shippingForm.city),
+        SubTotal: subtotalNum,
+        TotalTax: totalTaxNum,
+        TotalAmount: totalAmountNum,
+        ShippingCharges: parseFloat(shippingCharges) || 0,
+        AdjustmentField: adjustmentLabel || '',
+        AdjustmentPrice: parseFloat(adjustments) || 0,
+      };
+
+      console.log('AddPurchaseQuotation: submit payload ->', payload);
+      let resp;
+      if (headerResponse?.UUID) {
+        resp = await updatePurchaseOrder(payload);
+      } else {
+        resp = await addPurchaseOrder(payload);
+      }
+
+      const data = resp?.Data || resp || {};
+      setHeaderResponse(data);
+      setHeaderSaved(true);
+      setIsEditingHeader(false);
+      Alert.alert('Success', 'Order submitted successfully');
+      try { await loadPurchaseOrderLines(data?.UUID || data?.Id || data?.HeaderUUID || headerResponse?.UUID); } catch (e) { /* ignore */ }
+    } catch (err) {
+      console.error('handleCreateOrder error ->', err);
+      Alert.alert('Error', err?.message || 'Unable to submit order');
+    } finally {
+      setIsSavingHeader(false);
+    }
   };
   const onCancel = () => {};
 
@@ -424,6 +706,141 @@ const AddPurchaseQuotation = () => {
     setFile(null);
   };
 
+  // Fetch vendors for Purchase Quotation dropdown
+  useEffect(() => {
+    let mounted = true;
+    const loadVendors = async () => {
+      try {
+        const resp = await getPurchasequotationVendor();
+        console.log('getPurchasequotationVendor response ->', resp);
+        const list = resp?.Data || resp || [];
+        if (!mounted) return;
+        const mapped = (Array.isArray(list) ? list : []).map(it => {
+          if (!it) return '';
+          if (typeof it === 'string') return it.toString().trim();
+          const v = it.VendorName || it.Name || it.CompanyName || it.DisplayName || it.ContactName || it.Value || '';
+          return v ? String(v).trim() : '';
+        }).filter(Boolean);
+        const unique = Array.from(new Set(mapped));
+        setVendorOptions(unique);
+      } catch (err) {
+        console.error('Error loading purchase quotation vendors ->', err && (err.message || err));
+        setVendorOptions([]);
+      }
+    };
+    loadVendors();
+    return () => { mounted = false; };
+  }, []);
+
+  // Fetch purchase quotation numbers for dropdown
+  useEffect(() => {
+    let mounted = true;
+    const loadNumbers = async () => {
+      try {
+        const resp = await getpurchaseQuotationNumber();
+        console.log('getpurchaseQuotationNumber response ->', resp);
+        const list = resp?.Data || resp || [];
+        if (!mounted) return;
+        const mapped = (Array.isArray(list) ? list : []).map(it => {
+          if (!it) return '';
+          if (typeof it === 'string') return it.toString().trim();
+          // common fields containing number/label
+          const v = it.QuotationNumber || it.PurchaseQuotationNumber || it.Number || it.Value || it.Label || it.Text || '';
+          return v ? String(v).trim() : '';
+        }).filter(Boolean);
+        const unique = Array.from(new Set(mapped));
+        setPurchaseQuotationNumbers(unique);
+      } catch (err) {
+        console.error('Error loading purchase quotation numbers ->', err && (err.message || err));
+        setPurchaseQuotationNumbers([]);
+      }
+    };
+    loadNumbers();
+    return () => { mounted = false; };
+  }, []);
+
+  // Fetch payment terms for dropdown
+  useEffect(() => {
+    let mounted = true;
+    const loadTerms = async () => {
+      try {
+        const resp = await getPaymentTerms();
+        console.log('getPaymentTerms response ->', resp);
+        const list = resp?.Data || resp || [];
+        if (!mounted) return;
+        const mapped = (Array.isArray(list) ? list : []).map(it => {
+          if (!it) return '';
+          if (typeof it === 'string') return it.toString().trim();
+          const v = it.Name || it.Value || it.Label || it.Term || it.PaymentTerm || it.Text || it.Description || '';
+          return v ? String(v).trim() : '';
+        }).filter(Boolean);
+        const unique = Array.from(new Set(mapped));
+        setPaymentTermOptions(unique);
+      } catch (err) {
+        console.error('Error loading payment terms ->', err && (err.message || err));
+        setPaymentTermOptions([]);
+      }
+    };
+    loadTerms();
+    return () => { mounted = false; };
+  }, []);
+
+  // Fetch payment methods for dropdown
+  useEffect(() => {
+    let mounted = true;
+    const loadMethods = async () => {
+      try {
+        const resp = await getPaymentMethods();
+        console.log('getPaymentMethods response ->', resp);
+        const list = resp?.Data || resp || [];
+        if (!mounted) return;
+        const mapped = (Array.isArray(list) ? list : []).map(it => {
+          if (!it) return '';
+          if (typeof it === 'string') return it.toString().trim();
+          const v = it.Name || it.Value || it.Label || it.Mode || it.PaymentMethod || it.Text || it.Description || '';
+          return v ? String(v).trim() : '';
+        }).filter(Boolean);
+        const unique = Array.from(new Set(mapped));
+        setPaymentMethodOptions(unique);
+      } catch (err) {
+        console.error('Error loading payment methods ->', err && (err.message || err));
+        setPaymentMethodOptions([]);
+      }
+    };
+    loadMethods();
+    return () => { mounted = false; };
+  }, []);
+
+  // Load master items from API (normalized to { name, sku, rate, desc, hsn, uuid })
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        setMasterItemsLoading(true);
+        const resp = await getItems();
+        const rawList = resp?.Data?.Records || resp?.Data || resp || [];
+        const list = Array.isArray(rawList) ? rawList : [];
+        const normalized = list.map(it => ({
+          name: it?.Name || it?.name || it?.ItemName || '',
+          sku: it?.SKU || it?.sku || it?.Sku || it?.ItemCode || '',
+          rate: (it?.Rate ?? it?.rate ?? it?.Price) || 0,
+          desc: it?.Description || it?.description || it?.Desc || '',
+          hsn: it?.HSNCode || it?.HSN || it?.hsn || '',
+          uuid: it?.UUID || it?.Uuid || it?.uuid || null,
+          raw: it,
+        }));
+        if (mounted) setMasterItems(normalized);
+      } catch (err) {
+        console.warn('getItems failed', err);
+        if (mounted) setMasterItems([]);
+      } finally {
+        if (mounted) setMasterItemsLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, []);
+
   return (
     <>
       <View style={{ flex: 1, backgroundColor: '#fff'}}>
@@ -479,7 +896,7 @@ const AddPurchaseQuotation = () => {
                 <Dropdown
                   placeholder="select Purchase Inquiry"
                   value={headerForm.companyName}
-                  options={salesInquiries}
+                  options={purchaseQuotationNumbers}
                   getLabel={s => s}
                   getKey={s => s}
                   onSelect={v => setHeaderForm(s => ({ ...s, companyName: v }))}
@@ -498,7 +915,7 @@ const AddPurchaseQuotation = () => {
                   <Dropdown
                     placeholder="-Select Vendor-"
                     value={vendor}
-                    options={Vendor}
+                    options={vendorOptions}
                     getLabel={p => p}
                     getKey={p => p}
                     onSelect={v => setVendor(v)}
@@ -545,7 +962,7 @@ const AddPurchaseQuotation = () => {
                   <Dropdown
                     placeholder="Select Payment Term"
                     value={paymentTerm}
-                    options={PaymentTerm}
+                    options={paymentTermOptions}
                     getLabel={p => p}
                     getKey={p => p}
                     onSelect={v => setPaymentTerm(v)}
@@ -562,7 +979,7 @@ const AddPurchaseQuotation = () => {
                   <Dropdown
                     placeholder="Payment Method"
                     value={paymentMethod}
-                    options={paymentMethods}
+                    options={paymentMethodOptions && paymentMethodOptions.length ? paymentMethodOptions : paymentMethods}
                     getLabel={p => p}
                     getKey={p => p}
                     onSelect={v => setPaymentMethod(v)}
@@ -919,164 +1336,244 @@ const AddPurchaseQuotation = () => {
                 Item Details
               </Text>
 
-              {/* ── TABLE CONTAINER ── */}
-              <View style={styles.tableWrapper}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={true}
-                  stickyHeaderIndices={[0]}
-                  contentContainerStyle={{ minWidth: wp(180) }}
-                >
-                  <View style={styles.table}>
-                    {/* ── THEAD ── */}
-                    <View style={styles.thead}>
-                      <View style={styles.tr}>
-                        <Text style={[styles.th, { width: COL_WIDTHS.ITEM }]}>
-                          ITEM DETAILS
-                        </Text>
-                        <Text style={[styles.th, { width: COL_WIDTHS.QTY }]}>
-                          QUANTITY
-                        </Text>
-                        <Text style={[styles.th, { width: COL_WIDTHS.RATE }]}>
-                          RATE
-                        </Text>
-                        {/* TAX column removed */}
-                        <Text style={[styles.th, { width: COL_WIDTHS.AMOUNT }]}>
-                          AMOUNT
-                        </Text>
-                        <Text style={[styles.th, { width: COL_WIDTHS.ACTION }]}>
-                          ACTION
-                        </Text>
-                      </View>
-                    </View>
+              {/* LINE form: Item | Description | Quantity | Rate | Amount (copied UI from ManageSalesOrder) */}
+              <View style={{ marginBottom: hp(1.5) }}>
+                <View style={{ width: '100%', marginBottom: hp(1) }}>
+                  <Text style={inputStyles.label}>Item*</Text>
+                  <View style={{ zIndex: 9999, elevation: 20 }}>
+                    <Dropdown
+                      placeholder="Select Item"
+                      value={currentItem.itemName}
+                      options={masterItems}
+                      getLabel={it => (it?.name || String(it))}
+                      getKey={it => (it?.sku || it)}
+                      onSelect={v => {
+                        if (v && typeof v === 'object') {
+                          setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.sku || v, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '' }));
+                        } else {
+                          setCurrentItem(ci => ({ ...ci, itemName: v, itemNameUuid: null }));
+                        }
+                      }}
+                      renderInModal={true}
+                      inputBoxStyle={[inputStyles.box, { width: '100%' }]}
+                      textStyle={inputStyles.input}
+                    />
+                  </View>
+                </View>
 
-                    {/* ── TBODY ── */}
-                    <View style={styles.tbody}>
-                      {items.map(row => (
-                        <View key={row.id} style={styles.tr}>
-                          <View
-                            style={[
-                              styles.tableCellWide,
-                              {
-                                borderRightWidth: 1,
-                                borderColor: '#E0E0E0',
-                              },
-                            ]}
-                          >
-                            <View style={{ zIndex: 9999, elevation: 20 }}>
-                              <Dropdown
-                                placeholder="Select Item"
-                                value={
-                                  row.selectedItem ? row.selectedItem.name : ''
-                                }
-                                options={masterItems}
-                                getLabel={it =>
-                                  `${it.name} | ${it.sku} | ₹${it.rate}`
-                                }
-                                getKey={it => it.sku}
-                                onSelect={it => selectMasterItem(row.id, it)}
-                                renderInModal={true}
-                                inputBoxStyle={{
-                                  ...inputStyles.box,
-                                  height: hp(6), // bigger height
-                                  borderWidth: 1,
-                                  backgroundColor: '#fff',
-                                  width: wp(48), // wider dropdown
-                                }}
-                                textStyle={[
-                                  inputStyles.input,
-                                  { fontSize: wp(3.2) },
-                                ]}
-                                dropdownListStyle={{
-                                  backgroundColor: '#fff',
-                                  elevation: 10,
-                                  zIndex: 9999,
-                                  borderWidth: 1,
-                                  borderColor: '#ccc',
-                                  width: wp(55),
-                                }}
-                              />
-                            </View>
+                <View style={{ width: '100%', marginBottom: hp(1) }}>
+                  <Text style={inputStyles.label}>Description</Text>
+                  <TextInput
+                    style={[styles.descInput, { minHeight: hp(10), width: '100%' }]}
+                    value={currentItem.desc || ''}
+                    onChangeText={t => setCurrentItem(ci => ({ ...ci, desc: t }))}
+                    placeholder="Enter description"
+                    placeholderTextColor={COLORS.textLight}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
 
-                            {row.selectedItem ? (
-                              <View style={styles.selectedContainer}>
-                                <View style={styles.itemHeader}>
-                                  <Text style={styles.itemName}>
-                                    {row.name}
-                                  </Text>
-                                  <Text style={styles.itemSku}>
-                                    SKU: {row.sku}
-                                  </Text>
-                                </View>
-                                <View style={styles.descInput}>
-                                  <Text style={{ color: COLORS.text }}>
-                                    {row.desc}
-                                  </Text>
-                                </View>
-                                {row.hsn ? (
-                                  <Text style={styles.hsnTag}>
-                                    HSN: {row.hsn}
-                                  </Text>
-                                ) : null}
-                              </View>
-                            ) : null}
-                          </View>
-
-                          {/* QUANTITY */}
-                          <View style={[styles.td, { width: COL_WIDTHS.QTY }]}>
-                            <TextInput
-                              style={styles.input}
-                              keyboardType="numeric"
-                              value={String(row.qty ?? '')}
-                              onChangeText={v =>
-                                updateItemField(row.id, 'qty', v)
-                              }
-                            />
-                          </View>
-
-                          {/* RATE */}
-                          <View style={[styles.td, { width: COL_WIDTHS.RATE }]}>
-                            <TextInput
-                              style={styles.input}
-                              keyboardType="numeric"
-                              value={String(row.rate ?? '')}
-                              onChangeText={v =>
-                                updateItemField(row.id, 'rate', v)
-                              }
-                            />
-                          </View>
-
-                          {/* TAX column removed */}
-
-                          {/* AMOUNT */}
-                          <View
-                            style={[styles.td, { width: COL_WIDTHS.AMOUNT }]}
-                          >
-                            <Text style={[styles.input, { fontWeight: '600' }]}>
-                              ₹{row.amount ?? '0.00'}
-                            </Text>
-                          </View>
-
-                          {/* ACTION */}
-                          <View
-                            style={[
-                              styles.tdAction,
-                              { width: COL_WIDTHS.ACTION },
-                            ]}
-                          >
-                            <TouchableOpacity
-                              style={styles.deleteBtn}
-                              onPress={() => deleteItem(row.id)}
-                            >
-                              <Text style={styles.deleteBtnText}>Delete</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      ))}
+                <View style={[styles.row, { justifyContent: 'space-between' }]}> 
+                  <View style={{ width: '48%' }}>
+                    <Text style={inputStyles.label}>Quantity*</Text>
+                    <View style={[inputStyles.box, { marginTop: hp(0.5), width: '100%' }]}>
+                      <TextInput
+                        style={[inputStyles.input, { textAlign: 'center' }]}
+                        value={String(currentItem.quantity || '')}
+                        onChangeText={v => setCurrentItem(ci => ({ ...ci, quantity: v }))}
+                        keyboardType="numeric"
+                        placeholder="1"
+                        placeholderTextColor={COLORS.textLight}
+                      />
                     </View>
                   </View>
-                </ScrollView>
+
+                  <View style={{ width: '48%' }}>
+                    <Text style={inputStyles.label}>Rate*</Text>
+                    <View style={[inputStyles.box, { marginTop: hp(0.5), width: '100%' }]}>
+                      <TextInput
+                        style={[inputStyles.input, { textAlign: 'center' }]}
+                        value={String(currentItem.rate ?? '')}
+                        onChangeText={v => setCurrentItem(ci => ({ ...ci, rate: v }))}
+                        keyboardType="numeric"
+                        placeholder="0"
+                        placeholderTextColor={COLORS.textLight}
+                      />
+                    </View>
+                  </View>
+                </View>
+
+                <View style={[styles.row, { justifyContent: 'space-between', alignItems: 'center', marginTop: hp(1) }]}> 
+                  <View style={{ width: '40%' }}>
+                    <Text style={inputStyles.label}>Amount</Text>
+                    <View style={[inputStyles.box, { marginTop: hp(0.5), width: '60%' }]}>
+                      <Text style={[inputStyles.input, { textAlign: 'center', fontWeight: '600' }]}>₹{computeAmount(currentItem.quantity || 0, currentItem.rate || 0)}</Text>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row' }}>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      style={[styles.addButton, { backgroundColor: COLORS.primary }]}
+                      onPress={handleAddLineItem}
+                      disabled={isAddingLine}
+                    >
+                      {isAddingLine ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={[styles.addButtonText, { color: '#fff' }]}>{editItemId ? 'Update' : 'Add'}</Text>
+                      )}
+                    </TouchableOpacity>
+                    {editItemId ? (
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        style={[styles.addButton, { backgroundColor: '#6c757d', marginLeft: wp(3) }]}
+                        onPress={() => { setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', rate: '' }); setEditItemId(null); }}
+                      >
+                        <Text style={styles.addButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                </View>
               </View>
+              {/* Table container (search + pagination + table) */}
+              {linesLoading ? (
+                <View style={{ paddingVertical: hp(4), alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                </View>
+              ) : items.length > 0 && (
+                <View>
+                  <View style={styles.tableControlsRow}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={{ marginRight: wp(2) }}>Show</Text>
+                      <Dropdown
+                        placeholder={String(pageSize)}
+                        value={String(pageSize)}
+                        options={pageSizes}
+                        getLabel={p => String(p)}
+                        getKey={p => String(p)}
+                        onSelect={v => { setPageSize(Number(v)); setPage(1); }}
+                        inputBoxStyle={{ width: wp(18) }}
+                        textStyle={inputStyles.input}
+                      />
+                      <Text style={{ marginLeft: wp(2) }}>entries</Text>
+                    </View>
+
+                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                      <TextInput
+                        style={[inputStyles.box, { width: wp(40), height: hp(5), paddingHorizontal: wp(2) }]}
+                        placeholder="Search..."
+                        value={tableSearch}
+                        onChangeText={t => { setTableSearch(t); setPage(1); }}
+                        placeholderTextColor={COLORS.textLight}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.tableWrapper}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      nestedScrollEnabled={true}
+                      keyboardShouldPersistTaps="handled"
+                      directionalLockEnabled={true}
+                    >
+                      <View style={styles.table}>
+                        <View style={styles.thead}>
+                          <View style={styles.tr}>
+                            <Text style={[styles.th, { width: wp(10) }]}>Sr.No</Text>
+                            <Text style={[styles.th, { width: wp(30) }]}>Item Details</Text>
+                            <Text style={[styles.th, { width: wp(30) }]}>Description</Text>
+                            <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
+                            <Text style={[styles.th, { width: wp(20) }]}>Rate</Text>
+                            <Text style={[styles.th, { width: wp(20) }]}>Amount</Text>
+                            <Text style={[styles.th, { width: wp(25) }]}>Action</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.tbody}>
+                          {(() => {
+                            const q = String(tableSearch || '').trim().toLowerCase();
+                            const filtered = q ? items.filter(it => {
+                              return (
+                                String(it.name || '').toLowerCase().includes(q) ||
+                                String(it.itemType || '').toLowerCase().includes(q) ||
+                                String(it.desc || '').toLowerCase().includes(q)
+                              );
+                            }) : items;
+                            const total = filtered.length;
+                            const ps = Number(pageSize) || 10;
+                            const totalPages = Math.max(1, Math.ceil(total / ps));
+                            const currentPage = Math.min(Math.max(1, page), totalPages);
+                            const start = (currentPage - 1) * ps;
+                            const end = Math.min(start + ps, total);
+                            const visible = filtered.slice(start, end);
+
+                            return (
+                              <>
+                                {visible.map((item, idx) => (
+                                  <View key={item.id} style={styles.tr}>
+                                    <View style={[styles.td, { width: wp(10)  }]}>
+                                      <Text style={styles.tdText}>{start + idx + 1}</Text>
+                                    </View>
+                                    <View style={[styles.td, { width: wp(30),   paddingLeft: wp(2) }]}>
+                                      <Text style={styles.tdText}>{item.name}</Text>
+                                    </View>
+                                     <View style={[styles.td, { width: wp(30) }]}>
+                                      <Text style={styles.tdText}>{item.desc}</Text>
+                                    </View>
+                                    <View style={[styles.td, { width: wp(20) }]}>
+                                      <Text style={styles.tdText}>{item.qty}</Text>
+                                    </View>
+                                    <View style={[styles.td, { width: wp(20) }]}>
+                                      <Text style={styles.tdText}>₹{item.rate}</Text>
+                                    </View>
+                                    <View style={[styles.td, { width: wp(20) }]}>
+                                      <Text style={[styles.tdText, { fontWeight: '600' }]}>₹{item.amount}</Text>
+                                    </View>
+                                    <View style={[styles.tdAction, { width: wp(40) } ,{flexDirection: 'row',paddingLeft: wp(2)}]}>
+                                      <TouchableOpacity style={styles.actionButton} onPress={() => handleEditItem(item.id)}>
+                                        <Icon name="edit" size={rf(3.6)} color="#fff" />
+                                      </TouchableOpacity>
+                                      <TouchableOpacity style={[styles.actionButton, { marginLeft: wp(2) }]} onPress={() => deleteItem(item.id)}>
+                                        <Icon name="delete" size={rf(3.6)} color="#fff" />
+                                      </TouchableOpacity>
+                                    </View>
+                                  </View>
+                                ))}
+
+                                <View style={styles.paginationRow}>
+                                  <Text style={{ color: COLORS.textMuted }}>
+                                    Showing {total === 0 ? 0 : start + 1} to {end} of {total} entries
+                                  </Text>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <TouchableOpacity
+                                      style={[styles.pageButton, { marginRight: wp(2) }]}
+                                      disabled={currentPage <= 1}
+                                      onPress={() => setPage(p => Math.max(1, p - 1))}
+                                    >
+                                      <Text style={styles.pageButtonText}>Previous</Text>
+                                    </TouchableOpacity>
+                                    <Text style={{ marginHorizontal: wp(2) }}>{currentPage}</Text>
+                                    <TouchableOpacity
+                                      style={styles.pageButton}
+                                      disabled={currentPage >= totalPages}
+                                      onPress={() => setPage(p => Math.min(totalPages, p + 1))}
+                                    >
+                                      <Text style={styles.pageButtonText}>Next</Text>
+                                    </TouchableOpacity>
+                                  </View>
+                                </View>
+                              </>
+                            );
+                          })()}
+                        </View>
+                      </View>
+                    </ScrollView>
+                  </View>
+                </View>
+              )}
 
               {/* ADD ITEM */}
               <TouchableOpacity style={styles.addBtn} onPress={addItem}>
@@ -1792,11 +2289,41 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#fff',
   },
-  table: { minWidth: wp(180) },
+  table: { minWidth: wp(170) },
 
   /* ── COMMON ── */
     thead: { backgroundColor: '#f1f1f1' },
   tr: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#E0E0E0' },
+
+  tableControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: wp(2),
+  },
+  paginationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: wp(2),
+    width: '100%',
+  },
+  pageButton: {
+    backgroundColor: '#e5e7eb',
+    paddingVertical: hp(0.6),
+    paddingHorizontal: wp(3),
+    borderRadius: wp(0.8),
+  },
+  pageButtonText: {
+    color: COLORS.text,
+    fontWeight: '600',
+  },
+  actionButton: {
+    backgroundColor: '#6c757d',
+    paddingVertical: hp(0.5),
+    paddingHorizontal: wp(2),
+    borderRadius: wp(1),
+  },
 
   /* ── TH (header) ── */
   th: {
@@ -1819,6 +2346,11 @@ const styles = StyleSheet.create({
     borderRightColor: '#E0E0E0',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
+  },
+  tdText: {
+    fontSize: wp(3),
+    color: COLORS.text,
+    fontFamily: TYPOGRAPHY.fontFamilyRegular,
   },
   tdAction: {
     justifyContent: 'center',
@@ -1880,7 +2412,6 @@ const styles = StyleSheet.create({
     borderRadius: wp(1),
   },
   deleteBtnText: { color: '#fff', fontWeight: '600', fontSize: wp(2.8) },
-
   addBtn: {
     marginTop: hp(1.5),
     borderWidth: 1,
@@ -1891,6 +2422,22 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   addBtnText: { color: COLORS.primary, fontWeight: '600', fontSize: wp(3.5) },
+
+  addButton: {
+    paddingVertical: hp(0.8),
+    paddingHorizontal: wp(3),
+    borderRadius: wp(1),
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: wp(18),
+  },
+  addButtonText: {
+    color: COLORS.text,
+    fontWeight: '700',
+    fontSize: wp(3.4),
+    textAlign: 'center',
+    fontFamily: TYPOGRAPHY.fontFamilyMedium,
+  },
   billContainer: {
     paddingVertical: 10,
     width: '100%',

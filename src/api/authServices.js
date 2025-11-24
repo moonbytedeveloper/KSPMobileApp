@@ -126,10 +126,14 @@ const PATHS = {
     getSalesOrderHeaderById: Config.API_GET_SALES_ORDER_HEADER_BY_ID_PATH || '/api/Account/GetSalesOrderHeaderById',
     getPurchaseOrderHeaderById: Config.API_GET_PURCHASE_ORDER_HEADER_BY_ID_PATH || '/api/Account/GetPurchaseOrderHeaderById',
     getItems: Config.API_GET_ITEMS_PATH || '/api/Account/GetItems',
-    termsOfPayment: Config.API_TERMS_OF_PAYMENT_PATH || '/api/Account/termsofpayment',
+    termsOfPayment: Config.API_TERMS_OF_PAYMENT_PATH || '/api/Account/termsofpayment',  
     modeOfPayment: Config.API_MODE_OF_PAYMENT_PATH || '/api/Account/modeofpayment',
     getpurchaseInquiryHeader: Config.API_GET_PURCHASE_INQUIRY_HEADER_PATH || 'api/Account/GetPurchaseInquiryHeader',
     // Account Purchase
+    
+    getpurchaseQuotationHeaders: Config.API_GET_PURCHASE_QUOTATION_HEADERS_PATH || '/api/Account/GetPurchaseQuotationHeaders',
+    getpurchaseQuotationNumber: Config.API_GET_PURCHASE_QUOTATION_NUMBER_PATH || '/api/Account/PurchasequotationNumbers',
+    getPurchasequotationVendor : Config.API_GET_PURCHASE_QUOTATION_VENDOR_PATH || '/api/Account/PurchasequotationVendors',
     getCurrencies: Config.API_GET_CURRENCIES_PATH || '/api/Account/GetCurrencies',
     getPurchaseItemTypes:Config.API_GET_PURCHASEITEMTYPE || '/api/Account/GetPurchaseItemTypes',
     // getProjects: Config.API_PROJECTS_PATH || '/api/Projects/GetProjects',
@@ -487,6 +491,59 @@ export async function getPurchaseItemTypes({ cmpUuid, envUuid, userUuid } = {}) 
     const resp = await api.get(PATHS.getPurchaseItemTypes, { params });
     try { console.log('[authServices] getPurchaseItemTypes resp ->', resp && resp.data); } catch (_) {}
     return resp.data;
+}
+
+// Get vendors for purchase quotations
+export async function getPurchasequotationVendor({ cmpUuid, envUuid, userUuid } = {}) {
+    const [c, e, u] = await Promise.all([
+        cmpUuid || getCMPUUID(),
+        envUuid || getENVUUID(),
+        userUuid || getUUID(),
+    ]);
+    const params = { cmpUuid: c || '', envUuid: e || '', userUuid: u || '' };
+    try { console.log('[authServices] getPurchasequotationVendor params ->', params); } catch (_) {}
+    try {
+        const resp = await api.get(PATHS.getPurchasequotationVendor, { params });
+        try { console.log('[authServices] getPurchasequotationVendor resp ->', resp && resp.data); } catch (_) {}
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] getPurchasequotationVendor error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Get purchase quotation numbers (for dropdowns)
+export async function getpurchaseQuotationNumber({ cmpUuid, envUuid, userUuid } = {}) {
+    const [c, e, u] = await Promise.all([
+        cmpUuid || getCMPUUID(),
+        envUuid || getENVUUID(),
+        userUuid || getUUID(),
+    ]);
+    const params = { cmpUuid: c || '', envUuid: e || '', userUuid: u || '' };
+    try { console.log('[authServices] getpurchaseQuotationNumber params ->', params); } catch (_) {}
+    try {
+        const resp = await api.get(PATHS.getpurchaseQuotationNumber, { params });
+        try { console.log('[authServices] getpurchaseQuotationNumber resp ->', resp && resp.data); } catch (_) {}
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] getpurchaseQuotationNumber error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Get purchase quotation headers (list) - used in ViewPurchaseQuotation screen
+export async function getpurchaseQuotationHeaders({ cmpUuid, envUuid, userUuid, start = 0, length = 100, searchValue = '' } = {}) {
+    const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+    const params = { cmpUuid: c || '', envUuid: e || '', userUuid: u || '', start, length, searchValue };
+    try { console.log('[authServices] getpurchaseQuotationHeaders params ->', params); } catch (_) {}
+    try {
+        const resp = await api.get(PATHS.getpurchaseQuotationHeaders, { params });
+        try { console.log('[authServices] getpurchaseQuotationHeaders resp ->', resp && resp.data); } catch (_) {}
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] getpurchaseQuotationHeaders error ->', err && (err.message || err));
+        throw err;
+    }
 }
 
 // Get item masters (item names) optionally filtered by ItemType UUID
