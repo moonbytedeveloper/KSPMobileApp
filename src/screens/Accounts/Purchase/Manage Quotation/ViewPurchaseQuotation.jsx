@@ -1,6 +1,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
@@ -8,6 +8,7 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
+import { getpurchaseQuotationHeaders } from '../../../../api/authServices';
 
 const SALES_ORDERS = [
     {
@@ -74,15 +75,19 @@ const ViewPurchaseQuotation = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [itemsPerPage, setItemsPerPage] = useState(Number(ITEMS_PER_PAGE_OPTIONS[1]));
     const [currentPage, setCurrentPage] = useState(0);
+    const [orders, setOrders] = useState([]);
+    const [loadingOrders, setLoadingOrders] = useState(false);
+    const [ordersError, setOrdersError] = useState(null);
 
     const filteredOrders = useMemo(() => {
+        const source = (orders && orders.length) ? orders : SALES_ORDERS;
         const query = searchQuery.trim().toLowerCase();
-        if (!query) return SALES_ORDERS;
-        return SALES_ORDERS.filter((order) => {
-            const haystack = `${order.salesOrderNumber} ${order.customerName} ${order.contactPerson} ${order.status}`.toLowerCase();
+        if (!query) return source;
+        return source.filter((order) => {
+            const haystack = `${order.salesOrderNumber || ''} ${order.quotationNumber || ''} ${order.quotationTitle || ''} ${order.purchaseRequestNumber || ''} ${order.customerName || ''} ${order.contactPerson || ''} ${order.status || ''}`.toLowerCase();
             return haystack.includes(query);
         });
-    }, [searchQuery]);
+    }, [searchQuery, orders]);
 
     const totalPages = useMemo(() => {
         if (filteredOrders.length === 0) return 0;
@@ -98,6 +103,46 @@ const ViewPurchaseQuotation = () => {
             setCurrentPage(totalPages - 1);
         }
     }, [totalPages, currentPage]);
+
+    // Fetch purchase quotation headers from API
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                setLoadingOrders(true);
+                setOrdersError(null);
+                const resp = await getpurchaseQuotationHeaders();
+                console.log('getpurchaseQuotationHeaders response ->', resp);
+                // Normalize response shapes: Data / data / direct array
+                const payload = resp?.Data ?? resp?.data ?? resp ?? [];
+                // If payload is an object with Records/List, extract the array
+                const list = Array.isArray(payload) ? payload : (payload?.Records || payload?.List || []);
+                const mapped = (list || []).map((it) => ({
+                    id: it?.UUID || it?.Uuid || it?.Id || it?.PurchaseQuotationHeaderId || it?.PurchaseQuotationHeader_UUID || String(Math.random()),
+                    // Primary fields from API
+                    quotationNumber: it?.QuotationNo || it?.QuotationNumber || it?.Quotation_No || it?.QuotationNo || it?.Quotation || it?.Number || '',
+                    quotationTitle: it?.QuotationTitle || it?.Title || it?.Quotation_Title || it?.SalesOrderTitle || '',
+                    customerName: it?.VendorName || it?.Vendor || it?.CompanyName || it?.CustomerName || '',
+                    // Purchase Request - API may use different keys; include common fallbacks
+                    purchaseRequestNumber: it?.PurchaseRequestNumber || it?.PurchaseRequestNo || it?.PurchaseRequest || it?.PRNumber || it?.InquiryNo || it?.InquiryNumber || it?.ReferenceNumber || it?.SalesInvoiceNumber || it?.salesInvoiceNumber || '',
+                    // Backwards-compatible alias
+                    salesOrderNumber: it?.QuotationNo || it?.QuotationNumber || it?.Quotation_No || it?.QuotationNo || it?.Number || '',
+                    status: it?.Status || it?.ApprovalStatus || it?.Approval || '',
+                    deliveryDate: it?.DeliveryDate || it?.RequiredDate || '',
+                    dueDate: it?.DueDate || it?.ExpectedDate || '',
+                    _raw: it,
+                }));
+                console.log('Mapped purchase quotation headers ->', mapped);
+                if (mounted) setOrders(mapped);
+            } catch (err) {
+                console.error('getpurchaseQuotationHeaders error ->', err);
+                if (mounted) setOrdersError(err);
+            } finally {
+                if (mounted) setLoadingOrders(false);
+            }
+        })();
+        return () => { mounted = false; };
+    }, []);
 
     const paginatedOrders = useMemo(() => {
         const start = currentPage * itemsPerPage;
@@ -207,35 +252,43 @@ const ViewPurchaseQuotation = () => {
             </View>
 
             <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-                {paginatedOrders.map((order) => (
-                    <AccordionItem
-                        key={order.id}
-                        item={{
-                            soleExpenseCode: order.id,
-                            expenseName: order.salesOrderNumber,
-                            amount: order.salesInvoiceNumber,
-                        }}
-                        isActive={activeOrderId === order.id}
-                        onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
-                        customRows={[
-                            { label: 'Vendor Name', value: order.customerName },
-                            { label: 'Purchase Request Number', value: order.salesInvoiceNumber },
-                            { label: 'Quotation Title', value: 'Title' },
-                            { label: 'Status', value: order.status, isStatus: true },
-                            // { label: 'Due Date', value: order.dueDate },
-                        ]} 
-                        headerLeftLabel="Vendor Name"
-                        headerRightLabel="Purchase Request No."
-                        footerComponent={renderFooterActions(order)}
-                        headerRightContainerStyle={styles.headerRightContainer}
-                    />
-                ))}
+                {loadingOrders ? (
+                    <View style={[styles.emptyState, { paddingVertical: hp(6) }]}>
+                        <ActivityIndicator size="large" color={COLORS.primary} />
+                        {ordersError ? <Text style={[styles.emptyStateSubtitle, { marginTop: hp(1) }]}>Error loading quotations</Text> : null}
+                    </View>
+                ) : (
+                    paginatedOrders.map((order) => (
+                        <AccordionItem
+                            key={order.id}
+                            item={{
+                                soleExpenseCode: order.id,
+                                expenseName: order.customerName, // show Vendor Name in heading
+                                amount: order.purchaseRequestNumber || order._raw?.PurchaseRequestNumber || order._raw?.PurchaseRequestNo || order._raw?.InquiryNo || order.quotationNumber || '', // show Purchase Request No (fallback to Quotation No.)
+                                headerTitle: order.quotationTitle,
+                            }}
+                            isActive={activeOrderId === order.id}
+                            onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
+                            customRows={[
+                                { label: 'Vendor Name', value: order.customerName },
+                                { label: 'Purchase Request Number', value: order.purchaseRequestNumber || order._raw?.PurchaseRequestNumber || order._raw?.PurchaseRequestNo || order._raw?.InquiryNo || order.quotationNumber || '—' },
+                                { label: 'Quotation Title', value: order.quotationTitle || order.salesOrderNumber || 'Title' },
+                                { label: 'Status', value: order.status, isStatus: true },
+                                // { label: 'Due Date', value: order.dueDate },
+                            ]}
+                            headerLeftLabel="Vendor Name"
+                            headerRightLabel="Purchase Request No."
+                            footerComponent={renderFooterActions(order)}
+                            headerRightContainerStyle={styles.headerRightContainer}
+                        />
+                    ))
+                )}
 
-                {paginatedOrders.length === 0 && (
+                {(!loadingOrders && paginatedOrders.length === 0) && (
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyStateTitle}>No sales orders found</Text>
+                        <Text style={styles.emptyStateTitle}>No purchase quotations found</Text>
                         <Text style={styles.emptyStateSubtitle}>
-                            Try adjusting your search keyword or create a new sales order.
+                            Try adjusting your search keyword or create a new purchase quotation.
                         </Text>
                     </View>
                 )}
