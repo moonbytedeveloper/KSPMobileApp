@@ -768,7 +768,8 @@ const ManageSalesOrder = () => {
         ShippingCountryUUID: shippingForm.country || '',
         ShippingStateUUID: shippingForm.state || '',
         ShippingCityUUID: resolveCityUuid(shippingForm.city),
-        Discount: parseFloat(adjustments) || 0,
+        // Discount entered on the UI (labelled 'Discount') is stored in `shippingCharges`
+        Discount: parseFloat(shippingCharges) || 0,
         FilePath: file?.path || file?.uri || '',
 
         // SubTotal: subtotalNum,
@@ -915,8 +916,8 @@ const ManageSalesOrder = () => {
             PurchaseOrderNo: p?.PurchaseOrderNo || p?.PurchaseOrderNumber || p?.PurchaseOrder || p?.OrderNo || p?.Name || String(p),
             raw: p,
           }));
-          console.log(normalizedPOs,'response purchase order');
-          
+          console.log(normalizedPOs, 'response purchase order');
+
           setPurchaseOrderOptions(normalizedPOs);
         } catch (e) {
           console.warn('getPurchaseOrderHeaders lookup failed', e?.message || e);
@@ -1874,21 +1875,21 @@ const ManageSalesOrder = () => {
                     <Text style={inputStyles.input}>{renderLabel(SalesInquiryNo || headerForm.SalesInquiryUUID, ['InquiryNo', 'Name'])}</Text>
                   </View>
                 ) : (
-                    <Dropdown
-                      placeholder="Purchase Inquiry No."
-                      value={SalesInquiryNo}
-                      options={SalesInquiryNosOptions}
-                      getLabel={c => (c?.InquiryNo || c?.Name || String(c))}
-                      getKey={c => (c?.UUID || c?.Id || c)}
-                      onSelect={v => {
-                        setSalesInquiry(v?.InquiryNo || String(v));
-                        // store the most likely UUID candidate(s) returned by the option
-                        const candidateUuid = v?.UUID || v?.Uuid || v?.Id || v?.InquiryUUID || v?.SalesInqNoUUID || v?.SalesInquiryUUID || v;
-                        setHeaderForm(s => ({ ...s, SalesInquiryUUID: candidateUuid }));
-                      }}
-                      inputBoxStyle={inputStyles.box}
-                      textStyle={inputStyles.input}
-                    />
+                  <Dropdown
+                    placeholder="Purchase Inquiry No."
+                    value={SalesInquiryNo}
+                    options={SalesInquiryNosOptions}
+                    getLabel={c => (c?.InquiryNo || c?.Name || String(c))}
+                    getKey={c => (c?.UUID || c?.Id || c)}
+                    onSelect={v => {
+                      setSalesInquiry(v?.InquiryNo || String(v));
+                      // store the most likely UUID candidate(s) returned by the option
+                      const candidateUuid = v?.UUID || v?.Uuid || v?.Id || v?.InquiryUUID || v?.SalesInqNoUUID || v?.SalesInquiryUUID || v;
+                      setHeaderForm(s => ({ ...s, SalesInquiryUUID: candidateUuid }));
+                    }}
+                    inputBoxStyle={inputStyles.box}
+                    textStyle={inputStyles.input}
+                  />
                 )}
               </View>
 
@@ -2706,7 +2707,7 @@ const ManageSalesOrder = () => {
 
                 {/* Shipping Charges */}
                 <View style={styles.rowInput}>
-                  <Text style={styles.label}>Shipping Charges :</Text>
+                  <Text style={styles.label}>Discount :</Text>
 
                   <View style={styles.inputRightGroup}>
                     <TextInput
@@ -2760,7 +2761,7 @@ const ManageSalesOrder = () => {
                 </View>
 
                 {/* Adjustments */}
-                <View style={styles.rowInput}>
+                {/* <View style={styles.rowInput}>
                   <TextInput
                     value={adjustmentLabel}
                     onChangeText={setAdjustmentLabel}
@@ -2775,7 +2776,6 @@ const ManageSalesOrder = () => {
                       keyboardType="numeric"
                       style={styles.inputBox}
                     />
-                    {/* Question Icon with Tooltip */}
                     <View style={styles.helpIconWrapper}>
                       <TouchableOpacity
                         onPress={() => {
@@ -2787,7 +2787,6 @@ const ManageSalesOrder = () => {
                         <Text style={styles.helpIcon}>?</Text>
                       </TouchableOpacity>
 
-                      {/* Tooltip */}
                       {showAdjustmentTip && (
                         <>
                           <Modal
@@ -2817,7 +2816,7 @@ const ManageSalesOrder = () => {
                   <Text style={styles.value}>
                     ₹{parseFloat(adjustments || 0).toFixed(2)}
                   </Text>
-                </View>
+                </View> */}
 
                 {/* Total Tax */}
                 <View style={styles.row}>
@@ -2836,9 +2835,15 @@ const ManageSalesOrder = () => {
                     {(() => {
                       const serverNum = (serverTotalAmount !== null && serverTotalAmount !== undefined && String(serverTotalAmount).trim() !== '') ? parseFloat(serverTotalAmount) : NaN;
                       const displayed = (!isNaN(serverNum))
-                        ? (serverNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0))
-                        : ((parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax || 0) || 0));
+                        ? (serverNum - (parseFloat(shippingCharges) || 0))
+                        : (
+                          (parseFloat(computeSubtotal()) || 0) +
+                          (parseFloat(shippingCharges) || 0) +
+                          (parseFloat(totalTax) || 0)
+                        );
+
                       return displayed.toFixed(2);
+
                     })()}
                   </Text>
                 </View>

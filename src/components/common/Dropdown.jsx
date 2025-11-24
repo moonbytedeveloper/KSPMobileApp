@@ -189,14 +189,33 @@ const Dropdown = ({
             ) : null}
             {filteredOptions.map((item, index) => {
               const label = String(getLabel(item));
-              const key = getKey(item, index);
-              // Determine active state by comparing keys first, then labels
-              const itemKeyStr = String(key ?? index);
-              const valueKeyStr = typeof value === 'object' ? String(getKey(value, 0) ?? '') : String(value ?? '');
-              const isActive = itemKeyStr === valueKeyStr || label === displayValue;
+              let key = null;
+              try { key = getKey(item, index); } catch (e) { key = undefined; }
+              // Normalize key to a stable string. Prefer common id fields if key is an object.
+              let safeKey;
+              try {
+                if (key === null || key === undefined) safeKey = String(index);
+                else if (typeof key === 'string' || typeof key === 'number' || typeof key === 'boolean') safeKey = String(key);
+                else if (typeof key === 'object') {
+                  safeKey = String(key?.UUID || key?.Uuid || key?.Id || key?.id || JSON.stringify(key));
+                } else {
+                  safeKey = String(index);
+                }
+              } catch (e) {
+                safeKey = String(index);
+              }
+
+              // Determine active state by comparing normalized keys first, then labels
+              let valueKeyStr = '';
+              try {
+                const rawValKey = (typeof value === 'object') ? (getKey(value, 0) ?? '') : (value ?? '');
+                valueKeyStr = rawValKey === null || rawValKey === undefined ? '' : String(rawValKey);
+              } catch (e) { valueKeyStr = String(value ?? ''); }
+
+              const isActive = (safeKey === valueKeyStr) || (label === displayValue);
               return (
                 <TouchableOpacity
-                  key={key}
+                  key={`dd-${safeKey}-${index}`}
                   style={[styles.dropdownItem, isActive && styles.dropdownItemActive]}
                   onPress={() => handleChoose(item)}
                 >
@@ -265,12 +284,21 @@ const Dropdown = ({
                       </View>
                     ) : null}
                     {filteredOptions.map((item, index) => {
-                      const label = getLabel(item);
-                      const key = getKey(item, index);
+                      let label = null;
+                      try { label = String(getLabel(item)); } catch (e) { label = String(item); }
+                      let key = null;
+                      try { key = getKey(item, index); } catch (e) { key = undefined; }
+                      let safeKey;
+                      try {
+                        if (key === null || key === undefined) safeKey = String(index);
+                        else if (typeof key === 'string' || typeof key === 'number' || typeof key === 'boolean') safeKey = String(key);
+                        else if (typeof key === 'object') safeKey = String(key?.UUID || key?.Uuid || key?.Id || key?.id || JSON.stringify(key));
+                        else safeKey = String(index);
+                      } catch (e) { safeKey = String(index); }
                       const isActive = label === value;
                       return (
                         <TouchableOpacity
-                          key={key}
+                          key={`dd-${safeKey}-${index}`}
                           style={[styles.dropdownItem, isActive && styles.dropdownItemActive]}
                           onPress={() => handleChoose(item)}
                         >

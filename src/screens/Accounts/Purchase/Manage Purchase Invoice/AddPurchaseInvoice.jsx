@@ -24,7 +24,7 @@ import { useNavigation } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
-import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getCustomers, getCountries, getSalesOrderNumbers, addSalesInvoiceHeader, addSalesInvoiceLine, updateSalesInvoiceHeader, getSalesInvoiceHeaderById, getSalesInvoiceHeaders, getSalesInvoiceLines, updateSalesInvoiceLine, deleteSalesInvoiceLine, getItems } from '../../../../api/authServices';
+import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getCustomers, getCountries, getPurchaseOrderNumbers, addPurchaseInvoiceHeader, addPurchaseInvoiceLine, updatePurchaseInvoiceHeader, getPurchaseInvoiceHeaderById, getPurchaseInvoiceHeaders, getPurchaseInvoiceLines, updatePurchaseInvoiceLine, deletePurchaseInvoiceLine, getItems } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
 
 const COL_WIDTHS = {
@@ -188,7 +188,7 @@ const AddPurchaseInvoice = () => {
                     getPaymentMethods(),
                     fetchProjects(),
                     getAllInquiryNumbers(),
-                    getSalesOrderNumbers(),
+                    getPurchaseOrderNumbers(),
                 ]);
 
                 const custList = extractArray(custResp);
@@ -303,8 +303,9 @@ const AddPurchaseInvoice = () => {
                     try {
                         const cmp = await getCMPUUID();
                         const env = await getENVUUID();
-                        const resp = await getSalesInvoiceHeaderById({ headerUuid: salesInvValue, cmpUuid: cmp, envUuid: env });
+                        const resp = await getPurchaseInvoiceHeaderById({ headerUuid: salesInvValue, cmpUuid: cmp, envUuid: env });
                         const resolved = resp?.Data || resp || null;
+                        console.log('getPurchaseInvoiceHeaderById (resolve) returned UUID ->', resolved?.UUID || resolved?.Id || resolved?.HeaderUUID || resolved?.HeaderId || null);
                         const resolvedNo = resolved?.SalesInvNo || resolved?.SalesInvoiceNo || resolved?.SalesPerInvNo || resolved?.PerformaInvoiceNo || resolved?.PerformaNo || resolved?.SalesPerformaNo || '';
                         if (resolvedNo) {
                             setHeaderForm(s => ({ ...s, salesInquiryText: resolvedNo }));
@@ -377,7 +378,7 @@ const AddPurchaseInvoice = () => {
                         if (!term) continue;
                         try {
                             console.log('Attempting to resolve header UUID by searching with:', term);
-                            const listResp = await getSalesInvoiceHeaders({ cmpUuid, envUuid, start: 0, length: 10, searchValue: term });
+                            const listResp = await getPurchaseInvoiceHeaders({ cmpUuid, envUuid, start: 0, length: 10, searchValue: term });
                             const listData = listResp?.Data || listResp || {};
                             const records = Array.isArray(listData?.Records) ? listData.Records : (Array.isArray(listResp) ? listResp : []);
                             if (records && records.length > 0) {
@@ -407,12 +408,12 @@ const AddPurchaseInvoice = () => {
                 // proceed to fetch header details by resolvedHeaderUuid
                 setPrefillLoading(true);
                 console.log('Fetching header data for UUID:', resolvedHeaderUuid);
-                const resp = await getSalesInvoiceHeaderById({ headerUuid: resolvedHeaderUuid, cmpUuid, envUuid });
-                console.log('getSalesInvoiceHeaderById response ->', resp);
-
+                const resp = await getPurchaseInvoiceHeaderById({ headerUuid: resolvedHeaderUuid, cmpUuid, envUuid });
+                console.log('getPurchaseInvoiceHeaderById response ->', resp);
                 const data = resp?.Data || resp || null;
+                console.log('getPurchaseInvoiceHeaderById returned header UUID ->', data?.UUID || data?.Id || data?.HeaderUUID || data?.HeaderId || null);
                 if (!data) {
-                    console.warn('No data returned from getSalesInvoiceHeaderById');
+                    console.warn('No data returned from getPurchaseInvoiceHeaderById');
                     return;
                 }
                 // continue with existing prefill logic
@@ -518,7 +519,7 @@ const AddPurchaseInvoice = () => {
                     setLinesLoading(true);
                     const cmp = cmpUuid || (await getCMPUUID());
                     const env = envUuid || (await getENVUUID());
-                    const linesResp = await getSalesInvoiceLines({ headerUuid: data?.UUID || headerUuid, cmpUuid: cmp, envUuid: env, start: 0, length: 1000 });
+                    const linesResp = await getPurchaseInvoiceLines({ headerUuid: data?.UUID || headerUuid, cmpUuid: cmp, envUuid: env, start: 0, length: 1000 });
                     const rawLines = linesResp?.Data?.Records || linesResp?.Data || linesResp || [];
                     const list = Array.isArray(rawLines) ? rawLines : [];
                     const normalizedLines = list.map((l, idx) => {
@@ -907,8 +908,8 @@ const AddPurchaseInvoice = () => {
             try {
                 const cmp = await getCMPUUID();
                 const env = await getENVUUID();
-                const resp = await deleteSalesInvoiceLine({ lineUuid: it.serverLineUuid, overrides: { cmpUuid: cmp, envUuid: env } });
-                console.log('deleteSalesInvoiceLine resp ->', resp);
+                const resp = await deletePurchaseInvoiceLine({ lineUuid: it.serverLineUuid, overrides: { cmpUuid: cmp, envUuid: env } });
+                console.log('deletePurchaseInvoiceLine resp ->', resp);
                 // remove locally
                 setItems(prev => prev.filter(r => r.id !== id));
                 // refresh header totals after delete
@@ -968,7 +969,7 @@ const AddPurchaseInvoice = () => {
             if (!hid) return;
             const cmp = await getCMPUUID();
             const env = await getENVUUID();
-            const hResp = await getSalesInvoiceHeaderById({ headerUuid: hid, cmpUuid: cmp, envUuid: env });
+            const hResp = await getPurchaseInvoiceHeaderById({ headerUuid: hid, cmpUuid: cmp, envUuid: env });
             const hData = hResp?.Data || hResp || null;
             if (!hData) return;
             const headerTax = hData?.TotalTax ?? hData?.TaxAmount ?? hData?.HeaderTotalTax ?? 0;
@@ -1095,7 +1096,7 @@ const AddPurchaseInvoice = () => {
 
                 // If serverLineUuid exists, call update API, otherwise just update locally
                 if (existing.serverLineUuid) {
-                    const resp = await updateSalesInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
+                    const resp = await updatePurchaseInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
                     console.log('update line resp ->', resp);
                     const updatedLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || existing.serverLineUuid;
                     setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid }) : it));
@@ -1123,7 +1124,7 @@ const AddPurchaseInvoice = () => {
                 };
 
                 console.log('Posting line payload ->', payload);
-                const resp = await addSalesInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
+                const resp = await addPurchaseInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
                 console.log('add line resp ->', resp);
 
                 // on success, update local items list (assign local id and keep server uuid if returned)
@@ -1183,8 +1184,8 @@ const AddPurchaseInvoice = () => {
             };
 
             console.log('Final submit - update header payload ->', payload);
-            const resp = await updateSalesInvoiceHeader(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
-            console.log('UpdateSalesInvoiceHeader resp ->', resp);
+            const resp = await updatePurchaseInvoiceHeader(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
+            console.log('UpdatePurchaseInvoiceHeader resp ->', resp);
             Alert.alert('Success', 'Performa header updated successfully');
             // Refresh header totals from server after update
             await refreshHeaderTotals(headerUUID);
@@ -1219,30 +1220,25 @@ const AddPurchaseInvoice = () => {
     const submitHeader = async () => {
         setHeaderSubmitting(true);
         try {
+            // Build payload matching required purchase invoice header schema
             const payload = {
-                UUID: headerForm.UUID || '',
-                SalesPerInvNo: headerForm.salesInquiryText || '',
-                SalesInqNoUUID: salesInquiryUuid || headerForm.salesInquiryUUID || '',
-                SalesOrderNo: salesOrderUuid || headerForm.clientName || '',
-                CustomerUUID: headerForm.CustomerUUID || headerForm.CustomerUUID || '',
+                UUID: headerForm.UUID || headerUUID || '',
+                InvoiceNo: headerForm.salesInquiryText || '',
+                PurchaseInqNoUUID: salesInquiryUuid || headerForm.salesInquiryUUID || '',
+                PurchaseOrderNo: salesOrderUuid || headerForm.clientName || '',
+                VendorUUID: headerForm.CustomerUUID || '',
                 ProjectUUID: projectUUID || project || '',
-                PaymentTermUUID: paymentTermUuid || paymentTerm || '',
-                PaymentMethodUUID: paymentMethodUUID || paymentMethod || '',
-                OrderDate: uiDateToApiDate(invoiceDate),
-                DueDate: uiDateToApiDate(dueDate),
-                CustomerNotes: notes || '',
-                ShippingCharges: parseFloat(shippingCharges) || 0,
-                AdjustmentField: adjustmentLabel || '',
-                AdjustmentPrice: parseFloat(adjustments) || 0,
+                PaymentTerm: paymentTerm || (paymentTermUuid || ''),
+                PaymentMode: paymentMethod || (paymentMethodUUID || ''),
+                Note: notes || '',
                 TermsConditions: terms || '',
-                SubTotal: parseFloat(computeSubtotal()) || 0,
-                TotalTax: parseFloat(totalTax) || 0,
-                TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax) || 0),
+                Discount: parseFloat(shippingCharges) || 0,
+                OrderDate: uiDateToApiDate(invoiceDate) ? new Date(uiDateToApiDate(invoiceDate)).toISOString() : '',
                 FilePath: file?.uri || file?.name || '',
             };
 
             console.log('submitHeader payload ->', payload);
-            const resp = await addSalesInvoiceHeader(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
+            const resp = await addPurchaseInvoiceHeader(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
             console.log('submitHeader resp ->', resp);
             // Try to extract the returned Header UUID from response
             const gotHeaderUuid = resp?.Data?.UUID || resp?.Data?.HeaderUUID || resp?.UUID || resp?.HeaderUUID || (resp?.Data && (resp.Data.UUID || resp.Data.HeaderUUID)) || null;
@@ -1275,30 +1271,25 @@ const AddPurchaseInvoice = () => {
         setHeaderSubmitting(true);
         try {
             console.log('updateHeader: Building payload...');
+            // Build update payload following requested schema
             const payload = {
                 UUID: headerUUID,
-                SalesInvNo: headerForm.salesInquiryText || '',
-                SalesInqNoUUID: salesInquiryUuid || headerForm.salesInquiryUUID || '',
-                SalesOrderNo: salesOrderUuid || headerForm.clientName || '',
-                CustomerUUID: headerForm.CustomerUUID || headerForm.CustomerUUID || '',
+                InvoiceNo: headerForm.salesInquiryText || '',
+                PurchaseInqNoUUID: salesInquiryUuid || headerForm.salesInquiryUUID || '',
+                PurchaseOrderNo: salesOrderUuid || headerForm.clientName || '',
+                VendorUUID: headerForm.CustomerUUID || '',
                 ProjectUUID: projectUUID || project || '',
-                PaymentTermUUID: paymentTermUuid || paymentTerm || '',
-                PaymentMethodUUID: paymentMethodUUID || paymentMethod || '',
-                OrderDate: uiDateToApiDate(invoiceDate),
-                CustomerNotes: notes || '',
-                ShippingCharges: parseFloat(shippingCharges) || 0,
-                AdjustmentField: adjustmentLabel || '',
-                AdjustmentPrice: parseFloat(adjustments) || 0,
+                PaymentTerm: paymentTerm || (paymentTermUuid || ''),
+                PaymentMode: paymentMethod || (paymentMethodUUID || ''),
+                Note: notes || '',
                 TermsConditions: terms || '',
+                Discount: parseFloat(shippingCharges) || 0,
+                OrderDate: uiDateToApiDate(invoiceDate) ? new Date(uiDateToApiDate(invoiceDate)).toISOString() : '',
                 FilePath: file?.uri || file?.name || '',
-                SubTotal: parseFloat(computeSubtotal()) || 0,
-                TotalTax: parseFloat(totalTax) || 0,
-                TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax) || 0),
-                Notes: notes || '',
             };
             console.log('updateHeader payload ->', payload);
 
-            const resp = await updateSalesInvoiceHeader(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
+            const resp = await updatePurchaseInvoiceHeader(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
             console.log('updateHeader resp ->', resp);
             Alert.alert('Success', 'Header updated successfully');
             setHeaderEditable(false);
@@ -1444,11 +1435,11 @@ const AddPurchaseInvoice = () => {
                                 /> */}
                             {/* </View> */}
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Sales Inquiry No.</Text>
+                                <Text style={inputStyles.label}>Purchase Inquiry No.</Text>
 
                                 {/* <Text style={[inputStyles.label, { fontWeight: '600' }]}>Sales Inquiry No.</Text> */}
                                 <Dropdown
-                                    placeholder="Sales Inquiry No."
+                                    placeholder="Purchase Inquiry No."
                                     value={headerForm.salesInquiry}
                                     options={salesInquiryNosOptions}
                                     getLabel={s => s?.InquiryNo || String(s)}
@@ -1472,16 +1463,30 @@ const AddPurchaseInvoice = () => {
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             {/* { (headerSubmitted || route?.params?.prefillHeader) && ( */}
                             <View style={styles.col}>
-                                <Text style={[inputStyles.label,]}>Sales Order Number* </Text>
+                                <Text style={[inputStyles.label,]}>Purchase Order Number* </Text>
 
-                                <View style={[inputStyles.box, { marginTop: hp(1) }]} pointerEvents="box-none">
-                                    <TextInput
-                                        style={[inputStyles.input, { flex: 1, color: '#000000' }]}
-                                        value={1}
-                                        onChangeText={v => setHeaderForm(s => ({ ...s, salesInquiryText: v }))}
-                                        placeholder="eg."
-                                        placeholderTextColor={COLORS.textLight}
-                                        editable={headerEditable}
+                                <View style={{ zIndex: 9999, elevation: 25 }}>
+                                    <Dropdown
+                                        placeholder="Select Purchase Order"
+                                        value={headerForm.clientName || ''}
+                                        options={salesOrderOptions}
+                                        getLabel={o => (o?.OrderNo || o?.OrderNumber || (o?.raw && (o.raw.SalesOrderNo || o.raw.OrderNo)) || String(o))}
+                                        getKey={o => (o?.UUID || o?.Uuid || o?.Id || (o?.raw && (o.raw.UUID || o.raw.Id)) || o?.OrderNo || String(o))}
+                                        onSelect={v => {
+                                            if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
+                                            if (v && typeof v === 'object') {
+                                                const uuid = v?.UUID || v?.Uuid || v?.Id || (v?.raw && (v.raw.UUID || v.raw.Id)) || null;
+                                                const label = v?.OrderNo || v?.OrderNumber || (v?.raw && (v.raw.SalesOrderNo || v.raw.OrderNo)) || String(v);
+                                                setHeaderForm(s => ({ ...s, clientName: label }));
+                                                setSalesOrderUuid(uuid);
+                                            } else {
+                                                setHeaderForm(s => ({ ...s, clientName: String(v) }));
+                                                setSalesOrderUuid(null);
+                                            }
+                                        }}
+                                        renderInModal={true}
+                                        inputBoxStyle={inputStyles.box}
+                                        textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>

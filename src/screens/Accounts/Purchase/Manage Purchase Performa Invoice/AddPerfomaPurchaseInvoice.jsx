@@ -24,7 +24,7 @@ import { useNavigation } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
-import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getVendors, getCountries, getSalesOrderNumbers, addPurchasePerformaInvoiceHeader, addPurchasePerformaInvoiceLine, updateSalesPerformaInvoiceHeader, updateSalesInvoiceHeader, getSalesPerformaInvoiceHeaderById, getPurchasePerformaInvoiceLines, updateSalesPerformaInvoiceLine, deleteSalesPerformaInvoiceLine, getItems } from '../../../../api/authServices';
+import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getVendors, getCountries, getPurchaseOrderNumbers, addPurchasePerformaInvoiceHeader, addPurchasePerformaInvoiceLine, updatePurchasePerformaInvoiceHeader, getPurchasePerformaInvoiceHeaderById, getPurchasePerformaInvoiceLines, updatePurchasePerformaInvoiceLine, deletePurchasePerformaInvoiceLine, getItems } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
 
 const COL_WIDTHS = {
@@ -127,6 +127,8 @@ const AddSalesPerfomaInvoice = () => {
     const [salesInquiryNosOptions, setSalesInquiryNosOptions] = useState([]);
     const [salesOrderOptions, setSalesOrderOptions] = useState([]);
     const [salesOrderUuid, setSalesOrderUuid] = useState(null);
+    const [purchaseOrderOptions, setPurchaseOrderOptions] = useState([]);
+    const [purchaseOrderUuid, setPurchaseOrderUuid] = useState(null);
     const [headerSubmitting, setHeaderSubmitting] = useState(false);
     const [headerUUID, setHeaderUUID] = useState(null);
     const [headerSubmitted, setHeaderSubmitted] = useState(false);
@@ -149,13 +151,14 @@ const AddSalesPerfomaInvoice = () => {
 
         (async () => {
             try {
-                const [custResp, termsResp, methodsResp, projectsResp, inquiriesResp, salesOrdersResp] = await Promise.all([
+                const [custResp, termsResp, methodsResp, projectsResp, inquiriesResp, salesOrdersResp, purchaseOrdersResp] = await Promise.all([
                     getVendors(),
                     getPaymentTerms(),
                     getPaymentMethods(),
                     fetchProjects(),
                     getAllInquiryNumbers(),
-                    getSalesOrderNumbers(),
+                    getPurchaseOrderNumbers(),
+                    getPurchaseOrderNumbers(),
                 ]);
 
                 const custList = extractArray(custResp);
@@ -215,6 +218,26 @@ const AddSalesPerfomaInvoice = () => {
                 setSalesOrderOptions(normalizedSalesOrders);
                 console.log(normalizedSalesOrders, 'normalizedSalesOrders');
 
+                // Normalize Purchase Orders
+                const purchaseOrdersList = extractArray(purchaseOrdersResp);
+                const normalizedPurchaseOrders = (Array.isArray(purchaseOrdersList) ? purchaseOrdersList : []).map((r) => {
+                    const uuid = r?.UUID || r?.Uuid || r?.Id || r?.PurchaseOrderUUID || r?.PurchaseOrderId || null;
+                    const rawCandidate = r?.PurchaseOrderNo ?? r?.PurchaseOrderNumber ?? r?.OrderNumber ?? r?.OrderNo ?? r?.Name ?? r?.Title ?? r;
+                    const extractString = (val) => {
+                        if (val === null || val === undefined) return '';
+                        if (typeof val === 'string') return val;
+                        if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+                        try {
+                            const sub = val?.Name || val?.PurchaseOrderNo || val?.PurchaseOrderNumber || val?.OrderNo || val?.DisplayName || val?.Title;
+                            if (typeof sub === 'string' && sub.trim() !== '') return sub;
+                        } catch (e) { }
+                        try { return JSON.stringify(val); } catch (e) { return String(val); }
+                    };
+                    const orderNoStr = extractString(rawCandidate);
+                    return { UUID: uuid, OrderNo: orderNoStr, raw: r };
+                });
+                setPurchaseOrderOptions(normalizedPurchaseOrders);
+
             } catch (e) {
                 console.warn('Lookup fetch error', e?.message || e);
             }
@@ -232,6 +255,8 @@ const AddSalesPerfomaInvoice = () => {
             const inquiryUuid = data?.SalesInqNoUUID || data?.SalesInquiryUUID || data?.SalesInquiryId || data?.SalesInquiryUuid || null;
             if (inquiryUuid) {
                 setSalesInquiryUuid(inquiryUuid);
+                // also keep a copy on headerForm if backend returns this key there
+                setHeaderForm(s => ({ ...s, salesInquiryUUID: inquiryUuid }));
             }
 
             // Map a few common keys from server payload into our header form
@@ -251,6 +276,13 @@ const AddSalesPerfomaInvoice = () => {
                 CustomerUUID: data?.CustomerUUID || data?.CustomerId || s.CustomerUUID || null,
                 CustomerName: data?.CustomerName || s.CustomerName || '',
             }));
+            // Extract Purchase Order / Sales Order UUID if present so payload uses UUID
+            const poUuid = data?.PurchaseOrderUUID || data?.PurchaseOrderId || data?.PurchaseOrderNo || data?.SalesOrderUUID || data?.SalesOrderId || data?.SalesOrderNo || null;
+            if (poUuid) {
+                setPurchaseOrderUuid(poUuid);
+                // also set salesOrderUuid for backward compatibility
+                setSalesOrderUuid(poUuid);
+            }
             setInvoiceDate(data?.OrderDate || data?.PerformaDate || '');
             setDueDate(data?.DueDate || '');
             setShippingCharges(String(data?.ShippingCharges ?? data?.ShippingCharge ?? 0));
@@ -284,12 +316,12 @@ const AddSalesPerfomaInvoice = () => {
                 const envUuid = route?.params?.envUuid || route?.params?.envUUID || route?.params?.env || undefined;
 
                 console.log('Fetching header data for UUID:', headerUuid);
-                const resp = await getSalesPerformaInvoiceHeaderById({ headerUuid, cmpUuid, envUuid });
-                console.log('getSalesPerformaInvoiceHeaderById response ->', resp);
+                const resp = await getPurchasePerformaInvoiceHeaderById({ headerUuid, cmpUuid, envUuid });
+                console.log('getPurchasePerformaInvoiceHeaderById response ->', resp);
 
                 const data = resp?.Data || resp || null;
                 if (!data) {
-                    console.warn('No data returned from getSalesPerformaInvoiceHeaderById');
+                    console.warn('No data returned from getPurchasePerformaInvoiceHeaderById');
                     return;
                 }
 
@@ -317,10 +349,12 @@ const AddSalesPerfomaInvoice = () => {
                     setPaymentMethodUUID(payMethodUuid);
                 }
 
-                // Extract Sales Order UUID
-                const soUuid = data?.SalesOrderUUID || data?.SalesOrderId || data?.SalesOrderNo || null;
+                // Extract Sales Order UUID (also consider PurchaseOrder keys)
+                const soUuid = data?.SalesOrderUUID || data?.SalesOrderId || data?.SalesOrderNo || data?.PurchaseOrderUUID || data?.PurchaseOrderId || data?.PurchaseOrderNo || null;
                 if (soUuid) {
                     setSalesOrderUuid(soUuid);
+                    // also set purchaseOrderUuid for the Purchase flow
+                    setPurchaseOrderUuid(soUuid);
                 }
 
                 // Prefill header form
@@ -608,6 +642,7 @@ const AddSalesPerfomaInvoice = () => {
     const [adjustmentLabel, setAdjustmentLabel] = useState('Adjustments');
     const [totalTax, setTotalTax] = useState('0');
     const [serverTotalAmount, setServerTotalAmount] = useState('');
+    const [discount, setDiscount] = useState('0');
     const [file, setFile] = useState(null);
     const [showShippingTip, setShowShippingTip] = useState(false);
     const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
@@ -744,8 +779,8 @@ const AddSalesPerfomaInvoice = () => {
             try {
                 const cmp = await getCMPUUID();
                 const env = await getENVUUID();
-                const resp = await deleteSalesPerformaInvoiceLine({ lineUuid: it.serverLineUuid, overrides: { cmpUuid: cmp, envUuid: env } });
-                console.log('deleteSalesPerformaInvoiceLine resp ->', resp);
+                const resp = await deletePurchasePerformaInvoiceLine({ lineUuid: it.serverLineUuid, overrides: { cmpUuid: cmp, envUuid: env } });
+                console.log('deletePurchasePerformaInvoiceLine resp ->', resp);
                 // remove locally
                 setItems(prev => prev.filter(r => r.id !== id));
                 // refresh header totals after delete
@@ -805,7 +840,7 @@ const AddSalesPerfomaInvoice = () => {
             if (!hid) return;
             const cmp = await getCMPUUID();
             const env = await getENVUUID();
-            const hResp = await getSalesPerformaInvoiceHeaderById({ headerUuid: hid, cmpUuid: cmp, envUuid: env });
+            const hResp = await getPurchasePerformaInvoiceHeaderById({ headerUuid: hid, cmpUuid: cmp, envUuid: env });
             const hData = hResp?.Data || hResp || null;
             if (!hData) return;
             const headerTax = hData?.TotalTax ?? hData?.TaxAmount ?? hData?.HeaderTotalTax ?? 0;
@@ -932,7 +967,7 @@ const AddSalesPerfomaInvoice = () => {
 
                 // If serverLineUuid exists, call update API, otherwise just update locally
                 if (existing.serverLineUuid) {
-                    const resp = await updateSalesPerformaInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
+                    const resp = await updatePurchasePerformaInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
                     console.log('update line resp ->', resp);
                     const updatedLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || existing.serverLineUuid;
                     setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid }) : it));
@@ -1014,14 +1049,14 @@ const AddSalesPerfomaInvoice = () => {
                 TermsConditions: terms || '',
                 SubTotal: parseFloat(computeSubtotal()) || 0,
                 TotalTax: parseFloat(totalTax) || 0,
-                TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax) || 0),
+                TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) - (parseFloat(discount) || 0) + (parseFloat(totalTax) || 0),
                 FilePath: file?.uri || file?.name || '',
                 Notes: notes || '',
             };
 
             console.log('Final submit - update header payload ->', payload);
-            const resp = await updateSalesPerformaInvoiceHeader(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
-            console.log('updateSalesPerformaInvoiceHeader resp ->', resp);
+            const resp = await updatePurchasePerformaInvoiceHeader(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
+            console.log('updatePurchasePerformaInvoiceHeader resp ->', resp);
             Alert.alert('Success', 'Performa header updated successfully');
             // Refresh header totals from server after update
             await refreshHeaderTotals(headerUUID);
@@ -1060,7 +1095,7 @@ const AddSalesPerfomaInvoice = () => {
                 UUID: headerUUID || headerForm.UUID || '',
                 InvoiceNo: headerForm.salesInquiryText || '',
                 PurchaseInqNoUUID: salesInquiryUuid || headerForm.salesInquiryUUID || '',
-                PurchaseOrderNo: salesOrderUuid || headerForm.clientName || '',
+                PurchaseOrderNo: purchaseOrderUuid || salesOrderUuid || headerForm.clientName || '',
                 VendorUUID: headerForm.CustomerUUID || headerForm.CustomerUUID || '',
                 VendorName: headerForm.CustomerName || headerForm.CustomerName || '',
                 ProjectUUID: projectUUID || project || '',
@@ -1074,12 +1109,12 @@ const AddSalesPerfomaInvoice = () => {
                 // AdjustmentField: adjustmentLabel || '',
                 // AdjustmentPrice: parseFloat(adjustments) || 0,
                 TermsConditions: terms || '',
-                Discount: 0,
+                Discount: parseFloat(discount) || 0,
                 OrderDate: uiDateToApiDate(invoiceDate),
                 FilePath: file?.uri || file?.name || '',
                 SubTotal: parseFloat(computeSubtotal()) || 0,
                 TotalTax: parseFloat(totalTax) || 0,
-                TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax) || 0),
+                TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) - (parseFloat(discount) || 0) + (parseFloat(totalTax) || 0),
                 IsActive: true,
                 IsDisplay: true,
             };
@@ -1122,7 +1157,7 @@ const AddSalesPerfomaInvoice = () => {
                 UUID: headerUUID || headerForm.UUID || '',
                 InvoiceNo: headerForm.salesInquiryText || '',
                 PurchaseInqNoUUID: salesInquiryUuid || headerForm.salesInquiryUUID || '',
-                PurchaseOrderNo: salesOrderUuid || headerForm.clientName || '',
+                PurchaseOrderNo: purchaseOrderUuid || salesOrderUuid || headerForm.clientName || '',
                 VendorUUID: headerForm.CustomerUUID || headerForm.CustomerUUID || '',
                 VendorName: headerForm.CustomerName || headerForm.CustomerName || '',
                 ProjectUUID: projectUUID || project || '',
@@ -1131,21 +1166,18 @@ const AddSalesPerfomaInvoice = () => {
                 PaymentMode: paymentMethodUUID || paymentMethod || '',
                 OrderDate: uiDateToApiDate(invoiceDate),
                 Note: notes || '',
-                ShippingCharges: parseFloat(shippingCharges) || 0,
-                AdjustmentField: adjustmentLabel || '',
-                AdjustmentPrice: parseFloat(adjustments) || 0,
                 TermsConditions: terms || '',
                 FilePath: file?.uri || file?.name || '',
                 SubTotal: parseFloat(computeSubtotal()) || 0,
                 TotalTax: parseFloat(totalTax) || 0,
-                TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax) || 0),
-                Discount: 0,
+                TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) - (parseFloat(discount) || 0) + (parseFloat(totalTax) || 0),
+                Discount: parseFloat(discount) || 0,
                 IsActive: true,
                 IsDisplay: true,
             };
             console.log('updateHeader payload ->', payload);
 
-            const resp = await updateSalesPerformaInvoiceHeader(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
+            const resp = await updatePurchasePerformaInvoiceHeader(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
             console.log('updateHeader resp ->', resp);
             Alert.alert('Success', 'Header updated successfully');
             setHeaderEditable(false);
@@ -1321,16 +1353,34 @@ const AddSalesPerfomaInvoice = () => {
                             <View style={styles.col}>
                                 <Text style={[inputStyles.label,]}>Purchase Order Number* </Text>
 
-                                <View style={[inputStyles.box, { marginTop: hp(1) }]} pointerEvents="box-none">
-                                    <TextInput
-                                        style={[inputStyles.input, { flex: 1, color: '#000000' }]}
-                                        value={1}
-                                        onChangeText={v => setHeaderForm(s => ({ ...s, salesInquiryText: v }))}
-                                        placeholder="eg."
-                                        placeholderTextColor={COLORS.textLight}
-                                        editable={headerEditable}
-                                    />
-                                </View>
+                                {headerSubmitted && !headerEditable ? (
+                                    <View style={[inputStyles.box, { marginTop: hp(1) }]} pointerEvents="none">
+                                        <Text style={[inputStyles.input, { color: '#000' }]}>{headerForm?.SalesOrderNo || headerForm?.PurchaseOrderNo || headerForm?.clientName || ''}</Text>
+                                    </View>
+                                ) : (
+                                    <View style={{ zIndex: 9999, elevation: 20 }}>
+                                        <Dropdown
+                                            placeholder="Select Purchase Order"
+                                            value={headerForm?.SalesOrderNo || headerForm?.PurchaseOrderNo}
+                                            options={purchaseOrderOptions}
+                                            getLabel={p => (p?.OrderNo || String(p))}
+                                            getKey={p => (p?.UUID || p)}
+                                            onSelect={v => {
+                                                if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
+                                                if (v && typeof v === 'object') {
+                                                    setHeaderForm(s => ({ ...s, SalesOrderNo: v?.OrderNo || v?.PurchaseOrderNo || String(v) }));
+                                                    setPurchaseOrderUuid(v?.UUID || v?.Id || null);
+                                                } else {
+                                                    setHeaderForm(s => ({ ...s, SalesOrderNo: v }));
+                                                    setPurchaseOrderUuid(null);
+                                                }
+                                            }}
+                                            inputBoxStyle={[inputStyles.box, { marginTop: hp(1) }]}
+                                            textStyle={inputStyles.input}
+                                            renderInModal={true}
+                                        />
+                                    </View>
+                                )}
                             </View>
                             {/* )} */}
 
@@ -1798,119 +1848,19 @@ const AddSalesPerfomaInvoice = () => {
                                 <Text style={styles.valueBold}>₹{computeSubtotal()}</Text>
                             </View>
 
-                            {/* Shipping Charges */}
-                            <View style={styles.rowInput}>
-                                <Text style={styles.label}>Shipping Charges :</Text>
-
+                            {/* Discount */}
+                            <View style={styles.row}>
+                                <Text style={styles.label}>Discount:</Text>
                                 <View style={styles.inputRightGroup}>
                                     <TextInput
-                                        value={String(shippingCharges)}
-                                        onChangeText={setShippingCharges}
-                                        keyboardType="numeric"
-                                        style={[styles.inputBox, { color: '#000000' }]}
-                                    />
-
-                                    {/* Question Icon with Tooltip */}
-                                    <View style={styles.helpIconWrapper}>
-                                        <TouchableOpacity
-                                            onPress={() => {
-                                                setShowShippingTip(!showShippingTip);
-                                                setShowAdjustmentTip(false);
-                                            }}
-                                            style={styles.helpIconContainer}
-                                        >
-                                            <Text style={styles.helpIcon}>?</Text>
-                                        </TouchableOpacity>
-
-                                        {/* Tooltip */}
-                                        {showShippingTip && (
-                                            <>
-                                                <Modal
-                                                    transparent
-                                                    visible={showShippingTip}
-                                                    animationType="none"
-                                                    onRequestClose={() => setShowShippingTip(false)}
-                                                >
-                                                    <TouchableWithoutFeedback
-                                                        onPress={() => setShowShippingTip(false)}
-                                                    >
-                                                        <View style={styles.modalOverlay} />
-                                                    </TouchableWithoutFeedback>
-                                                </Modal>
-                                                <View style={styles.tooltipBox}>
-                                                    <Text style={styles.tooltipText}>
-                                                        Amount spent on shipping the goods.
-                                                    </Text>
-                                                    <View style={styles.tooltipArrow} />
-                                                </View>
-                                            </>
-                                        )}
-                                    </View>
-                                </View>
-
-                                <Text style={styles.value}>
-                                    ₹{parseFloat(shippingCharges || 0).toFixed(2)}
-                                </Text>
-                            </View>
-
-                            {/* Adjustments */}
-                            <View style={styles.rowInput}>
-                                <TextInput
-                                    value={adjustmentLabel}
-                                    onChangeText={setAdjustmentLabel}
-                                    underlineColorAndroid="transparent"
-                                    style={styles.labelInput}
-                                />
-
-                                <View style={styles.inputRightGroup}>
-                                    <TextInput
-                                        value={String(adjustments)}
-                                        onChangeText={setAdjustments}
+                                        value={String(discount)}
+                                        onChangeText={setDiscount}
                                         keyboardType="numeric"
                                         style={styles.inputBox}
                                     />
-                                    {/* Question Icon with Tooltip */}
-                                    <View style={styles.helpIconWrapper}>
-                                        <TouchableOpacity
-                                            onPress={() => {
-                                                setShowAdjustmentTip(!showAdjustmentTip);
-                                                setShowShippingTip(false);
-                                            }}
-                                            style={styles.helpIconContainer}
-                                        >
-                                            <Text style={styles.helpIcon}>?</Text>
-                                        </TouchableOpacity>
-
-                                        {/* Tooltip */}
-                                        {showAdjustmentTip && (
-                                            <>
-                                                <Modal
-                                                    transparent
-                                                    visible={showAdjustmentTip}
-                                                    animationType="none"
-                                                    onRequestClose={() => setShowAdjustmentTip(false)}
-                                                >
-                                                    <TouchableWithoutFeedback
-                                                        onPress={() => setShowAdjustmentTip(false)}
-                                                    >
-                                                        <View style={styles.modalOverlay} />
-                                                    </TouchableWithoutFeedback>
-                                                </Modal>
-                                                <View style={styles.tooltipBox}>
-                                                    <Text style={styles.tooltipText}>
-                                                        Additional charges or discounts applied to the
-                                                        order.
-                                                    </Text>
-                                                    <View style={styles.tooltipArrow} />
-                                                </View>
-                                            </>
-                                        )}
-                                    </View>
                                 </View>
 
-                                <Text style={styles.value}>
-                                    ₹{parseFloat(adjustments || 0).toFixed(2)}
-                                </Text>
+                                <Text style={styles.value}>- ₹{parseFloat(discount || 0).toFixed(2)}</Text>
                             </View>
 
                             {/* Total Tax */}
@@ -1931,12 +1881,13 @@ const AddSalesPerfomaInvoice = () => {
                                         const serverNum = (serverTotalAmount !== null && serverTotalAmount !== undefined && String(serverTotalAmount).trim() !== '') ? parseFloat(serverTotalAmount) : NaN;
                                         const shippingNum = parseFloat(shippingCharges) || 0;
                                         const adjustmentsNum = parseFloat(adjustments) || 0;
+                                        const discountNum = parseFloat(discount) || 0;
                                         const subtotalNum = parseFloat(computeSubtotal()) || 0;
                                         const totalTaxNum = parseFloat(totalTax) || 0;
 
                                         if (!isNaN(serverNum)) {
                                             // Determine whether serverTotalAmount already includes tax/shipping/adjustments
-                                            const delta = serverNum - subtotalNum - shippingNum - adjustmentsNum;
+                                            const delta = serverNum - subtotalNum - shippingNum - adjustmentsNum + discountNum;
                                             const eps = Math.max(0.01, Math.abs(totalTaxNum) * 0.01);
                                             // If delta roughly equals totalTaxNum, server total already includes tax -> don't add it again
                                             if (!isNaN(delta) && Math.abs(delta - totalTaxNum) <= eps) {
@@ -1946,7 +1897,7 @@ const AddSalesPerfomaInvoice = () => {
                                             return (serverNum + totalTaxNum).toFixed(2);
                                         }
 
-                                        const displayed = subtotalNum + shippingNum + adjustmentsNum + totalTaxNum;
+                                        const displayed = subtotalNum + shippingNum + adjustmentsNum - discountNum + totalTaxNum;
                                         return displayed.toFixed(2);
                                     })()}
                                 </Text>
