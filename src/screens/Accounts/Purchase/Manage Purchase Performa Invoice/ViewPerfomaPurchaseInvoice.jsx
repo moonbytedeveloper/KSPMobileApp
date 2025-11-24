@@ -6,6 +6,7 @@ import AccordionItem from '../../../../components/common/AccordionItem';
 import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
+import { getPurchasePerformaInvoiceHeaders } from '../../../../api/authServices';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 
 const SALES_ORDERS = [
@@ -80,20 +81,17 @@ const ViewPerfomaPurchaseInvoice = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [itemsPerPage, setItemsPerPage] = useState(Number(ITEMS_PER_PAGE_OPTIONS[1]));
     const [currentPage, setCurrentPage] = useState(0);
+    const [orders, setOrders] = useState([]);
+    const [totalCount, setTotalCount] = useState(0);
+    const [loading, setLoading] = useState(false);
 
-    const filteredOrders = useMemo(() => {
-        const query = searchQuery.trim().toLowerCase();
-        if (!query) return SALES_ORDERS;
-        return SALES_ORDERS.filter((order) => {
-            const haystack = `${order.salesOrderNumber} ${order.customerName} ${order.contactPerson} ${order.status}`.toLowerCase();
-            return haystack.includes(query);
-        });
-    }, [searchQuery]);
+    // Orders are fetched from API; filtering/search handled server-side via `searchQuery` param
+    const filteredOrders = orders || [];
 
     const totalPages = useMemo(() => {
-        if (filteredOrders.length === 0) return 0;
-        return Math.ceil(filteredOrders.length / itemsPerPage);
-    }, [filteredOrders.length, itemsPerPage]);
+        if (!totalCount || totalCount === 0) return 0;
+        return Math.ceil(totalCount / itemsPerPage);
+    }, [totalCount, itemsPerPage]);
 
     useEffect(() => {
         if (totalPages === 0) {
@@ -105,13 +103,37 @@ const ViewPerfomaPurchaseInvoice = () => {
         }
     }, [totalPages, currentPage]);
 
-    const paginatedOrders = useMemo(() => {
-        const start = currentPage * itemsPerPage;
-        return filteredOrders.slice(start, start + itemsPerPage);
-    }, [filteredOrders, currentPage, itemsPerPage]);
+    // When using server pagination, `orders` already represents the current page
+    const paginatedOrders = filteredOrders;
 
-    const rangeStart = filteredOrders.length === 0 ? 0 : currentPage * itemsPerPage + 1;
-    const rangeEnd = filteredOrders.length === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, filteredOrders.length);
+    const rangeStart = totalCount === 0 ? 0 : currentPage * itemsPerPage + 1;
+    const rangeEnd = totalCount === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, totalCount);
+
+    // Fetch orders from server when pagination or search changes
+    useEffect(() => {
+        let mounted = true;
+        const fetchOrders = async () => {
+            setLoading(true);
+            try {
+                const start = currentPage * itemsPerPage;
+                const resp = await getPurchasePerformaInvoiceHeaders({ start, length: itemsPerPage, searchValue: searchQuery });
+                // Normalise response shapes. API returns an object with `Data` containing `Records` and `TotalCount`.
+                const respRoot = resp && (resp.Data || resp.data || resp) || {};
+                const dataArray = respRoot.Records || respRoot.Data || respRoot.items || respRoot.Items || respRoot.Result || [];
+                const total = respRoot.TotalCount ?? respRoot.RecordsTotal ?? respRoot.RecordsFiltered ?? respRoot.TotalRecords ?? respRoot.Total ?? (Array.isArray(dataArray) ? dataArray.length : 0);
+                if (!mounted) return;
+                setOrders(Array.isArray(dataArray) ? dataArray : []);
+                setTotalCount(Number(total) || (Array.isArray(dataArray) ? dataArray.length : 0));
+                console.log(resp, 'resp');
+            } catch (err) {
+                console.error('Error fetching purchase performa invoice headers ->', err && (err.message || err));
+            } finally {
+                if (mounted) setLoading(false);
+            }
+        };
+        fetchOrders();
+        return () => { mounted = false; };
+    }, [itemsPerPage, currentPage, searchQuery]);
 
     const handleQuickAction = (order, actionLabel) => {
         Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber}`);
@@ -213,30 +235,40 @@ const ViewPerfomaPurchaseInvoice = () => {
             </View>
 
             <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-                {paginatedOrders.map((order) => (
-                    <AccordionItem
-                        key={order.id}
-                        item={{
-                            soleExpenseCode: order.id,
-                            expenseName: order.salesOrderNumber,
-                            amount: order.amount,
-                        }}
-                        isActive={activeOrderId === order.id}
-                        onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
-                        customRows={[
-                            { label: 'Vendor Name', value: order.customerName },
-                            { label: 'Purchase Order', value: order.amount },
-                            { label: 'Tax Invoice', value: 'Kalpesh' },
-                            { label: 'Delivery Date', value: order.deliveryDate },
-                            { label: 'Performa Invoice Number', value: order.performaInvoiceNumber },
+                {paginatedOrders.map((order) => {
+                    const id = order.HeaderUUID || order.UUID || order.id || order.headerUuid || order.HeaderId || order.Id || (order.PerformaInvoiceHeaderUUID || null);
+                    const salesOrderNumber = order.SalesOrderNumber || order.PurchaseOrderNumber || order.HeaderNumber || order.DocumentNo || order.Code || order.salesOrderNumber || '';
+                    const customerName = order.VendorName || order.SupplierName || order.CustomerName || order.PartyName || order.customerName || '';
+                    const deliveryDate = order.DeliveryDate || order.DueDate || order.deliveryDate || '';
+                    const performaInvoiceNumber = order.PerformaInvoiceNumber || order.PerformaInvoiceNo || order.PerformaInvoice || order.performaInvoiceNumber || '';
+                    const amount = order.GrandTotal || order.Amount || order.Total || order.amount || '';
+                    // New fields from API: InvoiceNo and OrderDate
+                    const invoiceNo = order.InvoiceNo || order.InvoiceNumber || order.PerformaInvoiceNo || performaInvoiceNumber || '';
+                    const PurchaseOrderNo = order.PurchaseOrderNo || order.PurchaseOrderNo || order.PurchaseOrderNo  || '';
+                    const orderDate = order.OrderDate || order.Order_On || order.OrderedDate || order.Ordered_On || '';
 
-                        ]} 
-                        headerLeftLabel="Purchase Order"
-                        headerRightLabel="Perfoma Invoice No."
-                        footerComponent={renderFooterActions(order)}
-                        headerRightContainerStyle={styles.headerRightContainer}
-                    />
-                ))}
+                    return (
+                        <AccordionItem
+                            key={id || JSON.stringify(order)}
+                            item={{
+                                soleExpenseCode: id,
+                                expenseName: PurchaseOrderNo,
+                                amount: invoiceNo,
+                            }}
+                            isActive={activeOrderId === id}
+                            onToggle={() => setActiveOrderId((prev) => (prev === id ? null : id))}
+                            customRows={[
+                                { label: 'Vendor Name', value: customerName },
+                                { label: 'Invoice No', value: invoiceNo },
+                                { label: 'Order Date', value: orderDate },
+                            ]}
+                            headerLeftLabel="Purchase Order"
+                            headerRightLabel="Perfoma Invoice No."
+                            footerComponent={renderFooterActions(order)}
+                            headerRightContainerStyle={styles.headerRightContainer}
+                        />
+                    );
+                })}
 
                 {paginatedOrders.length === 0 && (
                     <View style={styles.emptyState}>
@@ -248,10 +280,10 @@ const ViewPerfomaPurchaseInvoice = () => {
                 )}
             </ScrollView>
 
-            {filteredOrders.length > 0 && (
+            {totalCount > 0 && (
                 <View style={styles.paginationContainer}>
                     <Text style={styles.pageInfoText}>
-                        Showing {filteredOrders.length === 0 ? 0 : rangeStart} to {rangeEnd} of {filteredOrders.length} entries
+                        Showing {totalCount === 0 ? 0 : rangeStart} to {rangeEnd} of {totalCount} entries
                     </Text>
                     <View style={styles.paginationButtons}>
                         {pageItems.map((item, idx) => {
