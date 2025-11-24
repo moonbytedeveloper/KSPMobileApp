@@ -621,12 +621,14 @@ const AddSalesInquiry = () => {
         <>
             <View style={{ flex: 1, backgroundColor: '#fff' }}>
 
-                <AppHeader
-                    title="Add Sales Inquiry"
-                    onLeftPress={() => { 
-                            navigation.goBack();
-                    }}
-                />
+                    <AppHeader
+          title="Add Sales Inquiry"
+          onLeftPress={() => {
+              navigation.goBack();
+          
+          }}
+        />
+              
                 <View style={styles.headerSeparator} />
                 <ScrollView contentContainerStyle={[styles.container]} showsVerticalScrollIndicator={false}>
                     {/* Section 1: HEADER */}

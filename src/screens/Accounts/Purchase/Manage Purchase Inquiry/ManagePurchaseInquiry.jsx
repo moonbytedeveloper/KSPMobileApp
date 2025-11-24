@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import Dropdown from '../../../../components/common/Dropdown';
@@ -8,6 +8,7 @@ import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
+import { getCurrencies, getPurchaseItemTypes } from '../../../../api/authServices';
 
 const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyle }) => {
     return (
@@ -29,9 +30,10 @@ const ManagePurchaseInquiry = () => {
     const navigation = useNavigation();
     const toggleSection = (id) => setExpandedId((prev) => (prev === id ? null : id));
 
-    // Demo options for dropdowns
-    const currencyTypes = ['USD', 'INR', 'EUR', 'GBP'];
-    const itemTypes = ['Furniture', 'Electronics', 'Office Supplies', 'Equipment'];
+    // Currency options (fetched from API)
+    const [currencyTypes, setCurrencyTypes] = useState([]);
+    // Item types (fetched from API)
+    const [itemTypes, setItemTypes] = useState([]);
     const itemNames = [ 'Chair', 'Table', 'Desk', 'Cabinet'];
     const CustomerType = [ 'Abhinav','Raj',];
     const countries = [ 'India', 'United States', 'United Kingdom', 'Australia', 'Germany'];
@@ -103,6 +105,54 @@ const ManagePurchaseInquiry = () => {
         setOpenDatePicker(false);
         setDatePickerField(null);
     };
+
+    // Fetch currencies on mount and populate dropdown
+    useEffect(() => {
+        let mounted = true;
+        const load = async () => {
+            try {
+                const res = await getCurrencies();
+                console.log('getCurrencies response ->', res);
+                const list = res?.Data || res || [];
+                if (!mounted) return;
+                const mapped = (Array.isArray(list) ? list : []).map(it => {
+                    if (!it) return '';
+                    if (typeof it === 'string') return it;
+                    return it.Currency || it.CurrencyCode || it.Code || it.Name || it.CurrencyName || it.Value || '';
+                }).filter(Boolean);
+                setCurrencyTypes(mapped);
+            } catch (err) {
+                console.warn('Error loading currencies', err);
+            }
+        };
+        load();
+        return () => { mounted = false; };
+    }, []);
+
+    // Fetch purchase item types on mount and populate dropdown
+    useEffect(() => {
+        let mounted = true;
+        const load = async () => {
+            try {
+                const resp = await getPurchaseItemTypes();
+                console.log('getPurchaseItemTypes response ->', resp);
+                const list = resp?.Data || resp || [];
+                if (!mounted) return;
+                const mapped = (Array.isArray(list) ? list : []).map(it => {
+                    if (!it) return '';
+                    if (typeof it === 'string') return it.toString().trim();
+                    const v = it.Name || it.ItemType || it.Value || it.Text || it.Label || it.Type || it.ItemTypeName || '';
+                    return v ? String(v).trim() : '';
+                }).filter(Boolean);
+                const unique = Array.from(new Set(mapped));
+                setItemTypes(unique);
+            } catch (err) {
+                console.warn('Error loading purchase item types', err);
+            }
+        };
+        load();
+        return () => { mounted = false; };
+    }, []);
 
     const handleAddItem = () => {
         if (!currentItem.itemType || !currentItem.itemName || !currentItem.quantity || !currentItem.unit) {
