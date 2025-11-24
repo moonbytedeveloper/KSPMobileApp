@@ -6,7 +6,7 @@ import AccordionItem from '../../../../components/common/AccordionItem';
 import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
-import { getPurchasePerformaInvoiceHeaders } from '../../../../api/authServices';
+import { getPurchasePerformaInvoiceHeaders, deletePurchasePerformaInvoiceHeader } from '../../../../api/authServices';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 
 const SALES_ORDERS = [
@@ -110,30 +110,38 @@ const ViewPerfomaPurchaseInvoice = () => {
     const rangeEnd = totalCount === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, totalCount);
 
     // Fetch orders from server when pagination or search changes
+    // Reusable loader so other events (like navigation focus) can request a refresh
+    const loadOrders = async () => {
+        setLoading(true);
+        try {
+            const start = currentPage * itemsPerPage;
+            const resp = await getPurchasePerformaInvoiceHeaders({ start, length: itemsPerPage, searchValue: searchQuery });
+            // Normalise response shapes. API returns an object with `Data` containing `Records` and `TotalCount`.
+            const respRoot = resp && (resp.Data || resp.data || resp) || {};
+            const dataArray = respRoot.Records || respRoot.Data || respRoot.items || respRoot.Items || respRoot.Result || [];
+            const total = respRoot.TotalCount ?? respRoot.RecordsTotal ?? respRoot.RecordsFiltered ?? respRoot.TotalRecords ?? respRoot.Total ?? (Array.isArray(dataArray) ? dataArray.length : 0);
+            setOrders(Array.isArray(dataArray) ? dataArray : []);
+            setTotalCount(Number(total) || (Array.isArray(dataArray) ? dataArray.length : 0));
+            console.log(resp, 'resp');
+        } catch (err) {
+            console.error('Error fetching purchase performa invoice headers ->', err && (err.message || err));
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        let mounted = true;
-        const fetchOrders = async () => {
-            setLoading(true);
-            try {
-                const start = currentPage * itemsPerPage;
-                const resp = await getPurchasePerformaInvoiceHeaders({ start, length: itemsPerPage, searchValue: searchQuery });
-                // Normalise response shapes. API returns an object with `Data` containing `Records` and `TotalCount`.
-                const respRoot = resp && (resp.Data || resp.data || resp) || {};
-                const dataArray = respRoot.Records || respRoot.Data || respRoot.items || respRoot.Items || respRoot.Result || [];
-                const total = respRoot.TotalCount ?? respRoot.RecordsTotal ?? respRoot.RecordsFiltered ?? respRoot.TotalRecords ?? respRoot.Total ?? (Array.isArray(dataArray) ? dataArray.length : 0);
-                if (!mounted) return;
-                setOrders(Array.isArray(dataArray) ? dataArray : []);
-                setTotalCount(Number(total) || (Array.isArray(dataArray) ? dataArray.length : 0));
-                console.log(resp, 'resp');
-            } catch (err) {
-                console.error('Error fetching purchase performa invoice headers ->', err && (err.message || err));
-            } finally {
-                if (mounted) setLoading(false);
-            }
-        };
-        fetchOrders();
-        return () => { mounted = false; };
+        // initial load and when pagination/search changes
+        loadOrders();
     }, [itemsPerPage, currentPage, searchQuery]);
+
+    // Reload when screen gains focus (for example after returning from Add screen)
+    useEffect(() => {
+        const unsub = navigation.addListener('focus', () => {
+            loadOrders();
+        });
+        return unsub;
+    }, [navigation, itemsPerPage, currentPage, searchQuery]);
 
     const handleQuickAction = (order, actionLabel) => {
         Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber}`);
@@ -141,21 +149,67 @@ const ViewPerfomaPurchaseInvoice = () => {
 
     const renderFooterActions = (order) => {
         const buttons = [
-            { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444', action: 'Delete' },
-            { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6', action: 'Download' },
-            // { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280', action: 'Forward' },
-            { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E', action: 'View' },
-            // { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316', action: 'Update Status'  },
+            { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
+            { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
+            // { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
+            { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
+            { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316' },
         ];
 
         return (
             <View style={styles.cardActionRow}>
                 {buttons.map((btn) => (
                     <TouchableOpacity
-                        key={`${order.id}-${btn.icon}`}
+                        key={`${order.UUID || order.HeaderUUID || order.id || JSON.stringify(order)}-${btn.icon}`}
                         activeOpacity={0.85}
                         style={[styles.cardActionBtn , { backgroundColor: btn.bg, borderColor: btn.border }]}
-                        onPress={() => handleQuickAction(order, btn.action)}
+                        onPress={() => {
+                            if (btn.action === 'Edit') {
+                                try {
+                                    const headerUuid = order.UUID || order.HeaderUUID || order.id || null;
+                                    navigation.navigate('AddPerfomaPurchaseInvoice', { prefillHeader: order, headerUuid });
+                                } catch (e) {
+                                    console.warn('Failed to navigate to AddPerfomaPurchaseInvoice', e);
+                                    handleQuickAction(order, 'Edit');
+                                }
+                                return;
+                            }
+
+                            if (btn.action === 'Delete') {
+                                // Confirm then call API
+                                Alert.alert(
+                                    'Confirm Delete',
+                                    'Are you sure you want to delete this header?',
+                                    [
+                                        { text: 'Cancel', style: 'cancel' },
+                                        {
+                                            text: 'Delete',
+                                            style: 'destructive',
+                                            onPress: async () => {
+                                                try {
+                                                    const headerUuid = order.UUID || order.HeaderUUID || order.id || null;
+                                                    if (!headerUuid) throw new Error('No header UUID found');
+                                                    await deletePurchasePerformaInvoiceHeader({ headerUuid });
+                                                    // remove from local list
+                                                    setOrders(prev => Array.isArray(prev) ? prev.filter(o => {
+                                                        const id = o.HeaderUUID || o.UUID || o.id || o.headerUuid || o.HeaderId || o.Id;
+                                                        return id !== (order.HeaderUUID || order.UUID || order.id || order.headerUuid || order.HeaderId || order.Id);
+                                                    }) : []);
+                                                    setTotalCount(c => Math.max(0, (c || 1) - 1));
+                                                    Alert.alert('Deleted', 'Header deleted successfully');
+                                                } catch (e) {
+                                                    console.error('Delete error ->', e);
+                                                    Alert.alert('Error', e?.message || 'Unable to delete header');
+                                                }
+                                            }
+                                        }
+                                    ],
+                                );
+                                return;
+                            }
+
+                            handleQuickAction(order, btn.action);
+                        }}
                     >
                         <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
                     </TouchableOpacity>
@@ -246,13 +300,15 @@ const ViewPerfomaPurchaseInvoice = () => {
                     const invoiceNo = order.InvoiceNo || order.InvoiceNumber || order.PerformaInvoiceNo || performaInvoiceNumber || '';
                     const PurchaseOrderNo = order.PurchaseOrderNo || order.PurchaseOrderNo || order.PurchaseOrderNo  || '';
                     const orderDate = order.OrderDate || order.Order_On || order.OrderedDate || order.Ordered_On || '';
+                    const projectName = order.ProjectName || order.ProjectTitle || order.Project || order.Project_Name || order.ProjectTitleName || '';
 
                     return (
                         <AccordionItem
                             key={id || JSON.stringify(order)}
                             item={{
                                 soleExpenseCode: id,
-                                expenseName: PurchaseOrderNo,
+                                // Show project name in the left header; fallback to purchase order no.
+                                expenseName: projectName || PurchaseOrderNo,
                                 amount: invoiceNo,
                             }}
                             isActive={activeOrderId === id}
@@ -262,7 +318,7 @@ const ViewPerfomaPurchaseInvoice = () => {
                                 { label: 'Invoice No', value: invoiceNo },
                                 { label: 'Order Date', value: orderDate },
                             ]}
-                            headerLeftLabel="Purchase Order"
+                            headerLeftLabel="Project"
                             headerRightLabel="Perfoma Invoice No."
                             footerComponent={renderFooterActions(order)}
                             headerRightContainerStyle={styles.headerRightContainer}

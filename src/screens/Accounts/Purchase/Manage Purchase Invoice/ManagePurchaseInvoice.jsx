@@ -5,69 +5,13 @@ import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
 import Dropdown from '../../../../components/common/Dropdown';
+import { getPurchaseInvoiceHeaders, deletePurchaseInvoiceHeader } from '../../../../api/authServices';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 
-const SALES_ORDERS = [
-    {
-        id: 'KP1524',
-        salesOrderNumber: 'KP1524',
-        customerName: 'Moonbyte',
-        deliveryDate: '15-12-24',
-        dueDate: '15-12-24',
-        salesInvoiceNumber: 'OR.002',
-        parchase: 'Kalpesh',
-     
-    },
-    {
-        id: 'KP1525',
-        salesOrderNumber: 'KP1525',
-        customerName: 'Northwind Retail',
-        deliveryDate: '04-01-25',
-        dueDate: '20-12-24',
-        salesInvoiceNumber: 'OR.002',
-        parchase: 'Kalpesh',
-
-    },
-    {
-        id: 'KP1526',
-        salesOrderNumber: 'KP1526',
-        customerName: 'Creative Labs',
-        deliveryDate: '22-12-24',
-        dueDate: '18-12-24',
-        salesInvoiceNumber: 'OR.002',
-        parchase: 'Kalpesh',
-
-    },
-    {
-        id: 'KP1527',
-        salesOrderNumber: 'KP1527',
-        customerName: 'BlueStone Pvt Ltd',
-        deliveryDate: '11-01-25',
-        dueDate: '28-12-24',
-        salesInvoiceNumber: 'OR.002',
-        parchase: 'Kalpesh',
-    },
-    {
-        id: 'KP1528',
-        salesOrderNumber: 'KP1528',
-        customerName: 'Aero Technologies',
-        deliveryDate: '29-12-24',
-        dueDate: '24-12-24',
-        salesInvoiceNumber: 'OR.002',
-        parchase: 'Kalpesh',
-    },
-    {
-        id: 'KP1529',
-        salesOrderNumber: 'KP1529',
-        customerName: 'UrbanNest Homes',
-        deliveryDate: '05-02-25',
-        dueDate: '12-01-25',
-        salesInvoiceNumber: '₹1,85,300',
-        parchase: 'Kalpesh',
-    },
-];
+// server-driven orders
+// each record may contain fields like UUID / HeaderUUID / id, InvoiceNo, OrderDate, VendorName, ProjectName, TotalAmount
 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 
@@ -77,20 +21,14 @@ const ManagePurchaseInvoice = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [itemsPerPage, setItemsPerPage] = useState(Number(ITEMS_PER_PAGE_OPTIONS[1]));
     const [currentPage, setCurrentPage] = useState(0);
-
-    const filteredOrders = useMemo(() => {
-        const query = searchQuery.trim().toLowerCase();
-        if (!query) return SALES_ORDERS;
-        return SALES_ORDERS.filter((order) => {
-            const haystack = `${order.salesOrderNumber} ${order.customerName} ${order.contactPerson} ${order.status}`.toLowerCase();
-            return haystack.includes(query);
-        });
-    }, [searchQuery]);
+    const [orders, setOrders] = useState([]);
+    const [totalCount, setTotalCount] = useState(0);
+    const [loading, setLoading] = useState(false);
 
     const totalPages = useMemo(() => {
-        if (filteredOrders.length === 0) return 0;
-        return Math.ceil(filteredOrders.length / itemsPerPage);
-    }, [filteredOrders.length, itemsPerPage]);
+        if (totalCount === 0) return 0;
+        return Math.ceil(totalCount / itemsPerPage);
+    }, [totalCount, itemsPerPage]);
 
     useEffect(() => {
         if (totalPages === 0) {
@@ -102,35 +40,98 @@ const ManagePurchaseInvoice = () => {
         }
     }, [totalPages, currentPage]);
 
-    const paginatedOrders = useMemo(() => {
-        const start = currentPage * itemsPerPage;
-        return filteredOrders.slice(start, start + itemsPerPage);
-    }, [filteredOrders, currentPage, itemsPerPage]);
+    const rangeStart = totalCount === 0 ? 0 : currentPage * itemsPerPage + 1;
+    const rangeEnd = totalCount === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, totalCount);
 
-    const rangeStart = filteredOrders.length === 0 ? 0 : currentPage * itemsPerPage + 1;
-    const rangeEnd = filteredOrders.length === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, filteredOrders.length);
+    // load orders from server
+    const loadOrders = async () => {
+        try {
+            setLoading(true);
+            const start = currentPage * itemsPerPage;
+            const resp = await getPurchaseInvoiceHeaders({ start, length: itemsPerPage, searchValue: searchQuery });
+            // normalize response
+            console.log('getPurchaseInvoiceHeaders response ->', resp);
+            const data = resp && (resp.Data || resp) || {};
+            const records = data.Records || data.records || data.Items || data.items || data || [];
+            const total = data.TotalCount || data.totalCount || data.Total || data.total || (Array.isArray(records) ? records.length : 0);
+            setOrders(Array.isArray(records) ? records : []);
+            setTotalCount(Number.isFinite(total) ? total : (Array.isArray(records) ? records.length : 0));
+        } catch (err) {
+            console.error('loadOrders error ->', err && (err.message || err));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // reload when pagination, page size or search changes
+    useEffect(() => {
+        loadOrders();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentPage, itemsPerPage, searchQuery]);
 
     const handleQuickAction = (order, actionLabel) => {
-        Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber}`);
+        // Derive header UUID from several possible server field names (case variations)
+        const headerCandidate = order.HeaderUuid || order.HeaderUUID || order.Header_UUID || order.headerUuid || order.Header_Id || order.HeaderId || order.UUID || order.Uuid || order.Id || order.id || order.uuid || order.InvoiceNo || order.InvoiceNumber || null;
+        // If Edit pressed, navigate to AddPurchaseInvoice with multiple param names so receiver can pick the correct one
+        if (actionLabel === 'Edit') {
+            console.log('Navigating to AddPurchaseInvoice with headerUuid ->', headerCandidate);
+            navigation.navigate('AddPurchaseInvoice', {
+                headerUuid: headerCandidate,
+                HeaderUuid: headerCandidate,
+                HeaderUUID: headerCandidate,
+                UUID: headerCandidate,
+                from: 'ManagePurchaseInvoice',
+            });
+            return;
+        }
+        if (actionLabel === 'Delete') {
+            Alert.alert(
+                'Confirm delete',
+                `Delete purchase invoice ${order.InvoiceNo || order.InvoiceNumber || headerCandidate}?`,
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: async () => {
+                            try {
+                                console.log('[ManagePurchaseInvoice] Deleting header ->', headerCandidate);
+                                await deletePurchaseInvoiceHeader({ headerUuid: headerCandidate });
+                                Alert.alert('Deleted', 'Purchase invoice header deleted successfully');
+                                // reload list
+                                try { await loadOrders(); } catch (e) { console.warn('reload after delete failed', e); }
+                            } catch (err) {
+                                console.error('[ManagePurchaseInvoice] delete error ->', err);
+                                Alert.alert('Delete failed', err && (err.message || 'Unable to delete.'));
+                            }
+                        }
+                    }
+                ],
+                { cancelable: true }
+            );
+            return;
+        }
+        Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber || headerCandidate}`);
     };
 
     const renderFooterActions = (order) => {
         const buttons = [
-            { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444', action: 'Delete' },
-            { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6', action: 'Download' },
-            { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280', action: 'Forward' },
-            { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E', action: 'View' },
-            { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316', action: 'Update Status'  },
+            { icon: 'delete-outline', label: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
+            { icon: 'file-download', label: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
+            { icon: 'chat-bubble-outline', label: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
+            { icon: 'visibility', label: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
+            { icon: 'edit', label: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316' },
         ];
 
+    const safeKey = order.HeaderUuid || order.HeaderUUID || order.Header_UUID || order.headerUuid || order.UUID || order.Uuid || order.Id || order.id || order.InvoiceNo || order.InvoiceNumber || Math.random();
         return (
             <View style={styles.cardActionRow}>
                 {buttons.map((btn) => (
                     <TouchableOpacity
-                        key={`${order.id}-${btn.icon}`}
+                        key={`${safeKey}-${btn.icon}`}
                         activeOpacity={0.85}
                         style={[styles.cardActionBtn , { backgroundColor: btn.bg, borderColor: btn.border }]}
-                        onPress={() => handleQuickAction(order, btn.action)}
+                        onPress={() => handleQuickAction(order, btn.label)}
                     >
                         <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
                     </TouchableOpacity>
@@ -210,32 +211,43 @@ const ManagePurchaseInvoice = () => {
             </View>
 
             <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-                {paginatedOrders.map((order) => (
-                    <AccordionItem
-                        key={order.id}
-                        item={{
-                            soleExpenseCode: order.id,
-                            expenseName: order.salesOrderNumber,
-                            amount: order.salesInvoiceNumber,
-                        }}
-                        isActive={activeOrderId === order.id}
-                        onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
-                        customRows={[
-                            { label: 'Vendor Name', value: order.customerName },
-                            { label: 'Purchase Invoice Number', value: order.salesInvoiceNumber },
-                            { label: 'Delivery Date', value: order.deliveryDate },
-                            { label: 'Purchase Order', value: order.parchase },
+                {loading && (
+                    <View style={{ padding: hp(4), alignItems: 'center' }}>
+                        <Text>Loading...</Text>
+                    </View>
+                )}
+                {!loading && orders.map((order) => {
+                    const key = order.HeaderUuid || order.HeaderUUID || order.Header_UUID || order.headerUuid || order.UUID || order.Uuid || order.Id || order.id || order.uuid || String(order.InvoiceNo || order.InvoiceNumber || order.id || Math.random());
+                    const invoiceNo = order.InvoiceNo || order.InvoiceNumber || order.PurchaseInvoiceNo || '';
+                    const orderDate = order.OrderDate || order.InvoiceDate || order.Date || '';
+                    const vendorName = order.VendorName || order.Vendor || order.customerName || '';
+                    const projectName = order.ProjectName || order.Project || order.ProjectTitle || '';
 
-                            // { label: 'Due Date', value: order.dueDate },
-                        ]} 
-                        headerLeftLabel="Purchase Order"
-                        headerRightLabel="Purchase Invoice Number"
-                        footerComponent={renderFooterActions(order)}
-                        headerRightContainerStyle={styles.headerRightContainer}
-                    />
-                ))}
+                    return (
+                        <AccordionItem
+                            key={key}
+                            item={{
+                                soleExpenseCode: key,
+                                expenseName: projectName || invoiceNo,
+                                amount: invoiceNo,
+                            }}
+                            isActive={activeOrderId === key}
+                            onToggle={() => setActiveOrderId((prev) => (prev === key ? null : key))}
+                            customRows={[
+                                { label: 'Vendor Name', value: vendorName },
+                                { label: 'Purchase Invoice Number', value: invoiceNo },
+                                { label: 'Order Date', value: orderDate },
+                                { label: 'Total Amount', value: order.TotalAmount || order.Total || order.Amount || '' },
+                            ]}
+                            headerLeftLabel="Project"
+                            headerRightLabel="Purchase Invoice Number"
+                            footerComponent={renderFooterActions(order)}
+                            headerRightContainerStyle={styles.headerRightContainer}
+                        />
+                    );
+                })}
 
-                {paginatedOrders.length === 0 && (
+                {(!loading && orders.length === 0) && (
                     <View style={styles.emptyState}>
                         <Text style={styles.emptyStateTitle}>No Purchase orders found</Text>
                         <Text style={styles.emptyStateSubtitle}>
@@ -244,11 +256,10 @@ const ManagePurchaseInvoice = () => {
                     </View>
                 )}
             </ScrollView>
-
-            {filteredOrders.length > 0 && (
+            {totalCount > 0 && (
                 <View style={styles.paginationContainer}>
                     <Text style={styles.pageInfoText}>
-                        Showing {filteredOrders.length === 0 ? 0 : rangeStart} to {rangeEnd} of {filteredOrders.length} entries
+                        Showing {rangeStart} to {rangeEnd} of {totalCount} entries
                     </Text>
                     <View style={styles.paginationButtons}>
                         {pageItems.map((item, idx) => {
