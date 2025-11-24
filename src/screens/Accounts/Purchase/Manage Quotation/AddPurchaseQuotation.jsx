@@ -43,22 +43,29 @@ const AccordionSection = ({
   onToggle,
   children,
   wrapperStyle,
+  rightActions,
+  banner,
 }) => {
   return (
     <View style={[styles.sectionWrapper, wrapperStyle]}>
-     
       <TouchableOpacity
         activeOpacity={0.8}
         style={styles.sectionHeader}
         onPress={() => onToggle(id)}
       >
         <Text style={styles.sectionTitle}>{title}</Text>
-        <Icon
-          name={expanded ? 'expand-less' : 'expand-more'}
-          size={rf(4.2)}
-          color={COLORS.text}
-        />
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {rightActions ? (
+            <View style={{ marginRight: wp(2) }}>{rightActions}</View>
+          ) : null}
+          <Icon
+            name={expanded ? 'expand-less' : 'expand-more'}
+            size={rf(4.2)}
+            color={COLORS.text}
+          />
+        </View>
       </TouchableOpacity>
+      {banner ? <View style={styles.sectionBanner}>{banner}</View> : null}
       {expanded && <View style={styles.line} />}
       {expanded && <View style={styles.sectionBody}>{children}</View>}
     </View>
@@ -68,7 +75,23 @@ const AccordionSection = ({
 const AddPurchaseQuotation = () => {
   const [expandedId, setExpandedId] = useState(1);
   const navigation = useNavigation();
-  const toggleSection = id => setExpandedId(prev => (prev === id ? null : id));
+  // Header edit / submit state (mirror Sales Performa behavior)
+  const [headerSubmitted, setHeaderSubmitted] = useState(false);
+  const [headerEditable, setHeaderEditable] = useState(true);
+  const [headerSubmitting, setHeaderSubmitting] = useState(false);
+
+  const toggleSection = id => {
+    // Prevent opening header unless editable (user clicked Edit)
+    if (id === 1 && !headerEditable) return;
+
+    // If header has been submitted and is not editable, prevent opening other sections
+    if (typeof headerSubmitted !== 'undefined' && headerSubmitted && id !== 1) {
+      setExpandedId(null);
+      return;
+    }
+
+    setExpandedId(prev => (prev === id ? null : id));
+  };
 
   // Demo options for dropdowns
   const paymentTerms = [ 'Net 7', 'Net 15', 'Net 30'];
@@ -170,6 +193,7 @@ const AddPurchaseQuotation = () => {
   const [vendor, setVendor] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [shippingCharges, setShippingCharges] = useState('0');
+  const [discount, setDiscount] = useState('0');
   const [adjustments, setAdjustments] = useState('0');
   const [adjustmentLabel, setAdjustmentLabel] = useState('Adjustments');
   const [file, setFile] = useState(null);
@@ -301,6 +325,34 @@ const AddPurchaseQuotation = () => {
   const [linesLoading, setLinesLoading] = useState(false);
   const [isSavingHeader, setIsSavingHeader] = useState(false);
   const [isEditingHeader, setIsEditingHeader] = useState(false);
+  const [headerErrors, setHeaderErrors] = useState({});
+
+  const isHeaderValid = () => {
+    return (
+      headerForm.purchaseOrderNumber && String(headerForm.purchaseOrderNumber).trim() !== '' &&
+      headerForm.companyName && String(headerForm.companyName).trim() !== '' &&
+      vendor && String(vendor).trim() !== '' &&
+      headerForm.quotationTitle && String(headerForm.quotationTitle).trim() !== '' &&
+      paymentTerm && String(paymentTerm).trim() !== '' &&
+      paymentMethod && String(paymentMethod).trim() !== '' &&
+      file
+    );
+  };
+
+  const validateHeaderFields = () => {
+    const errors = {};
+    if (!headerForm.purchaseOrderNumber || String(headerForm.purchaseOrderNumber).trim() === '') errors.purchaseOrderNumber = 'Purchase Quotation No is required';
+    if (!headerForm.companyName || String(headerForm.companyName).trim() === '') errors.companyName = 'Purchase Inquiry No is required';
+    if (!vendor || String(vendor).trim() === '') errors.vendor = 'Vendor Name is required';
+    if (!headerForm.quotationTitle || String(headerForm.quotationTitle).trim() === '') errors.quotationTitle = 'Quotation Title is required';
+    if (!paymentTerm || String(paymentTerm).trim() === '') errors.paymentTerm = 'Payment Term is required';
+    if (!paymentMethod || String(paymentMethod).trim() === '') errors.paymentMethod = 'Payment Method is required';
+    if (!file) errors.file = 'PQ Document is required';
+    setHeaderErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const errorBorder = (field) => (headerErrors[field] ? { borderColor: '#dc3545', borderWidth: 1 } : {});
 
   // Helper to extract array from various response shapes
   const extractArray = (resp) => {
@@ -579,8 +631,8 @@ const AddPurchaseQuotation = () => {
       const totalTaxNum = parseFloat(totalTax) || 0;
       const serverNum = (serverTotalAmount !== null && serverTotalAmount !== undefined && String(serverTotalAmount).trim() !== '') ? parseFloat(serverTotalAmount) : NaN;
       const totalAmountNum = (!isNaN(serverNum))
-        ? (serverNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0))
-        : (subtotalNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + totalTaxNum);
+        ? (serverNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) - (parseFloat(discount) || 0))
+        : (subtotalNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + totalTaxNum - (parseFloat(discount) || 0));
 
       const resolveCityUuid = (c) => {
         if (!c) return '';
@@ -619,6 +671,7 @@ const AddPurchaseQuotation = () => {
         TotalTax: totalTaxNum,
         TotalAmount: totalAmountNum,
         ShippingCharges: parseFloat(shippingCharges) || 0,
+        Discount: parseFloat(discount) || 0,
         AdjustmentField: adjustmentLabel || '',
         AdjustmentPrice: parseFloat(adjustments) || 0,
       };
@@ -635,6 +688,9 @@ const AddPurchaseQuotation = () => {
       setHeaderResponse(data);
       setHeaderSaved(true);
       setIsEditingHeader(false);
+      setHeaderSubmitted(true);
+      setHeaderEditable(false);
+      setExpandedId(4);
       Alert.alert('Success', 'Order submitted successfully');
       try { await loadPurchaseOrderLines(data?.UUID || data?.Id || data?.HeaderUUID || headerResponse?.UUID); } catch (e) { /* ignore */ }
     } catch (err) {
@@ -645,6 +701,155 @@ const AddPurchaseQuotation = () => {
     }
   };
   const onCancel = () => {};
+
+  // Submit header only (creates header UUID and locks header fields)
+  const submitHeader = async () => {
+    setHeaderSubmitting(true);
+    try {
+      const subtotalNum = parseFloat(computeSubtotal()) || 0;
+      const totalTaxNum = parseFloat(totalTax) || 0;
+      const totalAmountNum = subtotalNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + totalTaxNum - (parseFloat(discount) || 0);
+
+      const payload = {
+        UUID: headerResponse?.UUID || '',
+        PurchaseOrderNo: headerForm.purchaseOrderNumber || '',
+        Inquiry_No: headerForm.companyName || '',
+        Vendor_UUID: vendor || headerForm.clientName || '',
+        ProjectUUID: projectName || '',
+        PaymentTermUUID: paymentTerm || '',
+        PaymentMethodUUID: paymentMethod || '',
+        OrderDate: uiDateToApiDate(invoiceDate),
+        DueDate: uiDateToApiDate(dueDate),
+        Notes: notes || '',
+        TermsConditions: terms || '',
+        BillingBuildingNo: billingForm.buildingNo || '',
+        BillingStreet1: billingForm.street1 || '',
+        BillingStreet2: billingForm.street2 || '',
+        BillingPostalCode: billingForm.postalCode || '',
+        BillingCountryUUID: billingForm.country || '',
+        BillingStateUUID: billingForm.state || '',
+        BillingCityUUID: billingForm.city || '',
+        IsShipAddrSame: !!isShippingSame,
+        ShippingBuildingNo: shippingForm.buildingNo || '',
+        ShippingStreet1: shippingForm.street1 || '',
+        ShippingStreet2: shippingForm.street2 || '',
+        ShippingPostalCode: shippingForm.postalCode || '',
+        ShippingCountryUUID: shippingForm.country || '',
+        ShippingStateUUID: shippingForm.state || '',
+        ShippingCityUUID: shippingForm.city || '',
+        SubTotal: subtotalNum,
+        TotalTax: totalTaxNum,
+        TotalAmount: totalAmountNum,
+        ShippingCharges: parseFloat(shippingCharges) || 0,
+        Discount: parseFloat(discount) || 0,
+        AdjustmentField: adjustmentLabel || '',
+        AdjustmentPrice: parseFloat(adjustments) || 0,
+      };
+
+      let resp;
+      if (headerResponse?.UUID) {
+        resp = await updatePurchaseOrder(payload);
+      } else {
+        resp = await addPurchaseOrder(payload);
+      }
+
+      const data = resp?.Data || resp || {};
+      setHeaderResponse(data);
+      setHeaderSaved(true);
+
+      // Show success message and only after user dismisses, lock header and open Create Order
+      Alert.alert('Success', 'Header submitted successfully', [
+        {
+          text: 'OK',
+          onPress: async () => {
+            try {
+              setHeaderSubmitted(true);
+              setHeaderEditable(false);
+              setExpandedId(4);
+              await loadPurchaseOrderLines(data?.UUID || data?.Id || data?.HeaderUUID || headerResponse?.UUID);
+            } catch (e) {
+              /* ignore */
+            }
+          },
+        },
+      ], { cancelable: false });
+    } catch (err) {
+      console.error('submitHeader error ->', err);
+      Alert.alert('Error', err?.message || 'Unable to submit header');
+    } finally {
+      setIsEditingHeader(false);
+      setHeaderSubmitting(false);
+    }
+  };
+
+  const updateHeader = async () => {
+    if (!headerResponse?.UUID) {
+      Alert.alert('Error', 'No header UUID to update');
+      return;
+    }
+    setHeaderSubmitting(true);
+    try {
+      const subtotalNum = parseFloat(computeSubtotal()) || 0;
+      const totalTaxNum = parseFloat(totalTax) || 0;
+      const totalAmountNum = subtotalNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + totalTaxNum - (parseFloat(discount) || 0);
+      const payload = {
+        UUID: headerResponse?.UUID,
+        PurchaseOrderNo: headerForm.purchaseOrderNumber || '',
+        Inquiry_No: headerForm.companyName || '',
+        Vendor_UUID: vendor || headerForm.clientName || '',
+        ProjectUUID: projectName || '',
+        PaymentTermUUID: paymentTerm || '',
+        PaymentMethodUUID: paymentMethod || '',
+        OrderDate: uiDateToApiDate(invoiceDate),
+        DueDate: uiDateToApiDate(dueDate),
+        Notes: notes || '',
+        TermsConditions: terms || '',
+        BillingBuildingNo: billingForm.buildingNo || '',
+        BillingStreet1: billingForm.street1 || '',
+        BillingStreet2: billingForm.street2 || '',
+        BillingPostalCode: billingForm.postalCode || '',
+        BillingCountryUUID: billingForm.country || '',
+        BillingStateUUID: billingForm.state || '',
+        BillingCityUUID: billingForm.city || '',
+        IsShipAddrSame: !!isShippingSame,
+        ShippingBuildingNo: shippingForm.buildingNo || '',
+        ShippingStreet1: shippingForm.street1 || '',
+        ShippingStreet2: shippingForm.street2 || '',
+        ShippingPostalCode: shippingForm.postalCode || '',
+        ShippingCountryUUID: shippingForm.country || '',
+        ShippingStateUUID: shippingForm.state || '',
+        ShippingCityUUID: shippingForm.city || '',
+        SubTotal: subtotalNum,
+        TotalTax: totalTaxNum,
+        TotalAmount: totalAmountNum,
+        ShippingCharges: parseFloat(shippingCharges) || 0,
+        Discount: parseFloat(discount) || 0,
+        AdjustmentField: adjustmentLabel || '',
+        AdjustmentPrice: parseFloat(adjustments) || 0,
+      };
+      await updatePurchaseOrder(payload);
+
+      Alert.alert('Success', 'Header updated successfully', [
+        {
+          text: 'OK',
+          onPress: async () => {
+            try {
+              setHeaderEditable(false);
+              setHeaderSubmitted(true);
+              setExpandedId(4);
+              await loadPurchaseOrderLines(headerResponse?.UUID);
+            } catch (e) { /* ignore */ }
+          },
+        },
+      ], { cancelable: false });
+    } catch (err) {
+      console.error('updateHeader error ->', err);
+      Alert.alert('Error', err?.message || 'Unable to update header');
+    } finally {
+      setIsEditingHeader(false);
+      setHeaderSubmitting(false);
+    }
+  };
 
   // File attachment functions
   const pickFile = async () => {
@@ -861,6 +1066,16 @@ const AddPurchaseQuotation = () => {
             title="Header"
             expanded={expandedId === 1}
             onToggle={toggleSection}
+            rightActions={
+              headerSubmitted && !headerEditable ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
+                  <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
+                  <TouchableOpacity onPress={() => { setHeaderEditable(true); setIsEditingHeader(true); setExpandedId(1); }}>
+                    <Icon name="edit" size={rf(4.4)} color={COLORS.primary} />
+                  </TouchableOpacity>
+                </View>
+              ) : null
+            }
           >
             <View style={styles.row}>
              <View style={styles.col}>
@@ -886,6 +1101,7 @@ const AddPurchaseQuotation = () => {
                     }
                     placeholder="eg."
                     placeholderTextColor={COLORS.textLight}
+                    editable={headerEditable}
                   />
                 </View>
               </View>
@@ -899,7 +1115,10 @@ const AddPurchaseQuotation = () => {
                   options={purchaseQuotationNumbers}
                   getLabel={s => s}
                   getKey={s => s}
-                  onSelect={v => setHeaderForm(s => ({ ...s, companyName: v }))}
+                  onSelect={v => {
+                    if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
+                    setHeaderForm(s => ({ ...s, companyName: v }));
+                  }}
                   inputBoxStyle={inputStyles.box}
                   textStyle={inputStyles.input}
                 />
@@ -918,7 +1137,10 @@ const AddPurchaseQuotation = () => {
                     options={vendorOptions}
                     getLabel={p => p}
                     getKey={p => p}
-                    onSelect={v => setVendor(v)}
+                    onSelect={v => {
+                      if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
+                      setVendor(v);
+                    }}
                     renderInModal={true}
                     inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                     textStyle={inputStyles.input}
@@ -948,6 +1170,7 @@ const AddPurchaseQuotation = () => {
                     }
                     placeholder="eg."
                     placeholderTextColor={COLORS.textLight}
+                    editable={headerEditable}
                   />
                 </View>
               </View>
@@ -965,7 +1188,10 @@ const AddPurchaseQuotation = () => {
                     options={paymentTermOptions}
                     getLabel={p => p}
                     getKey={p => p}
-                    onSelect={v => setPaymentTerm(v)}
+                    onSelect={v => {
+                      if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
+                      setPaymentTerm(v);
+                    }}
                     renderInModal={true}
                     inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                     textStyle={inputStyles.input}
@@ -982,7 +1208,10 @@ const AddPurchaseQuotation = () => {
                     options={paymentMethodOptions && paymentMethodOptions.length ? paymentMethodOptions : paymentMethods}
                     getLabel={p => p}
                     getKey={p => p}
-                    onSelect={v => setPaymentMethod(v)}
+                    onSelect={v => {
+                      if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
+                      setPaymentMethod(v);
+                    }}
                     renderInModal={true}
                     inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                     textStyle={inputStyles.input}
@@ -1023,7 +1252,10 @@ const AddPurchaseQuotation = () => {
                       <TouchableOpacity
                         activeOpacity={0.8}
                         style={[styles.uploadButton]}
-                        onPress={pickFile}
+                        onPress={() => {
+                          if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
+                          pickFile();
+                        }}
                       >
                         <Icon name="cloud-upload" size={rf(4)} color="#fff" />
                       </TouchableOpacity>
@@ -1033,6 +1265,34 @@ const AddPurchaseQuotation = () => {
                     Allowed: PDF, PNG, JPG • Max size 10 MB
                   </Text>
                 </View>
+                </View>
+
+            <View style={{ marginTop: hp(1.5), flexDirection: 'row', justifyContent: 'flex-end' }}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  if (headerResponse?.UUID && headerEditable) {
+                    updateHeader();
+                  } else {
+                    submitHeader();
+                  }
+                }}
+                style={{
+                  backgroundColor: COLORS.primary,
+                  paddingVertical: hp(1),
+                  paddingHorizontal: wp(4),
+                  borderRadius: 6,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }}
+                disabled={headerSubmitting || (headerSubmitted && !headerEditable)}
+              >
+                {headerSubmitting ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={{ color: '#fff', fontFamily: TYPOGRAPHY.fontFamilyMedium, fontSize: rf(3.2) }}>{(isEditingHeader || (headerResponse?.UUID && headerEditable)) ? 'Update' : 'Submit'}</Text>
+                )}
+              </TouchableOpacity>
             </View>
           </AccordionSection>
 
@@ -1488,7 +1748,7 @@ const AddPurchaseQuotation = () => {
                             <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
                             <Text style={[styles.th, { width: wp(20) }]}>Rate</Text>
                             <Text style={[styles.th, { width: wp(20) }]}>Amount</Text>
-                            <Text style={[styles.th, { width: wp(25) }]}>Action</Text>
+                            <Text style={[styles.th, { width: wp(40) }]}>Action</Text>
                           </View>
                         </View>
 
@@ -1602,8 +1862,8 @@ const AddPurchaseQuotation = () => {
                         ref={discountRef}
                         onFocus={() => setFocusedDiscount(true)}
                         onBlur={() => setFocusedDiscount(false)}
-                        value={String(shippingCharges)}
-                        onChangeText={setShippingCharges}
+                        value={String(discount)}
+                        onChangeText={setDiscount}
                         keyboardType="numeric"
                         style={[
                           styles.inputBox,
@@ -1617,7 +1877,7 @@ const AddPurchaseQuotation = () => {
                   </View>
 
                   <Text style={styles.value}>
-                    ₹{parseFloat(shippingCharges || 0).toFixed(2)}
+                    -₹{parseFloat(discount || 0).toFixed(2)}
                   </Text>
                 </View>
 
@@ -1640,7 +1900,9 @@ const AddPurchaseQuotation = () => {
                     {(
                       parseFloat(computeSubtotal()) +
                       parseFloat(shippingCharges || 0) +
-                      parseFloat(adjustments || 0)
+                      parseFloat(adjustments || 0) +
+                      parseFloat(totalTax || 0) -
+                      parseFloat(discount || 0)
                     ).toFixed(2)}
                   </Text>
                 </View>
@@ -1728,7 +1990,10 @@ const AddPurchaseQuotation = () => {
                       <TouchableOpacity
                         activeOpacity={0.8}
                         style={[styles.uploadButton]}
-                        onPress={pickFile}
+                        onPress={() => {
+                          if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
+                          pickFile();
+                        }}
                       >
                         <Icon name="cloud-upload" size={rf(4)} color="#fff" />
                       </TouchableOpacity>
@@ -1804,11 +2069,6 @@ const styles = StyleSheet.create({
     paddingBottom: hp(6),
     backgroundColor: '#fff',
   },
-  line: {
-    borderBottomColor: COLORS.border,
-    borderBottomWidth: hp(0.2),
-    // marginVertical: hp(0.7),
-  },
   headerSeparator: {
     height: 1,
     // backgroundColor: COLORS.border,
@@ -1834,6 +2094,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.6),
     backgroundColor: COLORS.bg,
+  },
+  sectionBanner: {
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(0.8),
+    backgroundColor: (COLORS.success || '#28a755') + '15',
   },
   sectionTitle: {
     fontSize: rf(4),

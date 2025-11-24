@@ -162,7 +162,7 @@ const ViewPurchaseQuotation = () => {
             { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6', action: 'Download' },
             { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280', action: 'Forward' },
             { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E', action: 'View' },
-            // { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316', action: 'Update Status'  },
+            { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316', action: 'Update Status'  },
         ];
 
         return (
@@ -273,7 +273,6 @@ const ViewPurchaseQuotation = () => {
                                 { label: 'Vendor Name', value: order.customerName },
                                 { label: 'Purchase Request Number', value: order.purchaseRequestNumber || order._raw?.PurchaseRequestNumber || order._raw?.PurchaseRequestNo || order._raw?.InquiryNo || order.quotationNumber || '—' },
                                 { label: 'Quotation Title', value: order.quotationTitle || order.salesOrderNumber || 'Title' },
-                                { label: 'Status', value: order.status, isStatus: true },
                                 // { label: 'Due Date', value: order.dueDate },
                             ]}
                             headerLeftLabel="Vendor Name"

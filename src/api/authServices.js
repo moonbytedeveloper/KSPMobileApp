@@ -134,7 +134,8 @@ const PATHS = {
     modeOfPayment: Config.API_MODE_OF_PAYMENT_PATH || '/api/Account/modeofpayment',
     getpurchaseInquiryHeader: Config.API_GET_PURCHASE_INQUIRY_HEADER_PATH || 'api/Account/GetPurchaseInquiryHeader',
     // Account Purchase
-    
+    postUpdatePurchaseQuotationHeader: Config.API_POST_UPDATE_PURCHASE_QUOTATION_HEADER_PATH || '/api/Account/UpdatePurchaseQuotationHeader',
+    postAddPurchaseQuotationHeader : Config.API_POST_ADD_PURCHASE_QUOTATION_HEADER_PATH || '/api/Account/AddPurchaseQuotationHeader',
     getpurchaseQuotationHeaders: Config.API_GET_PURCHASE_QUOTATION_HEADERS_PATH || '/api/Account/GetPurchaseQuotationHeaders',
     getpurchaseQuotationNumber: Config.API_GET_PURCHASE_QUOTATION_NUMBER_PATH || '/api/Account/PurchasequotationNumbers',
     getPurchasequotationVendor : Config.API_GET_PURCHASE_QUOTATION_VENDOR_PATH || '/api/Account/PurchasequotationVendors',
@@ -1265,7 +1266,6 @@ export async function getPaymentMethods({ cmpUuid, envUuid } = {}) {
     return resp.data;
 }
 
-
 // Add Sales Order (header)
 export async function addSalesOrder(payload = {}, { cmpUuid, envUuid, userUuid } = {}) {
     try {
@@ -1280,7 +1280,7 @@ export async function addSalesOrder(payload = {}, { cmpUuid, envUuid, userUuid }
         console.log(err, '123');
         console.log(err.message, '456');
 
-        console.log('[authServices] addSalesOrder error ->', err && (err.message || err));
+        console.error('[authServices] addSalesOrder error ->', err && (err.message || err));
         throw err;
     }
 }
@@ -1298,7 +1298,7 @@ export async function addPurchaseOrder(payload = {}, { cmpUuid, envUuid, userUui
         console.log(err, '123');
         console.log(err.message, '456');
 
-        console.log('[authServices] addPurchaseOrder error ->', err && (err.message || err));
+        console.error('[authServices] addPurchaseOrder error ->', err && (err.message || err));
         throw err;
     }
 }
@@ -2995,9 +2995,9 @@ export async function getNotApprovedTimesheets({ cmpUuid, envUuid, userUuid, sta
         ]);
         cmpUuid = c; envUuid = e; userUuid = u;
     }
-    if (!cmpUuid) throw new Error('Missing company UUID');
-    if (!envUuid) throw new Error('Missing environment UUID');
-    if (!userUuid) throw new Error('Missing user UUID');
+    if (!cmpUuid) throw new Error('cmpUuid is required');
+    if (!envUuid) throw new Error('envUuid is required');
+    if (!userUuid) throw new Error('userUuid is required');
 
     // Send multiple casings in case backend expects specific keys
     const params = {
@@ -3710,35 +3710,14 @@ export async function getDashboardLeadSummary({ cmpUuid, envUuid, superAdminUuid
             ]);
             cmpUuid = c; envUuid = e; superAdminUuid = u;
 
-            // Use role UUID if available, otherwise use user UUID
+            // Use role UUID if available (Super Admin UUID), otherwise use user UUID
             if (r) {
                 superAdminUuid = r;
+            } else {
+                superAdminUuid = u;
             }
         }
 
-        // TEMPORARY FIX: Force the correct superAdminUuid based on your login data
-        // TODO: Fix the login process to store the correct UUID
-        if (superAdminUuid === '97dcc757-b714-4b25-ac04-9bc7a988') {
-            console.log('🔧 [TEMP FIX] Overriding incorrect UUID with correct one');
-            superAdminUuid = '1afa6042-0bd6-4734-8e15-1dbe6b61';
-        }
-
-        // Debug logging to check what UUIDs are being used
-        console.log('🔍 [getDashboardLeadSummary] Retrieved UUIDs:');
-        console.log('  - cmpUuid:', cmpUuid);
-        console.log('  - envUuid:', envUuid);
-        console.log('  - superAdminUuid:', superAdminUuid);
-
-        // Check what's actually stored in storage
-        const [storedUUID, storedCMP, storedENV] = await Promise.all([
-            getUUID(),
-            getCMPUUID(),
-            getENVUUID()
-        ]);
-        console.log('🔍 [getDashboardLeadSummary] What\'s actually stored:');
-        console.log('  - storedUUID:', storedUUID);
-        console.log('  - storedCMP:', storedCMP);
-        console.log('  - storedENV:', storedENV);
         if (!cmpUuid) throw new Error('cmpUuid is required');
         if (!envUuid) throw new Error('envUuid is required');
         if (!superAdminUuid) throw new Error('superAdminUuid is required');
@@ -3811,12 +3790,12 @@ export async function getSoleApprovalData({ cmpUUID, envUUID, userUUID, start = 
     try {
         // Resolve missing IDs from storage if not provided
         if (!cmpUUID || !envUUID || !userUUID) {
-            const [c, e, u] = await Promise.all([
+            const [c, e, g] = await Promise.all([
                 cmpUUID || getCMPUUID(),
                 envUUID || getENVUUID(),
                 userUUID || getUUID(),
             ]);
-            cmpUUID = c; envUUID = e; userUUID = u;
+            cmpUUID = c; envUUID = e; userUUID = g;
         }
 
         if (!cmpUUID) throw new Error('cmpUUID is required');
@@ -4106,7 +4085,7 @@ export async function getAdminDashboard({ cmpUuid, envUuid, superAdminUuid } = {
                 superAdminUuid || getUUID(),
                 getRoleUUID(),
             ]);
-            cmpUuid = c; envUuid = e;
+            cmpUuid = c; envUuid = e; superAdminUuid = u;
 
             // Use role UUID if available (Super Admin UUID), otherwise use user UUID
             if (r) {
@@ -4150,7 +4129,7 @@ export async function getTotalHoursReported({ cmpUuid, envUuid, superAdminUuid }
                 superAdminUuid || getUUID(),
                 getRoleUUID(),
             ]);
-            cmpUuid = c; envUuid = e;
+            cmpUuid = c; envUuid = e; superAdminUuid = u;
 
             // Use role UUID if available (Super Admin UUID), otherwise use user UUID
             if (r) {
@@ -4194,7 +4173,7 @@ export async function getTotalEmployeeWorking({ cmpUuid, envUuid, superAdminUuid
                 superAdminUuid || getUUID(),
                 getRoleUUID(),
             ]);
-            cmpUuid = c; envUuid = e;
+            cmpUuid = c; envUuid = e; superAdminUuid = u;
 
             // Use role UUID if available (Super Admin UUID), otherwise use user UUID
             if (r) {
@@ -4227,3 +4206,28 @@ export async function getTotalEmployeeWorking({ cmpUuid, envUuid, superAdminUuid
         throw error;
     }
 }
+
+// Add the API endpoint for submitting a purchase quotation header
+export const postAddPurchaseQuotationHeader = async (payload) => {
+  const endpoint = Config.API_POST_ADD_PURCHASE_QUOTATION_HEADER_PATH || '/api/Account/AddPurchaseQuotationHeader';
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to submit purchase quotation header: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('API Response:', data);
+    return data;
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+};
