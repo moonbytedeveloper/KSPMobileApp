@@ -72,6 +72,7 @@ const AddSalesInquiry = () => {
     const [expectedPurchaseDate, setExpectedPurchaseDate] = useState('');
     const [projectName, setProjectName] = useState('');
     const [inquiryNo, setInquiryNo] = useState('');
+    const [showInquiryNoField, setShowInquiryNoField] = useState(false);
     const [country, setCountry] = useState('');
     const [loading, setLoading] = useState(false);
     const [successSheetVisible, setSuccessSheetVisible] = useState(false);
@@ -359,6 +360,9 @@ const AddSalesInquiry = () => {
             const headerUuidParam = route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.headerUUID || route?.params?.uuid || route?.params?.headerRaw?.UUID || route?.params?.headerRaw?.Id;
             // Only warn if route params were explicitly provided but header uuid is missing
             const hasRouteParams = !!route?.params && Object.keys(route.params).length > 0;
+            // If a header identifier is present in route params (navigated from ManageInquiry edit),
+            // show the Inquiry No field (read-only) so the user sees the number immediately.
+            if (headerUuidParam) setShowInquiryNoField(true);
             if (!headerUuidParam) {
                 if (hasRouteParams) {
                     console.warn('AddSalesInquiry prefill requested but header UUID missing in route params');
@@ -648,6 +652,23 @@ const AddSalesInquiry = () => {
                             ) : null
                         }
                     >
+                        {showInquiryNoField && (
+                            <View style={[styles.row, { marginBottom: hp(1.2) }]}> 
+                                <View >
+                                    <Text style={inputStyles.label}>Inquiry No</Text>
+                                    <View style={[inputStyles.box, { marginTop: hp(0.5) }]}>
+                                        <TextInput
+                                            style={[inputStyles.input, { color: COLORS.text }]}
+                                            value={inquiryNo}
+                                            placeholder="Inquiry No"
+                                            placeholderTextColor={COLORS.textLight}
+                                            editable={false}
+                                        />
+                                    </View>
+                                </View>
+                            </View>
+                        )}
+
                         <View style={styles.row}>
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>Project Name*</Text>

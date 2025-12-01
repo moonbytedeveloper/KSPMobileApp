@@ -194,7 +194,7 @@ const ViewSalesOrder = () => {
                 <AppHeader
                     title="View Sales Order"
                 onLeftPress={() => navigation.goBack()}
-                onRightPress={() => navigation.navigate('ManageSalesOrder')}
+                onRightPress={() => navigation.navigate('ManageSalesOrder', { mode: 'add' })}
                     rightButtonLabel="Add Sales Order"
                 showRight
             />

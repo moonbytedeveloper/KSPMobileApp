@@ -776,6 +776,21 @@ const AddSalesPerfomaInvoice = () => {
     const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
     const [prefillLoading, setPrefillLoading] = useState(false);
 
+    // Show Sales Invoice Number only when editing / prefilling from an existing header
+    const [showSalesInvoiceNoField, setShowSalesInvoiceNoField] = useState(false);
+
+    // If navigated with an existing header (edit/prefill), show the Sales Invoice Number field immediately
+    useEffect(() => {
+        try {
+            const p = route?.params || {};
+            if (p?.prefillHeader || p?.headerUuid || p?.headerRaw || p?.header) {
+                setShowSalesInvoiceNoField(true);
+            }
+        } catch (e) {
+            // ignore
+        }
+    }, [route?.params]);
+
     // Permission handling for Android
     const requestStoragePermissionAndroid = async () => {
         if (Platform.OS !== 'android') return true;
@@ -1400,74 +1415,85 @@ const AddSalesPerfomaInvoice = () => {
                         title="Header"
                         expanded={expandedId === 1}
                         onToggle={headerSubmitted && !headerEditable ? () => { } : toggleSection}
-                        rightActions={
+                            rightActions={
                             headerSubmitted && !headerEditable ? (
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
                                     <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
-                                    <TouchableOpacity onPress={() => { setHeaderEditable(true); setExpandedId(1); }}>
+                                    <TouchableOpacity onPress={() => { setHeaderEditable(true); setExpandedId(1); setShowSalesInvoiceNoField(true); }}>
                                         <Icon name="edit" size={rf(5)} color={COLORS.primary} />
                                     </TouchableOpacity>
                                 </View>
-                            ) : null
-                        }
-                    >
-                        <View style={styles.row}>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Sales Invoice Number.</Text>
+                            ) : null  
+                        }    
+                    >    
+                        {showSalesInvoiceNoField ? (
+                            <View style={styles.row}>
+                                <View style={styles.col}>
+                                    <Text style={inputStyles.label}>Sales Invoice Number.</Text>
 
-                                <View style={[inputStyles.box]} pointerEvents="box-none">
-                                    <TextInput
-                                        style={[inputStyles.input, { flex: 1, color: '#000000' }]}
-                                        value={headerForm.salesInquiryText}
-                                        onChangeText={v => setHeaderForm(s => ({ ...s, salesInquiryText: v }))}
-                                        placeholder="eg."
-                                        placeholderTextColor={COLORS.textLight}
-                                        editable={headerEditable}
+                                    <View style={[inputStyles.box]} pointerEvents="box-none">
+                                        <TextInput
+                                            style={[inputStyles.input, { flex: 1, color: '#000000' }]}
+                                            value={headerForm.salesInquiryText}
+                                            placeholder="eg."
+                                            placeholderTextColor={COLORS.textLight}
+                                            editable={false}
+                                            pointerEvents="none"
+                                        />
+                                    </View>
+                                </View>
+
+                                <View style={styles.col}>
+                                    <Text style={inputStyles.label}>Sales Inquiry No.</Text>
+
+                                    <Dropdown
+                                        placeholder="Sales Inquiry No."
+                                        value={headerForm.salesInquiry}
+                                        options={salesInquiryNosOptions}
+                                        getLabel={s => s?.InquiryNo || String(s)}
+                                        getKey={s => s?.UUID || s}
+                                        onSelect={v => {
+                                            if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
+                                            if (v && typeof v === 'object') {
+                                                setHeaderForm(s => ({ ...s, salesInquiry: v?.InquiryNo || String(v) }));
+                                                setSalesInquiryUuid(v?.UUID || null);
+                                            } else {
+                                                setHeaderForm(s => ({ ...s, salesInquiry: v }));
+                                                setSalesInquiryUuid(null);
+                                            }
+                                        }}
+                                        inputBoxStyle={inputStyles.box}
+                                        textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
-                            {/* <View style={styles.col}> */}
-                            {/* <Text style={inputStyles.label}>Customer Name* </Text> */}
+                        ) : (
+                            <View style={styles.row}>
+                                <View style={styles.col}>
+                                    <Text style={inputStyles.label}>Sales Inquiry No.</Text>
 
-                            {/* <Text style={inputStyles.label}>Customer Name*</Text> */}
-                            {/* <Dropdown
-                                    placeholder="Customer Name*"
-                                    value={headerForm.opportunityTitle}
-                                    options={customers}
-                                    getLabel={c => c}
-                                    getKey={c => c}
-                                    onSelect={v =>
-                                        setHeaderForm(s => ({ ...s, opportunityTitle: v }))
-                                    }
-                                    inputBoxStyle={inputStyles.box}
-                                    textStyle={inputStyles.input}
-                                /> */}
-                            {/* </View> */}
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Sales Inquiry No.</Text>
-
-                                {/* <Text style={[inputStyles.label, { fontWeight: '600' }]}>Sales Inquiry No.</Text> */}
-                                <Dropdown
-                                    placeholder="Sales Inquiry No."
-                                    value={headerForm.salesInquiry}
-                                    options={salesInquiryNosOptions}
-                                    getLabel={s => s?.InquiryNo || String(s)}
-                                    getKey={s => s?.UUID || s}
-                                    onSelect={v => {
-                                        if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
-                                        if (v && typeof v === 'object') {
-                                            setHeaderForm(s => ({ ...s, salesInquiry: v?.InquiryNo || String(v) }));
-                                            setSalesInquiryUuid(v?.UUID || null);
-                                        } else {
-                                            setHeaderForm(s => ({ ...s, salesInquiry: v }));
-                                            setSalesInquiryUuid(null);
-                                        }
-                                    }}
-                                    inputBoxStyle={inputStyles.box}
-                                    textStyle={inputStyles.input}
-                                />
+                                    <Dropdown
+                                        placeholder="Sales Inquiry No."
+                                        value={headerForm.salesInquiry}
+                                        options={salesInquiryNosOptions}
+                                        getLabel={s => s?.InquiryNo || String(s)}
+                                        getKey={s => s?.UUID || s}
+                                        onSelect={v => {
+                                            if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
+                                            if (v && typeof v === 'object') {
+                                                setHeaderForm(s => ({ ...s, salesInquiry: v?.InquiryNo || String(v) }));
+                                                setSalesInquiryUuid(v?.UUID || null);
+                                            } else {
+                                                setHeaderForm(s => ({ ...s, salesInquiry: v }));
+                                                setSalesInquiryUuid(null);
+                                            }
+                                        }}
+                                        inputBoxStyle={inputStyles.box}
+                                        textStyle={inputStyles.input}
+                                    />
+                                </View>
                             </View>
-                        </View>
+                        )}
 
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             {/* { (headerSubmitted || route?.params?.prefillHeader) && ( */}

@@ -64,6 +64,8 @@ const ViewPurchaseOrder = () => {
                     vendorName: it?.VendorName || it?.Vendor || it?.CustomerName || it?.Customer || '',
                     projectName: it?.ProjectTitle || it?.ProjectName || it?.Project || '',
                     deliveryDate: it?.DeliveryDate || it?.DeliveryDateUTC || it?.OrderDate || '',
+                    // amount may be returned under different keys depending on API
+                    amount: it?.Amount || it?.TotalAmount || it?.NetAmount || it?.OrderAmount || '',
                     item: { itemType: '', name: '' },
                     quantity: it?.LineCount || it?.TotalLines || 0,
                     raw: it,
@@ -234,22 +236,24 @@ const ViewPurchaseOrder = () => {
                     <AccordionItem
                         key={order.id}
                         item={{
-                            headerTitle: order.vendorName,        // LEFT SIDE
-                            headerValue: order.projectName,       // RIGHT SIDE
+                            headerTitle: order.purchaseOrderNumber || order.vendorName || order.raw?.PurchaseOrderNo || '',
+                            headerValue: order.amount || order.quantity || '',
+                            // keep raw for downstream actions
+                            ...order,
                         }}
 
                         isActive={activeOrderId === order.id}
                         onToggle={() => setActiveOrderId(prev => prev === order.id ? null : order.id)}
 
                         customRows={[
-                            { label: "Vendor Name", value: order.vendorName },
-                            { label: "Project Name", value: order.projectName },
-                            { label: "Delivery Date", value: order.deliveryDate },
-                            { label: "Quantity", value: order.quantity }
+                            { label: "Vendor Name", value: order.vendorName || order.raw?.VendorName || '' },
+                            { label: "Project Name", value: order.projectName || order.raw?.ProjectTitle || '' },
+                            { label: "Delivery Date", value: order.deliveryDate || '' },
+                            { label: "Total Amount", value: order.amount || '' }
                         ]}
 
-                        headerLeftLabel="Vendor Name"
-                        headerRightLabel="Project Name"
+                        headerLeftLabel="Purchase Order No"
+                        headerRightLabel="Total Amount"
                         footerComponent={renderFooterActions(order)}
                         headerRightContainerStyle={styles.headerRightContainer}
                     />

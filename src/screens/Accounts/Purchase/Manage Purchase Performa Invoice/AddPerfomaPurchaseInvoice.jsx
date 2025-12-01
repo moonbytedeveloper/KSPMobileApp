@@ -268,7 +268,10 @@ const AddSalesPerfomaInvoice = () => {
 
             setHeaderForm(s => ({
                 ...s,
-                salesInquiryText: data?.SalesPerInvNo || data?.PerformaInvoiceNo || data?.PerformaNo || data?.SalesPerformaNo || data?.SalesPerInvNo || s.salesInquiryText || '',
+                salesInquiryText: data?.SalesPerInvNo || data?.PerformaInvoiceNumber || data?.PerformaInvoiceNo || data?.PerformaInvoice || data?.PerformaNo || data?.SalesPerformaNo || data?.SalesPerInvNo || data?.InvoiceNo || data?.InvoiceNumber || s.salesInquiryText || '',
+                // Also store common variants explicitly so UI can read a stable key
+                PerformaInvoiceNo: data?.PerformaInvoiceNo || data?.PerformaInvoiceNumber || data?.PerformaInvoice || data?.PerformaNo || data?.InvoiceNo || data?.InvoiceNumber || s.PerformaInvoiceNo || '',
+                performaInvoiceNumber: data?.PerformaInvoiceNumber || data?.PerformaInvoiceNo || data?.PerformaInvoice || data?.PerformaNo || data?.InvoiceNumber || data?.InvoiceNo || s.performaInvoiceNumber || '',
                 // Only set salesInquiry if we have a valid InquiryNo (not a UUID)
                 // If we only have UUID, leave it empty - the mapping useEffect will fill it
                 salesInquiry: (inquiryNo && !isInquiryNoUuid) ? inquiryNo : '',
@@ -360,7 +363,9 @@ const AddSalesPerfomaInvoice = () => {
                 // Prefill header form
                 setHeaderForm(s => ({
                     ...s,
-                    salesInquiryText: data?.SalesPerInvNo || data?.PerformaInvoiceNo || data?.PerformaNo || data?.SalesPerformaNo || s.salesInquiryText || '',
+                    salesInquiryText: data?.SalesPerInvNo || data?.PerformaInvoiceNumber || data?.PerformaInvoiceNo || data?.PerformaInvoice || data?.PerformaNo || data?.SalesPerformaNo || data?.SalesPerInvNo || data?.InvoiceNo || data?.InvoiceNumber || s.salesInquiryText || '',
+                    PerformaInvoiceNo: data?.PerformaInvoiceNo || data?.PerformaInvoiceNumber || data?.PerformaInvoice || data?.PerformaNo || data?.InvoiceNo || data?.InvoiceNumber || s.PerformaInvoiceNo || '',
+                    performaInvoiceNumber: data?.PerformaInvoiceNumber || data?.PerformaInvoiceNo || data?.PerformaInvoice || data?.PerformaNo || data?.InvoiceNumber || data?.InvoiceNo || s.performaInvoiceNumber || '',
                     salesInquiry: data?.SalesInqNo || data?.SalesInquiryNo || data?.InquiryNo || s.salesInquiry || '',
                     clientName: data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || s.clientName || '',
                     CustomerUUID: data?.CustomerUUID || data?.CustomerId || s.CustomerUUID || null,
@@ -647,6 +652,21 @@ const AddSalesPerfomaInvoice = () => {
     const [showShippingTip, setShowShippingTip] = useState(false);
     const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
     const [prefillLoading, setPrefillLoading] = useState(false);
+
+    // Show Proforma Invoice Number only when editing / prefilling an existing header
+    const [showProformaInvoiceNoField, setShowProformaInvoiceNoField] = useState(false);
+
+    // If navigated with an existing header (edit/prefill), show the Proforma Invoice Number field
+    useEffect(() => {
+        try {
+            const p = route?.params || {};
+            if (p?.prefillHeader || p?.headerUuid || p?.headerData || p?.header) {
+                setShowProformaInvoiceNoField(true);
+            }
+        } catch (e) {
+            // ignore
+        }
+    }, [route?.params]);
 
     // Permission handling for Android
     const requestStoragePermissionAndroid = async () => {
@@ -1277,34 +1297,38 @@ const AddSalesPerfomaInvoice = () => {
                     <AccordionSection
                         id={1}
                         title="Header"
-                        expanded={expandedId === 1}
+                        expanded={expandedId === 1} 
                         onToggle={headerSubmitted && !headerEditable ? () => { } : toggleSection}
                         rightActions={
                             headerSubmitted && !headerEditable ? (
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
                                     <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
-                                    <TouchableOpacity onPress={() => { setHeaderEditable(true); setExpandedId(1); }}>
+                                    <TouchableOpacity onPress={() => { setHeaderEditable(true); setExpandedId(1); setShowProformaInvoiceNoField(true); }}>
                                         <Icon name="edit" size={rf(5)} color={COLORS.primary} />
                                     </TouchableOpacity>
                                 </View>
                             ) : null
                         }
                     >
-                        <View style={styles.row}>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Purchase Invoice Number.</Text>
+                        {showProformaInvoiceNoField ? (
+                            <View style={styles.row}>
+                                <View style={styles.col}>
+                                    <Text style={inputStyles.label}>Proforma Invoice Number.</Text>
 
-                                <View style={[inputStyles.box]} pointerEvents="box-none">
-                                    <TextInput
-                                        style={[inputStyles.input, { flex: 1, color: '#000000' }]}
-                                        value={headerForm.salesInquiryText}
-                                        onChangeText={v => setHeaderForm(s => ({ ...s, salesInquiryText: v }))}
-                                        placeholder="eg."
-                                        placeholderTextColor={COLORS.textLight}
-                                        editable={headerEditable}
-                                    />
+                                    <View style={[inputStyles.box]} pointerEvents="box-none">
+                                        <TextInput
+                                            style={[inputStyles.input, { flex: 1, color: '#000000' }]}
+                                            value={headerForm.salesInquiryText || headerForm.PerformaInvoiceNo || headerForm.performaInvoiceNumber || headerForm.salesInquiry || ''}
+                                            placeholder="eg."
+                                            placeholderTextColor={COLORS.textLight}
+                                            editable={false}
+                                            pointerEvents="none"
+                                        />
+                                    </View>
                                 </View>
                             </View>
+                        ) : null}
+                        <View style={styles.row}>
                             {/* <View style={styles.col}> */}
                             {/* <Text style={inputStyles.label}>Customer Name* </Text> */}
 

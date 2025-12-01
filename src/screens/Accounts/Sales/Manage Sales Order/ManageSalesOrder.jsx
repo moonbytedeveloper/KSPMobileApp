@@ -1718,24 +1718,13 @@ const ManageSalesOrder = () => {
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Sales Order Number* </Text>
 
-                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
-                {headerSaved && !isEditingHeader ? (
+                {/* Show Sales Order Number only when editing an existing header or when viewing a saved header.
+                   It must be read-only in both cases; hide it during Add-mode (creating new header). */}
+                {(headerForm?.SalesOrderNo && (headerSaved || isEditingHeader)) ? (
                   <View style={[inputStyles.box]} pointerEvents="none">
                     <Text style={[inputStyles.input, { flex: 1 }]}>{renderLabel(headerForm.SalesOrderNo)}</Text>
                   </View>
-                ) : (
-                  <View style={[inputStyles.box]} pointerEvents="box-none">
-                    <TextInput
-                      style={[inputStyles.input, { flex: 1 }]}
-                      value={headerForm.SalesOrderNo}
-                      onChangeText={v =>
-                        setHeaderForm(s => ({ ...s, SalesOrderNo: v }))
-                      }
-                      placeholder="eg."
-                      placeholderTextColor={COLORS.textLight}
-                    />
-                  </View>
-                )}
+                ) : null}
               </View>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Project Name </Text>

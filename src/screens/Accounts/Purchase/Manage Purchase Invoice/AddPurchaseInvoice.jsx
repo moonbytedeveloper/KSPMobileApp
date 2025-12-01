@@ -24,7 +24,7 @@ import { useNavigation } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
-import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getCustomers, getCountries, getPurchaseOrderNumbers, addPurchaseInvoiceHeader, addPurchaseInvoiceLine, updatePurchaseInvoiceHeader, getPurchaseInvoiceHeaderById, getPurchaseInvoiceHeaders, getPurchaseInvoiceLines, updatePurchaseInvoiceLine, deletePurchaseInvoiceLine, getItems } from '../../../../api/authServices';
+import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getVendors, getCountries, getPurchaseOrderNumbers, addPurchaseInvoiceHeader, addPurchaseInvoiceLine, updatePurchaseInvoiceHeader, getPurchaseInvoiceHeaderById, getPurchaseInvoiceHeaders, getPurchaseInvoiceLines, updatePurchaseInvoiceLine, deletePurchaseInvoiceLine, getItems } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
 
 const COL_WIDTHS = {
@@ -155,7 +155,7 @@ const AddPurchaseInvoice = () => {
     const [paymentTermsOptions, setPaymentTermsOptions] = useState([]);
     const [paymentMethodsOptions, setPaymentMethodsOptions] = useState([]);
     const [projectsOptions, setProjectsOptions] = useState([]);
-    const [customersOptions, setCustomersOptions] = useState([]);
+    const [vendorsOptions, setVendorsOptions] = useState([]);
     const [salesInquiryNosOptions, setSalesInquiryNosOptions] = useState([]);
     const [salesOrderOptions, setSalesOrderOptions] = useState([]);
     const [salesOrderUuid, setSalesOrderUuid] = useState(null);
@@ -183,13 +183,14 @@ const AddPurchaseInvoice = () => {
         (async () => {
             try {
                 const [custResp, termsResp, methodsResp, projectsResp, inquiriesResp, salesOrdersResp] = await Promise.all([
-                    getCustomers(),
+                    getVendors(),
                     getPaymentTerms(),
                     getPaymentMethods(),
                     fetchProjects(),
                     getAllInquiryNumbers(),
                     getPurchaseOrderNumbers(),
                 ]);
+
 
                 const custList = extractArray(custResp);
                 const termsList = extractArray(termsResp);
@@ -205,7 +206,7 @@ const AddPurchaseInvoice = () => {
                     raw: r,
                 }));
 
-                setCustomersOptions(custList);
+                setVendorsOptions(custList);
                 setPaymentTermsOptions(termsList);
                 setPaymentMethodsOptions(methodsList);
                 setProjectsOptions(projectsList);
@@ -279,8 +280,8 @@ const AddPurchaseInvoice = () => {
             // Check if inquiryNo is actually a UUID - if so, treat it as salesInquiryUuid
             const isInquiryNoUuid = inquiryNo && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(inquiryNo);
 
-            // Prefill Sales Invoice number (SalesInvNo) first, then fallback to performa fields
-            const salesInvValue = data?.SalesInvNo || data?.SalesInvoiceNo || data?.SalesInv || data?.SalesPerInvNo || data?.PerformaInvoiceNo || data?.PerformaNo || data?.SalesPerformaNo || '';
+            // Prefill Purchase / Sales Invoice number: accept many possible keys including PurchaseInvoiceNo / InvoiceNo
+            const salesInvValue = data?.SalesInvNo || data?.SalesInvoiceNo || data?.SalesInv || data?.SalesPerInvNo || data?.PerformaInvoiceNo || data?.PerformaNo || data?.SalesPerformaNo || data?.PurchaseInvoiceNo || data?.PurchaseInvNo || data?.InvoiceNo || data?.InvoiceNumber || '';
 
             // If the API accidentally provided a UUID in place of the readable Sales Invoice number,
             // attempt to resolve it to a human-friendly invoice number before showing it in the input.
@@ -294,8 +295,9 @@ const AddPurchaseInvoice = () => {
                 // If we only have UUID, leave it empty - the mapping useEffect will fill it
                 salesInquiry: (inquiryNo && !isInquiryNoUuid) ? inquiryNo : '',
                 clientName: data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || s.clientName || '',
-                CustomerUUID: data?.CustomerUUID || data?.CustomerId || s.CustomerUUID || null,
-                CustomerName: data?.CustomerName || s.CustomerName || '',
+                // Vendor/Customer: accept vendor keys as well (prefill from ManagePurchaseInvoice row)
+                CustomerUUID: data?.CustomerUUID || data?.CustomerId || data?.VendorUUID || data?.VendorId || s.CustomerUUID || null,
+                CustomerName: data?.CustomerName || data?.VendorName || data?.Vendor || s.CustomerName || '',
             }));
 
             if (isSalesInvUuid) {
@@ -455,7 +457,7 @@ const AddPurchaseInvoice = () => {
                 }
 
                 // Prefill header form
-                const fetchedSalesInv = data?.SalesInvNo || data?.SalesInvoiceNo || data?.SalesInv || data?.SalesPerInvNo || data?.PerformaInvoiceNo || data?.PerformaNo || data?.SalesPerformaNo || '';
+                const fetchedSalesInv = data?.SalesInvNo || data?.SalesInvoiceNo || data?.SalesInv || data?.SalesPerInvNo || data?.PerformaInvoiceNo || data?.PerformaNo || data?.SalesPerformaNo || data?.PurchaseInvoiceNo || data?.PurchaseInvNo || data?.InvoiceNo || data?.InvoiceNumber || '';
                 const fetchedInquiryNo = data?.SalesInqNo || data?.SalesInquiryNo || data?.InquiryNo || '';
                 const isFetchedInquiryUuid = fetchedInquiryNo && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(fetchedInquiryNo);
 
@@ -464,8 +466,9 @@ const AddPurchaseInvoice = () => {
                     salesInquiryText: fetchedSalesInv || s.salesInquiryText || '',
                     salesInquiry: (!isFetchedInquiryUuid && fetchedInquiryNo) ? fetchedInquiryNo : s.salesInquiry || '',
                     clientName: data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || s.clientName || '',
-                    CustomerUUID: data?.CustomerUUID || data?.CustomerId || s.CustomerUUID || null,
-                    CustomerName: data?.CustomerName || data?.Customer || s.CustomerName || '',
+                    // Accept vendor fields as well as customer fields
+                    CustomerUUID: data?.CustomerUUID || data?.CustomerId || data?.VendorUUID || data?.VendorId || s.CustomerUUID || null,
+                    CustomerName: data?.CustomerName || data?.VendorName || data?.Vendor || data?.Customer || s.CustomerName || '',
                 }));
 
                 if (isFetchedInquiryUuid) setSalesInquiryUuid(fetchedInquiryNo);
@@ -666,9 +669,9 @@ const AddPurchaseInvoice = () => {
 
     // Map Customer UUID to Customer Name when options are loaded (for edit mode)
     useEffect(() => {
-        if (!headerForm || !headerForm.CustomerUUID || !customersOptions || customersOptions.length === 0) return;
+        if (!headerForm || !headerForm.CustomerUUID || !vendorsOptions || vendorsOptions.length === 0) return;
         if (!headerForm.CustomerName) {
-            const found = customersOptions.find(c =>
+            const found = vendorsOptions.find(c =>
                 c?.UUID === headerForm.CustomerUUID ||
                 c?.Uuid === headerForm.CustomerUUID ||
                 c?.Id === headerForm.CustomerUUID ||
@@ -677,11 +680,11 @@ const AddPurchaseInvoice = () => {
             if (found) {
                 setHeaderForm(s => ({
                     ...s,
-                    CustomerName: found?.CustomerName || found?.Name || found?.DisplayName || String(found)
+                    CustomerName: found?.VendorName || found?.CustomerName || found?.Name || found?.DisplayName || String(found)
                 }));
             }
         }
-    }, [headerForm, customersOptions]);
+    }, [headerForm, vendorsOptions]);
 
     // Master items (loaded from server)
     const [masterItems, setMasterItems] = useState([]);
@@ -1403,20 +1406,22 @@ const AddPurchaseInvoice = () => {
                         }
                     >
                         <View style={styles.row}>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Sales Invoice Number.</Text>
+                            {(headerUUID || route?.params?.prefillHeader) ? (
+                                <View style={styles.col}>
+                                    <Text style={inputStyles.label}>Invoice Number.</Text>
 
-                                <View style={[inputStyles.box]} pointerEvents="box-none">
-                                    <TextInput
-                                        style={[inputStyles.input, { flex: 1, color: '#000000' }]}
-                                        value={headerForm.salesInquiryText}
-                                        onChangeText={v => setHeaderForm(s => ({ ...s, salesInquiryText: v }))}
-                                        placeholder="eg."
-                                        placeholderTextColor={COLORS.textLight}
-                                        editable={headerEditable}
-                                    />
+                                    <View style={[inputStyles.box]} pointerEvents="box-none">
+                                        <TextInput
+                                            style={[inputStyles.input, { flex: 1, color: '#000000' }]}
+                                            value={headerForm.salesInquiryText}
+                                            onChangeText={v => setHeaderForm(s => ({ ...s, salesInquiryText: v }))}
+                                            placeholder="eg."
+                                            placeholderTextColor={COLORS.textLight}
+                                            editable={false}
+                                        />
+                                    </View>
                                 </View>
-                            </View>
+                            ) : null}
                             {/* <View style={styles.col}> */}
                             {/* <Text style={inputStyles.label}>Customer Name* </Text> */}
 
@@ -1493,19 +1498,19 @@ const AddPurchaseInvoice = () => {
                             {/* )} */}
 
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Customer Name* </Text>
+                                <Text style={inputStyles.label}>Vendor Name* </Text>
 
                                 <View style={{ zIndex: 9998, elevation: 20 }}>
                                     <Dropdown
-                                        placeholder="Customer Name*"
+                                        placeholder="Vendor Name*"
                                         value={headerForm.CustomerName || headerForm.opportunityTitle}
-                                        options={customersOptions}
-                                        getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
+                                        options={vendorsOptions}
+                                        getLabel={c => (c?.VendorName || c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
                                         getKey={c => (c?.UUID || c?.Id || c)}
                                         onSelect={v => {
                                             if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
                                             if (v && typeof v === 'object') {
-                                                setHeaderForm(s => ({ ...s, CustomerName: v?.CustomerName || v?.Name || v, CustomerUUID: v?.UUID || v?.Id || null }));
+                                                setHeaderForm(s => ({ ...s, CustomerName: v?.VendorName || v?.CustomerName || v?.Name || v, CustomerUUID: v?.UUID || v?.Id || null }));
                                             } else {
                                                 setHeaderForm(s => ({ ...s, CustomerName: v, CustomerUUID: null }));
                                             }
@@ -1515,7 +1520,7 @@ const AddPurchaseInvoice = () => {
                                         textStyle={inputStyles.input}
                                     />
                                 </View>
-                            </View>
+                                </View>
 
 
 

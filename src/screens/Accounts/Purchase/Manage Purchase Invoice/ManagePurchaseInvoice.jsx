@@ -80,6 +80,7 @@ const ManagePurchaseInvoice = () => {
                 HeaderUuid: headerCandidate,
                 HeaderUUID: headerCandidate,
                 UUID: headerCandidate,
+                prefillHeader: order,
                 from: 'ManagePurchaseInvoice',
             });
             return;
@@ -239,7 +240,7 @@ const ManagePurchaseInvoice = () => {
                                 { label: 'Order Date', value: orderDate },
                                 { label: 'Total Amount', value: order.TotalAmount || order.Total || order.Amount || '' },
                             ]}
-                            headerLeftLabel="Project"
+                            headerLeftLabel="Project Name"
                             headerRightLabel="Purchase Invoice Number"
                             footerComponent={renderFooterActions(order)}
                             headerRightContainerStyle={styles.headerRightContainer}

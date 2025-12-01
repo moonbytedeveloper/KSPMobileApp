@@ -19,10 +19,11 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { COLORS, TYPOGRAPHY, inputStyles, SPACING } from '../../../styles/styles';
 import AppHeader from '../../../../components/common/AppHeader';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
-import { getPurchasequotationVendor, getItems, addPurchaseOrder, updatePurchaseOrder, addPurchaseOrderLine, updatePurchaseOrderLine, deletePurchaseOrderLine, getPurchaseOrderLines } from '../../../../api/authServices';
+import { getPurchasequotationVendor, getItems, postAddPurchaseQuotationHeader, addPurchaseOrder, updatePurchaseOrder, updatePurchaseQuotationHeader, addPurchaseOrderLine, updatePurchaseOrderLine, addPurchaseQuotationLine, updatePurchaseQuotationLine, deletePurchaseOrderLine, deletePurchaseQuotationLine, getPurchaseOrderLines, getProjects } from '../../../../api/authServices';
+import { publish } from '../../../../utils/eventBus';
 import { getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 import { getpurchaseQuotationNumber } from '../../../../api/authServices';
@@ -36,16 +37,7 @@ const COL_WIDTHS = {
   AMOUNT: wp(35), // 30%
   ACTION: wp(35), // 30%
 };
-const AccordionSection = ({
-  id,
-  title,
-  expanded,
-  onToggle,
-  children,
-  wrapperStyle,
-  rightActions,
-  banner,
-}) => {
+const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyle, rightActions, banner }) => {
   return (
     <View style={[styles.sectionWrapper, wrapperStyle]}>
       <TouchableOpacity
@@ -75,6 +67,7 @@ const AccordionSection = ({
 const AddPurchaseQuotation = () => {
   const [expandedId, setExpandedId] = useState(1);
   const navigation = useNavigation();
+  const route = useRoute();
   // Header edit / submit state (mirror Sales Performa behavior)
   const [headerSubmitted, setHeaderSubmitted] = useState(false);
   const [headerEditable, setHeaderEditable] = useState(true);
@@ -86,11 +79,18 @@ const AddPurchaseQuotation = () => {
 
     // If header has been submitted and is not editable, prevent opening other sections
     if (typeof headerSubmitted !== 'undefined' && headerSubmitted && id !== 1) {
-      setExpandedId(null);
+        navigation.goBack();
       return;
     }
 
     setExpandedId(prev => (prev === id ? null : id));
+  };
+
+  const addItem = () => {
+    // Open the Create Order section and reset the line editor for a new item
+    setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', rate: '' });
+    setEditItemId(null);
+    setExpandedId(4);
   };
 
   // Demo options for dropdowns
@@ -108,15 +108,12 @@ const AddPurchaseQuotation = () => {
   const paymentMethods = [
     'Cash',
     'Bank Transfer',
-    'Mobile App Development',
-    
   ];
-  // Vendor options (fetched from API)
   const [vendorOptions, setVendorOptions] = useState([]);
   // payment methods fetched from API
   const [paymentMethodOptions, setPaymentMethodOptions] = useState([]);
 
-  const projects = [ 'Mobile App Development', 'Website Revamp'];
+  const [projects, setProjects] = useState([]);
 
   // payment terms fetched from API
   const [paymentTermOptions, setPaymentTermOptions] = useState([]);
@@ -326,10 +323,12 @@ const AddPurchaseQuotation = () => {
   const [isSavingHeader, setIsSavingHeader] = useState(false);
   const [isEditingHeader, setIsEditingHeader] = useState(false);
   const [headerErrors, setHeaderErrors] = useState({});
+  // Show Purchase Quotation Number only when navigated from ViewPurchaseQuotation (edit/prefill)
+  const [showPurchaseQuotationNoField, setShowPurchaseQuotationNoField] = useState(false);
 
   const isHeaderValid = () => {
     return (
-      headerForm.purchaseOrderNumber && String(headerForm.purchaseOrderNumber).trim() !== '' &&
+      projectName && String(projectName).trim() !== '' &&
       headerForm.companyName && String(headerForm.companyName).trim() !== '' &&
       vendor && String(vendor).trim() !== '' &&
       headerForm.quotationTitle && String(headerForm.quotationTitle).trim() !== '' &&
@@ -341,7 +340,7 @@ const AddPurchaseQuotation = () => {
 
   const validateHeaderFields = () => {
     const errors = {};
-    if (!headerForm.purchaseOrderNumber || String(headerForm.purchaseOrderNumber).trim() === '') errors.purchaseOrderNumber = 'Purchase Quotation No is required';
+    if (!projectName || String(projectName).trim() === '') errors.projectName = 'Project Name is required';
     if (!headerForm.companyName || String(headerForm.companyName).trim() === '') errors.companyName = 'Purchase Inquiry No is required';
     if (!vendor || String(vendor).trim() === '') errors.vendor = 'Vendor Name is required';
     if (!headerForm.quotationTitle || String(headerForm.quotationTitle).trim() === '') errors.quotationTitle = 'Quotation Title is required';
@@ -371,11 +370,18 @@ const AddPurchaseQuotation = () => {
       setLinesLoading(true);
       const c = await getCMPUUID();
       const e = await getENVUUID();
-      const resp = await getPurchaseOrderLines({ headerUuid, cmpUuid: c, envUuid: e });
+      let resp;
+      try {
+        resp = await getPurchaseOrderLines({ headerUuid, cmpUuid: c, envUuid: e });
+      } catch (e) {
+        // fallback attempt
+        resp = await getPurchaseOrderLines({ headerUuid, cmpUuid: c, envUuid: e });
+      }
+
       const raw = resp?.Data?.Records || resp?.Data || resp || [];
       const list = Array.isArray(raw) ? raw : [];
       const normalized = list.map((r, idx) => {
-        const serverUuid = r?.UUID || r?.LineUUID || r?.Id || null;
+        const serverUuid = r?.UUID || r?.LineUUID || r?.Id || r?.Line_Id || null;
         const itemUuid = r?.ItemUUID || r?.ItemUuid || r?.ItemId || r?.Item || null;
         const name = r?.ItemName || r?.Name || r?.Item || r?.Description || '';
         const sku = r?.SKU || r?.Sku || r?.ItemCode || '';
@@ -419,36 +425,18 @@ const AddPurchaseQuotation = () => {
     }
   };
 
-  const addItem = () => {
-    setItems(prev => {
-      const nextId = prev.length ? prev[prev.length - 1].id + 1 : 1;
-      return [
-        ...prev,
-        {
-          id: nextId,
-          selectedItem: null,
-          name: '',
-          sku: '',
-          rate: '0',
-          desc: '',
-          hsn: '',
-          qty: '1',
-          tax: 'IGST',
-          amount: '0.00',
-        },
-      ];
-    });
-  };
-
   const deleteItem = async id => {
     try {
+      console.log('[AddPurchaseQuotation] deleteItem called ->', id);
       const toDelete = items.find(r => r.id === id);
+      console.log('[AddPurchaseQuotation] toDelete ->', toDelete);
       // If header is saved and item exists on server, try deleting on server
       if (headerSaved && toDelete && toDelete.serverUuid) {
         try {
-          await deletePurchaseOrderLine({ lineUuid: toDelete.serverUuid });
+          const headerUuidToSend = headerResponse?.UUID || headerResponse?.Id || route?.params?.headerUuid || null;
+          await deletePurchaseQuotationLine({ lineUuid: toDelete.serverUuid, headerUuid: headerUuidToSend });
         } catch (e) {
-          console.error('deletePurchaseOrderLine error ->', e);
+          console.error('deletePurchaseQuotationLine error ->', e);
           Alert.alert('Warning', 'Unable to delete line on server. Removed locally.');
         }
       }
@@ -516,6 +504,7 @@ const AddPurchaseQuotation = () => {
     try {
       setIsAddingLine(true);
       const nextId = items.length ? items[items.length - 1].id + 1 : 1;
+      const existingEdit = editItemId ? items.find(x => x.id === editItemId) : null;
       // try to find matching master item for defaults
       const master = (masterItems || []).find(m => {
         if (!m) return false;
@@ -548,10 +537,11 @@ const AddPurchaseQuotation = () => {
       };
 
       // If header has been saved to server (we have Header UUID), attempt to POST the line
-      if (headerSaved && headerResponse?.UUID) {
+      const headerUuidForLine = headerResponse?.UUID || headerResponse?.Uuid || headerResponse?.Id || headerResponse?.HeaderUUID || headerResponse?.HeaderId || route?.params?.headerUuid || null;
+      if (headerSaved && headerUuidForLine) {
         try {
           const payload = {
-            HeaderUUID: headerResponse.UUID,
+            HeaderUUID: headerUuidForLine,
             ItemUUID: (master && master.uuid) || currentItem.itemNameUuid || null,
             Quantity: Number(qty) || 0,
             Description: newItem.desc || '',
@@ -559,29 +549,98 @@ const AddPurchaseQuotation = () => {
           };
           let resp;
           if (editItemId) {
-            const existing = items.find(x => x.id === editItemId);
+            const existing = existingEdit;
             if (existing && existing.serverUuid) {
               const upayload = {
                 UUID: existing.serverUuid,
-                HeaderUUID: headerResponse.UUID,
+                HeaderUUID: headerUuidForLine,
                 ItemUUID: (master && master.uuid) || currentItem.itemNameUuid || null,
                 Quantity: Number(qty) || 0,
                 Description: newItem.desc || '',
                 Rate: Number(rate) || 0,
               };
-              resp = await updatePurchaseOrderLine(upayload);
+              // Detect if anything actually changed compared to local `existing` values.
+              const existingItemUUID = existing.itemUuid || existing.itemNameUuid || existing.sku || null;
+              const existingQty = Number(existing.qty || 0);
+              const existingDesc = String(existing.desc || '');
+              const existingRate = Number(existing.rate || 0);
+              const newItemUUID = upayload.ItemUUID || null;
+              const newQty = Number(upayload.Quantity || 0);
+              const newDesc = String(upayload.Description || '');
+              const newRate = Number(upayload.Rate || 0);
+
+              const changed = (
+                String(existingItemUUID) !== String(newItemUUID) ||
+                Number(existingQty) !== Number(newQty) ||
+                String(existingDesc) !== String(newDesc) ||
+                Number(existingRate) !== Number(newRate)
+              );
+
+              if (changed) {
+                // Update quotation line on server only if something changed
+                resp = await updatePurchaseQuotationLine(upayload);
+              } else {
+                // Nothing changed — skip server call and treat as successful update locally
+                resp = null;
+                console.log('[AddPurchaseQuotation] update skipped — no changes detected for item', editItemId);
+              }
             } else {
-              resp = await addPurchaseOrderLine(payload);
+              resp = await addPurchaseQuotationLine(payload);
             }
           } else {
-            resp = await addPurchaseOrderLine(payload);
+            resp = await addPurchaseQuotationLine(payload);
           }
+          console.log('[AddPurchaseQuotation] addPurchaseQuotationLine resp ->', resp);
           const data = resp?.Data || resp || null;
           const serverItem = data && (Array.isArray(data) ? data[0] : data);
+          // try to find any server-provided id (UUID or numeric) inside serverItem
+          const findServerId = (obj) => {
+            // Prefer explicit identifier keys first, then fall back to a cautious recursive search
+            if (!obj || typeof obj !== 'object') return null;
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            const preferKeys = ['UUID', 'Uuid', 'uuid', 'LineUUID', 'Line_Id', 'LineId', 'Id', 'id'];
+            for (const k of preferKeys) {
+              if (Object.prototype.hasOwnProperty.call(obj, k)) {
+                const v = obj[k];
+                if (v || v === 0) return String(v);
+              }
+            }
+
+            // fallback: recursive search but avoid mistaking numeric fields like Rate/Quantity/Amount for an id
+            const excludedNumericKeys = new Set(['rate', 'quantity', 'amount', 'total', 'price', 'discount']);
+            const inner = (o) => {
+              if (!o || typeof o !== 'object') return null;
+              for (const k of Object.keys(o)) {
+                const v = o[k];
+                if (v === null || typeof v === 'undefined') continue;
+                if (typeof v === 'string') {
+                  const s = v.trim();
+                  if (uuidRegex.test(s)) return s;
+                  const lk = String(k).toLowerCase();
+                  if (/^\d+$/.test(s) && (lk.includes('id') || lk.includes('uuid') || lk.includes('line'))) return s;
+                }
+                if (typeof v === 'number') {
+                  const lk = String(k).toLowerCase();
+                  if (lk.includes('id') || lk.includes('uuid') || lk.includes('line')) return String(v);
+                  if (!excludedNumericKeys.has(lk)) {
+                    // as a last resort allow numeric values, but prefer id-like keys first
+                    // continue searching other keys instead of returning immediately
+                  }
+                }
+                if (typeof v === 'object') {
+                  const f = inner(v);
+                  if (f) return f;
+                }
+              }
+              return null;
+            };
+            return inner(obj);
+          };
+              const detectedId = serverItem ? findServerId(serverItem) : null;
           const itemToPush = {
             ...newItem,
             id: editItemId ? editItemId : nextId,
-            serverUuid: serverItem?.UUID || serverItem?.LineUUID || serverItem?.Id || null,
+            serverUuid: serverItem?.UUID || serverItem?.LineUUID || serverItem?.Id || detectedId || existingEdit?.serverUuid || null,
             itemUuid: serverItem?.ItemUUID || serverItem?.ItemUuid || serverItem?.ItemId || newItem.itemNameUuid || null,
             sku: serverItem?.SKU || newItem.sku,
             rate: (serverItem && (serverItem?.Rate ?? serverItem?.rate)) ?? newItem.rate,
@@ -644,13 +703,20 @@ const AddPurchaseQuotation = () => {
         UUID: headerResponse?.UUID || '',
         PurchaseOrderNo: headerForm.purchaseOrderNumber || '',
         Inquiry_No: headerForm.companyName || '',
+        InquiryNo: headerForm.companyName || '',
         Vendor_UUID: vendor || headerForm.clientName || '',
+        VendorUUID: vendor || headerForm.clientName || '',
         ProjectUUID: projectName || '',
         PaymentTermUUID: paymentTerm || '',
+        PaymentTerm: paymentTerm || '',
         PaymentMethodUUID: paymentMethod || '',
+        PaymentMode: paymentMethod || '',
         OrderDate: uiDateToApiDate(invoiceDate),
         DueDate: uiDateToApiDate(dueDate),
         Notes: notes || '',
+        Note: notes || '',
+        QuotationNo: headerForm.purchaseOrderNumber || '',
+        QuotationTitle: headerForm.quotationTitle || '',
         TermsConditions: terms || '',
         BillingBuildingNo: billingForm.buildingNo || '',
         BillingStreet1: billingForm.street1 || '',
@@ -679,9 +745,10 @@ const AddPurchaseQuotation = () => {
       console.log('AddPurchaseQuotation: submit payload ->', payload);
       let resp;
       if (headerResponse?.UUID) {
-        resp = await updatePurchaseOrder(payload);
+        resp = await updatePurchaseQuotationHeader(payload);
       } else {
-        resp = await addPurchaseOrder(payload);
+        // Create a purchase quotation header (use quotation API)
+        resp = await postAddPurchaseQuotationHeader(payload);
       }
 
       const data = resp?.Data || resp || {};
@@ -693,6 +760,21 @@ const AddPurchaseQuotation = () => {
       setExpandedId(4);
       Alert.alert('Success', 'Order submitted successfully');
       try { await loadPurchaseOrderLines(data?.UUID || data?.Id || data?.HeaderUUID || headerResponse?.UUID); } catch (e) { /* ignore */ }
+      try {
+        // publish added event so list screen can update quickly
+        try {
+          const mapped = {
+            UUID: data?.UUID || data?.Uuid || data?.Id,
+            QuotationNo: data?.QuotationNo || headerForm.purchaseOrderNumber || '',
+            QuotationTitle: data?.QuotationTitle || headerForm.quotationTitle || '',
+            VendorName: data?.VendorName || headerForm.clientName || vendor || '',
+            _raw: data,
+          };
+          publish('purchaseQuotation.added', mapped);
+        } catch (_) {}
+        // navigate back to list so user can see newly added record
+        try { navigation.goBack(); } catch (_) {}
+      } catch (e) { /* ignore */ }
     } catch (err) {
       console.error('handleCreateOrder error ->', err);
       Alert.alert('Error', err?.message || 'Unable to submit order');
@@ -714,13 +796,20 @@ const AddPurchaseQuotation = () => {
         UUID: headerResponse?.UUID || '',
         PurchaseOrderNo: headerForm.purchaseOrderNumber || '',
         Inquiry_No: headerForm.companyName || '',
+        InquiryNo: headerForm.companyName || '',
         Vendor_UUID: vendor || headerForm.clientName || '',
+        VendorUUID: vendor || headerForm.clientName || '',
         ProjectUUID: projectName || '',
         PaymentTermUUID: paymentTerm || '',
         PaymentMethodUUID: paymentMethod || '',
+        PaymentTerm: paymentTerm || '',
+        PaymentMode: paymentMethod || '',
         OrderDate: uiDateToApiDate(invoiceDate),
         DueDate: uiDateToApiDate(dueDate),
         Notes: notes || '',
+        Note: notes || '',
+        QuotationNo: headerForm.purchaseOrderNumber || '',
+        QuotationTitle: headerForm.quotationTitle || '',
         TermsConditions: terms || '',
         BillingBuildingNo: billingForm.buildingNo || '',
         BillingStreet1: billingForm.street1 || '',
@@ -748,9 +837,10 @@ const AddPurchaseQuotation = () => {
 
       let resp;
       if (headerResponse?.UUID) {
-        resp = await updatePurchaseOrder(payload);
+        resp = await updatePurchaseQuotationHeader(payload);
       } else {
-        resp = await addPurchaseOrder(payload);
+        // Create a purchase quotation header instead of creating a purchase order header
+        resp = await postAddPurchaseQuotationHeader(payload);
       }
 
       const data = resp?.Data || resp || {};
@@ -767,6 +857,7 @@ const AddPurchaseQuotation = () => {
               setHeaderEditable(false);
               setExpandedId(4);
               await loadPurchaseOrderLines(data?.UUID || data?.Id || data?.HeaderUUID || headerResponse?.UUID);
+              try { navigation.goBack(); } catch (_) {}
             } catch (e) {
               /* ignore */
             }
@@ -783,7 +874,8 @@ const AddPurchaseQuotation = () => {
   };
 
   const updateHeader = async () => {
-    if (!headerResponse?.UUID) {
+    const headerUuid = headerResponse?.UUID || headerResponse?.Uuid || headerResponse?.Id || headerResponse?.HeaderUUID || headerResponse?.HeaderId || route?.params?.headerUuid || null;
+    if (!headerUuid) {
       Alert.alert('Error', 'No header UUID to update');
       return;
     }
@@ -793,16 +885,23 @@ const AddPurchaseQuotation = () => {
       const totalTaxNum = parseFloat(totalTax) || 0;
       const totalAmountNum = subtotalNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + totalTaxNum - (parseFloat(discount) || 0);
       const payload = {
-        UUID: headerResponse?.UUID,
+        UUID: headerUuid,
         PurchaseOrderNo: headerForm.purchaseOrderNumber || '',
         Inquiry_No: headerForm.companyName || '',
+        InquiryNo: headerForm.companyName || '',
         Vendor_UUID: vendor || headerForm.clientName || '',
+        VendorUUID: vendor || headerForm.clientName || '',
         ProjectUUID: projectName || '',
         PaymentTermUUID: paymentTerm || '',
         PaymentMethodUUID: paymentMethod || '',
+        PaymentTerm: paymentTerm || '',
+        PaymentMode: paymentMethod || '',
         OrderDate: uiDateToApiDate(invoiceDate),
         DueDate: uiDateToApiDate(dueDate),
         Notes: notes || '',
+        Note: notes || '',
+        QuotationNo: headerForm.purchaseOrderNumber || '',
+        QuotationTitle: headerForm.quotationTitle || '',
         TermsConditions: terms || '',
         BillingBuildingNo: billingForm.buildingNo || '',
         BillingStreet1: billingForm.street1 || '',
@@ -827,17 +926,31 @@ const AddPurchaseQuotation = () => {
         AdjustmentField: adjustmentLabel || '',
         AdjustmentPrice: parseFloat(adjustments) || 0,
       };
-      await updatePurchaseOrder(payload);
+      const resp = await updatePurchaseQuotationHeader(payload);
+      const data = resp?.Data || resp || {};
+      // update local headerResponse with server-returned data
+      setHeaderResponse(data);
 
       Alert.alert('Success', 'Header updated successfully', [
         {
           text: 'OK',
-          onPress: async () => {
+              onPress: async () => {
             try {
               setHeaderEditable(false);
               setHeaderSubmitted(true);
               setExpandedId(4);
-              await loadPurchaseOrderLines(headerResponse?.UUID);
+                await loadPurchaseOrderLines(data?.UUID || data?.Id || data?.HeaderUUID || headerUuid);
+              // Publish update so any list screen can refresh in-place without navigation
+              try {
+                const mapped = {
+                  UUID: data?.UUID || data?.Uuid || data?.Id,
+                  QuotationNo: data?.QuotationNo || headerForm.purchaseOrderNumber || '',
+                  QuotationTitle: data?.QuotationTitle || headerForm.quotationTitle || '',
+                  VendorName: data?.VendorName || headerForm.clientName || vendor || '',
+                  _raw: data,
+                };
+                publish('purchaseQuotation.updated', mapped);
+              } catch (_) {}
             } catch (e) { /* ignore */ }
           },
         },
@@ -911,7 +1024,7 @@ const AddPurchaseQuotation = () => {
     setFile(null);
   };
 
-  // Fetch vendors for Purchase Quotation dropdown
+  // Fetch vendors for Purchase Quotation dropdown (preserve UUIDs when available)
   useEffect(() => {
     let mounted = true;
     const loadVendors = async () => {
@@ -921,12 +1034,19 @@ const AddPurchaseQuotation = () => {
         const list = resp?.Data || resp || [];
         if (!mounted) return;
         const mapped = (Array.isArray(list) ? list : []).map(it => {
-          if (!it) return '';
-          if (typeof it === 'string') return it.toString().trim();
-          const v = it.VendorName || it.Name || it.CompanyName || it.DisplayName || it.ContactName || it.Value || '';
-          return v ? String(v).trim() : '';
+          if (!it) return null;
+          if (typeof it === 'string') {
+            const label = it.toString().trim();
+            return { label, value: label };
+          }
+          const label = String(it.VendorName || it.Name || it.CompanyName || it.DisplayName || it.ContactName || it.Value || '').trim();
+          const value = it.UUID || it.VendorUUID || it.Id || it.Value || label;
+          return { label: label || String(value), value };
         }).filter(Boolean);
-        const unique = Array.from(new Set(mapped));
+        // dedupe by value
+        const uniqueMap = new Map();
+        mapped.forEach(m => { if (m && m.value) uniqueMap.set(String(m.value), m); });
+        const unique = Array.from(uniqueMap.values());
         setVendorOptions(unique);
       } catch (err) {
         console.error('Error loading purchase quotation vendors ->', err && (err.message || err));
@@ -974,13 +1094,15 @@ const AddPurchaseQuotation = () => {
         const list = resp?.Data || resp || [];
         if (!mounted) return;
         const mapped = (Array.isArray(list) ? list : []).map(it => {
-          if (!it) return '';
-          if (typeof it === 'string') return it.toString().trim();
-          const v = it.Name || it.Value || it.Label || it.Term || it.PaymentTerm || it.Text || it.Description || '';
-          return v ? String(v).trim() : '';
+          if (!it) return null;
+          if (typeof it === 'string') return { label: it, value: it };
+          const label = String(it.Name || it.Value || it.Label || it.Term || it.PaymentTerm || it.Text || it.Description || '').trim();
+          const value = it.UUID || it.Value || it.Id || label;
+          return { label: label || String(value), value };
         }).filter(Boolean);
-        const unique = Array.from(new Set(mapped));
-        setPaymentTermOptions(unique);
+        const uniqueMap = new Map();
+        mapped.forEach(m => { if (m && m.value) uniqueMap.set(String(m.value), m); });
+        setPaymentTermOptions(Array.from(uniqueMap.values()));
       } catch (err) {
         console.error('Error loading payment terms ->', err && (err.message || err));
         setPaymentTermOptions([]);
@@ -1000,13 +1122,15 @@ const AddPurchaseQuotation = () => {
         const list = resp?.Data || resp || [];
         if (!mounted) return;
         const mapped = (Array.isArray(list) ? list : []).map(it => {
-          if (!it) return '';
-          if (typeof it === 'string') return it.toString().trim();
-          const v = it.Name || it.Value || it.Label || it.Mode || it.PaymentMethod || it.Text || it.Description || '';
-          return v ? String(v).trim() : '';
+          if (!it) return null;
+          if (typeof it === 'string') return { label: it, value: it };
+          const label = String(it.Name || it.Value || it.Label || it.Mode || it.PaymentMethod || it.Text || it.Description || '').trim();
+          const value = it.UUID || it.Value || it.Id || label;
+          return { label: label || String(value), value };
         }).filter(Boolean);
-        const unique = Array.from(new Set(mapped));
-        setPaymentMethodOptions(unique);
+        const uniqueMap = new Map();
+        mapped.forEach(m => { if (m && m.value) uniqueMap.set(String(m.value), m); });
+        setPaymentMethodOptions(Array.from(uniqueMap.values()));
       } catch (err) {
         console.error('Error loading payment methods ->', err && (err.message || err));
         setPaymentMethodOptions([]);
@@ -1046,6 +1170,120 @@ const AddPurchaseQuotation = () => {
     return () => { mounted = false; };
   }, []);
 
+  // Load projects for Project Name dropdown
+  useEffect(() => {
+    let mounted = true;
+    const loadProjects = async () => {
+      try {
+        const resp = await getProjects();
+        const raw = resp?.Data ?? resp ?? [];
+        const list = Array.isArray(raw) ? raw : (raw?.Records || raw?.List || raw?.Items || []);
+        const safeLabel = (raw) => {
+          if (raw === null || typeof raw === 'undefined') return '';
+          if (typeof raw === 'string') return raw;
+          if (typeof raw === 'number' || typeof raw === 'boolean') return String(raw);
+          if (typeof raw === 'object') {
+            return raw?.ProjectName || raw?.Name || raw?.Label || raw?.Value || raw?.Text || raw?.DisplayName || JSON.stringify(raw);
+          }
+          return String(raw);
+        };
+
+        const normalized = (Array.isArray(list) ? list : []).map(it => {
+          if (!it) return null;
+          const rawLabel = it?.ProjectTitle ?? it?.ProjectName ?? it?.Name ?? it?.Title ?? it?.DisplayName ?? it?.Value ?? (typeof it === 'string' ? it : '');
+          const labelStr = safeLabel(rawLabel).trim();
+          let value = it?.UUID ?? it?.ProjectUUID ?? it?.Id ?? it?.ProjectId ?? it?.projectId ?? it?.uuid ?? it?.id ?? null;
+          if (value && typeof value === 'object') {
+            // try to extract common id fields
+            value = value?.UUID || value?.Id || value?.projectId || JSON.stringify(value);
+          }
+          if (value === null || typeof value === 'undefined' || value === '') value = labelStr || String(Math.random());
+          return { label: labelStr || String(value), value };
+        }).filter(Boolean);
+        if (!mounted) return;
+        setProjects(normalized);
+
+        // If navigated with headerData, try to set selected project (prefer UUID)
+        const hdr = route?.params?.headerData || null;
+        if (hdr) {
+          const uuid = hdr?.ProjectUUID || hdr?.ProjectId || hdr?.Project_Id || hdr?.Project || null;
+          if (uuid) {
+            setProjectName(uuid);
+          } else {
+            const name = hdr?.ProjectTitle || hdr?.ProjectName || hdr?.Project || null;
+            if (name) {
+              const found = normalized.find(p => String(p.label).toLowerCase() === String(name).toLowerCase());
+              if (found) setProjectName(found.value);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('getProjects error ->', err && (err.message || err));
+        if (mounted) setProjects([]);
+      }
+    };
+    loadProjects();
+    return () => { mounted = false; };
+  }, [route?.params]);
+
+  // If navigated here for Edit, prefill header fields from route.params.headerData
+  useEffect(() => {
+    try {
+      const params = route?.params || {};
+      const hdr = params.headerData || null;
+      const headerUuid = params.headerUuid || (hdr && (hdr.UUID || hdr.Id || hdr.Id));
+      if (hdr) {
+        // Map common server keys to local state where possible
+        setHeaderResponse(hdr);
+        setHeaderSaved(true);
+        setHeaderEditable(true);
+        setIsEditingHeader(true);
+        setExpandedId(1);
+
+        setHeaderForm(s => ({
+          ...s,
+          companyName: hdr.Inquiry_No || hdr.InquiryNo || hdr.PurchaseRequestNumber || hdr.PurchaseRequestNo || hdr.companyName || hdr.InquiryNumber || '',
+          quotationTitle: hdr.QuotationTitle || hdr.Title || hdr.quotationTitle || hdr.SalesOrderTitle || '',
+          purchaseOrderNumber: hdr.PurchaseOrderNo || hdr.PurchaseOrderNumber || s.purchaseOrderNumber || '',
+          purchaseQuotationNumber: hdr.QuotationNo || hdr.QuotationNumber || hdr.Quotation || hdr.QuotationNo || s.purchaseQuotationNumber || '',
+        }));
+
+        setVendor(hdr.VendorName || hdr.Vendor || hdr.CustomerName || hdr.Vendor_UUID || hdr.VendorUUID || '');
+        setProjectName(hdr.ProjectUUID || hdr.ProjectName || hdr.Project || hdr.Project_Id || hdr.ProjectId || '');
+        setPaymentTerm(hdr.PaymentTermUUID || hdr.PaymentTerm || hdr.PaymentTermUUID || '');
+        setPaymentMethod(hdr.PaymentMethodUUID || hdr.PaymentMethod || hdr.PaymentMethodUUID || '');
+
+        // Dates: convert server date to UI format if present
+        try {
+          const od = hdr.OrderDate || hdr.Order_Date || hdr.OrderedAt || hdr.OrderDateString || hdr.Order_Date_String || hdr.OrderDateTime || hdr.OrderedDate;
+          const dd = hdr.DueDate || hdr.Due_Date || hdr.ExpectedDate || hdr.DeliveryDate || hdr.RequiredDate;
+          if (od) setInvoiceDate(formatUiDate(od));
+          if (dd) setDueDate(formatUiDate(dd));
+        } catch (e) { /* ignore */ }
+
+        // Load lines for this header if UUID available
+        const uuidToLoad = headerUuid || (hdr && (hdr.UUID || hdr.Id || hdr.HeaderUUID));
+        if (uuidToLoad) {
+          loadPurchaseOrderLines(uuidToLoad);
+        }
+      }
+    } catch (e) {
+      console.warn('prefill from route params failed', e);
+    }
+  }, [route?.params]);
+
+  // When navigated with header data or headerUuid, show the Purchase Quotation Number field
+  useEffect(() => {
+    try {
+      const params = route?.params || {};
+      if (params?.headerData || params?.headerUuid || params?.prefillHeader) {
+        setShowPurchaseQuotationNoField(true);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [route?.params]);
+
   return (
     <>
       <View style={{ flex: 1, backgroundColor: '#fff'}}>
@@ -1070,45 +1308,34 @@ const AddPurchaseQuotation = () => {
               headerSubmitted && !headerEditable ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
                   <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
-                  <TouchableOpacity onPress={() => { setHeaderEditable(true); setIsEditingHeader(true); setExpandedId(1); }}>
+                    <TouchableOpacity onPress={() => { setHeaderEditable(true); setIsEditingHeader(true); setExpandedId(1); setShowPurchaseQuotationNoField(true); }}>
                     <Icon name="edit" size={rf(4.4)} color={COLORS.primary} />
                   </TouchableOpacity>
                 </View>
               ) : null
             }
           >
-            <View style={styles.row}>
-             <View style={styles.col}>
-         <Text style={inputStyles.label}>Purchase Quotation No*</Text>
-
-                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
-                <View
-                  style={[inputStyles.box]}
-                  onStartShouldSetResponder={() => true}
-                  onResponderGrant={() => purchaseOrderRef.current?.focus()}
-                >
-                  <TextInput
-                    ref={purchaseOrderRef}
-                    onFocus={() => setFocusedPurchaseOrder(true)}
-                    onBlur={() => setFocusedPurchaseOrder(false)}
-                    style={[
-                      inputStyles.input,
-                      { color: focusedPurchaseOrder ? '#000000' : COLORS.text, textShadowColor: focusedPurchaseOrder ? '#000000' : 'transparent' },
-                    ]}
-                    value={headerForm.purchaseOrderNumber}
-                    onChangeText={v =>
-                      setHeaderForm(s => ({ ...s, purchaseOrderNumber: v }))
-                    }
-                    placeholder="eg."
-                    placeholderTextColor={COLORS.textLight}
-                    editable={headerEditable}
-                  />
+            {showPurchaseQuotationNoField && (
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={inputStyles.label}>Purchase Quotation Number*</Text>
+                  <View style={[inputStyles.box]}>
+                    <TextInput
+                      style={[inputStyles.input, { color: '#000000' }]}
+                      value={headerForm.purchaseQuotationNumber || headerResponse?.QuotationNo || headerResponse?.QuotationNumber || ''}
+                      placeholder="eg."
+                      placeholderTextColor={COLORS.textLight}
+                      editable={false}
+                      pointerEvents="none"
+                    />
+                  </View>
                 </View>
               </View>
-            <View style={styles.col}>
-                <Text style={inputStyles.label}>Purchase Inquiry No.</Text>
+            )}
 
-                {/* <Text style={[inputStyles.label, { fontWeight: '600' }]}>Sales Inquiry No.</Text> */}
+            <View style={styles.row}>
+              <View style={styles.col}>
+                <Text style={inputStyles.label}>Purchase Inquiry No.</Text>
                 <Dropdown
                   placeholder="select Purchase Inquiry"
                   value={headerForm.companyName}
@@ -1123,23 +1350,23 @@ const AddPurchaseQuotation = () => {
                   textStyle={inputStyles.input}
                 />
               </View>
-            </View>
-
-            <View style={[styles.row, { marginTop: hp(1.5) }]}>
               <View style={styles.col}>
-         <Text style={inputStyles.label}> Vendor Name*  </Text>
-
-                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
-               <View style={{ zIndex: 9998, elevation: 20 }}>
+                <Text style={inputStyles.label}> Vendor Name*  </Text>
+                <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
                     placeholder="-Select Vendor-"
                     value={vendor}
                     options={vendorOptions}
-                    getLabel={p => p}
-                    getKey={p => p}
-                    onSelect={v => {
+                    getLabel={p => (p?.label ?? String(p))}
+                    getKey={p => (p?.value ?? String(p))}
+                    onSelect={opt => {
                       if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
-                      setVendor(v);
+                      try {
+                        const selectedValue = opt && (opt.value ?? opt?.UUID ?? opt);
+                        setVendor(selectedValue);
+                      } catch (e) {
+                        setVendor(opt);
+                      }
                     }}
                     renderInModal={true}
                     inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
@@ -1147,10 +1374,11 @@ const AddPurchaseQuotation = () => {
                   />
                 </View>
               </View>
-             <View style={styles.col}>
-         <Text style={inputStyles.label}>Quotation Title*</Text>
+            </View>
 
-                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
+            <View style={[styles.row, { marginTop: hp(1.5) }]}> 
+              <View style={styles.col}>
+                <Text style={inputStyles.label}>Quotation Title*</Text>
                 <View
                   style={[inputStyles.box]}
                   onStartShouldSetResponder={() => true}
@@ -1174,6 +1402,31 @@ const AddPurchaseQuotation = () => {
                   />
                 </View>
               </View>
+              <View style={styles.col}>
+                <Text style={inputStyles.label}>Project Name*</Text>
+                <View style={{ zIndex: 9998, elevation: 20 }}>
+                  <Dropdown
+                    placeholder="Select Project"
+                    value={projectName}
+                    options={projects}
+                    getLabel={p => p?.label || ''}
+                    getKey={p => p?.value}
+                    onSelect={opt => {
+                      if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
+                      // Dropdown passes the selected item object; store its `value` (UUID/id)
+                      try {
+                        const selectedValue = opt && (opt.value ?? opt?.ProjectUUID ?? opt?.UUID ?? opt?.Id ?? opt?.id ?? opt);
+                        setProjectName(selectedValue);
+                      } catch (e) {
+                        setProjectName(opt);
+                      }
+                    }}
+                    renderInModal={true}
+                    inputBoxStyle={[inputStyles.box]}
+                    textStyle={inputStyles.input}
+                  />
+                </View>
+              </View>
             </View>
 
             <View style={[styles.row, { marginTop: hp(1.5) }]}>
@@ -1186,11 +1439,11 @@ const AddPurchaseQuotation = () => {
                     placeholder="Select Payment Term"
                     value={paymentTerm}
                     options={paymentTermOptions}
-                    getLabel={p => p}
-                    getKey={p => p}
-                    onSelect={v => {
+                    getLabel={p => (p?.label ?? String(p))}
+                    getKey={p => (p?.value ?? String(p))}
+                    onSelect={opt => {
                       if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
-                      setPaymentTerm(v);
+                      try { const v = opt && (opt.value ?? opt); setPaymentTerm(v); } catch (e) { setPaymentTerm(opt); }
                     }}
                     renderInModal={true}
                     inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
@@ -1205,12 +1458,12 @@ const AddPurchaseQuotation = () => {
                   <Dropdown
                     placeholder="Payment Method"
                     value={paymentMethod}
-                    options={paymentMethodOptions && paymentMethodOptions.length ? paymentMethodOptions : paymentMethods}
-                    getLabel={p => p}
-                    getKey={p => p}
-                    onSelect={v => {
+                    options={(paymentMethodOptions && paymentMethodOptions.length) ? paymentMethodOptions : paymentMethods.map(m => ({ label: m, value: m }))}
+                    getLabel={p => (p?.label ?? String(p))}
+                    getKey={p => (p?.value ?? String(p))}
+                    onSelect={opt => {
                       if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
-                      setPaymentMethod(v);
+                      try { const v = opt && (opt.value ?? opt); setPaymentMethod(v); } catch (e) { setPaymentMethod(opt); }
                     }}
                     renderInModal={true}
                     inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
@@ -1271,7 +1524,8 @@ const AddPurchaseQuotation = () => {
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => {
-                  if (headerResponse?.UUID && headerEditable) {
+                  const shouldUpdate = (isEditingHeader || (headerResponse?.UUID && headerEditable));
+                  if (shouldUpdate) {
                     updateHeader();
                   } else {
                     submitHeader();
