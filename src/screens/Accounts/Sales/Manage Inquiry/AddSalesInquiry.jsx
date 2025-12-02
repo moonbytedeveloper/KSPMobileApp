@@ -7,7 +7,7 @@ import { COLORS, TYPOGRAPHY, inputStyles } from '../../../styles/styles';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
-import { addSalesInquiry, getCustomers, getItemTypes, getItemMasters, getUnits, addSalesHeader, addSalesLine, updateSalesHeader, getSalesHeader, getSalesLines, updateSalesLine, deleteSalesLine } from '../../../../api/authServices';
+import { addSalesInquiry, getCustomers, getItemTypes, getItemMasters, getUnits, addSalesHeader, addSalesLine, updateSalesHeader, getSalesHeader, getSalesLines, updateSalesLine, deleteSalesLine, fetchProjects } from '../../../../api/authServices';
 import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { uiDateToApiDate } from '../../../../utils/dateUtils';
 import BottomSheetConfirm from '../../../../components/common/BottomSheetConfirm';
@@ -61,6 +61,8 @@ const AddSalesInquiry = () => {
     const [customerName, setCustomerName] = useState('');
     const [customerUuid, setCustomerUuid] = useState(null);
     const [customers, setCustomers] = useState([]);
+    const [projects, setProjects] = useState([]);
+    const [projectUuid, setProjectUuid] = useState(null);
     const [serverItemTypes, setServerItemTypes] = useState([]);
     const [itemTypesLoading, setItemTypesLoading] = useState(false);
     const [serverItemMasters, setServerItemMasters] = useState([]);
@@ -277,6 +279,31 @@ const AddSalesInquiry = () => {
         }
     };
 
+    const fetchProjectsList = async () => {
+        try {
+            const resp = await fetchProjects();
+            console.log('FetchProjects resp ->', resp);
+            const data = resp?.Data || resp || [];
+            // Try multiple possible array locations
+            let list = [];
+            if (Array.isArray(data)) {
+                list = data;
+            } else if (Array.isArray(data?.List)) {
+                list = data.List;
+            } else if (Array.isArray(data?.Records)) {
+                list = data.Records;
+            } else if (Array.isArray(data?.Items)) {
+                list = data.Items;
+            }
+            console.log('FetchProjects extracted list ->', list);
+            setProjects(list);
+            return list;
+        } catch (e) {
+            console.log('Error fetching projects', e?.message || e);
+            return [];
+        }
+    };
+
     const fetchItemTypes = async () => {
         try {
             setItemTypesLoading(true);
@@ -334,6 +361,7 @@ const AddSalesInquiry = () => {
             try {
                 await Promise.all([
                     fetchCustomers(),
+                    fetchProjectsList(),
                     fetchItemTypes(),
                     fetchItemMasters(null),
                     fetchUnits(),
@@ -672,13 +700,25 @@ const AddSalesInquiry = () => {
                         <View style={styles.row}>
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>Project Name*</Text>
-                                <View style={[inputStyles.box]}>
-                                    <TextInput
-                                        style={[inputStyles.input, { color: COLORS.text }]}
+                                <View style={{ zIndex: 9998, elevation: 20 }}>
+                                    <Dropdown
+                                        placeholder="- Select Project -"
                                         value={projectName}
-                                        onChangeText={setProjectName}
-                                        placeholder="eg. Ksp"
-                                        placeholderTextColor={COLORS.textLight}
+                                        options={projects}
+                                        getLabel={(p) => p?.ProjectTitle || p?.Name || p?.DisplayName || p?.name || ''}
+                                        getKey={(p) => p?.Uuid || p?.UUID || p?.Id || p?.id || (p?.ProjectTitle ?? p)}
+                                        onSelect={(v) => {
+                                            if (v && typeof v === 'object') {
+                                                setProjectName(v?.ProjectTitle || v?.Name || v?.DisplayName || v?.name || '');
+                                                setProjectUuid(v?.Uuid || v?.UUID || v?.Id || v?.id || null);
+                                            } else {
+                                                setProjectName(v);
+                                                setProjectUuid(null);
+                                            }
+                                        }}
+                                        renderInModal={true}
+                                        inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                                        textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>

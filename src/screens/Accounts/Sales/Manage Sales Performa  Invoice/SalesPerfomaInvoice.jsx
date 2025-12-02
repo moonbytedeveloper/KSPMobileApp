@@ -9,7 +9,7 @@ import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles'; 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
-import { getSalesPerformaInvoiceHeaders, deleteSalesPerformaInvoiceHeader } from '../../../../api/authServices';
+import { getSalesPerformaInvoiceHeaders, deleteSalesPerformaInvoiceHeader, getSalesPerformaInvoiceSlip } from '../../../../api/authServices';
 
 const SalesPerfomaInvoice = () => {
     const navigation = useNavigation();
@@ -21,6 +21,7 @@ const SalesPerfomaInvoice = () => {
     const [totalRecords, setTotalRecords] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
     const totalPages = useMemo(() => {
         if (totalRecords === 0) return 0;
@@ -81,6 +82,37 @@ const SalesPerfomaInvoice = () => {
         fetchPurchaseInquiries(currentPage, itemsPerPage, searchQuery);
     }, [fetchPurchaseInquiries]);
 
+    // Static base64 PDF string for demo purposes
+    const handleDownloadPerformaPDF = async (order) => {
+        try {
+            if (!order?.id) {
+                Alert.alert('Error', 'Performa invoice not found');
+                return;
+            }
+
+            setIsGeneratingPDF(true);
+            const pdfBase64 = await getSalesPerformaInvoiceSlip({ headerUuid: order.id });
+            
+            if (!pdfBase64) {
+                Alert.alert('Error', 'Performa invoice PDF is not available right now.');
+                return;
+            }
+
+            // Navigate to FileViewerScreen with PDF data
+            navigation.navigate('FileViewerScreen', {
+                pdfBase64,
+                fileName: `PerformaInvoice_${order.title || order.inquiryNo || order.id}`,
+                opportunityTitle: order.title || order.inquiryNo || 'Performa Invoice',
+                companyName: order.customerName || '',
+            });
+        } catch (error) {
+            console.log('handleDownloadPerformaPDF error:', error?.message || error);
+            Alert.alert('Error', error?.message || 'Unable to generate PDF. Please try again.');
+        } finally {
+            setIsGeneratingPDF(false);
+        }
+    };
+
     const rangeStart = totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1;
     const rangeEnd = totalRecords === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, totalRecords);
 
@@ -121,14 +153,17 @@ const SalesPerfomaInvoice = () => {
             try {
                 const headerUuid = order?.raw?.UUID || order?.UUID || order?.id || order?.Id;
                 if (headerUuid) {
-                    navigation.navigate('AddSalesInvoice', { headerUuid });
+                    navigation.navigate('AddSalesPerfomaInvoice', { headerUuid });
                 } else {
                     // Fallback to prefillHeader if UUID not found (pass raw data)
-                    navigation.navigate('AddSalesInvoice', { prefillHeader: order.raw || order });
+                    navigation.navigate('AddSalesPerfomaInvoice', { prefillHeader: order.raw || order });
                 }
             } catch (e) {
                 console.warn('navigate to edit performa invoice failed', e);
             }
+        }
+        if (actionLabel === 'Download') {
+            handleDownloadPerformaPDF(order);
         }
 
     };
@@ -136,6 +171,7 @@ const SalesPerfomaInvoice = () => {
     const renderFooterActions = (order) => {
         const buttons = [
             { icon: 'delete-outline', label: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
+            { icon: 'file-download', label: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
             { icon: 'chat-bubble-outline', label: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
             { icon: 'visibility', label: 'View', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
             { icon: 'edit', label: 'Edit', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
@@ -149,8 +185,13 @@ const SalesPerfomaInvoice = () => {
                         activeOpacity={0.85}
                         style={[styles.cardActionBtn, { backgroundColor: btn.bg, borderColor: btn.border }]}
                         onPress={() => handleQuickAction(order, btn.label)}
+                        disabled={btn.icon === 'file-download' && isGeneratingPDF}
                     >
-                        <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
+                        {btn.icon === 'file-download' && isGeneratingPDF ? (
+                            <ActivityIndicator size="small" color={btn.color} />
+                        ) : (
+                            <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
+                        )}
                     </TouchableOpacity>
                 ))}
             </View>

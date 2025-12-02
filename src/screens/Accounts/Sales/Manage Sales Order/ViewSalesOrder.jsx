@@ -7,7 +7,7 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
-import { getSalesOrderHeaders, getSalesHeader, deleteSalesOrderHeader } from '../../../../api/authServices';
+import { getSalesOrderHeaders, getSalesHeader, deleteSalesOrderHeader, getSalesOrderSlip, convertSalesOrderToInvoice } from '../../../../api/authServices';
 
 // sales orders will be fetched from API
 
@@ -23,6 +23,7 @@ const ViewSalesOrder = () => {
     const [totalRecords, setTotalRecords] = useState(0);
     const [loading, setLoading] = useState(false);
     const [isFetchingHeader, setIsFetchingHeader] = useState(false);
+    const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
     const filteredOrders = useMemo(() => {
         const query = searchQuery.trim().toLowerCase();
@@ -56,8 +57,43 @@ const ViewSalesOrder = () => {
     const rangeStart = totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1;
     const rangeEnd = totalRecords === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, totalRecords);
 
-    const handleQuickAction = (order, actionLabel) => {
-        Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber}`);
+    const handleQuickAction = async (order, actionLabel) => {
+        if (actionLabel === 'Forward') {
+            try {
+                const salesOrderUuid = order?.raw?.UUID || order?.raw?.SalesOrderUUID || order?.id;
+                if (!salesOrderUuid) {
+                    Alert.alert('Error', 'Sales Order UUID not found');
+                    return;
+                }
+                
+                console.log('Converting Sales Order to Invoice:', salesOrderUuid);
+                const result = await convertSalesOrderToInvoice({ salesOrderUuid });
+                console.log('Convert result:', result);
+                const HeaderUUID = result?.Data?.HeaderUUID;
+                if (!HeaderUUID) {
+                    Alert.alert('Error', 'Failed to retrieve Invoice UUID after conversion');
+                    return;
+                }
+                console.log(HeaderUUID,'here is the header uuid');
+                
+                
+                Alert.alert(
+                    'Success', 
+                    'Sales Order converted to Invoice successfully',
+                    [
+                        { text: 'OK', onPress: () => { 
+                            navigation.navigate('AddSalesInvoice', { headerUuid: HeaderUUID }); 
+                            fetchOrders(); 
+                        } }
+                    ]
+                );
+            } catch (error) {
+                console.log('Convert error:', error?.message || error);
+                Alert.alert('Error', error?.message || 'Failed to convert Sales Order to Invoice');
+            }
+        } else {
+            Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber}`);
+        }
     };
 
     const fetchOrders = async ({ start = 0, length = itemsPerPage, searchValue = '' } = {}) => {
@@ -134,11 +170,41 @@ const ViewSalesOrder = () => {
         );
     };
 
+    const handleDownloadPDF = async (order) => {
+        try {
+            if (!order?.id) {
+                Alert.alert('Error', 'Sales order not found');
+                return;
+            }
+
+            setIsGeneratingPDF(true);
+            const pdfBase64 = await getSalesOrderSlip({ headerUuid: order.id });
+            
+            if (!pdfBase64) {
+                Alert.alert('Error', 'Sales order PDF is not available right now.');
+                return;
+            }
+
+            // Navigate to FileViewerScreen with PDF data
+            navigation.navigate('FileViewerScreen', {
+                pdfBase64,
+                fileName: `SalesOrder_${order.salesOrderNumber || order.id}`,
+                opportunityTitle: order.salesOrderNumber || 'Sales Order',
+                companyName: order.customerName || '',
+            });
+        } catch (error) {
+            console.log('handleDownloadPDF error:', error?.message || error);
+            Alert.alert('Error', error?.message || 'Unable to generate PDF. Please try again.');
+        } finally {
+            setIsGeneratingPDF(false);
+        }
+    };
+
     const renderFooterActions = (order) => {
         const buttons = [
             { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444', action: 'Delete' },
             { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6', action: 'Download' },
-            { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280', action: 'Forward' },
+            { icon: 'logout', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280', action: 'Forward' },
             { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E', action: 'View' },
             { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316', action: 'Update Status'  },
         ];
@@ -155,12 +221,19 @@ const ViewSalesOrder = () => {
                                 handleEditOrder(order);
                             } else if (btn.icon === 'delete-outline') {
                                 handleDeleteOrder(order);
+                            } else if (btn.icon === 'file-download') {
+                                handleDownloadPDF(order);
                             } else {
                                 handleQuickAction(order, btn.action);
                             }
                         }}
+                        disabled={btn.icon === 'file-download' && isGeneratingPDF}
                     >
-                        <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
+                        {btn.icon === 'file-download' && isGeneratingPDF ? (
+                            <ActivityIndicator size="small" color={btn.color} />
+                        ) : (
+                            <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
+                        )}
                     </TouchableOpacity>
                 ))}
             </View>

@@ -56,29 +56,38 @@ const handleSessionExpired = async () => {
   try {
     // Clear all tokens
     await clearTokens();
-    
-    // Show session expired popup
-    Alert.alert(
-      'Session Expired',
-      'Please login again your session is expired',
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            // Navigate to login screen
-            if (navigationRef) {
-              navigationRef.dispatch(
-                CommonActions.reset({
-                  index: 0,
-                  routes: [{ name: 'Login' }],
-                })
-              );
-            }
-          }
-        }
-      ],
-      { cancelable: false }
-    );
+		// Try to show a bottom-sheet session expired screen if navigationRef is available
+		if (navigationRef && typeof navigationRef.navigate === 'function') {
+			try {
+				navigationRef.navigate('SessionExpired');
+				return;
+			} catch (e) {
+				console.warn('navigationRef.navigate(SessionExpired) failed', e);
+			}
+		}
+
+		// Fallback to Alert if navigationRef not available or navigation failed
+		Alert.alert(
+			'Session Expired',
+			'Please login again your session is expired',
+			[
+				{
+					text: 'OK',
+					onPress: () => {
+						// Navigate to login screen
+						if (navigationRef) {
+							navigationRef.dispatch(
+								CommonActions.reset({
+									index: 0,
+									routes: [{ name: 'Login' }],
+								})
+							);
+						}
+					}
+				}
+			],
+			{ cancelable: false }
+		);
   } catch (error) {
     console.log('Error handling session expiration:', error);
   }

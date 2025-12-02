@@ -38,6 +38,7 @@ import LoginScreen from '../../screens/Auth/LoginScreen';
 import ForgotPasswordScreen from '../../screens/Auth/ForgotPasswordScreen';
 import OTPVerificationScreen from '../../screens/Auth/OTPVerificationScreen';
 import NewPasswordScreen from '../../screens/Auth/NewPasswordScreen';
+import SessionExpiredBottomSheet from '../../screens/Auth/SessionExpiredBottomSheet';
 import ManageLeadScreen from '../../screens/BusinessDevelopment/ManageLeadScreen';
 import AddExpenseScreen from '../../screens/Expense/AddExpenseScreen.jsx';
 import ApplyLeaveScreen from '../../screens/Leave/ApplyLeaveScreen.jsx';
@@ -114,6 +115,11 @@ const AppStack = () => {
       <Stack.Screen
         name="NewPassword"
         component={NewPasswordScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="SessionExpired"
+        component={SessionExpiredBottomSheet}
         options={{ headerShown: false }}
       />
       <Stack.Screen

@@ -429,6 +429,12 @@ const AddSalesPerfomaInvoice = () => {
                     } catch (e) { /* ignore */ }
                 }
 
+                // Prefill SalesInqNoUUID directly in headerForm for reference
+                const salesInqUuid = data?.SalesInqNoUUID || null;
+                if (salesInqUuid) {
+                    setHeaderForm(s => ({ ...s, salesInquiryUUID: salesInqUuid }));
+                }
+
                 // Extract Project UUID
                 const projUuid = data?.ProjectUUID || data?.ProjectId || data?.Project || null;
                 if (projUuid) {
@@ -463,6 +469,7 @@ const AddSalesPerfomaInvoice = () => {
                     salesInquiryText: fetchedSalesInv || s.salesInquiryText || '',
                     salesInquiry: (!isFetchedInquiryUuid && fetchedInquiryNo) ? fetchedInquiryNo : s.salesInquiry || '',
                     clientName: data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || s.clientName || '',
+                    salesOrderNo: data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || s.salesOrderNo || '',
                     CustomerUUID: data?.CustomerUUID || data?.CustomerId || s.CustomerUUID || null,
                     CustomerName: data?.CustomerName || data?.Customer || s.CustomerName || '',
                 }));
@@ -492,6 +499,11 @@ const AddSalesPerfomaInvoice = () => {
                     } else {
                         setDueDate(dueDate);
                     }
+                }
+
+                // Prefill Days field
+                if (data?.Days !== undefined && data?.Days !== null) {
+                    setDueDays(String(data.Days));
                 }
 
                 setShippingCharges(String(data?.ShippingCharges ?? data?.ShippingCharge ?? 0));
@@ -728,6 +740,8 @@ const AddSalesPerfomaInvoice = () => {
         salesInquiryText: '',
         salesInquiry: '',
         clientName: '',
+        salesOrderNo: '',
+        salesOrderUUID: '',
         phone: '',
         email: '',
     });
@@ -754,6 +768,7 @@ const AddSalesPerfomaInvoice = () => {
     const [items, setItems] = useState([]);
     const [invoiceDate, setInvoiceDate] = useState('');
     const [dueDate, setDueDate] = useState('');
+    const [dueDays, setDueDays] = useState('');
     const [openDatePicker, setOpenDatePicker] = useState(false);
     const [datePickerField, setDatePickerField] = useState(null); // 'invoice' | 'due'
     const [datePickerSelectedDate, setDatePickerSelectedDate] = useState(
@@ -867,11 +882,70 @@ const AddSalesPerfomaInvoice = () => {
 
     const handleDateSelect = date => {
         const formatted = formatUiDate(date);
-        if (datePickerField === 'invoice') setInvoiceDate(formatted);
+        if (datePickerField === 'invoice') {
+            setInvoiceDate(formatted);
+            // Auto-calculate due date if days are set
+            if (dueDays) {
+                calculateDueDate(date, dueDays);
+            }
+        }
         if (datePickerField === 'due') setDueDate(formatted);
         setOpenDatePicker(false);
         setDatePickerField(null);
     };
+
+    // Centralized calculation: Order Date (Date or UI string) + days -> DueDate (UI string dd-MMM-yyyy)
+    const calculateDueDate = (orderDateInput = null, daysInput = null) => {
+        try {
+            // determine base date
+            let baseDate = null;
+            if (orderDateInput instanceof Date && !isNaN(orderDateInput)) {
+                baseDate = orderDateInput;
+            } else {
+                const od = orderDateInput ?? invoiceDate;
+                if (!od) return;
+                // try dd-MMM-yyyy first (our UI)
+                const m = String(od).match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+                if (m) {
+                    const dd = parseInt(m[1], 10);
+                    const months = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+                    const mm = months[m[2]];
+                    baseDate = new Date(m[3], mm, dd);
+                } else if (/\//.test(String(od))) {
+                    // try dd/MM/YYYY or similar
+                    const parts = String(od).split('/');
+                    if (parts.length === 3) {
+                        baseDate = new Date(parts[2], parts[1] - 1, parts[0]);
+                    }
+                }
+                if (!baseDate) {
+                    const parsed = new Date(od);
+                    if (!isNaN(parsed)) baseDate = parsed;
+                }
+            }
+            if (!baseDate) return;
+
+            // determine days
+            const rawDays = (typeof daysInput !== 'undefined' && daysInput !== null) ? daysInput : dueDays;
+            const days = (typeof rawDays === 'number') ? rawDays : parseInt(String(rawDays).replace(/\D/g, ''), 10);
+            if (isNaN(days)) return;
+
+            const newDue = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + days);
+            const newDueStr = formatUiDate(newDue);
+            console.log('[AddSalesInvoice] calculateDueDate -> base=', baseDate, 'days=', days, 'due=', newDueStr);
+            setDueDate(newDueStr);
+        } catch (e) {
+            console.warn('calculateDueDate error', e);
+        }
+    };
+
+    // Auto-calculate Due Date as Order Date + DueDays (if DueDays is set)
+    React.useEffect(() => {
+        // whenever invoiceDate or dueDays change, recompute due date
+        if (invoiceDate && dueDays) {
+            calculateDueDate(invoiceDate, dueDays);
+        }
+    }, [invoiceDate, dueDays]);
 
     const computeAmount = (qty, rate) => {
         const q = parseFloat(qty) || 0;
@@ -996,7 +1070,7 @@ const AddSalesPerfomaInvoice = () => {
     };
 
     // State & handlers used by the Item Details form (Section 4)
-    const [currentItem, setCurrentItem] = useState({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', rate: '' });
+    const [currentItem, setCurrentItem] = useState({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
     const [editItemId, setEditItemId] = useState(null);
     const [isAddingLine, setIsAddingLine] = useState(false);
     const [linesLoading, setLinesLoading] = useState(false);
@@ -1053,7 +1127,7 @@ const AddSalesPerfomaInvoice = () => {
         setAdjustmentLabel('Adjustments');
         setFile(null);
         setExpandedId(null);
-        setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', rate: '' });
+        setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
         setEditItemId(null);
         setIsAddingLine(false);
         setLinesLoading(false);
@@ -1106,6 +1180,7 @@ const AddSalesPerfomaInvoice = () => {
                     Quantity: qty,
                     Rate: rate,
                     Description: description,
+                    HSNSACNO: currentItem.hsn || '',
                 };
 
                 // If serverLineUuid exists, call update API, otherwise just update locally
@@ -1113,18 +1188,18 @@ const AddSalesPerfomaInvoice = () => {
                     const resp = await updateSalesInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
                     console.log('update line resp ->', resp);
                     const updatedLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || existing.serverLineUuid;
-                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid }) : it));
+                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid }) : it));
                     // refresh header totals from server after update
                     await refreshHeaderTotals(headerUUID);
                 } else {
                     // local-only line - update in state
-                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', qty: String(qty), amount: computeAmount(qty, rate) }) : it));
+                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate) }) : it));
                     // Clear serverTotalAmount so UI will compute Total Amount from local subtotal
                     setServerTotalAmount('');
                 }
 
                 // reset edit state
-                setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', rate: '' });
+                setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
                 setEditItemId(null);
             } else {
                 // Build payload expected by backend
@@ -1135,6 +1210,7 @@ const AddSalesPerfomaInvoice = () => {
                     Quantity: qty,
                     Rate: rate,
                     Description: description,
+                    HSNSACNO: currentItem.hsn || '',
                 };
 
                 console.log('Posting line payload ->', payload);
@@ -1144,10 +1220,10 @@ const AddSalesPerfomaInvoice = () => {
                 // on success, update local items list (assign local id and keep server uuid if returned)
                 const nextId = items.length ? (items[items.length - 1].id + 1) : 1;
                 const serverLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || null;
-                setItems(prev => ([...prev, { id: nextId, selectedItem: null, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: '', qty: String(qty), tax: 'IGST', amount: computeAmount(qty, rate), serverLineUuid }]));
+                setItems(prev => ([...prev, { id: nextId, selectedItem: null, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), tax: 'IGST', amount: computeAmount(qty, rate), serverLineUuid }]));
 
                 // reset line form
-                setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', rate: '' });
+                setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
                 // After server add, refresh header totals from server
                 await refreshHeaderTotals(headerUUID || (resp?.Data?.HeaderUUID || resp?.HeaderUUID || null));
             }
@@ -1162,7 +1238,7 @@ const AddSalesPerfomaInvoice = () => {
     const handleEditItem = id => {
         const it = items.find(x => x.id === id);
         if (!it) return;
-        setCurrentItem({ itemType: it.itemType || '', itemTypeUuid: it.itemTypeUuid || null, itemName: it.name || '', itemNameUuid: it.itemUuid || it.sku || null, quantity: it.qty || '1', unit: it.unit || '', unitUuid: it.unitUuid || null, desc: it.desc || '', rate: it.rate || '' });
+        setCurrentItem({ itemType: it.itemType || '', itemTypeUuid: it.itemTypeUuid || null, itemName: it.name || '', itemNameUuid: it.itemUuid || it.sku || null, quantity: it.qty || '1', unit: it.unit || '', unitUuid: it.unitUuid || null, desc: it.desc || '', hsn: it.hsn || '', rate: it.rate || '' });
         setEditItemId(id);
     };
 
@@ -1245,6 +1321,7 @@ const AddSalesPerfomaInvoice = () => {
                 PaymentMethodUUID: paymentMethodUUID || paymentMethod || '',
                 OrderDate: uiDateToApiDate(invoiceDate),
                 DueDate: uiDateToApiDate(dueDate),
+                Days: parseInt(dueDays) || 0,
                 CustomerNotes: notes || '',
                 ShippingCharges: parseFloat(shippingCharges) || 0,
                 AdjustmentField: adjustmentLabel || '',
@@ -1300,6 +1377,8 @@ const AddSalesPerfomaInvoice = () => {
                 PaymentTermUUID: paymentTermUuid || paymentTerm || '',
                 PaymentMethodUUID: paymentMethodUUID || paymentMethod || '',
                 OrderDate: uiDateToApiDate(invoiceDate),
+                DueDate: uiDateToApiDate(dueDate),
+                Days: parseInt(dueDays) || 0,
                 CustomerNotes: notes || '',
                 ShippingCharges: parseFloat(shippingCharges) || 0,
                 AdjustmentField: adjustmentLabel || '',
@@ -1415,7 +1494,7 @@ const AddSalesPerfomaInvoice = () => {
                         title="Header"
                         expanded={expandedId === 1}
                         onToggle={headerSubmitted && !headerEditable ? () => { } : toggleSection}
-                            rightActions={
+                        rightActions={
                             headerSubmitted && !headerEditable ? (
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
                                     <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
@@ -1423,96 +1502,72 @@ const AddSalesPerfomaInvoice = () => {
                                         <Icon name="edit" size={rf(5)} color={COLORS.primary} />
                                     </TouchableOpacity>
                                 </View>
-                            ) : null  
-                        }    
-                    >    
-                        {showSalesInvoiceNoField ? (
-                            <View style={styles.row}>
-                                <View style={styles.col}>
-                                    <Text style={inputStyles.label}>Sales Invoice Number.</Text>
+                            ) : null
+                        }
+                    >
 
-                                    <View style={[inputStyles.box]} pointerEvents="box-none">
-                                        <TextInput
-                                            style={[inputStyles.input, { flex: 1, color: '#000000' }]}
-                                            value={headerForm.salesInquiryText}
-                                            placeholder="eg."
-                                            placeholderTextColor={COLORS.textLight}
-                                            editable={false}
-                                            pointerEvents="none"
-                                        />
-                                    </View>
-                                </View>
-
-                                <View style={styles.col}>
-                                    <Text style={inputStyles.label}>Sales Inquiry No.</Text>
-
-                                    <Dropdown
-                                        placeholder="Sales Inquiry No."
-                                        value={headerForm.salesInquiry}
-                                        options={salesInquiryNosOptions}
-                                        getLabel={s => s?.InquiryNo || String(s)}
-                                        getKey={s => s?.UUID || s}
-                                        onSelect={v => {
-                                            if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
-                                            if (v && typeof v === 'object') {
-                                                setHeaderForm(s => ({ ...s, salesInquiry: v?.InquiryNo || String(v) }));
-                                                setSalesInquiryUuid(v?.UUID || null);
-                                            } else {
-                                                setHeaderForm(s => ({ ...s, salesInquiry: v }));
-                                                setSalesInquiryUuid(null);
-                                            }
-                                        }}
-                                        inputBoxStyle={inputStyles.box}
-                                        textStyle={inputStyles.input}
-                                    />
-                                </View>
-                            </View>
-                        ) : (
-                            <View style={styles.row}>
-                                <View style={styles.col}>
-                                    <Text style={inputStyles.label}>Sales Inquiry No.</Text>
-
-                                    <Dropdown
-                                        placeholder="Sales Inquiry No."
-                                        value={headerForm.salesInquiry}
-                                        options={salesInquiryNosOptions}
-                                        getLabel={s => s?.InquiryNo || String(s)}
-                                        getKey={s => s?.UUID || s}
-                                        onSelect={v => {
-                                            if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
-                                            if (v && typeof v === 'object') {
-                                                setHeaderForm(s => ({ ...s, salesInquiry: v?.InquiryNo || String(v) }));
-                                                setSalesInquiryUuid(v?.UUID || null);
-                                            } else {
-                                                setHeaderForm(s => ({ ...s, salesInquiry: v }));
-                                                setSalesInquiryUuid(null);
-                                            }
-                                        }}
-                                        inputBoxStyle={inputStyles.box}
-                                        textStyle={inputStyles.input}
-                                    />
-                                </View>
-                            </View>
-                        )}
 
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
-                            {/* { (headerSubmitted || route?.params?.prefillHeader) && ( */}
                             <View style={styles.col}>
-                                <Text style={[inputStyles.label,]}>Sales Order Number* </Text>
+                                <Text style={inputStyles.label}>Sales Inquiry No.</Text>
+                                <View style={{ zIndex: 9997, elevation: 19 }}>
+                                    <Dropdown
+                                        placeholder="Sales Inquiry No."
+                                        value={headerForm.salesInquiry}
+                                        options={salesInquiryNosOptions}
+                                        getLabel={s => s?.InquiryNo || String(s)}
+                                        getKey={s => s?.UUID || s}
+                                        onSelect={v => {
+                                            if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
+                                            if (v && typeof v === 'object') {
+                                                setHeaderForm(s => ({ ...s, salesInquiry: v?.InquiryNo || String(v) }));
+                                                setSalesInquiryUuid(v?.UUID || null);
+                                            } else {
+                                                setHeaderForm(s => ({ ...s, salesInquiry: v }));
+                                                setSalesInquiryUuid(null);
+                                            }
+                                        }}
+                                        renderInModal={true}
+                                        inputBoxStyle={inputStyles.box}
+                                        textStyle={inputStyles.input}
+                                    />
+                                </View>
+                            </View>
 
-                                <View style={[inputStyles.box, { marginTop: hp(1) }]} pointerEvents="box-none">
-                                    <TextInput
-                                        style={[inputStyles.input, { flex: 1, color: '#000000' }]}
-                                        value={1}
-                                        onChangeText={v => setHeaderForm(s => ({ ...s, salesInquiryText: v }))}
-                                        placeholder="eg."
-                                        placeholderTextColor={COLORS.textLight}
-                                        editable={headerEditable}
+                            <View style={styles.col}>
+                                <Text style={[inputStyles.label]}>Sales Order Number* </Text>
+
+                                <View style={{ zIndex: 9997, elevation: 19 }}>
+                                    <Dropdown
+                                        placeholder="Sales Order Number*"
+                                        value={headerForm.salesOrderNo}
+                                        options={salesOrderOptions}
+                                        getLabel={so => (so?.OrderNo || so?.SalesOrderNo || so?.SalesOrderNumber || String(so))}
+                                        getKey={so => (so?.UUID || so?.Id || so)}
+                                        onSelect={v => {
+                                            if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
+                                            if (v && typeof v === 'object') {
+                                                setHeaderForm(s => ({ ...s, salesOrderNo: v?.OrderNo || v?.SalesOrderNo || v, salesOrderUUID: v?.UUID || v?.Id || null }));
+                                                setSalesOrderUuid(v?.UUID || v?.Id || null);
+                                            } else {
+                                                setHeaderForm(s => ({ ...s, salesOrderNo: v, salesOrderUUID: null }));
+                                                setSalesOrderUuid(null);
+                                            }
+                                        }}
+                                        renderInModal={true}
+                                        inputBoxStyle={inputStyles.box}
+                                        textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
                             {/* )} */}
 
+
+
+
+                        </View>
+
+                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>Customer Name* </Text>
 
@@ -1538,12 +1593,6 @@ const AddSalesPerfomaInvoice = () => {
                                 </View>
                             </View>
 
-
-
-                        </View>
-
-                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
-
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>Project Name* </Text>
 
@@ -1565,6 +1614,9 @@ const AddSalesPerfomaInvoice = () => {
                                 </View>
                             </View>
 
+
+                        </View>
+                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>payment Tearm* </Text>
 
@@ -1592,8 +1644,6 @@ const AddSalesPerfomaInvoice = () => {
                                 </View>
                             </View>
 
-                        </View>
-                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>payment Method* </Text>
 
@@ -1621,6 +1671,10 @@ const AddSalesPerfomaInvoice = () => {
                                 </View>
                             </View>
 
+
+                        </View>
+
+                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             <View style={styles.col}>
                                 <TouchableOpacity
                                     activeOpacity={0.7}
@@ -1669,6 +1723,94 @@ const AddSalesPerfomaInvoice = () => {
                                     </View>
                                 </TouchableOpacity>
                             </View>
+                            <View style={styles.col}>
+                                <Text style={inputStyles.label}>Days</Text>
+                                <View style={[inputStyles.box]}>
+                                    <TextInput
+                                        style={inputStyles.input}
+                                        value={dueDays}
+                                        onChangeText={t => {
+                                            const cleanValue = String(t).replace(/[^0-9]/g, '');
+                                            setDueDays(cleanValue);
+                                        }}
+                                        placeholder="Days"
+                                        placeholderTextColor={COLORS.textLight}
+                                        keyboardType="number-pad"
+                                        returnKeyType="done"
+                                        editable={headerEditable}
+                                    />
+                                </View>
+                            </View>
+
+
+                        </View>
+                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
+                            <View style={styles.col}>
+                                <TouchableOpacity
+                                    activeOpacity={0.7}
+                                    onPress={() => { if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; } openDatePickerFor('due'); }}
+                                    style={{ marginTop: hp(0.8), opacity: headerEditable ? 1 : 0.6 }}
+                                    disabled={!headerEditable}
+                                >
+                                    <Text style={inputStyles.label}>Due Date* </Text>
+
+                                    <View
+                                        style={[
+                                            inputStyles.box,
+                                            styles.innerFieldBox,
+                                            styles.datePickerBox,
+                                            { alignItems: 'center' },
+                                        ]}
+                                    >
+                                        <Text
+                                            style={[
+                                                inputStyles.input,
+                                                styles.datePickerText,
+                                                !dueDate && {
+                                                    color: COLORS.textLight,
+                                                    fontFamily: TYPOGRAPHY.fontFamilyRegular,
+                                                },
+                                                dueDate && {
+                                                    color: COLORS.text,
+                                                    fontFamily: TYPOGRAPHY.fontFamilyMedium,
+                                                },
+                                            ]}
+                                        >
+                                            {dueDate || 'Due Date*'}
+                                        </Text>
+                                        <View
+                                            style={[
+                                                styles.calendarIconContainer,
+                                                dueDate && styles.calendarIconContainerSelected,
+                                            ]}
+                                        >
+                                            <Icon
+                                                name="calendar-today"
+                                                size={rf(3.2)}
+                                                color={dueDate ? COLORS.primary : COLORS.textLight}
+                                            />
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
+
+                            {showSalesInvoiceNoField && (
+
+                                <View style={styles.col}>
+                                    <Text style={inputStyles.label}>Sales Invoice Number</Text>
+                                    <View style={[inputStyles.box]} pointerEvents="box-none">
+                                        <TextInput
+                                            style={[inputStyles.input, { flex: 1, color: '#000000' }]}
+                                            value={headerForm.salesInquiryText}
+                                            placeholder="eg."
+                                            placeholderTextColor={COLORS.textLight}
+                                            editable={false}
+                                            pointerEvents="none"
+                                        />
+                                    </View>
+                                </View>
+
+                            )}
                         </View>
 
                         <View style={{ marginTop: hp(1.5), flexDirection: 'row', justifyContent: 'flex-end' }}>
@@ -1750,7 +1892,7 @@ const AddSalesPerfomaInvoice = () => {
                                             getKey={it => (it?.uuid || it?.sku || it)}
                                             onSelect={v => {
                                                 if (v && typeof v === 'object') {
-                                                    setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.uuid || v?.UUID || v?.sku || null, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '' }));
+                                                    setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.uuid || v?.UUID || v?.sku || null, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '', hsn: v?.hsn || ci?.hsn || '' }));
                                                 } else {
                                                     setCurrentItem(ci => ({ ...ci, itemName: v, itemNameUuid: null }));
                                                 }
@@ -1774,6 +1916,20 @@ const AddSalesPerfomaInvoice = () => {
                                         multiline
                                         numberOfLines={3}
                                     />
+                                </View>
+
+                                {/* HSN/SAC field */}
+                                <View style={{ width: '100%', marginBottom: hp(1) }}>
+                                    <Text style={inputStyles.label}>HSN/SAC</Text>
+                                    <View style={[inputStyles.box, { marginTop: hp(0.5), width: '100%' }]}>
+                                        <TextInput
+                                            style={[inputStyles.input]}
+                                            value={currentItem.hsn || ''}
+                                            onChangeText={t => setCurrentItem(ci => ({ ...ci, hsn: t }))}
+                                            placeholder="Enter HSN/SAC code"
+                                            placeholderTextColor={COLORS.textLight}
+                                        />
+                                    </View>
                                 </View>
 
                                 {/* Two fields in one line: Quantity & Rate */}
@@ -1833,7 +1989,7 @@ const AddSalesPerfomaInvoice = () => {
                                             <TouchableOpacity
                                                 activeOpacity={0.8}
                                                 style={[styles.addBtn, { backgroundColor: '#6c757d', marginLeft: wp(3) }]}
-                                                onPress={() => { setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null, desc: '', rate: '' }); setEditItemId(null); }}
+                                                onPress={() => { setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' }); setEditItemId(null); }}
                                             >
                                                 <Text style={styles.addBtnText}>Cancel</Text>
                                             </TouchableOpacity>
@@ -1910,6 +2066,7 @@ const AddSalesPerfomaInvoice = () => {
                                                             <Text style={[styles.th, { width: wp(10) }]}>Sr.No</Text>
                                                             <Text style={[styles.th, { width: wp(30) }]}>Item Details</Text>
                                                             <Text style={[styles.th, { width: wp(30) }]}>Description</Text>
+                                                            <Text style={[styles.th, { width: wp(25) }]}>HSN/SAC</Text>
                                                             <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
                                                             <Text style={[styles.th, { width: wp(20) }]}>Rate</Text>
                                                             <Text style={[styles.th, { width: wp(20) }]}>Amount</Text>
@@ -1928,6 +2085,9 @@ const AddSalesPerfomaInvoice = () => {
                                                                 </View>
                                                                 <View style={[styles.td, { width: wp(30) }]}>
                                                                     <Text style={styles.tdText}>{item.desc}</Text>
+                                                                </View>
+                                                                <View style={[styles.td, { width: wp(25) }]}>
+                                                                    <Text style={styles.tdText}>{item.hsn || '-'}</Text>
                                                                 </View>
                                                                 <View style={[styles.td, { width: wp(20) }]}>
                                                                     <Text style={styles.tdText}>{item.qty}</Text>

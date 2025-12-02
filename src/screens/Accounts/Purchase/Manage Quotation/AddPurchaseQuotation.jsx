@@ -22,7 +22,7 @@ import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
-import { getPurchasequotationVendor, getItems, postAddPurchaseQuotationHeader, addPurchaseOrder, updatePurchaseOrder, updatePurchaseQuotationHeader, addPurchaseOrderLine, updatePurchaseOrderLine, addPurchaseQuotationLine, updatePurchaseQuotationLine, deletePurchaseOrderLine, deletePurchaseQuotationLine, getPurchaseOrderLines, getProjects } from '../../../../api/authServices';
+import { getPurchasequotationVendor, getItems, postAddPurchaseQuotationHeader, addPurchaseOrder, updatePurchaseOrder, updatePurchaseQuotationHeader, addPurchaseQuotationLine, updatePurchaseQuotationLine,  deletePurchaseQuotationLine, getPurchaseOrderLines, getProjects } from '../../../../api/authServices';
 import { publish } from '../../../../utils/eventBus';
 import { getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { pick, types, isCancel } from '@react-native-documents/picker';
@@ -550,6 +550,7 @@ const AddPurchaseQuotation = () => {
           let resp;
           if (editItemId) {
             const existing = existingEdit;
+            console.log('[AddPurchaseQuotation] existing item for edit ->', existing);
             if (existing && existing.serverUuid) {
               const upayload = {
                 UUID: existing.serverUuid,
