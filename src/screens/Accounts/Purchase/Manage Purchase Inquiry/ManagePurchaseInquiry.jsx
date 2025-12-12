@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert 
 import { wp, hp, rf } from '../../../../utils/responsive';
 import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { COLORS, TYPOGRAPHY, inputStyles } from '../../../styles/styles';
+import { COLORS, TYPOGRAPHY, inputStyles, formStyles } from '../../../styles/styles';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
@@ -11,7 +11,7 @@ import { addSalesInquiry, getCustomers, getItemTypes, getItemMasters, getUnits, 
 import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { uiDateToApiDate } from '../../../../utils/dateUtils';
 import BottomSheetConfirm from '../../../../components/common/BottomSheetConfirm';
-    
+
 const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyle, rightActions }) => {
     return (
         <View style={[styles.sectionWrapper, wrapperStyle]}>
@@ -159,7 +159,10 @@ const AddSalesInquiry = () => {
             return '';
         }
     };
-
+    const handleCreateOrder = () => {
+        // Call update header API when final submit button is clicked
+        handleUpdateHeader(true); // true indicates final submit - should navigate back
+    } 
     // Helpers to compute display names robustly (avoid placeholder values)
     const isPlaceholderString = (s) => typeof s === 'string' && /select/i.test(s);
 
@@ -293,7 +296,7 @@ const AddSalesInquiry = () => {
                                 }) : it);
                                 return { ...prevMap, [key]: updated };
                             });
-                        } catch (_) {}
+                        } catch (_) { }
                     } catch (e) {
                         console.log('UpdatePurchaseInquiryLine error ->', e?.message || e);
                         const backendMsg = e?.response?.data?.Message || e?.response?.data || e?.message || null;
@@ -344,7 +347,7 @@ const AddSalesInquiry = () => {
                     }) : it);
                     return { ...prev, [key]: updated };
                 });
-            } catch (_) {}
+            } catch (_) { }
             // reset editor
             setEditLineItemId(null);
             setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
@@ -399,7 +402,7 @@ const AddSalesInquiry = () => {
                             const list = Array.isArray(prev[key]) ? prev[key] : [];
                             return { ...prev, [key]: [...list, newItem] };
                         });
-                    } catch (_) {}
+                    } catch (_) { }
                     setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
                 } catch (e) {
                     console.log('AddPurchaseInquiryLine error ->', e?.message || e);
@@ -426,13 +429,13 @@ const AddSalesInquiry = () => {
         // store in draft map
         try {
             setHeaderLinesMap(prev => {
-                const list = Array.isArray(prev['__draft']) ? prev['__draft'] : [];
+                const list = Array.isArray(prev.__draft) ? prev.__draft : [];
                 return { ...prev, ['__draft']: [...list, newItemBase] };
             });
-        } catch (_) {}
+        } catch (_) { }
         setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
     };
-    
+
     // Fetch customers for dropdown
     const fetchCustomers = async () => {
         try {
@@ -653,6 +656,13 @@ const AddSalesInquiry = () => {
                 if (projUuid) {
                     setSelectedProjectUuid(projUuid);
                     setProjectName(headerData.ProjectName || headerData.ProjectTitle || headerData.Project || '');
+                    // Also set selectedProject to maintain consistency
+                    setSelectedProject({
+                        UUID: projUuid,
+                        ProjectTitle: headerData.ProjectName || headerData.ProjectTitle || headerData.Project || '',
+                        Name: headerData.ProjectName || headerData.ProjectTitle || headerData.Project || ''
+                    });
+                    console.log('Prefilled project UUID:', projUuid);
                 }
 
                 // Normalize header response: backend sometimes returns Data as array
@@ -726,7 +736,7 @@ const AddSalesInquiry = () => {
                             const list = Array.isArray(prev[key]) ? prev[key] : [];
                             return { ...prev, [key]: list.filter(it => it.id !== id) };
                         });
-                    } catch (_) {}
+                    } catch (_) { }
                 } catch (e) {
                     console.log('DeletePurchaseInquiryLine error ->', e?.message || e);
                     const backendMsg = e?.response?.data?.Message || e?.response?.data || e?.message || null;
@@ -755,7 +765,7 @@ const AddSalesInquiry = () => {
                 const list = Array.isArray(prev[key]) ? prev[key] : [];
                 return { ...prev, [key]: list.filter(it => it.id !== id) };
             });
-        } catch (_) {}
+        } catch (_) { }
     };
 
     const handleSubmit = async () => {
@@ -825,7 +835,6 @@ const AddSalesInquiry = () => {
                 CurrencyUUID: currencyUuid || '',
                 OrderDate: uiDateToApiDate(requestedDate) || null,
                 RequestedDeliveryDate: uiDateToApiDate(expectedPurchaseDate) || null,
-                ProjectName: projectName || '',
                 InquiryNo: inquiryNo || ''
             };
             console.log('AddSalesHeader payload ->', payload);
@@ -876,10 +885,10 @@ const AddSalesInquiry = () => {
                 Request_Date: uiDateToApiDate(requestedDate) || null,
                 RequestedDeliveryDate: uiDateToApiDate(expectedPurchaseDate) || null,
                 ExpectedPurchaseDate: uiDateToApiDate(expectedPurchaseDate) || null,
-                ProjectUUID: selectedProjectUuid,
-                ProjectName: projectName || ''
+                ProjectUUID: selectedProjectUuid || ''
             };
 
+            console.log('selectedProjectUuid value:', selectedProjectUuid);
             console.log('AddPurchaseInquiryHeader payload ->', payload);
 
             const resp = await addPurchaseInquiryHeader(payload, { userUuid: await getUUID(), cmpUuid: await getCMPUUID(), envUuid: await getENVUUID() });
@@ -887,8 +896,8 @@ const AddSalesInquiry = () => {
             setHeaderResponse(resp);
             setHeaderSaved(true);
             setHeaderEditing(false);
-            // collapse header section
-            setExpandedId(null);
+            // Open LINE section after successful header submission
+            setExpandedId(2);
             // success notification removed (non-blocking flow requested)
         } catch (e) {
             console.log('AddPurchaseInquiryHeader error ->', e?.message || e);
@@ -909,7 +918,7 @@ const AddSalesInquiry = () => {
         }
     };
 
-    const handleUpdateHeader = async () => {
+    const handleUpdateHeader = async (isFromFinalSubmit = false) => {
         try {
             setHeaderSubmitting(true);
             // For purchase inquiry updates ensure minimal required fields are present
@@ -948,28 +957,33 @@ const AddSalesInquiry = () => {
                 RequestedDeliveryDate: uiDateToApiDate(expectedPurchaseDate) || null,
                 ExpectedPurchaseDate: uiDateToApiDate(expectedPurchaseDate) || null,
                 ProjectUUID: selectedProjectUuid || '',
-                ProjectName: projectName || '',
                 InquiryNo: inquiryNo || ''
             };
+            console.log('selectedProjectUuid value:', selectedProjectUuid);
             console.log('UpdatePurchaseInquiryHeader payload ->', payload);
             // Quick on-screen debug so you can confirm the payload and UUID before the API call
-            try { Alert.alert('Updating header', `UUID: ${headerUuid}\nRequestDate: ${payload.RequestDate || ''}`); } catch (_) {}
+            try { Alert.alert('Updating header', `UUID: ${headerUuid}\nProjectUUID: ${selectedProjectUuid || 'null'}\nRequestDate: ${payload.RequestDate || ''}`); } catch (_) { }
 
             const resp = await updatePurchaseInquiryHeader(payload, { userUuid: await getUUID(), cmpUuid: await getCMPUUID(), envUuid: await getENVUUID() });
             console.log('UpdatePurchaseInquiryHeader resp ->', resp);
             try {
                 const message = resp?.Message || resp?.message || resp?.Data?.Message || 'Updated';
                 Alert.alert('Update response', String(message));
-            } catch (_) {}
+            } catch (_) { }
             setHeaderResponse(resp);
             setHeaderSaved(true);
             setHeaderEditing(false);
-            setExpandedId(null);
-            // Return to the ViewPurchaseInquiry screen so it can re-fetch (on focus).
-            try {
-                navigation.navigate('ViewPurchaseInquiry');
-            } catch (e) {
-                try { navigation.goBack(); } catch (_) { /* ignore */ }
+            
+            if (isFromFinalSubmit) {
+                // Navigate back when called from final submit
+                try {
+                    navigation.navigate('ViewPurchaseInquiry');
+                } catch (e) {
+                    navigation.goBack();
+                }
+            } else {
+                // Open LINE section after regular header update
+                setExpandedId(2);
             }
         } catch (e) {
             console.log('UpdatePurchaseInquiryHeader error ->', e?.message || e);
@@ -986,15 +1000,14 @@ const AddSalesInquiry = () => {
     return (
         <>
             <View style={{ flex: 1, backgroundColor: '#fff' }}>
+                <AppHeader
+                    title="Add Purchase Inquiry"
+                    onLeftPress={() => {
+                        navigation.goBack();
+                    }}
+                />
 
-                    <AppHeader
-          title="Add Purchase Inquiry"
-          onLeftPress={() => {
-              navigation.goBack();
-          
-          }}
-        />
-              
+
                 <View style={styles.headerSeparator} />
                 <ScrollView contentContainerStyle={[styles.container]} showsVerticalScrollIndicator={false}>
                     {/* Section 1: HEADER */}
@@ -1023,7 +1036,7 @@ const AddSalesInquiry = () => {
                         {/* Show Inquiry No only when editing an existing header (have a header UUID).
                             This prevents an empty placeholder space when creating a new record. */}
                         {(currentHeaderUuid || route?.params?.headerUuid) && (
-                            <View style={[styles.row, { marginBottom: hp(1) }]}> 
+                            <View style={[styles.row, { marginBottom: hp(1) }]}>
                                 <View style={styles.col}>
                                     <Text style={inputStyles.label}>Inquiry No</Text>
                                     <TouchableOpacity
@@ -1103,7 +1116,7 @@ const AddSalesInquiry = () => {
                             </View>
                         </View>
 
-                        <View style={[styles.row, { marginTop: hp(1.5) }]}> 
+                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>Request Title*</Text>
                                 <View style={[inputStyles.box]}>
@@ -1147,48 +1160,66 @@ const AddSalesInquiry = () => {
                             </View>
                         </View>
 
-                        <View style={[styles.row, { marginTop: hp(1.5) }]}> 
+                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>Project Name*</Text>
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
-                                        <Dropdown
-                                            placeholder="Select Project"
-                                            value={selectedProject}
-                                            options={projects.length ? projects : projectsStatic}
-                                            getLabel={(p) => {
-                                                if (typeof p === 'string') return p;
-                                                return p?.ProjectTitle || p?.Project_Name || p?.Name || p?.ProjectName || p?.Title || p?.DisplayName || p?.projectTitle || p?.name || '';
-                                            }}
-                                            getKey={(p) => {
-                                                if (typeof p === 'string') return p;
-                                                return p?.Uuid || p?.UUID || p?.ProjectUUID || p?.Project_Id || p?.Id || p?.id || p?.uuid || '';
-                                            }}
-                                            onSelect={(v) => {
-                                                try { console.log('Project dropdown selected ->', v); } catch (e) { }
-                                                if (v && typeof v === 'object') {
-                                                    const name = v?.Name || v?.ProjectName || v?.Title || v?.DisplayName || v?.name || JSON.stringify(v);
-                                                    const uuid = v?.UUID || v?.ProjectUUID || v?.Project_Id || v?.Id || v?.id || null;
-                                                    setSelectedProject(v);
-                                                    setSelectedProjectUuid(uuid);
-                                                    setProjectName(name);
-                                                } else if (typeof v === 'string') {
-                                                    // ignore placeholder-like selections
-                                                    if (isPlaceholderString(v)) {
-                                                        setSelectedProject(null);
-                                                        setSelectedProjectUuid(null);
-                                                        setProjectName('');
-                                                        return;
-                                                    }
-                                                    // selected a primitive from static list
-                                                    setSelectedProject(v);
-                                                    setSelectedProjectUuid(v);
-                                                    setProjectName(v);
-                                                } else {
+                                    <Dropdown
+                                        placeholder="Select Project"
+                                        value={projectName}
+                                        options={projects.length ? projects : projectsStatic}
+                                        getLabel={(p) => {
+                                            if (typeof p === 'string') return p;
+                                            return p?.ProjectTitle || p?.Project_Name || p?.Name || p?.ProjectName || p?.Title || p?.DisplayName || p?.projectTitle || p?.name || '';
+                                        }}
+                                        getKey={(p) => {
+                                            if (typeof p === 'string') return p;
+                                            return p?.Uuid || p?.UUID || p?.ProjectUUID || p?.Project_Id || p?.Id || p?.id || p?.uuid || '';
+                                        }}
+                                        onSelect={(v) => {
+                                            try { console.log('Project dropdown selected ->', v); } catch (e) { }
+                                            if (v && typeof v === 'object') {
+                                                const name = v?.ProjectTitle || v?.Name || v?.ProjectName || v?.Title || v?.DisplayName || v?.name || JSON.stringify(v);
+                                                const uuid = v?.Uuid || v?.UUID || v?.ProjectUUID || v?.Project_Id || v?.Id || v?.id || null;
+                                                console.log('Extracted UUID from object:', uuid, 'Name:', name);
+                                                setSelectedProject(v);
+                                                setSelectedProjectUuid(uuid);
+                                                setProjectName(name);
+                                            } else if (typeof v === 'string') {
+                                                // ignore placeholder-like selections
+                                                if (isPlaceholderString(v)) {
                                                     setSelectedProject(null);
                                                     setSelectedProjectUuid(null);
                                                     setProjectName('');
+                                                    return;
                                                 }
-                                            }}
+                                                
+                                                // Check if string contains JSON with UUID
+                                                try {
+                                                    const parsed = JSON.parse(v);
+                                                    if (parsed && typeof parsed === 'object') {
+                                                        const extractedUuid = parsed?.Uuid || parsed?.UUID || parsed?.ProjectUUID || parsed?.Id || null;
+                                                        const extractedName = parsed?.ProjectTitle || parsed?.Name || parsed?.ProjectName || v;
+                                                        console.log('Extracted UUID from JSON:', extractedUuid, 'Name:', extractedName);
+                                                        setSelectedProject(parsed);
+                                                        setSelectedProjectUuid(extractedUuid);
+                                                        setProjectName(extractedName);
+                                                        return;
+                                                    }
+                                                } catch (jsonError) {
+                                                    // Not JSON, treat as regular string
+                                                }
+                                                
+                                                // selected a primitive from static list
+                                                setSelectedProject(v);
+                                                setSelectedProjectUuid(v);
+                                                setProjectName(v);
+                                            } else {
+                                                setSelectedProject(null);
+                                                setSelectedProjectUuid(null);
+                                                setProjectName('');
+                                            }
+                                        }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                                         textStyle={inputStyles.input}
@@ -1229,7 +1260,7 @@ const AddSalesInquiry = () => {
                             <TouchableOpacity
                                 activeOpacity={0.85}
                                 style={[styles.submitButton, headerSubmitting && styles.submitButtonDisabled]}
-                                onPress={headerEditing ? handleUpdateHeader : handleApplyHeader}
+                                onPress={headerEditing ? () => handleUpdateHeader(false) : handleApplyHeader}
                                 disabled={headerSubmitting}
                             >
                                 <Text style={styles.submitButtonText}>{headerSubmitting ? (headerEditing ? 'Updating...' : 'Saving...') : (headerEditing ? 'Update Header' : 'Save Header')}</Text>
@@ -1240,7 +1271,7 @@ const AddSalesInquiry = () => {
 
                     {/* Section 2: LINE */}
                     {headerSaved && (
-                        <AccordionSection id={2} title="LINE" expanded={expandedId === 2} onToggle={toggleSection}>
+                        <AccordionSection id={2} title="Create Order" expanded={expandedId === 2} onToggle={toggleSection}>
                             <View style={styles.row}>
                                 <View style={styles.col}>
                                     <Text style={inputStyles.label}>Item Type*</Text>
@@ -1332,13 +1363,13 @@ const AddSalesInquiry = () => {
                             </View>
                             <View style={styles.addButtonWrapper}>
                                 <TouchableOpacity
-                                        activeOpacity={0.8}
-                                        style={styles.addButton}
-                                        onPress={handleAddItem}
-                                        disabled={lineAdding}
-                                    >
-                                        <Text style={styles.addButtonText}>{editLineItemId ? (lineAdding ? 'Updating...' : 'Update') : (lineAdding ? 'Adding...' : 'Add')}</Text>
-                                    </TouchableOpacity>
+                                    activeOpacity={0.8}
+                                    style={styles.addButton}
+                                    onPress={handleAddItem}
+                                    disabled={lineAdding}
+                                >
+                                    <Text style={styles.addButtonText}>{editLineItemId ? (lineAdding ? 'Updating...' : 'Update') : (lineAdding ? 'Adding...' : 'Add')}</Text>
+                                </TouchableOpacity>
                             </View>
                         </AccordionSection>
                     )}
@@ -1437,25 +1468,38 @@ const AddSalesInquiry = () => {
                     onCancel={() => setSuccessSheetVisible(false)}
                 />
 
-                {/* <View style={styles.footerBar}>
-                    <View style={styles.footerButtonsRow}>
+                <View style={styles.footerBar}>
+                    <View
+                        style={[
+                            formStyles.actionsRow,
+                            {
+                                justifyContent: 'space-between',
+                                paddingHorizontal: wp(3.5),
+                                paddingVertical: hp(1),
+                            },
+                        ]}
+                    >
                         <TouchableOpacity
                             activeOpacity={0.85}
-                            style={styles.cancelButton}
+                            style={[formStyles.primaryBtn, { paddingVertical: hp(1.4) }]}
+                            onPress={handleCreateOrder}
+                            disabled={false}
+                        >
+                            <Text style={formStyles.primaryBtnText}>
+                                Submit
+                                {/* {isSubmitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Submit')} */}
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            activeOpacity={0.85}
+                            style={formStyles.cancelBtn}
                             onPress={handleCancel}
                         >
-                            <Text style={styles.cancelButtonText}>Cancel</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            activeOpacity={0.85}
-                            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-                            onPress={handleSubmit}
-                            disabled={loading}
-                        >
-                            <Text style={styles.submitButtonText}>{loading ? 'Submitting...' : 'Submit'}</Text>
+                            <Text style={formStyles.cancelBtnText}>Cancel</Text>
                         </TouchableOpacity>
                     </View>
-                </View> */}
+
+                </View>
             </View>
         </>
     );
@@ -1638,7 +1682,7 @@ const styles = StyleSheet.create({
     },
     footerButtonsRow: {
         flexDirection: 'row',
-        justifyContent: 'flex-end',
+        justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: wp(3.5),
         paddingVertical: hp(1),

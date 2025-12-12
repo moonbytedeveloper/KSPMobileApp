@@ -1,4 +1,4 @@
-import { StyleSheet, Platform } from 'react-native';
+import { StyleSheet, Platform, useColorScheme } from 'react-native';
 import { wp, hp, rf } from '../../utils/responsive';
 
 // Design tokens
@@ -33,6 +33,31 @@ export const COLORS = {
   divider: '#EEE',
   shadow: '#000000',
 };
+
+// Dark mode color overrides
+const DARK_COLORS = {
+  text: '#ffffff',
+  textMuted: '#d1d5db',
+  textLight: '#9ca3af',
+  bg: '#1f2937',
+  bgMuted: '#374151',
+  border: '#4b5563',
+  divider: '#374151',
+  shadow: '#000000',
+};
+
+// Function to get theme-aware colors
+// Hook to get theme-aware colors
+export const useColors = () => {
+  const colorScheme = useColorScheme();
+  return {
+    ...COLORS,
+    ...(colorScheme === 'dark' ? DARK_COLORS : {}),
+  };
+};
+
+// Backwards-compatible alias
+export const useThemeColors = useColors;
 
 export const SPACING = {
   xxs: wp(0.8),
@@ -147,6 +172,8 @@ export const inputStyles = StyleSheet.create({
   input: {
     paddingVertical: 0, 
     fontFamily: 'Nunito-Regular',
+    flex: 1,
+    // Note: color should be set dynamically by components for dark mode support
   },
   inputMultiline: {
     minHeight: hp(10),

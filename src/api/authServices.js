@@ -99,7 +99,15 @@ const PATHS = {
     salesOrderSlip: '/api/Account/salesorderpdf',
     salesPerformaInvoiceSlip: '/api/Account/salesperformainvoicepdf',
     salesInvoiceSlip: '/api/Account/salesinvoicepdf',
+    purchaseOrderSlip: '/api/Account/purchaseorderpdf',
+    purchasePerformaInvoiceSlip: '/api/Account/purchaseperformainvoicepdf',
+    purchaseInvoiceSlip: '/api/Account/purchaseinvoicepdf',
     convertSalesOrderToInvoice: '/api/Account/ConvertSalesOrderToInvoice',
+    convertSalesPerformaToInvoice: '/api/Account/ConvertsalesPerformaToInvoice',
+    convertPurchaseOrderToInvoice: '/api/Account/ConvertPurchaseOrderToInvoice',
+    convertPurchasePerformaToInvoice: '/api/Account/ConvertpurchasePerformaToInvoice',
+    convertPurchaseQuotationToOrder: '/api/Account/ConvertPurchaseQuotationToOrder',
+    convertInquiryToPurchaseOrder: '/api/Account/ConvertInquiryToPurchaseOrder',
     convertInquiryToSalesOrder: '/api/Account/ConvertInquiryToSalesOrder',
     // Dashboard Lead Summary
     getDashboardLeadSummary: Config.API_GET_DASHBOARD_LEAD_SUMMARY_PATH || '/api/DashBoard/GetDashboardLeadSummary',
@@ -113,7 +121,7 @@ const PATHS = {
     deleteSalesOrderHeader: '/api/Account/DeleteSalesOrderHeader',
     getSalesHeaderInquiries: Config.API_GET_SALES_HEADER_INQUIRIES_PATH || '/api/Account/GetSalesHeaderInquiries',
     getPurchaseHeaderInquiries: Config.API_GET_PURCHASE_HEADER_INQUIRIES_PATH || '/api/Account/GetPurchaseHeaderInquiries',
-    addSalesInquiry: Config.ADD_SALES_INQUIRY || '/api/Account/AddCombinedSalesInquiry',
+    addSalesInquiry: Config.ADD_SALES_INQUIRY || '/api/Account/AddSalesHeader',
     getCustomers: Config.API_GET_CUSTOMERS_PATH || '/api/Account/GetCustomers',
     getVendors: Config.API_GET_VENDORS_PATH || '/api/Account/PurchasequotationVendors',
     getItemTypes: Config.API_GET_ITEM_TYPES_PATH || '/api/Account/ItemTypes',
@@ -219,6 +227,50 @@ const PATHS = {
 
 };
 console.log(PATHS, 'PATHS');
+
+// Helper function to extract user-friendly error messages from API responses
+function extractErrorMessage(error) {
+    // Try to extract a user-friendly message from various possible locations
+    const responseData = error?.response?.data;
+    
+    // Check for Message field (capital M) - common in API responses
+    if (responseData?.Message) {
+        return responseData.Message;
+    }
+    
+    // Check for message field (lowercase m)
+    if (responseData?.message) {
+        return responseData.message;
+    }
+    
+    // Check for error description
+    if (responseData?.error) {
+        return responseData.error;
+    }
+    
+    // Check for validation errors array
+    if (responseData?.errors && Array.isArray(responseData.errors) && responseData.errors.length > 0) {
+        return responseData.errors[0];
+    }
+    
+    // Check for status text
+    if (error?.response?.statusText && error.response.statusText !== 'OK') {
+        return error.response.statusText;
+    }
+    
+    // Check for network errors
+    if (error?.message?.includes('Network Error')) {
+        return 'Network connection error. Please check your internet connection.';
+    }
+    
+    // Check for timeout errors
+    if (error?.message?.includes('timeout')) {
+        return 'Request timed out. Please try again.';
+    }
+    
+    // Fallback to generic message
+    return error?.message || 'An unexpected error occurred. Please try again.';
+}
 
 async function getLocalIp() {
     try {
@@ -1974,7 +2026,7 @@ export async function addSalesInquiry(payload, overrides = {}) {
 
     const params = { userUuid, cmpUuid, envUuid };
     const resp = await api.post(
-        PATHS.addSalesInquiry || '/api/Account/AddCombinedSalesInquiry',
+        PATHS.addSalesInquiry || '/api/Account/AddSalesHeader',
         payload,
         { params }
     );
@@ -3953,6 +4005,151 @@ export async function getSalesOrderSlip({ headerUuid, cmpUuid, envUuid, userUuid
     }
 }
 
+// Purchase Order: Get Purchase Order Slip PDF (base64 string)
+export async function getPurchaseOrderSlip({ headerUuid, cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        if (!headerUuid) throw new Error('headerUuid is required');
+        if (!cmpUuid || !envUuid || !userUuid) {
+            const [c, e, u] = await Promise.all([
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+                userUuid || getUUID(),
+            ]);
+            cmpUuid = c; envUuid = e; userUuid = u;
+        }
+        const params = { headerUuid, cmpUuid, envUuid };
+        try {
+            const fullUrl = `${api.defaults.baseURL}${PATHS.purchaseOrderSlip}`;
+            console.log('📋 [getPurchaseOrderSlip] URL:', fullUrl, 'params:', params);
+        } catch (_) { }
+        const resp = await api.get(PATHS.purchaseOrderSlip, { params });
+        console.log('[getPurchaseOrderSlip] Response Status:', resp?.status);
+        const unwrap = resp?.data ?? resp;
+        const payload = unwrap?.Data ?? unwrap?.data ?? unwrap;
+        const pdfBase64 =
+            payload?.SlipBase64 ||
+            payload?.pdfBase64 ||
+            payload?.Pdf ||
+            payload?.pdf ||
+            payload?.FileBase64 ||
+            payload?.fileBase64 ||
+            (typeof payload === 'string' ? payload : null);
+        if (!pdfBase64) {
+            console.log('❌ [getPurchaseOrderSlip] No base64 found in response:', JSON.stringify(payload, null, 2));
+            throw new Error('Purchase Order PDF not found in response');
+        }
+        return pdfBase64;
+    } catch (error) {
+        console.log('❌ [getPurchaseOrderSlip] Error:', error?.message || error);
+        console.log('❌ [getPurchaseOrderSlip] Error response:', error?.response?.data);
+        console.log('❌ [getPurchaseOrderSlip] Error status:', error?.response?.status);
+        
+        // Create user-friendly error
+        const userError = new Error(extractErrorMessage(error));
+        userError.originalError = error;
+        throw userError;
+    }
+}
+
+// Purchase Performa Invoice: Get Purchase Performa Invoice Slip PDF (base64 string)
+export async function getPurchasePerformaInvoiceSlip({ headerUuid, cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        if (!headerUuid) throw new Error('headerUuid is required');
+        if (!cmpUuid || !envUuid || !userUuid) {
+            const [c, e, u] = await Promise.all([
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+                userUuid || getUUID(),
+            ]);
+            cmpUuid = c; envUuid = e; userUuid = u;
+        }
+        const params = { headerUuid, cmpUuid, envUuid };
+        try {
+            const fullUrl = `${api.defaults.baseURL}${PATHS.purchasePerformaInvoiceSlip}`;
+            console.log('📋 [getPurchasePerformaInvoiceSlip] URL:', fullUrl, 'params:', params);
+        } catch (_) { }
+        const resp = await api.get(PATHS.purchasePerformaInvoiceSlip, { params });
+        console.log('[getPurchasePerformaInvoiceSlip] Response Status:', resp?.status);
+        const unwrap = resp?.data ?? resp;
+        const payload = unwrap?.Data ?? unwrap?.data ?? unwrap;
+        
+        // Handle nested structure like {data: {pdfBase64: '...'}}
+        const pdfBase64 =
+            payload?.SlipBase64 ||
+            payload?.pdfBase64 ||
+            payload?.data?.pdfBase64 ||
+            payload?.Pdf ||
+            payload?.pdf ||
+            payload?.FileBase64 ||
+            payload?.fileBase64 ||
+            (typeof payload === 'string' ? payload : null);
+        if (!pdfBase64) {
+            console.log('❌ [getPurchasePerformaInvoiceSlip] No base64 found in response:', JSON.stringify(payload, null, 2));
+            throw new Error('Purchase Performa Invoice PDF not found in response');
+        }
+        return pdfBase64;
+    } catch (error) {
+        console.log('❌ [getPurchasePerformaInvoiceSlip] Error:', error?.message || error);
+        console.log('❌ [getPurchasePerformaInvoiceSlip] Error response:', error?.response?.data);
+        console.log('❌ [getPurchasePerformaInvoiceSlip] Error status:', error?.response?.status);
+        
+        // Create user-friendly error
+        const userError = new Error(extractErrorMessage(error));
+        userError.originalError = error;
+        throw userError;
+    }
+}
+
+// Purchase Invoice: Get Purchase Invoice Slip PDF (base64 string)
+export async function getPurchaseInvoiceSlip({ headerUuid, cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        if (!headerUuid) throw new Error('headerUuid is required');
+        if (!cmpUuid || !envUuid || !userUuid) {
+            const [c, e, u] = await Promise.all([
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+                userUuid || getUUID(),
+            ]);
+            cmpUuid = c; envUuid = e; userUuid = u;
+        }
+        const params = { headerUuid, cmpUuid, envUuid };
+        try {
+            const fullUrl = `${api.defaults.baseURL}${PATHS.purchaseInvoiceSlip}`;
+            console.log('📋 [getPurchaseInvoiceSlip] URL:', fullUrl, 'params:', params);
+        } catch (_) { }
+        const resp = await api.get(PATHS.purchaseInvoiceSlip, { params });
+        console.log('[getPurchaseInvoiceSlip] Response Status:', resp?.status);
+        console.log('[getPurchaseInvoiceSlip] Full Response:', resp);
+        const unwrap = resp?.data ?? resp;
+        const payload = unwrap?.Data ?? unwrap?.data ?? unwrap;
+        const pdfBase64 =
+            payload?.data?.pdfBase64 ||
+            payload?.pdfBase64 ||
+            payload?.SlipBase64 ||
+            payload?.Pdf ||
+            payload?.pdf ||
+            payload?.FileBase64 ||
+            payload?.fileBase64 ||
+            (typeof payload === 'string' ? payload : null);
+
+            console.log(pdfBase64,'8522')
+        if (!pdfBase64) {
+            console.log('❌ [getPurchaseInvoiceSlip] No base64 found in response:', JSON.stringify(payload, null, 2));
+            throw new Error('Purchase Invoice PDF not found in response');
+        }
+        return pdfBase64;
+    } catch (error) {
+        console.log('❌ [getPurchaseInvoiceSlip] Error:', error?.message || error);
+        console.log('❌ [getPurchaseInvoiceSlip] Error response:', error?.response?.data);
+        console.log('❌ [getPurchaseInvoiceSlip] Error status:', error?.response?.status);
+        
+        // Create user-friendly error
+        const userError = new Error(extractErrorMessage(error));
+        userError.originalError = error;
+        throw userError;
+    }
+}
+
 // Sales Performa Invoice: Get Sales Performa Invoice Slip PDF (base64 string)
 export async function getSalesPerformaInvoiceSlip({ headerUuid, cmpUuid, envUuid, userUuid } = {}) {
     try {
@@ -3971,6 +4168,8 @@ export async function getSalesPerformaInvoiceSlip({ headerUuid, cmpUuid, envUuid
             console.log('📋 [getSalesPerformaInvoiceSlip] URL:', fullUrl, 'params:', params);
         } catch (_) { }
         const resp = await api.get(PATHS.salesPerformaInvoiceSlip, { params });
+        console.log(resp,'555');
+        
         const unwrap = resp?.data ?? resp;
         const payload = unwrap?.Data ?? unwrap?.data ?? unwrap;
         const pdfBase64 =
@@ -5067,7 +5266,98 @@ export async function convertSalesOrderToInvoice({ salesOrderUuid, CmpUUID, EnvU
         console.log('❌ [convertSalesOrderToInvoice] Error:', error?.message || error);
         console.log('❌ [convertSalesOrderToInvoice] Error response:', error?.response?.data);
         console.log('❌ [convertSalesOrderToInvoice] Error status:', error?.response?.status);
-        throw error;
+        
+        // Create user-friendly error
+        const userError = new Error(extractErrorMessage(error));
+        userError.originalError = error;
+        throw userError;
+    }
+}
+
+export async function convertSalesPerformaToInvoice({ performaUuid, EnvUUID, CmpUUID, UserUUID } = {}) {
+    try {
+        if (!CmpUUID || !EnvUUID || !UserUUID) {
+            const [c, e, u] = await Promise.all([
+                CmpUUID || getCMPUUID(),
+                EnvUUID || getENVUUID(),
+                UserUUID || getUUID(),
+            ]);
+            CmpUUID = c; EnvUUID = e; UserUUID = u;
+        }
+        const params = { performaUuid, EnvUUID, CmpUUID, UserUUID };
+        console.log('🔄 [convertSalesPerformaToInvoice] Params:', PATHS.convertSalesPerformaToInvoice, params);
+        
+        const resp = await api.get(PATHS.convertSalesPerformaToInvoice, {params});
+        console.log('✅ [convertSalesPerformaToInvoice] Response:', resp?.data);
+        
+        return resp?.data ?? resp;
+    } catch (error) {
+        console.log('❌ [convertSalesPerformaToInvoice] Error:', error?.message || error);
+        console.log('❌ [convertSalesPerformaToInvoice] Error response:', error?.response?.data);
+        console.log('❌ [convertSalesPerformaToInvoice] Error status:', error?.response?.status);
+        
+        // Create user-friendly error
+        const userError = new Error(extractErrorMessage(error));
+        userError.originalError = error;
+        throw userError;
+    }
+}
+
+export async function convertPurchaseOrderToInvoice({ purchaseOrderUuid, EnvUUID, CmpUUID, UserUUID } = {}) {
+    try {
+        if (!CmpUUID || !EnvUUID || !UserUUID) {
+            const [c, e, u] = await Promise.all([
+                CmpUUID || getCMPUUID(),
+                EnvUUID || getENVUUID(),
+                UserUUID || getUUID(),
+            ]);
+            CmpUUID = c; EnvUUID = e; UserUUID = u;
+        }
+        const params = { purchaseOrderUuid, EnvUUID, CmpUUID, UserUUID };
+        console.log('🔄 [convertPurchaseOrderToInvoice] Params:', PATHS.convertPurchaseOrderToInvoice, params);
+        
+        const resp = await api.get(PATHS.convertPurchaseOrderToInvoice, {params});
+        console.log('✅ [convertPurchaseOrderToInvoice] Response:', resp?.data);
+        
+        return resp?.data ?? resp;
+    } catch (error) {
+        console.log('❌ [convertPurchaseOrderToInvoice] Error:', error?.message || error);
+        console.log('❌ [convertPurchaseOrderToInvoice] Error response:', error?.response?.data);
+        console.log('❌ [convertPurchaseOrderToInvoice] Error status:', error?.response?.status);
+        
+        // Create user-friendly error
+        const userError = new Error(extractErrorMessage(error));
+        userError.originalError = error;
+        throw userError;
+    }
+}
+
+export async function convertPurchaseQuotationToOrder({ quotationUUID, EnvUUID, CmpUUID, UserUUID } = {}) {
+    try {
+        if (!CmpUUID || !EnvUUID || !UserUUID) {
+            const [c, e, u] = await Promise.all([
+                CmpUUID || getCMPUUID(),
+                EnvUUID || getENVUUID(),
+                UserUUID || getUUID(),
+            ]);
+            CmpUUID = c; EnvUUID = e; UserUUID = u;
+        }
+        const params = { quotationUUID, EnvUUID, CmpUUID, UserUUID };
+        console.log('🔄 [convertPurchaseQuotationToOrder] Params:', PATHS.convertPurchaseQuotationToOrder, params);
+        
+        const resp = await api.get(PATHS.convertPurchaseQuotationToOrder, {params});
+        console.log('✅ [convertPurchaseQuotationToOrder] Response:', resp?.data);
+        
+        return resp?.data ?? resp;
+    } catch (error) {
+        console.log('❌ [convertPurchaseQuotationToOrder] Error:', error?.message || error);
+        console.log('❌ [convertPurchaseQuotationToOrder] Error response:', error?.response?.data);
+        console.log('❌ [convertPurchaseQuotationToOrder] Error status:', error?.response?.status);
+        
+        // Create user-friendly error
+        const userError = new Error(extractErrorMessage(error));
+        userError.originalError = error;
+        throw userError;
     }
 }
 
@@ -5092,6 +5382,68 @@ export async function convertInquiryToSalesOrder({ inquiryUuid, CmpUUID, EnvUUID
         console.log('❌ [convertInquiryToSalesOrder] Error:', error?.message || error);
         console.log('❌ [convertInquiryToSalesOrder] Error response:', error?.response?.data);
         console.log('❌ [convertInquiryToSalesOrder] Error status:', error?.response?.status);
-        throw error;
+        
+        // Create user-friendly error
+        const userError = new Error(extractErrorMessage(error));
+        userError.originalError = error;
+        throw userError;
+    }
+}
+
+export async function convertInquiryToPurchaseOrder({ inquiryUuid, CmpUUID, EnvUUID, UserUUID } = {}) {
+    try {
+        if (!CmpUUID || !EnvUUID || !UserUUID) {
+            const [c, e, u] = await Promise.all([
+                CmpUUID || getCMPUUID(),
+                EnvUUID || getENVUUID(),
+                UserUUID || getUUID(),
+            ]);
+            CmpUUID = c; EnvUUID = e; UserUUID = u;
+        }
+        const params = { inquiryUuid, CmpUUID, EnvUUID, UserUUID };
+        console.log('🔄 [convertInquiryToPurchaseOrder] Params:', PATHS.convertInquiryToPurchaseOrder, params);
+        
+        const resp = await api.get(PATHS.convertInquiryToPurchaseOrder, {params});
+        console.log('✅ [convertInquiryToPurchaseOrder] Response:', resp?.data);
+        
+        return resp?.data ?? resp;
+    } catch (error) {
+        console.log('❌ [convertInquiryToPurchaseOrder] Error:', error?.message || error);
+        console.log('❌ [convertInquiryToPurchaseOrder] Error response:', error?.response?.data);
+        console.log('❌ [convertInquiryToPurchaseOrder] Error status:', error?.response?.status);
+        
+        // Create user-friendly error
+        const userError = new Error(extractErrorMessage(error));
+        userError.originalError = error;
+        throw userError;
+    }
+}
+
+export async function convertPurchasePerformaToInvoice({ performaUuid, CmpUUID, EnvUUID, UserUUID } = {}) {
+    try {
+        if (!CmpUUID || !EnvUUID || !UserUUID) {
+            const [c, e, u] = await Promise.all([
+                CmpUUID || getCMPUUID(),
+                EnvUUID || getENVUUID(),
+                UserUUID || getUUID(),
+            ]);
+            CmpUUID = c; EnvUUID = e; UserUUID = u;
+        }
+        const params = { performaUuid, CmpUUID, EnvUUID, UserUUID };
+        console.log('🔄 [convertPurchasePerformaToInvoice] Params:', PATHS.convertPurchasePerformaToInvoice, params);
+        
+        const resp = await api.get(PATHS.convertPurchasePerformaToInvoice, {params});
+        console.log('✅ [convertPurchasePerformaToInvoice] Response:', resp?.data);
+        
+        return resp?.data ?? resp;
+    } catch (error) {
+        console.log('❌ [convertPurchasePerformaToInvoice] Error:', error?.message || error);
+        console.log('❌ [convertPurchasePerformaToInvoice] Error response:', error?.response?.data);
+        console.log('❌ [convertPurchasePerformaToInvoice] Error status:', error?.response?.status);
+        
+        // Create user-friendly error
+        const userError = new Error(extractErrorMessage(error));
+        userError.originalError = error;
+        throw userError;
     }
 }

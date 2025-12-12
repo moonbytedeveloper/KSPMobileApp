@@ -24,7 +24,7 @@ import { useNavigation } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
-import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getCustomers, getCountries, getSalesOrderNumbers, addSalesPerformaInvoiceHeader, addSalesPerformaInvoiceLine, updateSalesPerformaInvoiceHeader, updateSalesInvoiceHeader, getSalesPerformaInvoiceHeaderById, getSalesPerformaInvoiceLines, updateSalesPerformaInvoiceLine, deleteSalesPerformaInvoiceLine, getItems } from '../../../../api/authServices';
+import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getCustomers, getEmployees, getCountries, getSalesOrderNumbers, addSalesPerformaInvoiceHeader, addSalesPerformaInvoiceLine, updateSalesPerformaInvoiceHeader, updateSalesInvoiceHeader, getSalesPerformaInvoiceHeaderById, getSalesPerformaInvoiceLines, updateSalesPerformaInvoiceLine, deleteSalesPerformaInvoiceLine, getItems } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
 
 const COL_WIDTHS = {
@@ -123,6 +123,7 @@ const AddSalesPerfomaInvoice = () => {
     const [paymentTermsOptions, setPaymentTermsOptions] = useState([]);
     const [paymentMethodsOptions, setPaymentMethodsOptions] = useState([]);
     const [projectsOptions, setProjectsOptions] = useState([]);
+    const [employeesOptions, setEmployeesOptions] = useState([]);
     const [customersOptions, setCustomersOptions] = useState([]);
     const [salesInquiryNosOptions, setSalesInquiryNosOptions] = useState([]);
     const [salesOrderOptions, setSalesOrderOptions] = useState([]);
@@ -134,6 +135,7 @@ const AddSalesPerfomaInvoice = () => {
     const [paymentTermUuid, setPaymentTermUuid] = useState(null);
     const [paymentMethodUUID, setPaymentMethodUUID] = useState(null);
     const [projectUUID, setProjectUUID] = useState(null);
+    const [selectedProjectData, setSelectedProjectData] = useState(null);
     const [salesInquiryUuid, setSalesInquiryUuid] = useState(null);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
 
@@ -151,10 +153,11 @@ const AddSalesPerfomaInvoice = () => {
         (async () => {
             try {
                 setIsInitialLoading(true);
-                const [custResp, termsResp, methodsResp, projectsResp, inquiriesResp, salesOrdersResp] = await Promise.all([
+                const [custResp, termsResp, methodsResp, employeesResp, projectsResp, inquiriesResp, salesOrdersResp] = await Promise.all([
                     getCustomers(),
                     getPaymentTerms(),
                     getPaymentMethods(),
+                    getEmployees(),
                     fetchProjects(),
                     getAllInquiryNumbers(),
                     getSalesOrderNumbers(),
@@ -166,7 +169,7 @@ const AddSalesPerfomaInvoice = () => {
                 const projectsList = extractArray(projectsResp);
                 const inquiriesList = extractArray(inquiriesResp);
                 const salesOrdersList = extractArray(salesOrdersResp);
-                console.log(salesOrdersList, 'salesordernum');
+                console.log(projectsResp, 'projectsResp');
 
                 const normalizedInquiries = (Array.isArray(inquiriesList) ? inquiriesList : []).map((r) => ({
                     UUID: r?.UUID || r?.Uuid || r?.Id || r?.InquiryUUID || r?.SalesInquiryUUID || null,
@@ -177,6 +180,8 @@ const AddSalesPerfomaInvoice = () => {
                 setCustomersOptions(custList);
                 setPaymentTermsOptions(termsList);
                 setPaymentMethodsOptions(methodsList);
+                const employeesList = extractArray(employeesResp);
+                setEmployeesOptions(employeesList);
                 setProjectsOptions(projectsList);
                 setSalesInquiryNosOptions(normalizedInquiries);
                 const normalizedSalesOrders = (Array.isArray(salesOrdersList) ? salesOrdersList : []).map((r) => {
@@ -234,78 +239,89 @@ const AddSalesPerfomaInvoice = () => {
             try {
                 setPrefillLoading(true);
                 await new Promise(resolve => setTimeout(resolve, 100)); // Small delay to show loader
-            // Extract Sales Inquiry UUID first
-            const inquiryUuid = data?.SalesInqNoUUID || data?.SalesInquiryUUID || data?.SalesInquiryId || data?.SalesInquiryUuid || null;
-            if (inquiryUuid) {
-                setSalesInquiryUuid(inquiryUuid);
-            }
+                // Extract Sales Inquiry UUID first
+                const inquiryUuid = data?.SalesInqNoUUID || data?.SalesInquiryUUID || data?.SalesInquiryId || data?.SalesInquiryUuid || null;
+                if (inquiryUuid) {
+                    setSalesInquiryUuid(inquiryUuid);
+                }
 
-            // Map a few common keys from server payload into our header form
-            // For salesInquiry, only set if we have the actual InquiryNo (not UUID)
-            // If we only have UUID, leave it empty and let the mapping useEffect handle it
-            const inquiryNo = data?.SalesInqNo || data?.SalesInquiryNo || data?.InquiryNo || '';
-            // Check if inquiryNo is actually a UUID - if so, don't use it
-            const isInquiryNoUuid = inquiryNo && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(inquiryNo);
+                // Map a few common keys from server payload into our header form
+                // For salesInquiry, only set if we have the actual InquiryNo (not UUID)
+                // If we only have UUID, leave it empty and let the mapping useEffect handle it
+                const inquiryNo = data?.SalesInqNo || data?.SalesInquiryNo || data?.InquiryNo || '';
+                // Check if inquiryNo is actually a UUID - if so, don't use it
+                const isInquiryNoUuid = inquiryNo && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(inquiryNo);
 
-            setHeaderForm(s => ({
-                ...s,
-                salesInquiryText: data?.SalesPerInvNo || data?.PerformaInvoiceNo || data?.PerformaNo || data?.SalesPerformaNo || data?.SalesPerInvNo || s.salesInquiryText || '',
-                // Only set salesInquiry if we have a valid InquiryNo (not a UUID)
-                // If we only have UUID, leave it empty - the mapping useEffect will fill it
-                salesInquiry: (inquiryNo && !isInquiryNoUuid) ? inquiryNo : '',
-                clientName: data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || s.clientName || '',
-                salesOrderNo: data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || s.salesOrderNo || '',
-                salesOrderUUID: data?.SalesOrderUUID || data?.SalesOrderId || s.salesOrderUUID || '',
-                CustomerUUID: data?.CustomerUUID || data?.CustomerId || s.CustomerUUID || null,
-                CustomerName: data?.CustomerName || s.CustomerName || '',
-            }));
-            
-            // Prefill dates and days
-            setInvoiceDate(data?.OrderDate || data?.PerformaDate || data?.InvoiceDate || '');
-            setDueDate(data?.DueDate || '');
-            const daysValue = data?.Days || data?.DueDays || data?.PaymentDueDays || '';
-            if (daysValue) {
-                setDueDays(String(daysValue));
-            }
-            
-            // Prefill financial fields
-            setShippingCharges(String(data?.ShippingCharges ?? data?.ShippingCharge ?? 0));
-            setAdjustments(String(data?.AdjustmentPrice ?? data?.Adjustment ?? 0));
-            if (data?.AdjustmentField) {
-                setAdjustmentLabel(data.AdjustmentField);
-            }
-            
-            // Prefill notes and terms
-            setTerms(data?.TermsConditions || data?.Terms || '');
-            setNotes(data?.CustomerNotes || data?.Notes || '');
-            
-            // Prefill project, payment method, payment term
-            const projUuid = data?.ProjectUUID || data?.ProjectId || null;
-            if (projUuid) {
-                setProjectUUID(projUuid);
-                setProject(data?.ProjectTitle || data?.ProjectName || '');
-            }
-            
-            const pMethodUuid = data?.PaymentMethodUUID || data?.PaymentMethodId || null;
-            if (pMethodUuid) {
-                setPaymentMethodUUID(pMethodUuid);
-                setPaymentMethod(data?.PaymentMethodName || data?.PaymentMethod || '');
-            }
-            
-            const pTermUuid = data?.PaymentTermUUID || data?.PaymentTermId || null;
-            if (pTermUuid) {
-                setPaymentTermUuid(pTermUuid);
-                setPaymentTerm(data?.PaymentTermName || data?.PaymentTerm || '');
-            }
-            
-            const headerUuid = data?.UUID || data?.Id || data?.HeaderUUID || null;
-            setHeaderUUID(headerUuid);
-            if (data?.FilePath) setFile({ uri: data.FilePath, name: data.FilePath });
-            // If headerUUID exists, it's edit mode - make it editable by default
-            // Otherwise, it's view mode - make it non-editable
-            setHeaderSubmitted(true);
-            setHeaderEditable(!!headerUuid); // true if headerUuid exists (edit mode), false otherwise (view mode)
-            // Do not auto-open header on prefill; user must click Edit to open
+                setHeaderForm(s => ({
+                    ...s,
+                    salesInquiryText: data?.SalesPerInvNo || data?.PerformaInvoiceNo || data?.PerformaNo || data?.SalesPerformaNo || data?.SalesPerInvNo || s.salesInquiryText || '',
+                    // Only set salesInquiry if we have a valid InquiryNo (not a UUID)
+                    // If we only have UUID, leave it empty - the mapping useEffect will fill it
+                    salesInquiry: (inquiryNo && !isInquiryNoUuid) ? inquiryNo : '',
+                    clientName: data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || s.clientName || '',
+                    salesOrderNo: data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || s.salesOrderNo || '',
+                    salesOrderUUID: data?.SalesOrderUUID || data?.SalesOrderId || s.salesOrderUUID || '',
+                    CustomerUUID: data?.CustomerUUID || data?.CustomerId || s.CustomerUUID || null,
+                    CustomerName: data?.CustomerName || s.CustomerName || '',
+                }));
+
+                // Prefill dates and days
+                setInvoiceDate(data?.OrderDate || data?.PerformaDate || data?.InvoiceDate || '');
+                setDueDate(data?.DueDate || '');
+                setStartDate(data?.StartDate || '');
+                setEndDate(data?.EndDate || '');
+                setStartDate(data?.StartDate || '');
+                setEndDate(data?.EndDate || '');
+                const daysValue = data?.Days || data?.DueDays || data?.PaymentDueDays || '';
+                if (daysValue) {
+                    setDueDays(String(daysValue));
+                }
+
+                // Prefill financial fields
+                setShippingCharges(String(data?.ShippingCharges ?? data?.ShippingCharge ?? 0));
+                setAdjustments(String(data?.AdjustmentPrice ?? data?.Adjustment ?? 0));
+                if (data?.AdjustmentField) {
+                    setAdjustmentLabel(data.AdjustmentField);
+                }
+
+                // Prefill notes and terms
+                setTerms(data?.TermsConditions || data?.Terms || '');
+                setNotes(data?.CustomerNotes || data?.Notes || '');
+
+                // Prefill project, payment method, payment term
+                const projUuid = data?.ProjectUUID || data?.ProjectId || null;
+                if (projUuid) {
+                    setProjectUUID(projUuid);
+                    setProject(data?.ProjectTitle || data?.ProjectName || '');
+                    // Find and set complete project data for IsTimesheetBased check
+                    const foundProject = projectsOptions.find(p => 
+                        String(p?.Uuid || p?.UUID || p?.Id) === String(projUuid)
+                    );
+                    if (foundProject) {
+                        setSelectedProjectData(foundProject);
+                    }
+                }
+
+                const pMethodUuid = data?.PaymentMethodUUID || data?.PaymentMethodId || null;
+                if (pMethodUuid) {
+                    setPaymentMethodUUID(pMethodUuid);
+                    setPaymentMethod(data?.PaymentMethodName || data?.PaymentMethod || '');
+                }
+
+                const pTermUuid = data?.PaymentTermUUID || data?.PaymentTermId || null;
+                if (pTermUuid) {
+                    setPaymentTermUuid(pTermUuid);
+                    setPaymentTerm(data?.PaymentTermName || data?.PaymentTerm || '');
+                }
+
+                const headerUuid = data?.UUID || data?.Id || data?.HeaderUUID || null;
+                setHeaderUUID(headerUuid);
+                if (data?.FilePath) setFile({ uri: data.FilePath, name: data.FilePath });
+                // If headerUUID exists, it's edit mode - make it editable by default
+                // Otherwise, it's view mode - make it non-editable
+                setHeaderSubmitted(true);
+                setHeaderEditable(!!headerUuid); // true if headerUuid exists (edit mode), false otherwise (view mode)
+                // Do not auto-open header on prefill; user must click Edit to open
             } catch (e) {
                 console.warn('prefill header failed', e);
             } finally {
@@ -403,6 +419,28 @@ const AddSalesPerfomaInvoice = () => {
                     }
                 }
 
+                if (data?.StartDate) {
+                    const startDate = data.StartDate;
+                    if (startDate.includes('-') && startDate.length === 10) {
+                        const [yyyy, mm, dd] = startDate.split('-');
+                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        setStartDate(`${dd}-${months[parseInt(mm) - 1]}-${yyyy}`);
+                    } else {
+                        setStartDate(startDate);
+                    }
+                }
+
+                if (data?.EndDate) {
+                    const endDate = data.EndDate;
+                    if (endDate.includes('-') && endDate.length === 10) {
+                        const [yyyy, mm, dd] = endDate.split('-');
+                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        setEndDate(`${dd}-${months[parseInt(mm) - 1]}-${yyyy}`);
+                    } else {
+                        setEndDate(endDate);
+                    }
+                }
+
                 setShippingCharges(String(data?.ShippingCharges ?? data?.ShippingCharge ?? 0));
                 setAdjustments(String(data?.AdjustmentPrice ?? data?.Adjustment ?? 0));
                 if (data?.AdjustmentField) {
@@ -410,28 +448,35 @@ const AddSalesPerfomaInvoice = () => {
                 }
                 setTerms(data?.TermsConditions || data?.Terms || '');
                 setNotes(data?.CustomerNotes || data?.Notes || '');
-                
+
                 // Prefill Days field
                 const daysValue = data?.Days || data?.DueDays || data?.PaymentDueDays || '';
                 if (daysValue) {
                     setDueDays(String(daysValue));
                 }
-                
+
                 // Prefill project display name
                 if (data?.ProjectTitle || data?.ProjectName) {
                     setProject(data.ProjectTitle || data.ProjectName);
+                    // Find complete project data by name
+                    const foundProject = projectsOptions.find(p => 
+                        (p?.ProjectTitle || p?.Name) === (data.ProjectTitle || data.ProjectName)
+                    );
+                    if (foundProject) {
+                        setSelectedProjectData(foundProject);
+                    }
                 }
-                
+
                 // Prefill payment method display name
                 if (data?.PaymentMethodName || data?.PaymentMethod) {
                     setPaymentMethod(data.PaymentMethodName || data.PaymentMethod);
                 }
-                
+
                 // Prefill payment term display name
                 if (data?.PaymentTermName || data?.PaymentTerm) {
                     setPaymentTerm(data.PaymentTermName || data.PaymentTerm);
                 }
-                
+
                 setHeaderUUID(data?.UUID || data?.Id || data?.HeaderUUID || headerUuid);
 
                 // Populate tax and server total if provided by API
@@ -468,7 +513,7 @@ const AddSalesPerfomaInvoice = () => {
                             itemUuid: l?.ItemUUID || l?.ItemId || l?.Item || null,
                             rate: String(rate ?? 0),
                             desc: l?.Description || l?.Desc || '',
-                            hsn:  hsn || '-',
+                            hsn: hsn || '-',
                             qty: String(qty ?? 1),
                             tax: l?.TaxType || l?.Tax || 'IGST',
                             amount: String(Number(amount || 0).toFixed(2)),
@@ -535,6 +580,7 @@ const AddSalesPerfomaInvoice = () => {
             );
             if (found) {
                 setProject(found?.ProjectTitle || found?.Name || String(found));
+                setSelectedProjectData(found);
             }
         }
     }, [projectUUID, projectsOptions, project]);
@@ -664,9 +710,11 @@ const AddSalesPerfomaInvoice = () => {
     const [items, setItems] = useState([]);
     const [invoiceDate, setInvoiceDate] = useState('');
     const [dueDate, setDueDate] = useState('');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
     const [dueDays, setDueDays] = useState('');
     const [openDatePicker, setOpenDatePicker] = useState(false);
-    const [datePickerField, setDatePickerField] = useState(null); // 'invoice' | 'due'
+    const [datePickerField, setDatePickerField] = useState(null); // 'invoice' | 'due' | 'start' | 'end'
     const [datePickerSelectedDate, setDatePickerSelectedDate] = useState(
         new Date(),
     );
@@ -751,6 +799,14 @@ const AddSalesPerfomaInvoice = () => {
             const parsed = new Date(dueDate);
             if (!isNaN(parsed)) initial = parsed;
         }
+        if (field === 'start' && startDate) {
+            const parsed = new Date(startDate);
+            if (!isNaN(parsed)) initial = parsed;
+        }
+        if (field === 'end' && endDate) {
+            const parsed = new Date(endDate);
+            if (!isNaN(parsed)) initial = parsed;
+        }
         setDatePickerSelectedDate(initial);
         setDatePickerField(field);
         setOpenDatePicker(true);
@@ -771,6 +827,8 @@ const AddSalesPerfomaInvoice = () => {
             }
         }
         if (datePickerField === 'due') setDueDate(formatted);
+        if (datePickerField === 'start') setStartDate(formatted);
+        if (datePickerField === 'end') setEndDate(formatted);
         setOpenDatePicker(false);
         setDatePickerField(null);
     };
@@ -873,6 +931,7 @@ const AddSalesPerfomaInvoice = () => {
                 setNotes('');
                 setTerms('');
                 setProject('');
+                setSelectedProjectData(null);
                 setPaymentMethod('');
                 setShippingCharges('0');
                 setAdjustments('0');
@@ -888,6 +947,7 @@ const AddSalesPerfomaInvoice = () => {
                 setPaymentTermUuid(null);
                 setPaymentMethodUUID(null);
                 setProjectUUID(null);
+                setSelectedProjectData(null);
                 setSalesInquiryUuid(null);
                 setHeaderSubmitting(false);
                 setPrefillLoading(false);
@@ -1033,7 +1093,7 @@ const AddSalesPerfomaInvoice = () => {
     };
 
     // State & handlers used by the Item Details form (Section 4)
-    const [currentItem, setCurrentItem] = useState({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
+    const [currentItem, setCurrentItem] = useState({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '', employeeName: '', employeeUuid: null });
     const [editItemId, setEditItemId] = useState(null);
     const [isAddingLine, setIsAddingLine] = useState(false);
     const [linesLoading, setLinesLoading] = useState(false);
@@ -1082,11 +1142,14 @@ const AddSalesPerfomaInvoice = () => {
         setItems([]);
         setInvoiceDate('');
         setDueDate('');
+        setStartDate('');
+        setEndDate('');
         setDueDays('');
         setPaymentTerm('');
         setNotes('');
         setTerms('');
         setProject('');
+        setSelectedProjectData(null);
         setPaymentMethod('');
         setShippingCharges('0');
         setAdjustments('0');
@@ -1115,11 +1178,6 @@ const AddSalesPerfomaInvoice = () => {
     }, [navigation]);
 
     const handleAddLineItem = async () => {
-        // Basic validation
-        if (!currentItem.itemName || String(currentItem.itemName).trim() === '') {
-            Alert.alert('Validation', 'Please select an item');
-            return;
-        }
         // Require header UUID (submit header first)
         if (!headerUUID) {
             Alert.alert('Save header first', 'Please submit the header to obtain Header UUID before adding line items.');
@@ -1147,6 +1205,10 @@ const AddSalesPerfomaInvoice = () => {
                     Rate: rate,
                     Description: description,
                     HSNSACNO: currentItem.hsn || '',
+                    // Pass assigned employee data when available
+                    EmployeeUUID: currentItem.employeeUuid || null,
+                    EmployeeUuid: currentItem.employeeUuid || null,
+                    EmployeeName: currentItem.employeeName || '',
                 };
 
                 // If serverLineUuid exists, call update API, otherwise just update locally
@@ -1177,6 +1239,10 @@ const AddSalesPerfomaInvoice = () => {
                     Rate: rate,
                     Description: description,
                     HSNSACNO: currentItem.hsn || '',
+                    // include selected employee for timesheet-based projects
+                    EmployeeUUID: currentItem.employeeUuid || null,
+                    EmployeeUuid: currentItem.employeeUuid || null,
+                    EmployeeName: currentItem.employeeName || '',
                 };
 
                 console.log('Posting line payload ->', payload);
@@ -1222,7 +1288,7 @@ const AddSalesPerfomaInvoice = () => {
                 SalesInqNoUUID: salesInquiryUuid || headerForm.salesInquiryUUID || '',
                 SalesOrderNo: salesOrderUuid || headerForm.clientName || '',
                 CustomerUUID: headerForm.CustomerUUID || headerForm.CustomerUUID || '',
-                ProjectUUID: projectUUID || project || '',
+                ProjectUUID: projectUUID || '',
                 PaymentTermUUID: paymentTermUuid || paymentTerm || '',
                 PaymentMethodUUID: paymentMethodUUID || paymentMethod || '',
                 OrderDate: uiDateToApiDate(invoiceDate),
@@ -1283,11 +1349,13 @@ const AddSalesPerfomaInvoice = () => {
                 SalesInqNoUUID: salesInquiryUuid || headerForm.salesInquiryUUID || '',
                 SalesOrderNo: salesOrderUuid || headerForm.clientName || '',
                 CustomerUUID: headerForm.CustomerUUID || headerForm.CustomerUUID || '',
-                ProjectUUID: projectUUID || project || '',
+                ProjectUUID: projectUUID || '',
                 PaymentTermUUID: paymentTermUuid || paymentTerm || '',
                 PaymentMethodUUID: paymentMethodUUID || paymentMethod || '',
                 OrderDate: uiDateToApiDate(invoiceDate),
                 DueDate: uiDateToApiDate(dueDate),
+                FromDate: uiDateToApiDate(startDate),
+                ToDate: uiDateToApiDate(endDate),
                 Days: parseInt(dueDays, 10) || 0,
                 CustomerNotes: notes || '',
                 ShippingCharges: parseFloat(shippingCharges) || 0,
@@ -1340,11 +1408,13 @@ const AddSalesPerfomaInvoice = () => {
                 SalesInqNoUUID: salesInquiryUuid || headerForm.salesInquiryUUID || '',
                 SalesOrderNo: salesOrderUuid || headerForm.clientName || '',
                 CustomerUUID: headerForm.CustomerUUID || headerForm.CustomerUUID || '',
-                ProjectUUID: projectUUID || project || '',
+                ProjectUUID: projectUUID || '',
                 PaymentTermUUID: paymentTermUuid || paymentTerm || '',
                 PaymentMethodUUID: paymentMethodUUID || paymentMethod || '',
                 OrderDate: uiDateToApiDate(invoiceDate),
                 DueDate: uiDateToApiDate(dueDate),
+                FromDate: uiDateToApiDate(startDate),
+                ToDate: uiDateToApiDate(endDate),
                 Days: parseInt(dueDays, 10) || 0,
                 CustomerNotes: notes || '',
                 ShippingCharges: parseFloat(shippingCharges) || 0,
@@ -1504,11 +1574,11 @@ const AddSalesPerfomaInvoice = () => {
                                 />
                             </View>
                             <View style={styles.col}>
-                                <Text style={[inputStyles.label,]}>Sales Order Number* </Text>
+                                <Text style={[inputStyles.label,]}>Sales Order Number</Text>
 
                                 <View style={{ zIndex: 9997, elevation: 19 }}>
                                     <Dropdown
-                                        placeholder="Sales Order Number*"
+                                        placeholder="Sales Order Number"
                                         value={headerForm.salesOrderNo}
                                         options={salesOrderOptions}
                                         getLabel={so => (so?.OrderNo || so?.SalesOrderNo || so?.SalesOrderNumber || String(so))}
@@ -1573,7 +1643,14 @@ const AddSalesPerfomaInvoice = () => {
                                         getKey={p => (p?.Uuid || p?.Id || p)}
                                         onSelect={v => {
                                             if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
-                                            setProject(v?.ProjectTitle || v); setProjectUUID(v?.Uuid || v);
+                                            setProject(v?.ProjectTitle || v?.Name || String(v));
+                                            setProjectUUID(v?.Uuid || v?.UUID || v?.Id || null);
+                                            setSelectedProjectData(v);
+                                            // Clear start/end dates if project is not timesheet-based
+                                            if (!v?.IsTimesheetBased) {
+                                                setStartDate('');
+                                                setEndDate('');
+                                            }
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box]}
@@ -1584,7 +1661,106 @@ const AddSalesPerfomaInvoice = () => {
 
 
                         </View>
+                        {selectedProjectData?.IsTimesheetBased && (
+                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
+                            <View style={styles.col}>
+                                <TouchableOpacity
+                                    activeOpacity={0.7}
+                                    onPress={() => { if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; } openDatePickerFor('start'); }}
+                                    style={{ marginTop: hp(0.8), opacity: headerEditable ? 1 : 0.6 }}
+                                    disabled={!headerEditable}
+                                >
+                                    <Text style={inputStyles.label}>Start Date</Text>
 
+                                    <View
+                                        style={[
+                                            inputStyles.box,
+                                            styles.innerFieldBox,
+                                            styles.datePickerBox,
+                                            { alignItems: 'center' },
+                                        ]}
+                                    >
+                                        <Text
+                                            style={[
+                                                inputStyles.input,
+                                                styles.datePickerText,
+                                                !startDate && {
+                                                    color: COLORS.textLight,
+                                                    fontFamily: TYPOGRAPHY.fontFamilyRegular,
+                                                },
+                                                startDate && {
+                                                    color: COLORS.text,
+                                                    fontFamily: TYPOGRAPHY.fontFamilyMedium,
+                                                },
+                                            ]}
+                                        >
+                                            {startDate || 'Start Date'}
+                                        </Text>
+                                        <View
+                                            style={[
+                                                styles.calendarIconContainer,
+                                                startDate && styles.calendarIconContainerSelected,
+                                            ]}
+                                        >
+                                            <Icon
+                                                name="calendar-today"
+                                                size={rf(3.2)}
+                                                color={startDate ? COLORS.primary : COLORS.textLight}
+                                            />
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.col}>
+                                <TouchableOpacity
+                                    activeOpacity={0.7}
+                                    onPress={() => { if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; } openDatePickerFor('end'); }}
+                                    style={{ marginTop: hp(0.8), opacity: headerEditable ? 1 : 0.6 }}
+                                    disabled={!headerEditable}
+                                >
+                                    <Text style={inputStyles.label}>End Date</Text>
+
+                                    <View
+                                        style={[
+                                            inputStyles.box,
+                                            styles.innerFieldBox,
+                                            styles.datePickerBox,
+                                            { alignItems: 'center' },
+                                        ]}
+                                    >
+                                        <Text
+                                            style={[
+                                                inputStyles.input,
+                                                styles.datePickerText,
+                                                !endDate && {
+                                                    color: COLORS.textLight,
+                                                    fontFamily: TYPOGRAPHY.fontFamilyRegular,
+                                                },
+                                                endDate && {
+                                                    color: COLORS.text,
+                                                    fontFamily: TYPOGRAPHY.fontFamilyMedium,
+                                                },
+                                            ]}
+                                        >
+                                            {endDate || 'End Date'}
+                                        </Text>
+                                        <View
+                                            style={[
+                                                styles.calendarIconContainer,
+                                                endDate && styles.calendarIconContainerSelected,
+                                            ]}
+                                        >
+                                            <Icon
+                                                name="calendar-today"
+                                                size={rf(3.2)}
+                                                color={endDate ? COLORS.primary : COLORS.textLight}
+                                            />
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                        )}
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
 
                             <View style={styles.col}>
@@ -1780,6 +1956,8 @@ const AddSalesPerfomaInvoice = () => {
                         </View>
 
 
+
+
                         <View style={{ marginTop: hp(1.5), flexDirection: 'row', justifyContent: 'flex-end' }}>
                             <TouchableOpacity
                                 activeOpacity={0.8}
@@ -1839,8 +2017,35 @@ const AddSalesPerfomaInvoice = () => {
 
                             {/* LINE form: Item | Description | Quantity | Rate | Amount */}
                             <View style={{ marginBottom: hp(1.5) }}>
+                                {/* Employee dropdown (assign to) - shown only for timesheet-based projects */}
+                                {selectedProjectData?.IsTimesheetBased && (
+                                    <View style={{ width: '100%', marginBottom: hp(1) }}>
+                                        <Text style={inputStyles.label}>Assign To (Employee)</Text>
+                                        <View style={{ zIndex: 10000, elevation: 22 }}>
+                                            <Dropdown
+                                                placeholder="Select Employee"
+                                                value={currentItem.employeeName}
+                                                options={employeesOptions.length ? employeesOptions : []}
+                                                getLabel={e => (e?.FullName || e?.Fullname || e?.Name || e?.DisplayName || e?.name || String(e))}
+                                                getKey={e => (e?.Uuid || e?.UUID || e?.Id || e?.id || e)}
+                                                onSelect={v => {
+                                                    if (v && typeof v === 'object') {
+                                                        setCurrentItem(ci => ({ ...ci, employeeName: v?.FullName || v?.Fullname || v?.Name || v?.DisplayName || v?.name || '', employeeUuid: v?.Uuid || v?.UUID || v?.Id || v?.id || null }));
+                                                    } else {
+                                                        setCurrentItem(ci => ({ ...ci, employeeName: v, employeeUuid: null }));
+                                                    }
+                                                }}
+                                                renderInModal={true}
+                                                inputBoxStyle={[inputStyles.box, { width: '100%' }]}
+                                                textStyle={inputStyles.input}
+                                            />
+                                        </View>
+                                    </View>
+                                )}
+
                                 {/* Item dropdown full width */}
-                                <View style={{ width: '100%', marginBottom: hp(1) }}>
+                                {!selectedProjectData?.IsTimesheetBased && (
+                                    <View style={{ width: '100%', marginBottom: hp(1) }}>
                                     <Text style={inputStyles.label}>Item*</Text>
                                     <View style={{ zIndex: 9999, elevation: 20 }}>
                                         <Dropdown
@@ -1862,6 +2067,7 @@ const AddSalesPerfomaInvoice = () => {
                                         />
                                     </View>
                                 </View>
+                                )}
 
                                 {/* Description full width */}
                                 <View style={{ width: '100%', marginBottom: hp(1) }}>
@@ -1877,24 +2083,26 @@ const AddSalesPerfomaInvoice = () => {
                                     />
                                 </View>
 
-                                {/* HSN/SAC field */}
-                                <View style={{ width: '100%', marginBottom: hp(1) }}>
-                                    <Text style={inputStyles.label}>HSN/SAC</Text>
-                                    <View style={[inputStyles.box, { marginTop: hp(0.5), width: '100%' }]}>
-                                        <TextInput
-                                            style={[inputStyles.input]}
-                                            value={currentItem.hsn || ''}
-                                            onChangeText={t => setCurrentItem(ci => ({ ...ci, hsn: t }))}
-                                            placeholder="Enter HSN/SAC code"
-                                            placeholderTextColor={COLORS.textLight}
-                                        />
+                                {/* HSN/SAC field - hide for timesheet-based projects */}
+                                {!selectedProjectData?.IsTimesheetBased && (
+                                    <View style={{ width: '100%', marginBottom: hp(1) }}>
+                                        <Text style={inputStyles.label}>HSN/SAC</Text>
+                                        <View style={[inputStyles.box, { marginTop: hp(0.5), width: '100%' }]}>
+                                            <TextInput
+                                                style={[inputStyles.input]}
+                                                value={currentItem.hsn || ''}
+                                                onChangeText={t => setCurrentItem(ci => ({ ...ci, hsn: t }))}
+                                                placeholder="Enter HSN/SAC code"
+                                                placeholderTextColor={COLORS.textLight}
+                                            />
+                                        </View>
                                     </View>
-                                </View>
+                                )}
 
                                 {/* Two fields in one line: Quantity & Rate */}
                                 <View style={[styles.row, { justifyContent: 'space-between' }]}>
                                     <View style={{ width: '48%' }}>
-                                        <Text style={inputStyles.label}>Quantity*</Text>
+                                        <Text style={inputStyles.label}>{selectedProjectData?.IsTimesheetBased ? 'Total Hour Worked*' : 'Quantity*'}</Text>
                                         <View style={[inputStyles.box, { marginTop: hp(0.5), width: '100%' }]}>
                                             <TextInput
                                                 style={[inputStyles.input, { textAlign: 'center' }]}

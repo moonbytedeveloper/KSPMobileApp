@@ -537,6 +537,7 @@ const ManageSalesOrder = () => {
     unit: '',
     unitUuid: null,
     desc: '',
+    hsn: '',
     rate: '',
   });
   const [editItemId, setEditItemId] = useState(null);
@@ -967,7 +968,7 @@ const ManageSalesOrder = () => {
         const sku = r?.SKU || r?.Sku || r?.ItemCode || '';
         const rate = String(r?.Rate ?? r?.Price ?? r?.UnitPrice ?? 0);
         const desc = r?.Description || r?.Desc || '';
-        const hsn = r?.HSNCode || r?.HSN || r?.hsn || '';
+        const hsn = r?.HSNCode || r?.HSN || r?.hsn ||r?.HSNSACNO|| '-';
         const qty = String(r?.Quantity ?? r?.Qty ?? r?.QuantityOrdered ?? 1);
         const amtNum = Number(r?.Amount ?? r?.TotalAmount ?? r?.NetAmount ?? r?.LineAmount ?? 0) || 0;
         const amount = amtNum.toFixed(2);
@@ -1513,7 +1514,7 @@ const ManageSalesOrder = () => {
       sku: master ? master.sku : '',
       rate: rate,
       desc: currentItem.desc && currentItem.desc.length ? currentItem.desc : (master ? master.desc || '' : ''),
-      hsn: master ? master.hsn || '' : '',
+      hsn:  currentItem.hsn && currentItem.hsn.length ? currentItem.hsn : (master ? master.hsn || '' : ''),
       qty: qty,
       tax: 'IGST',
       amount: amount,
@@ -1531,6 +1532,7 @@ const ManageSalesOrder = () => {
           Quantity: Number(qty) || 0,
           Description: newItem.desc || '',
           Rate: Number(rate) || 0,
+          HSNSACNO: newItem.hsn || '',
         };
         console.log('Adding sales line payload ->', payload, 'headerUuidUsed ->', headerUuid);
         // If we are editing an existing line that exists on server, call update API instead
@@ -1546,6 +1548,7 @@ const ManageSalesOrder = () => {
               Quantity: Number(qty) || 0,
               Description: newItem.desc || '',
               Rate: Number(rate) || 0,
+              HSNSACNO: newItem.hsn || '',
             };
             console.log('Updating sales order line payload ->', updatePayload);
             try {
@@ -1586,6 +1589,7 @@ const ManageSalesOrder = () => {
           sku: serverItem?.SKU || newItem.sku,
           rate: (serverItem && (serverItem?.Rate ?? serverItem?.rate)) ?? newItem.rate,
           desc: serverItem?.Description ?? newItem.desc,
+          hsn: serverItem?.HSNCode || serverItem?.HSN || newItem.hsn,
         };
         if (editItemId) {
           setItems(prev => prev.map(it => it.id === editItemId ? { ...it, ...itemToPush, id: editItemId } : it));
@@ -1624,7 +1628,7 @@ const ManageSalesOrder = () => {
     }
 
     // reset form
-    setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: 1, unit: '', unitUuid: null });
+    setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: 1, unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
   };
 
   const handleEditItem = id => {
@@ -1641,6 +1645,7 @@ const ManageSalesOrder = () => {
       unit: it.unit || '',
       unitUuid: it.unitUuid || null,
       desc: it.desc || it.desc || '',
+      hsn: it.hsn || (matchedMaster ? matchedMaster.hsn : '') || '',
       rate: it.rate || '',
     });
     setEditItemId(id);
@@ -2003,7 +2008,7 @@ const ManageSalesOrder = () => {
                 </View>
               </View>
               <View style={styles.col}>
-                <Text style={inputStyles.label}>payment Method* </Text>
+                <Text style={inputStyles.label}>Payment Method* </Text>
 
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   {headerSaved && !isEditingHeader ? (
@@ -2466,7 +2471,7 @@ const ManageSalesOrder = () => {
                         getKey={it => (it?.sku || it)}
                         onSelect={v => {
                           if (v && typeof v === 'object') {
-                            setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.sku || v, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '' }));
+                            setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.sku || v, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '', hsn: v?.hsn || ci?.hsn || '' }));
                           } else {
                             setCurrentItem(ci => ({ ...ci, itemName: v, itemNameUuid: null }));
                           }
@@ -2490,6 +2495,20 @@ const ManageSalesOrder = () => {
                       multiline
                       numberOfLines={3}
                     />
+                  </View>
+
+                  {/* HSN/SAC field */}
+                  <View style={{ width: '100%', marginBottom: hp(1) }}>
+                    <Text style={inputStyles.label}>HSN/SAC Code</Text>
+                    <View style={[inputStyles.box, { marginTop: hp(0.5), width: '100%' }]}>
+                      <TextInput
+                        style={[inputStyles.input]}
+                        value={currentItem.hsn || ''}
+                        onChangeText={t => setCurrentItem(ci => ({ ...ci, hsn: t }))}
+                        placeholder="Enter HSN/SAC code"
+                        placeholderTextColor={COLORS.textLight}
+                      />
+                    </View>
                   </View>
 
                   {/* Two fields in one line: Quantity & Rate */}
@@ -2609,6 +2628,7 @@ const ManageSalesOrder = () => {
                             <Text style={[styles.th, { width: wp(10) }]}>Sr.No</Text>
                             <Text style={[styles.th, { width: wp(30) }]}>Item Details</Text>
                             <Text style={[styles.th, { width: wp(30) }]}>Description</Text>
+                            <Text style={[styles.th, { width: wp(20) }]}>HSN/SAC</Text>
                             <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
                             <Text style={[styles.th, { width: wp(20) }]}>Rate</Text>
                             <Text style={[styles.th, { width: wp(20) }]}>Amount</Text>
@@ -2623,7 +2643,8 @@ const ManageSalesOrder = () => {
                               return (
                                 String(it.name || '').toLowerCase().includes(q) ||
                                 String(it.itemType || '').toLowerCase().includes(q) ||
-                                String(it.desc || '').toLowerCase().includes(q)
+                                String(it.desc || '').toLowerCase().includes(q) ||
+                                String(it.hsn || '').toLowerCase().includes(q)
                               );
                             }) : items;
                             const total = filtered.length;
@@ -2646,6 +2667,9 @@ const ManageSalesOrder = () => {
                                     </View>
                                     <View style={[styles.td, { width: wp(30) }]}>
                                       <Text style={styles.tdText}>{item.desc}</Text>
+                                    </View>
+                                    <View style={[styles.td, { width: wp(20) }]}>
+                                      <Text style={[styles.tdText]}>{item.hsn || 'N/A'}</Text>
                                     </View>
                                     <View style={[styles.td, { width: wp(20) }]}>
                                       <Text style={styles.tdText}>{item.qty}</Text>

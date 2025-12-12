@@ -7,7 +7,7 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons'; 
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
-import { getPurchaseHeaderInquiries, deletePurchaseInquiryHeader } from '../../../../api/authServices'; 
+import { getPurchaseHeaderInquiries, deletePurchaseInquiryHeader, convertInquiryToPurchaseOrder } from '../../../../api/authServices'; 
 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 
@@ -120,7 +120,7 @@ const ViewPurchaseInquiry = () => {
     const renderFooterActions = (order) => {
         const buttons = [
             { icon: 'delete-outline', label: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
-            { icon: 'chat-bubble-outline', label: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
+            { icon: 'logout', label: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
             { icon: 'edit', label: 'Edit', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
         ];
 
@@ -131,7 +131,7 @@ const ViewPurchaseInquiry = () => {
                         key={`${order.id}-${btn.icon}`}
                         activeOpacity={0.85}
                         style={[styles.cardActionBtn, { backgroundColor: btn.bg, borderColor: btn.border }]}
-                        onPress={() => {
+                        onPress={async () => {
                             // Delete action: confirm and call deleteSalesHeader
                             if (btn.label === 'Delete') {
                                 const headerUuid = order.raw?.UUID || order.raw?.Id || order.raw?.Data?.UUID || order.raw?.Data?.UUIDString || order.id;
@@ -154,6 +154,30 @@ const ViewPurchaseInquiry = () => {
                                         } }
                                     ]
                                 );
+                                return;
+                            }
+                            // Convert inquiry to purchase order when Forward is clicked
+                            if (btn.label === 'Forward') {
+                                const headerUuid = order.raw?.UUID || order.raw?.Id || order.raw?.Data?.UUID || order.raw?.Data?.UUIDString || order.id;
+                                try {
+                                    console.log('ViewPurchaseInquiry -> converting inquiry to purchase order ->', headerUuid);
+                                    const response = await convertInquiryToPurchaseOrder({ inquiryUuid: headerUuid });
+                                    
+                                    // Show success message from API
+                                    const successMessage = response?.Message || response?.message || 'Purchase inquiry converted to order successfully';
+                                    Alert.alert('Success', successMessage);
+                                    
+                                    // Get the new order UUID from response (based on your API response structure)
+                                    const newOrderUuid = response?.Data?.headerUUID || response?.Data?.HeaderUUID || response?.Data?.UUID || response?.headerUUID || response?.HeaderUUID || response?.UUID;
+                                    console.log('ViewPurchaseInquiry -> New Order UUID from conversion:', newOrderUuid);
+                                    
+                                    // Navigate to ManagePurchaseOrder with the headerUuid - the screen will automatically call getPurchaseOrderHeaderById
+                                    navigation.navigate('ManagePurchaseOrder', { headerUuid: newOrderUuid });
+                                    
+                                } catch (err) {
+                                    console.error('Failed to convert inquiry', err);
+                                    Alert.alert('Error', err?.message || 'Failed to convert purchase inquiry to order');
+                                }
                                 return;
                             }
                             // Navigate to AddSalesInquiry when Edit is clicked, passing header UUID

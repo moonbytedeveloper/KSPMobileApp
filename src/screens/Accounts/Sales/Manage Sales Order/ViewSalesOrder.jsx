@@ -89,7 +89,8 @@ const ViewSalesOrder = () => {
                 );
             } catch (error) {
                 console.log('Convert error:', error?.message || error);
-                Alert.alert('Error', error?.message || 'Failed to convert Sales Order to Invoice');
+                const errorMessage = error?.message || 'Unable to convert sales order to invoice. Please try again.';
+                Alert.alert('Conversion Failed', errorMessage);
             }
         } else {
             Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber}`);
@@ -266,11 +267,19 @@ const ViewSalesOrder = () => {
         <View style={styles.screen}>
                 <AppHeader
                     title="View Sales Order"
-                onLeftPress={() => navigation.goBack()}
-                onRightPress={() => navigation.navigate('ManageSalesOrder', { mode: 'add' })}
+                    onLeftPress={() => {
+                        // Prevent GO_BACK action when there's no previous screen in the navigator
+                        if (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
+                            navigation.goBack();
+                        } else {
+                            // Fallback: navigate to a safe root screen. Change 'Dashboard' to your app's main screen name if needed.
+                            try { navigation.replace('Main'); } catch (e) { try { navigation.navigate('Main'); } catch (_) { /* ignore */ } }
+                        }
+                    }}
+                    onRightPress={() => navigation.navigate('ManageSalesOrder', { mode: 'add' })}
                     rightButtonLabel="Add Sales Order"
-                showRight
-            />
+                    showRight
+                />
             <View style={styles.headerSeparator} />
 
             <View style={styles.controlsWrapper}>

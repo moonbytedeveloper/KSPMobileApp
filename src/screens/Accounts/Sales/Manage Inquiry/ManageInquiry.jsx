@@ -156,7 +156,8 @@ const ManageInquiry = () => {
                                     }
                                 } catch (err) {
                                     console.error('Failed to convert inquiry', err);
-                                    Alert.alert('Error', err?.message || 'Failed to convert inquiry to sales order');
+                                    const errorMessage = err?.message || 'Unable to convert inquiry to sales order. Please try again.';
+                                    Alert.alert('Conversion Failed', errorMessage);
                                 }
                                 return;
                             }

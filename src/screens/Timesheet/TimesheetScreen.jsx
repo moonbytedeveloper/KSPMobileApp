@@ -350,6 +350,7 @@ const TimesheetScreen = ({ navigation }) => {
   }, []);
 
   // Fetch data on component focus for fresh data every time
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useFocusEffect(
     React.useCallback(() => {
       // Only fetch if we don't have data or if dates are not set
@@ -368,6 +369,7 @@ const TimesheetScreen = ({ navigation }) => {
   );
 
   // Fetch data when dates change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (fromDate !== 'From Date' && toDate !== 'To Date' && !isLoading) {
       console.log('🔧 [TimesheetScreen] Date changed, fetching data:', { fromDate, toDate });

@@ -8,7 +8,7 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
-import { getpurchaseQuotationHeaders, deletePurchaseQuotationHeader, getPurchasequotationVendor } from '../../../../api/authServices';
+import { getpurchaseQuotationHeaders, deletePurchaseQuotationHeader, getPurchasequotationVendor, convertPurchaseQuotationToOrder } from '../../../../api/authServices';
 import { subscribe, publish } from '../../../../utils/eventBus';
 
 const SALES_ORDERS = [
@@ -310,7 +310,7 @@ const ViewPurchaseQuotation = () => {
     const rangeStart = filteredOrders.length === 0 ? 0 : currentPage * itemsPerPage + 1;
     const rangeEnd = filteredOrders.length === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, filteredOrders.length);
 
-    const handleQuickAction = (order, actionLabel) => {
+    const handleQuickAction = async (order, actionLabel) => {
         if (actionLabel === 'Delete') {
             Alert.alert(
                 'Confirm',
@@ -344,6 +344,46 @@ const ViewPurchaseQuotation = () => {
             return;
         }
 
+        if (actionLabel === 'Convert to Order') {
+            try {
+                setLoadingOrders(true);
+                const quotationUUID = order._raw?.UUID || order.id || null;
+                if (!quotationUUID) throw new Error('Quotation UUID not found');
+                
+                console.log('Converting quotation to order with UUID:', quotationUUID);
+                const resp = await convertPurchaseQuotationToOrder({ quotationUUID });
+                console.log('convertPurchaseQuotationToOrder resp ->', resp);
+                
+                // Extract header UUID from response for navigation
+                const headerUuid = resp?.Data?.HeaderUUID || resp?.HeaderUUID || resp?.UUID || resp?.Data?.UUID || null;
+                
+                if (headerUuid) {
+                    // Show success message from API response
+                    const successMessage = resp?.Message || resp?.Data?.Message || 'Quotation converted to purchase order successfully';
+                    Alert.alert('Success', successMessage, [
+                        {
+                            text: 'OK',
+                            onPress: () => {
+                                // Navigate to ManagePurchaseOrder with prefill data
+                                navigation.navigate('ManagePurchaseOrder', {
+                                    headerUuid,
+                                    prefillHeader: resp?.Data || resp,
+                                    fromConversion: true,
+                                    sourceType: 'quotation'
+                                });
+                            }
+                        }
+                    ]);
+                }
+            } catch (err) {
+                console.error('convertPurchaseQuotationToOrder error ->', err);
+                try { Alert.alert('Error', err?.message || 'Unable to convert quotation to order'); } catch (_) {}
+            } finally {
+                setLoadingOrders(false);
+            }
+            return;
+        }
+
         if (actionLabel === 'Edit') {
             try {
                 const headerUuid = order._raw?.UUID || order.id || null;
@@ -361,9 +401,9 @@ const ViewPurchaseQuotation = () => {
     const renderFooterActions = (order) => {
         const buttons = [
             { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
-            { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
-            { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
-            { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
+            // { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
+            { icon: 'logout', action: 'Convert to Order', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
+            // { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
             { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316'  },
         ];
 

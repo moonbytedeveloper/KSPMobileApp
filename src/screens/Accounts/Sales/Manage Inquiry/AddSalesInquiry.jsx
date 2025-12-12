@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import Dropdown from '../../../../components/common/Dropdown';
@@ -7,27 +7,31 @@ import { COLORS, TYPOGRAPHY, inputStyles } from '../../../styles/styles';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
-import { addSalesInquiry, getCustomers, getItemTypes, getItemMasters, getUnits, addSalesHeader, addSalesLine, updateSalesHeader, getSalesHeader, getSalesLines, updateSalesLine, deleteSalesLine, fetchProjects } from '../../../../api/authServices';
+// Network API calls removed from this screen — local-only behavior
 import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
+import { fetchProjects, getSalesHeader, getCustomers, addSalesInquiry, addSalesLine, updateSalesLine, deleteSalesLine, getItemTypes, getItemMasters, getUnits } from '../../../../api/authServices';
 import { uiDateToApiDate } from '../../../../utils/dateUtils';
 import BottomSheetConfirm from '../../../../components/common/BottomSheetConfirm';
 
 const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyle, rightActions }) => {
     return (
         <View style={[styles.sectionWrapper, wrapperStyle]}>
-            <TouchableOpacity activeOpacity={0.8} style={styles.sectionHeader} onPress={() => onToggle(id)}>
-                <Text style={styles.sectionTitle}>{title}</Text>
+            <View style={styles.sectionHeader}>
+                <TouchableOpacity activeOpacity={0.8} style={{ flex: 1 }} onPress={() => onToggle(id)}>
+                    <Text style={styles.sectionTitle}>{title}</Text>
+                </TouchableOpacity>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-
                     {rightActions ? (
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: wp(2) }}>
                             {rightActions}
                         </View>
                     ) : null}
-                    <Icon name={expanded ? 'expand-less' : 'expand-more'} size={rf(4.2)} color={COLORS.text} />
+                    <TouchableOpacity onPress={() => onToggle(id)} activeOpacity={0.8}>
+                        <Icon name={expanded ? 'expand-less' : 'expand-more'} size={rf(4.2)} color={COLORS.text} />
+                    </TouchableOpacity>
                 </View>
-            </TouchableOpacity>
+            </View>
             {expanded && <View style={styles.line} />}
             {expanded && <View style={styles.sectionBody}>{children}</View>}
         </View>
@@ -45,6 +49,63 @@ const AddSalesInquiry = () => {
             return;
         }
         toggleSection(id);
+    };
+
+    // Called when user explicitly taps the edit icon for the header.
+    // Ensure the header fields are populated into component state so the
+    // user sees the full, editable form. We reset the userEdited flags so
+    // the prefill will apply in this explicit-edit scenario.
+    const enterHeaderEditMode = async () => {
+        try {
+            setHeaderEditing(true);
+            setExpandedId(1);
+            // Reset user-edited marks so prefill applies now
+            userEditedRef.current = { project: false, customer: false, requestedDate: false, expectedDate: false };
+
+            // If we already have headerResponse from a previous prefill, use it
+            const headerData = headerResponse?.Data || headerResponse || null;
+            if (headerData) {
+                setProjectName(headerData.ProjectName || '');
+                setInquiryNo(headerData.InquiryNo || '');
+                if (headerData.OrderDate) setRequestedDate(headerData.OrderDate);
+                if (headerData.RequestedDeliveryDate) setExpectedPurchaseDate(headerData.RequestedDeliveryDate);
+
+                const custUuid = headerData.CustomerUUID || headerData.CustomerId || headerData.CustomerID;
+                if (custUuid) {
+                    setCustomerUuid(custUuid);
+                    const found = (customers || []).find(c => (c.UUID || c.Id || c.id) === custUuid) || null;
+                    if (found) setCustomerName(found?.Name || found?.DisplayName || found?.name || '');
+                    else if (headerData.CustomerName || headerData.Customer) setCustomerName(headerData.CustomerName || headerData.Customer);
+                }
+            } else {
+                // If headerResponse not present, attempt a fresh fetch using any route param
+                const headerUuidParam = route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.headerUUID || route?.params?.uuid || route?.params?.headerRaw?.UUID || route?.params?.headerRaw?.Id;
+                if (headerUuidParam) {
+                    try {
+                        const resp = await getSalesHeader({ headerUuid: headerUuidParam });
+                        const hd = resp?.Data || {};
+                        setProjectName(hd.ProjectName || '');
+                        setInquiryNo(hd.InquiryNo || '');
+                        if (hd.OrderDate) setRequestedDate(hd.OrderDate);
+                        if (hd.RequestedDeliveryDate) setExpectedPurchaseDate(hd.RequestedDeliveryDate);
+                        const custUuid = hd.CustomerUUID || hd.CustomerId || hd.CustomerID;
+                        if (custUuid) {
+                            setCustomerUuid(custUuid);
+                            const found = (customers || []).find(c => (c.UUID || c.Id || c.id) === custUuid) || null;
+                            if (found) setCustomerName(found?.Name || found?.DisplayName || found?.name || '');
+                            else if (hd.CustomerName || hd.Customer) setCustomerName(hd.CustomerName || hd.Customer);
+                        }
+                        // store response for later
+                        setHeaderResponse(resp);
+                        setHeaderSaved(true);
+                    } catch (e) {
+                        console.log('enterHeaderEditMode fetch error ->', e?.message || e);
+                    }
+                }
+            }
+        } catch (e) {
+            console.log('enterHeaderEditMode error ->', e?.message || e);
+        }
     };
 
     // Demo options for dropdowns
@@ -83,6 +144,10 @@ const AddSalesInquiry = () => {
     const [headerSaved, setHeaderSaved] = useState(false);
     const [headerResponse, setHeaderResponse] = useState(null);
     const [headerEditing, setHeaderEditing] = useState(false);
+
+    // Track whether the user has manually edited header fields so background
+    // prefill/mapping logic doesn't overwrite their changes.
+    const userEditedRef = useRef({ project: false, customer: false, requestedDate: false, expectedDate: false });
 
     // Line items state
     const [lineItems, setLineItems] = useState([]);
@@ -139,61 +204,88 @@ const AddSalesInquiry = () => {
 
     const handleDateSelect = (date) => {
         const formatted = formatUiDate(date);
-        if (datePickerField === 'requested') setRequestedDate(formatted);
-        if (datePickerField === 'expected') setExpectedPurchaseDate(formatted);
+        if (datePickerField === 'requested') {
+            setRequestedDate(formatted);
+            userEditedRef.current.requestedDate = true;
+        }
+        if (datePickerField === 'expected') {
+            setExpectedPurchaseDate(formatted);
+            userEditedRef.current.expectedDate = true;
+        }
         setOpenDatePicker(false);
         setDatePickerField(null);
     };
 
-    const handleAddItem = () => {
+    const handleAddItem = async () => {
         if (!currentItem.itemType || !currentItem.itemName || !currentItem.quantity || !currentItem.unit) {
             Alert.alert('Validation', 'Please fill all fields');
             return;
         }
-        // If editing, update the existing item
+
+        // If editing, prefer server update when line has a server UUID; otherwise perform local update
         if (editLineItemId) {
-            const existing = lineItems.find(it => it.id === editLineItemId);
-            // If the item exists on server (has lineUuid) and header is saved, call update API
-            const headerUuid = headerResponse?.Data?.UUID || headerResponse?.UUID || headerResponse?.Data?.HeaderUUID || headerResponse?.HeaderUUID || headerResponse?.HeaderUuid || headerResponse?.Data?.HeaderUuid;
-            if (existing?.lineUuid && headerSaved && headerUuid) {
-                (async () => {
-                    try {
-                        setLineAdding(true);
-                        const payload = {
-                            UUID: existing.lineUuid,
-                            HeaderUUID: headerUuid,
-                            ItemType_UUID: currentItem.itemTypeUuid || existing.itemTypeUuid || null,
-                            ItemName_UUID: currentItem.itemNameUuid || existing.itemNameUuid || null,
-                            Quantity: Number(currentItem.quantity) || Number(existing.quantity) || 0,
-                            Unit_UUID: currentItem.unitUuid || existing.unitUuid || null,
-                        };
-                        console.log('UpdateSalesLine payload ->', payload);
-                        const resp = await updateSalesLine(payload);
-                        console.log('UpdateSalesLine resp ->', resp);
-                        // Update local state with new values
-                        setLineItems(prev => prev.map(it => it.id === editLineItemId ? {
-                            ...it,
-                            itemType: currentItem.itemType,
-                            itemTypeUuid: currentItem.itemTypeUuid || it.itemTypeUuid,
-                            itemName: currentItem.itemName,
-                            itemNameUuid: currentItem.itemNameUuid || it.itemNameUuid,
-                            quantity: currentItem.quantity,
-                            unit: currentItem.unit,
-                            unitUuid: currentItem.unitUuid || it.unitUuid
-                        } : it));
-                    } catch (e) {
-                        console.log('UpdateSalesLine error ->', e?.message || e);
-                        Alert.alert('Error', e?.message || 'Failed to update line on server');
-                    } finally {
-                        setEditLineItemId(null);
-                        setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
-                        setLineAdding(false);
-                    }
-                })();
+            const existing = lineItems.find(i => i.id === editLineItemId) || {};
+            const existingLineUuid = existing?.lineUuid || existing?.LineUUID || existing?.UUID || null;
+
+            // If this line is already saved on server, call updateSalesLine
+            if (existingLineUuid) {
+                setLineAdding(true);
+                try {
+                    const payload = {
+                        UUID: existingLineUuid,
+                        LineUUID: existingLineUuid,
+                        SrNo: existing?.SrNo || editLineItemId,
+                        ItemTypeUUID: currentItem.itemTypeUuid || existing.itemTypeUuid || null,
+                        ItemTypeName: currentItem.itemType || existing.itemType || '',
+                        ItemUUID: currentItem.itemNameUuid || existing.itemNameUuid || null,
+                        ItemName: currentItem.itemName || existing.itemName || '',
+                        Quantity: currentItem.quantity,
+                        UnitUUID: currentItem.unitUuid || existing.unitUuid || null,
+                        Unit: currentItem.unit || existing.unit || ''
+                    };
+                    console.log('updateSalesLine payload ->', payload);
+                    const resp = await updateSalesLine(payload);
+                    console.log('updateSalesLine resp ->', resp);
+
+                    const updatedUuid = resp?.Data?.UUID || resp?.Data?.LineUUID || resp?.UUID || existingLineUuid;
+                    const updatedItem = {
+                        ...existing,
+                        itemType: currentItem.itemType,
+                        itemTypeUuid: currentItem.itemTypeUuid || existing.itemTypeUuid || null,
+                        itemName: currentItem.itemName,
+                        itemNameUuid: currentItem.itemNameUuid || existing.itemNameUuid || null,
+                        quantity: currentItem.quantity,
+                        unit: currentItem.unit,
+                        unitUuid: currentItem.unitUuid || existing.unitUuid || null,
+                        lineUuid: updatedUuid,
+                    };
+
+                    setLineItems(prev => prev.map(it => it.id === editLineItemId ? updatedItem : it));
+                    setEditLineItemId(null);
+                    setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
+                } catch (e) {
+                    console.log('updateSalesLine error ->', e?.message || e);
+                    Alert.alert('Error', e?.message || 'Failed to update line on server. Changes saved locally.');
+                    // fallback to local update
+                    setLineItems(prev => prev.map(it => it.id === editLineItemId ? {
+                        ...it,
+                        itemType: currentItem.itemType,
+                        itemTypeUuid: currentItem.itemTypeUuid || it.itemTypeUuid,
+                        itemName: currentItem.itemName,
+                        itemNameUuid: currentItem.itemNameUuid || it.itemNameUuid,
+                        quantity: currentItem.quantity,
+                        unit: currentItem.unit,
+                        unitUuid: currentItem.unitUuid || it.unitUuid
+                    } : it));
+                    setEditLineItemId(null);
+                    setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
+                } finally {
+                    setLineAdding(false);
+                }
                 return;
             }
 
-            // Local-only update (line not yet saved on server)
+            // No server UUID -> perform local-only update
             setLineItems(prev => prev.map(it => it.id === editLineItemId ? {
                 ...it,
                 itemType: currentItem.itemType,
@@ -210,6 +302,70 @@ const AddSalesInquiry = () => {
             return;
         }
 
+        // If header is saved on server, create payload and post line to API
+        const headerUuid = headerResponse?.Data?.UUID || headerResponse?.Data?.HeaderUUID || headerResponse?.Data?.Id || null;
+        if (headerSaved && headerUuid) {
+            setLineAdding(true);
+            try {
+                const srNo = lineItems.length ? Math.max(...lineItems.map(i => i.id)) + 1 : 1;
+                const payload = {
+                    HeaderUUID: headerUuid,
+                    headerUuid: headerUuid,
+                    UUID: headerUuid,
+                    SrNo: srNo,
+                    ItemTypeUUID: currentItem.itemTypeUuid || null,
+                    ItemTypeName: currentItem.itemType || '',
+                    ItemUUID: currentItem.itemNameUuid || null,
+                    ItemName: currentItem.itemName || '',
+                    Quantity: currentItem.quantity,
+                    UnitUUID: currentItem.unitUuid || null,
+                    Unit: currentItem.unit || ''
+                };
+
+                console.log('addSalesLine payload ->', payload);
+                const resp = await addSalesLine(payload);
+                console.log('addSalesLine resp ->', resp);
+
+                // Map response to local item. Prefer resp.Data.UUID or resp.Data.LineUUID
+                const createdUuid = resp?.Data?.UUID || resp?.Data?.LineUUID || resp?.Data?.Id || resp?.UUID || null;
+                const newItem = {
+                    id: srNo,
+                    itemType: currentItem.itemType,
+                    itemTypeUuid: currentItem.itemTypeUuid || null,
+                    itemName: currentItem.itemName,
+                    itemNameUuid: currentItem.itemNameUuid || null,
+                    quantity: currentItem.quantity,
+                    unit: currentItem.unit,
+                    unitUuid: currentItem.unitUuid || null,
+                    lineUuid: createdUuid,
+                };
+
+                setLineItems(prev => [...prev, newItem]);
+                setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
+            } catch (e) {
+                console.log('addSalesLine error ->', e?.message || e);
+                Alert.alert('Error', e?.message || 'Failed to add line to server. Saving locally instead.');
+                // fallback to local add if API fails
+                const newItemBase = {
+                    id: lineItems.length ? Math.max(...lineItems.map(i => i.id)) + 1 : 1,
+                    itemType: currentItem.itemType,
+                    itemTypeUuid: currentItem.itemTypeUuid || null,
+                    itemName: currentItem.itemName,
+                    itemNameUuid: currentItem.itemNameUuid || null,
+                    quantity: currentItem.quantity,
+                    unit: currentItem.unit,
+                    unitUuid: currentItem.unitUuid || null,
+                    lineUuid: null,
+                };
+                setLineItems(prev => [...prev, newItemBase]);
+                setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
+            } finally {
+                setLineAdding(false);
+            }
+            return;
+        }
+
+        // Header not saved on server — perform a local-only add
         const newItemBase = {
             id: lineItems.length ? Math.max(...lineItems.map(i => i.id)) + 1 : 1,
             itemType: currentItem.itemType,
@@ -222,134 +378,95 @@ const AddSalesInquiry = () => {
             lineUuid: null,
         };
 
-        // If header already saved, post the line immediately
-        if (headerSaved) {
-            (async () => {
-                try {
-                    setLineAdding(true);
-                    // Determine header UUID from headerResponse (try multiple keys)
-                    const headerUuid = headerResponse?.Data?.UUID || headerResponse?.UUID || headerResponse?.Data?.HeaderUUID || headerResponse?.HeaderUUID || headerResponse?.HeaderUuid || headerResponse?.Data?.HeaderUuid;
-                    if (!headerUuid) {
-                        Alert.alert('Error', 'Header UUID missing. Cannot add line to server.');
-                        return;
-                    }
-                    const payload = {
-                        UUID: '',
-                        HeaderUUID: headerUuid,
-                        ItemType_UUID: newItemBase.itemTypeUuid,
-                        ItemName_UUID: newItemBase.itemNameUuid,
-                        Quantity: Number(newItemBase.quantity) || 0,
-                        Unit_UUID: newItemBase.unitUuid || null,
-                    };
-                    console.log('AddSalesLine payload ->', payload);
-                    const resp = await addSalesLine(payload);
-                    console.log('AddSalesLine resp ->', resp);
-                    // Try to extract created line UUID from response
-                    const createdLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || resp?.LineUUID || null;
-                    const newItem = { ...newItemBase, lineUuid: createdLineUuid };
-                    setLineItems(prev => [...prev, newItem]);
-                    setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
-                } catch (e) {
-                    console.log('AddSalesLine error ->', e?.message || e);
-                    Alert.alert('Error', e?.message || 'Failed to add line to server');
-                } finally {
-                    setLineAdding(false);
-                }
-            })();
-            return;
-        }
-
-        // Local-only add (header not saved yet)
-        setLineItems([...lineItems, newItemBase]);
+        setLineItems(prev => [...prev, newItemBase]);
         setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
     };
 
-    // Fetch customers for dropdown
+    // Fetch customers for dropdown (prefer API, fall back to demo list)
     const fetchCustomers = async () => {
         try {
             const resp = await getCustomers();
-            console.log('GetCustomers resp ->', resp);
-            const data = resp?.Data || resp || [];
-            const list = Array.isArray(data) ? data : (data?.List || []);
+            const list = resp?.Data || resp?.Records || resp?.List || resp || [];
+            const arr = Array.isArray(list) ? list : [];
+            setCustomers(arr);
+            return arr;
+        } catch (e) {
+            console.log('fetchCustomers error ->', e?.message || e);
+            const list = (CustomerType || []).slice(1).map((name, idx) => ({ UUID: `local-cust-${idx + 1}`, Name: name }));
             setCustomers(list);
             return list;
-        } catch (e) {
-            console.log('Error fetching customers', e?.message || e);
-            return [];
         }
     };
 
     const fetchProjectsList = async () => {
         try {
             const resp = await fetchProjects();
-            console.log('FetchProjects resp ->', resp);
-            const data = resp?.Data || resp || [];
-            // Try multiple possible array locations
-            let list = [];
-            if (Array.isArray(data)) {
-                list = data;
-            } else if (Array.isArray(data?.List)) {
-                list = data.List;
-            } else if (Array.isArray(data?.Records)) {
-                list = data.Records;
-            } else if (Array.isArray(data?.Items)) {
-                list = data.Items;
-            }
-            console.log('FetchProjects extracted list ->', list);
+            const list = resp?.Data || resp?.Records || resp?.List || resp || [];
+            const arr = Array.isArray(list) ? list : [];
+            setProjects(arr);
+            return arr;
+        } catch (e) {
+            console.log('fetchProjectsList error ->', e?.message || e);
+            const list = [];
             setProjects(list);
             return list;
-        } catch (e) {
-            console.log('Error fetching projects', e?.message || e);
-            return [];
         }
     };
 
     const fetchItemTypes = async () => {
+        setItemTypesLoading(true);
         try {
-            setItemTypesLoading(true);
+            // Prefer API-backed item types
             const resp = await getItemTypes();
-            console.log('GetItemTypes resp ->', resp);
-            const data = resp?.Data || resp || [];
-            const list = Array.isArray(data) ? data : (data?.List || []);
+            const list = resp?.Data || resp?.Records || resp?.List || resp || [];
+            const arr = Array.isArray(list) ? list : [];
+            setServerItemTypes(arr);
+            return arr;
+        } catch (e) {
+            console.log('fetchItemTypes error ->', e?.message || e);
+            // Local fallback: use demoItemTypes as simple objects
+            const list = (demoItemTypes || []).slice(1).map((name, idx) => ({ UUID: `local-it-${idx + 1}`, Name: name }));
             setServerItemTypes(list);
             return list;
-        } catch (e) {
-            console.log('Error fetching item types', e?.message || e);
-            return [];
         } finally {
             setItemTypesLoading(false);
         }
     };
 
     const fetchItemMasters = async (itemTypeUuid = null) => {
+        setItemMastersLoading(true);
         try {
-            setItemMastersLoading(true);
-            const resp = await getItemMasters({ itemTypeUuid });
-            console.log('GetItemMasters resp ->', resp);
-            const data = resp?.Data || resp || [];
-            const list = Array.isArray(data) ? data : (data?.List || []);
+            // Prefer API-backed item masters for the given item type
+            // Call signature: pass identifier if available (service may accept an object or raw id)
+            const resp = await getItemMasters(itemTypeUuid ? { itemTypeUuid } : {});
+            const list = resp?.Data || resp?.Records || resp?.List || resp || [];
+            const arr = Array.isArray(list) ? list : [];
+            setServerItemMasters(arr);
+            return arr;
+        } catch (e) {
+            console.log('fetchItemMasters error ->', e?.message || e);
+            // Local fallback: use itemNames demo list
+            const list = (itemNames || []).slice(1).map((name, idx) => ({ UUID: `local-im-${idx + 1}`, Name: name }));
             setServerItemMasters(list);
             return list;
-        } catch (e) {
-            console.log('Error fetching item masters', e?.message || e);
-            return [];
         } finally {
             setItemMastersLoading(false);
         }
     };
 
     const fetchUnits = async () => {
+        setUnitsLoading(true);
         try {
-            setUnitsLoading(true);
             const resp = await getUnits();
-            console.log('GetUnits resp ->', resp);
-            const data = resp?.Data || resp || [];
-            const list = Array.isArray(data) ? data : (data?.List || []);
+            const list = resp?.Data || resp?.Records || resp?.List || resp || [];
+            const arr = Array.isArray(list) ? list : [];
+            setServerUnits(arr);
+            return arr;
+        } catch (e) {
+            console.log('fetchUnits error ->', e?.message || e);
+            const list = (units || []).slice(1).map((name, idx) => ({ UUID: `local-unit-${idx + 1}`, Name: name }));
             setServerUnits(list);
             return list;
-        } catch (e) {
-            console.log('Error fetching units', e?.message || e);
-            return [];
         } finally {
             setUnitsLoading(false);
         }
@@ -357,6 +474,7 @@ const AddSalesInquiry = () => {
 
     // Always load lookup lists on mount so new entries have dropdowns populated
     React.useEffect(() => {
+        // Load local/demo lookup lists on mount
         (async () => {
             try {
                 await Promise.all([
@@ -367,7 +485,7 @@ const AddSalesInquiry = () => {
                     fetchUnits(),
                 ]);
             } catch (e) {
-                console.log('Initial lookup fetch error ->', e?.message || e);
+                console.log('Initial lookup load error ->', e?.message || e);
             }
         })();
     }, []);
@@ -415,54 +533,53 @@ const AddSalesInquiry = () => {
             }
 
             try {
-                // fetch header
-                const headerResp = await getSalesHeader({ headerUuid: headerUuidParam });
-                console.log('Prefill getSalesHeader ->', headerResp);
-                const headerData = headerResp?.Data || {};
-
-                // Prefill fields using exact API keys
-                setProjectName(headerData.ProjectName || '');
-                setInquiryNo(headerData.InquiryNo || '');
-                // API returns dates in dd-MMM-yyyy already — keep as-is
-                if (headerData.OrderDate) setRequestedDate(headerData.OrderDate);
-                if (headerData.RequestedDeliveryDate) setExpectedPurchaseDate(headerData.RequestedDeliveryDate);
-
-                // Customer
-                if (headerData.CustomerUUID || headerData.CustomerId || headerData.CustomerID) {
-                    const custUuid = headerData.CustomerUUID || headerData.CustomerId || headerData.CustomerID;
-                    setCustomerUuid(custUuid);
-                    // Prefer the freshly fetched customers list for immediate lookup
-                    const found = (customersList || customers || []).find(c => (c.UUID || c.Id || c.id) === custUuid) || null;
-                    if (found) {
-                        setCustomerName(found?.Name || found?.DisplayName || found?.name || '');
-                    } else if (headerData.CustomerName || headerData.Customer) {
-                        setCustomerName(headerData.CustomerName || headerData.Customer);
+                // Use route-provided headerRaw (if present) to prefill locally. No network calls.
+                const headerRaw = route?.params?.headerRaw || route?.params?.headerData || null;
+                if (headerData) {
+                    if (!headerEditing) {
+                        if (!userEditedRef.current.project) setProjectName(headerData.ProjectName || '');
+                        // also bind project UUID when available so API posts use UUID
+                        if (headerData.ProjectUUID || headerData.ProjectId || headerData.Project) {
+                            setProjectUuid(headerData.ProjectUUID || headerData.ProjectId || headerData.Project || null);
+                        }
+                        setInquiryNo(headerData.InquiryNo || '');
+                        if (headerData.OrderDate && !userEditedRef.current.requestedDate) setRequestedDate(headerData.OrderDate);
+                        if (headerData.RequestedDeliveryDate && !userEditedRef.current.expectedDate) setExpectedPurchaseDate(headerData.RequestedDeliveryDate);
+                    } else {
+                        if (!inquiryNo) setInquiryNo(headerData.InquiryNo || '');
                     }
+
+                    if (headerData.CustomerUUID || headerData.CustomerId || headerData.CustomerID) {
+                        const custUuid = headerData.CustomerUUID || headerData.CustomerId || headerData.CustomerID;
+                        if (!userEditedRef.current.customer) {
+                            setCustomerUuid(custUuid);
+                            const found = (customersList || customers || []).find(c => (c.UUID || c.Id || c.id) === custUuid) || null;
+                            if (found) setCustomerName(found?.Name || found?.DisplayName || found?.name || '');
+                            else if (headerData.CustomerName || headerData.Customer) setCustomerName(headerData.CustomerName || headerData.Customer);
+                        }
+                    }
+
+                    // store local header response and mark saved
+                    setHeaderResponse({ Data: headerData });
+                    setHeaderSaved(true);
+
+                    // Map any provided lines from headerRaw (if available)
+                    const records = headerRaw?.Lines || headerRaw?.Data?.Lines || headerRaw?.LinesRecords || [];
+                    const mapped = (records || []).map((ln, idx) => ({
+                        id: ln?.SrNo || idx + 1,
+                        itemType: ln?.ItemTypeName || ln?.ItemType || '',
+                        itemTypeUuid: null,
+                        itemName: ln?.ItemName || ln?.Name || '',
+                        itemNameUuid: null,
+                        quantity: ln?.Quantity || 0,
+                        unit: ln?.Unit || '',
+                        unitUuid: null,
+                        lineUuid: ln?.UUID || null,
+                    }));
+                    setLineItems(mapped);
                 }
-
-                // mark saved and store response
-                setHeaderResponse(headerResp);
-                setHeaderSaved(true);
-                setHeaderEditing(false);
-
-                // fetch lines
-                const linesResp = await getSalesLines({ headerUuid: headerUuidParam });
-                console.log('Prefill getSalesLines ->', linesResp);
-                const records = linesResp?.Data?.Records || [];
-                const mapped = (records || []).map((ln, idx) => ({
-                    id: ln?.SrNo || idx + 1,
-                    itemType: ln?.ItemTypeName || '',
-                    itemTypeUuid: null,
-                    itemName: ln?.ItemName || '',
-                    itemNameUuid: null,
-                    quantity: ln?.Quantity || 0,
-                    unit: '',
-                    unitUuid: null,
-                    lineUuid: ln?.UUID || null,
-                }));
-                setLineItems(mapped);
             } catch (e) {
-                console.log('Prefill error ->', e?.message || e);
+                console.log('Prefill local error ->', e?.message || e);
             } finally {
                 // Clear route params after handling prefill so stale header UUIDs don't persist
                 try {
@@ -476,19 +593,36 @@ const AddSalesInquiry = () => {
         })();
     }, [route?.params]);
 
-    const handleEditItem = (id) => {
+    const handleEditItem = async (id) => {
         const item = lineItems.find(i => i.id === id);
         if (item) {
+            const itemTypeUuid = item.itemTypeUuid || item.ItemType_UUID || item.ItemTypeUuid || null;
+            const itemNameUuid = item.itemNameUuid || item.ItemName_UUID || item.ItemNameUuid || null;
+            const unitUuid = item.unitUuid || item.Unit_UUID || item.UnitUuid || null;
+
+            // Populate editor state including UUIDs so dropdowns can use them
             setCurrentItem({
-                itemType: item.itemType,
-                itemTypeUuid: item.itemTypeUuid || item.ItemType_UUID || null,
-                itemName: item.itemName,
-                itemNameUuid: item.itemNameUuid || item.ItemName_UUID || null,
-                quantity: item.quantity,
-                unit: item.unit
+                itemType: item.itemType || '',
+                itemTypeUuid: itemTypeUuid,
+                itemName: item.itemName || '',
+                itemNameUuid: itemNameUuid,
+                quantity: item.quantity || '',
+                unit: item.unit || '',
+                unitUuid: unitUuid
             });
+
             setEditLineItemId(id);
-            // Expand LINE section so editor is visible (optional)
+
+            // Ensure lookup lists are loaded for the selected item type and units
+            // so the dropdowns show the selected option immediately.
+            try {
+                if (itemTypeUuid) await fetchItemMasters(itemTypeUuid);
+                await fetchUnits();
+            } catch (e) {
+                console.log('handleEditItem lookup fetch error ->', e?.message || e);
+            }
+
+            // Expand LINE section so editor is visible
             setExpandedId(2);
         }
     };
@@ -500,19 +634,21 @@ const AddSalesInquiry = () => {
 
     const handleDeleteItem = (id) => {
         const toDelete = lineItems.find(item => item.id === id);
-        // If this line exists on server (has lineUuid) and header is saved, call delete API
-        if (toDelete?.lineUuid && headerSaved) {
+        if (!toDelete) return;
+
+        // If this line exists on server (has lineUuid), confirm and call delete API
+        const existingLineUuid = toDelete?.lineUuid || toDelete?.LineUUID || toDelete?.UUID || null;
+        if (existingLineUuid) {
+            // Direct delete without confirmation (per user request)
             (async () => {
+                setLineAdding(true);
                 try {
-                    setLineAdding(true);
-                    const headerUuid = headerResponse?.Data?.UUID || headerResponse?.UUID || headerResponse?.Data?.HeaderUUID || headerResponse?.HeaderUUID || headerResponse?.HeaderUuid || headerResponse?.Data?.HeaderUuid;
-                    console.log('Deleting sales line ->', { uuid: toDelete.lineUuid, headerUuid });
-                    const resp = await deleteSalesLine({ lineUuid: toDelete.lineUuid });
-                    console.log('DeleteSalesLine resp ->', resp);
-                    // remove locally after successful delete
-                    setLineItems(prev => prev.filter(it => it.id !== id));
+                    console.log('deleteSalesLine ->', existingLineUuid);
+                    await deleteSalesLine({ lineUuid: existingLineUuid });
+                    // remove from local state after successful server delete
+                    setLineItems(prev => prev.filter(item => item.id !== id));
                 } catch (e) {
-                    console.log('DeleteSalesLine error ->', e?.message || e);
+                    console.log('deleteSalesLine error ->', e?.message || e);
                     Alert.alert('Error', e?.message || 'Failed to delete line on server');
                 } finally {
                     setLineAdding(false);
@@ -521,47 +657,29 @@ const AddSalesInquiry = () => {
             return;
         }
 
-        // Local-only remove if not persisted
-        setLineItems(lineItems.filter(item => item.id !== id));
+        // Local-only line (no server UUID) — remove immediately
+        setLineItems(prev => prev.filter(item => item.id !== id));
     };
 
     const handleSubmit = async () => {
         try {
             setLoading(true);
-            const userUuid = await getUUID();
-            if (!userUuid) {
-                Alert.alert('Authentication', 'User not logged in');
-                setLoading(false);
-                return;
-            }
-
+            // Local-only submit: validate and show success without network
             if (!customerUuid) {
                 Alert.alert('Validation', 'Please select a customer');
                 setLoading(false);
                 return;
             }
-
             const payload = {
                 projectName,
+                projectUUID: projectUuid || '',
                 customerUUID: customerUuid,
-                requestedDate: uiDateToApiDate(requestedDate),
-                expectedPurchaseDate: uiDateToApiDate(expectedPurchaseDate),
-                lineItems: lineItems.map((item, index) => ({
-                    srNo: index + 1,
-                    ItemType_UUID: item.itemTypeUuid || item.ItemType_UUID || null,
-                    ItemName_UUID: item.itemNameUuid || item.ItemName_UUID || null,
-                    quantity: item.quantity,
-                    Unit_UUID: item.unitUuid || item.Unit_UUID || null,
-                }))
+                requestedDate,
+                expectedPurchaseDate,
+                lineItems
             };
-
-            console.log('Final Payload:', payload);
-
-            const resp = await addSalesInquiry(payload);
-            console.log('Final SALES INQUIRY resp:', resp);
-            // Use sensible response message fallbacks
-            const message = resp?.Message || resp?.message || resp?.Data?.Message || 'Sales inquiry submitted successfully';
-            setSuccessMessage(String(message));
+            console.log('Local submit payload ->', payload);
+            setSuccessMessage('Sales inquiry saved locally');
             setSuccessSheetVisible(true);
         } catch (e) {
             console.log('Error Message:', e && e.message ? e.message : e);
@@ -582,21 +700,27 @@ const AddSalesInquiry = () => {
                 return;
             }
             const payload = {
-                UUID: '',
-                CustomerUUID: customerUuid,
-                OrderDate: uiDateToApiDate(requestedDate) || null,
-                RequestedDeliveryDate: uiDateToApiDate(expectedPurchaseDate) || null,
-                ProjectName: projectName || '',
-                InquiryNo: inquiryNo || ''
+                projectName,
+                customerUUID: customerUuid,
+                requestedDate: uiDateToApiDate(requestedDate) || null,
+                expectedPurchaseDate: uiDateToApiDate(expectedPurchaseDate) || null,
+                InquiryNo: inquiryNo || '',
+              
             };
-            console.log('AddSalesHeader payload ->', payload);
-            // call API helper
-            const resp = await addSalesHeader(payload, { userUuid: await getUUID(), cmpUuid: await getCMPUUID(), envUuid: await getENVUUID() });
-            console.log('AddSalesHeader resp ->', resp);
-            setHeaderResponse(resp);
+            console.log('addSalesInquiry payload ->', payload);
+            // Call API to save the combined sales inquiry (header + lines)
+            const resp = await addSalesInquiry(payload);
+            console.log('addSalesInquiry resp ->', resp);
+            // Use response Data as headerResponse when available
+            const headerResp = resp?.Data ? resp : { Data: resp?.Data || resp };
+            setHeaderResponse(headerResp);
             setHeaderSaved(true);
             setHeaderEditing(false);
-            // collapse header section
+            userEditedRef.current = { project: false, customer: false, requestedDate: false, expectedDate: false };
+            // Show success message from API if provided
+            const msg = resp?.Message || resp?.message || 'Header saved successfully';
+            setSuccessMessage(String(msg));
+            setSuccessSheetVisible(true);
             setExpandedId(null);
         } catch (e) {
             console.log('AddSalesHeader error ->', e?.message || e);
@@ -614,28 +738,22 @@ const AddSalesInquiry = () => {
                 setHeaderSubmitting(false);
                 return;
             }
-            // get header UUID from previous response
-            const headerUuid = headerResponse?.Data?.UUID || headerResponse?.UUID || headerResponse?.Data?.HeaderUUID || headerResponse?.HeaderUUID || headerResponse?.HeaderUuid || headerResponse?.Data?.HeaderUuid;
-            if (!headerUuid) {
-                Alert.alert('Error', 'Header UUID missing. Cannot update header.');
-                setHeaderSubmitting(false);
-                return;
-            }
-
+            // Local-only update: simulate update by updating headerResponse
+            const headerUuid = headerResponse?.Data?.UUID || `local-header-${Date.now()}`;
             const payload = {
                 UUID: headerUuid,
                 CustomerUUID: customerUuid,
+                ProjectUUID: projectUuid || '',
                 OrderDate: uiDateToApiDate(requestedDate) || null,
                 RequestedDeliveryDate: uiDateToApiDate(expectedPurchaseDate) || null,
                 ProjectName: projectName || '',
                 InquiryNo: inquiryNo || ''
             };
-            console.log('UpdateSalesHeader payload ->', payload);
-            const resp = await updateSalesHeader(payload, { userUuid: await getUUID(), cmpUuid: await getCMPUUID(), envUuid: await getENVUUID() });
-            console.log('UpdateSalesHeader resp ->', resp);
-            setHeaderResponse(resp);
+            console.log('Local update header payload ->', payload);
+            setHeaderResponse({ Data: payload });
             setHeaderSaved(true);
             setHeaderEditing(false);
+            userEditedRef.current = { project: false, customer: false, requestedDate: false, expectedDate: false };
             setExpandedId(null);
         } catch (e) {
             console.log('UpdateSalesHeader error ->', e?.message || e);
@@ -646,7 +764,11 @@ const AddSalesInquiry = () => {
     };
 
     const handleCancel = () => {
-        navigation.goBack();
+        if (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
+            navigation.goBack();
+        } else {
+            try { navigation.replace('Main'); } catch (e) { try { navigation.navigate('Main'); } catch (_) { /* ignore */ } }
+        }
     };
 
     return (
@@ -656,8 +778,11 @@ const AddSalesInquiry = () => {
                     <AppHeader
           title="Add Sales Inquiry"
           onLeftPress={() => {
-              navigation.goBack();
-          
+              if (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
+                  navigation.goBack();
+              } else {
+                  try { navigation.replace('Main'); } catch (e) { try { navigation.navigate('Main'); } catch (_) { /* ignore */ } }
+              }
           }}
         />
               
@@ -673,7 +798,7 @@ const AddSalesInquiry = () => {
                             headerSaved ? (
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
                                     <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
-                                    <TouchableOpacity onPress={() => { setHeaderEditing(true); setExpandedId(1); }}>
+                                    <TouchableOpacity onPress={() => enterHeaderEditMode()}>
                                         <Icon name="edit" size={rf(5)} color={COLORS.primary} />
                                     </TouchableOpacity>
                                 </View>
@@ -711,9 +836,11 @@ const AddSalesInquiry = () => {
                                             if (v && typeof v === 'object') {
                                                 setProjectName(v?.ProjectTitle || v?.Name || v?.DisplayName || v?.name || '');
                                                 setProjectUuid(v?.Uuid || v?.UUID || v?.Id || v?.id || null);
+                                                userEditedRef.current.project = true;
                                             } else {
                                                 setProjectName(v);
                                                 setProjectUuid(null);
+                                                userEditedRef.current.project = true;
                                             }
                                         }}
                                         renderInModal={true}
@@ -736,10 +863,12 @@ const AddSalesInquiry = () => {
                                             if (v && typeof v === 'object') {
                                                 setCustomerName(v?.Name || v?.DisplayName || v?.name || '');
                                                 setCustomerUuid(v?.UUID || v?.Id || v?.id || null);
+                                                userEditedRef.current.customer = true;
                                             } else {
                                                 // fallback for string values
                                                 setCustomerName(v);
                                                 setCustomerUuid(null);
+                                                userEditedRef.current.customer = true;
                                             }
                                         }}
                                         renderInModal={true}
@@ -920,8 +1049,9 @@ const AddSalesInquiry = () => {
                                     activeOpacity={0.8}
                                     style={styles.addButton}
                                     onPress={handleAddItem}
+                                    disabled={lineAdding}
                                 >
-                                    <Text style={styles.addButtonText}>Add</Text>
+                                    <Text style={styles.addButtonText}>{editLineItemId ? (lineAdding ? 'Updating...' : 'Update') : (lineAdding ? 'Adding...' : 'Add')}</Text>
                                 </TouchableOpacity>
                             </View>
                         </AccordionSection>
@@ -1020,16 +1150,10 @@ const AddSalesInquiry = () => {
                     }}
                     onCancel={() => setSuccessSheetVisible(false)}
                 />
-
+               {/* No longer needed */}
                 {/* <View style={styles.footerBar}>
                     <View style={styles.footerButtonsRow}>
-                        <TouchableOpacity
-                            activeOpacity={0.85}
-                            style={styles.cancelButton}
-                            onPress={handleCancel}
-                        >
-                            <Text style={styles.cancelButtonText}>Cancel</Text>
-                        </TouchableOpacity>
+                      
                         <TouchableOpacity
                             activeOpacity={0.85}
                             style={[styles.submitButton, loading && styles.submitButtonDisabled]}
@@ -1037,6 +1161,13 @@ const AddSalesInquiry = () => {
                             disabled={loading}
                         >
                             <Text style={styles.submitButtonText}>{loading ? 'Submitting...' : 'Submit'}</Text>
+                        </TouchableOpacity>
+                          <TouchableOpacity
+                            activeOpacity={0.85}
+                            style={styles.cancelButton}
+                            onPress={handleCancel}
+                        >
+                            <Text style={styles.cancelButtonText}>Cancel</Text>
                         </TouchableOpacity>
                     </View>
                 </View> */}

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
@@ -7,7 +7,7 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
-import { getPurchaseOrderHeaders, deletePurchaseOrderHeader } from '../../../../api/authServices';
+import { getPurchaseOrderHeaders, deletePurchaseOrderHeader, convertPurchaseOrderToInvoice, getPurchaseOrderSlip } from '../../../../api/authServices';
 
 // Will be loaded from server
 
@@ -23,6 +23,7 @@ const ViewPurchaseOrder = () => {
     const [orders, setOrders] = useState([]);
     const [totalRecords, setTotalRecords] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
     // Server-backed paging: fetch whenever page, pageSize or search changes
     const totalPages = useMemo(() => {
@@ -87,6 +88,37 @@ const ViewPurchaseOrder = () => {
         return () => { mounted = false; };
     }, [currentPage, itemsPerPage, searchQuery]);
 
+    const handleDownloadPDF = async (order) => {
+        try {
+            if (!order?.id) {
+                Alert.alert('Error', 'Purchase order not found');
+                return;
+            }
+
+            setIsGeneratingPDF(true);
+            const pdfBase64 = await getPurchaseOrderSlip({ headerUuid: order.id });
+            
+            if (!pdfBase64) {
+                Alert.alert('Error', 'Purchase order PDF is not available right now.');
+                return;
+            }
+
+            // Navigate to FileViewerScreen with PDF data
+            navigation.navigate('FileViewerScreen', {
+                pdfBase64,
+                fileName: `PurchaseOrder_${order.purchaseOrderNumber || order.id}`,
+                opportunityTitle: order.purchaseOrderNumber || 'Purchase Order',
+                companyName: order.vendorName || '',
+            });
+        } catch (error) {
+            console.log('handleDownloadPDF error:', error?.message || error);
+            const errorMessage = error?.message || 'Unable to generate PDF. Please try again.';
+            Alert.alert('PDF Generation Failed', errorMessage);
+        } finally {
+            setIsGeneratingPDF(false);
+        }
+    };
+
     const handleQuickAction = (order, actionLabel) => {
         switch (actionLabel) {
             case 'Edit':
@@ -126,10 +158,52 @@ const ViewPurchaseOrder = () => {
                 );
                 return;
             case 'Download':
-                Alert.alert('Download', `Download clicked for ${order.purchaseOrderNumber}`);
+                handleDownloadPDF(order);
                 return;
             case 'Forward':
-                Alert.alert('Forward', `Forward clicked for ${order.purchaseOrderNumber}`);
+                // Convert Purchase Order to Invoice
+                (async () => {
+                    try {
+                        setLoading(true);
+                        console.log('🔄 [ViewPurchaseOrder] Converting purchase order to invoice:', order.id);
+                        
+                        const conversionResponse = await convertPurchaseOrderToInvoice({ 
+                            purchaseOrderUuid: order.id 
+                        });
+                        
+                        console.log('✅ [ViewPurchaseOrder] Conversion response:', conversionResponse);
+                        
+                        // Navigate to AddPurchaseInvoice with headerUuid for prefill
+                        if (conversionResponse) {
+                            // Extract headerUuid from the response structure
+                            const headerUuid = conversionResponse?.Data?.HeaderUUID || 
+                                             conversionResponse?.headerUuid?.Data?.HeaderUUID || 
+                                             conversionResponse?.headerUuid?.HeaderUUID || 
+                                             conversionResponse?.HeaderUUID ||
+                                             conversionResponse?.headerUuid;
+                            
+                            console.log('🔄 [ViewPurchaseOrder] Navigating to AddPurchaseInvoice with headerUuid:', headerUuid);
+                            console.log('🔄 [ViewPurchaseOrder] Full conversion response:', conversionResponse);
+                            
+                            navigation.navigate('AddPurchaseInvoice', { 
+                                headerUuid: headerUuid,
+                                origin: 'ViewPurchaseOrder'
+                            });
+                        } else {
+                            console.log('⚠️ [ViewPurchaseOrder] No headerUuid in conversion response, navigating without prefill');
+                            navigation.navigate('AddPurchaseInvoice', { 
+                                origin: 'ViewPurchaseOrder'
+                            });
+                        }
+                        
+                    } catch (error) {
+                        console.log('❌ [ViewPurchaseOrder] Conversion failed:', error?.message || error);
+                        const errorMessage = error?.message || 'Unable to convert purchase order to invoice. Please try again.';
+                        Alert.alert('Conversion Failed', errorMessage);
+                    } finally {
+                        setLoading(false);
+                    }
+                })();
                 return;
             default:
                 Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.purchaseOrderNumber}`);
@@ -140,7 +214,7 @@ const ViewPurchaseOrder = () => {
         const buttons = [
             { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
             { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
-            { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
+            { icon: 'logout', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
             { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
             { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316' },
         ];
@@ -153,8 +227,13 @@ const ViewPurchaseOrder = () => {
                         activeOpacity={0.85}
                         style={[styles.cardActionBtn, { backgroundColor: btn.bg, borderColor: btn.border }]}
                         onPress={() => handleQuickAction(order, btn.action)}
+                        disabled={btn.icon === 'file-download' && isGeneratingPDF}
                     >
-                        <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
+                        {btn.icon === 'file-download' && isGeneratingPDF ? (
+                            <ActivityIndicator size="small" color={btn.color} />
+                        ) : (
+                            <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
+                        )}
                     </TouchableOpacity>
                 ))}
             </View>

@@ -17,7 +17,7 @@ import {
 import { wp, hp, rf } from '../../../../utils/responsive';
 import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { COLORS, TYPOGRAPHY, inputStyles, SPACING } from '../../../styles/styles';
+import { COLORS, TYPOGRAPHY, inputStyles, SPACING, useThemeColors } from '../../../styles/styles';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
@@ -80,6 +80,7 @@ const AccordionSection = ({
 };
 
 const ManageSalesOrder = () => {
+  const themeColors = useThemeColors();
   const [expandedIds, setExpandedIds] = useState([1]);
   const navigation = useNavigation();
   const toggleSection = id => setExpandedIds(prev => {
@@ -160,6 +161,7 @@ const ManageSalesOrder = () => {
     SalesInquiryUUID: '',
     SalesInquiryNo: '',
     CustomerUUID: '',
+    CustomerName: '',
     SalesOrderNo: '',
     DueDays: '',
   });
@@ -225,6 +227,8 @@ const ManageSalesOrder = () => {
   const [isSavingHeader, setIsSavingHeader] = useState(false);
   const [isEditingHeader, setIsEditingHeader] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [reloadAttempts, setReloadAttempts] = useState(0);
+  const MAX_RELOAD_ATTEMPTS = 5;
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [customersOptions, setCustomersOptions] = useState([]);
   const [paymentTermsOptions, setPaymentTermsOptions] = useState([]);
@@ -276,19 +280,31 @@ const ManageSalesOrder = () => {
         setDueDays(String(daysValue));
       }
 
-      // Set UUID states for proper dropdown mapping
-      if (data?.PaymentTermUUID || data?.PaymentTermsUUID) {
+      // Set UUID states for proper dropdown mapping (only if not empty)
+      if ((data?.PaymentTermUUID || data?.PaymentTermsUUID) && (data.PaymentTermUUID?.trim() !== '' || data.PaymentTermsUUID?.trim() !== '')) {
         const termUuid = data.PaymentTermUUID || data.PaymentTermsUUID;
         setPaymentTermUuid(termUuid);
-        setSelectedPaymentTermUuid?.(termUuid);
       }
-      if (data?.PaymentMethodUUID) {
+      if (data?.PaymentMethodUUID && data.PaymentMethodUUID.trim() !== '') {
         setPaymentMethodUUID(data.PaymentMethodUUID);
-        setSelectedPaymentMethodUuid?.(data.PaymentMethodUUID);
       }
-      if (data?.ProjectUUID) {
+      if (data?.ProjectUUID && data.ProjectUUID.trim() !== '') {
         setProjectUUID(data.ProjectUUID);
-        setSelectedProjectUuid?.(data.ProjectUUID);
+      }
+
+      // Set additional form states
+      if (data?.Notes !== undefined) setNotes(data.Notes || '');
+      if (data?.TermsConditions !== undefined) setTerms(data.TermsConditions || '');
+      if (data?.ShippingCharges !== undefined) setShippingCharges(String(data.ShippingCharges || 0));
+      if (data?.AdjustmentField !== undefined) setAdjustmentLabel(data.AdjustmentField || 'Adjustments');
+      if (data?.AdjustmentPrice !== undefined) setAdjustments(String(data.AdjustmentPrice || 0));
+      if (data?.TotalTax !== undefined) setTotalTax(String(data.TotalTax || 0));
+      if (data?.SubTotal !== undefined) setServerTotalAmount(String(data.SubTotal || ''));
+      
+      // Set response data if this is a saved header
+      if (data?.UUID) {
+        setHeaderResponse(data);
+        setHeaderSaved(true);
       }
 
       // Prefill billing (best-effort keys)
@@ -297,15 +313,16 @@ const ManageSalesOrder = () => {
         street1: data?.BillingStreet1 || data?.Billing?.street1 || data?.billingStreet1 || data?.Street1 || '',
         street2: data?.BillingStreet2 || data?.Billing?.street2 || data?.billingStreet2 || '',
         postalCode: data?.BillingPostalCode || data?.Billing?.postalCode || data?.PostalCode || data?.billingPostal || '',
-        country: resolveUuid(data?.BillingCountryUUID || data?.BillingCountry || data?.BillingCountryName || data?.Country),
-        state: resolveUuid(data?.BillingStateUUID || data?.BillingState || data?.State),
-        city: resolveUuid(data?.BillingCityUUID || data?.BillingCity || data?.City),
+        country: data?.BillingCountryUUID || resolveUuid(data?.BillingCountry || data?.BillingCountryName || data?.Country) || '',
+        state: data?.BillingStateUUID || resolveUuid(data?.BillingState || data?.State) || '',
+        city: data?.BillingCityUUID || resolveUuid(data?.BillingCity || data?.City) || '',
       });
 
-      // Set billing UUID states for dropdowns
-      if (data?.BillingCountryUUID) setSelectedBillingCountry(data.BillingCountryUUID);
-      if (data?.BillingStateUUID) setSelectedBillingState(data.BillingStateUUID);
-      if (data?.BillingCityUUID) setSelectedBillingCity(data.BillingCityUUID);
+      // Set billing UUID states for dropdowns - defer to useEffect for proper mapping
+      // Store UUIDs directly, let useEffect map them to proper objects when options load
+      // if (data?.BillingCountryUUID) setSelectedBillingCountry(data.BillingCountryUUID);
+      // if (data?.BillingStateUUID) setSelectedBillingState(data.BillingStateUUID);
+      // if (data?.BillingCityUUID) setSelectedBillingCity(data.BillingCityUUID);
 
       // Prefill shipping (best-effort keys)
       setShippingForm({
@@ -313,59 +330,81 @@ const ManageSalesOrder = () => {
         street1: data?.ShippingStreet1 || data?.Shipping?.street1 || data?.ShipStreet1 || '',
         street2: data?.ShippingStreet2 || data?.Shipping?.street2 || data?.ShipStreet2 || '',
         postalCode: data?.ShippingPostalCode || data?.Shipping?.postalCode || data?.ShipPostal || '',
-        country: resolveUuid(data?.ShippingCountryUUID || data?.ShippingCountry || data?.ShipCountry),
-        state: resolveUuid(data?.ShippingStateUUID || data?.ShippingState || data?.ShipState),
-        city: resolveUuid(data?.ShippingCityUUID || data?.ShippingCity || data?.ShipCity),
+        country: data?.ShippingCountryUUID || resolveUuid(data?.ShippingCountry || data?.ShipCountry) || '',
+        state: data?.ShippingStateUUID || resolveUuid(data?.ShippingState || data?.ShipState) || '',
+        city: data?.ShippingCityUUID || resolveUuid(data?.ShippingCity || data?.ShipCity) || '',
       });
 
-      // Set shipping UUID states for dropdowns
-      if (data?.ShippingCountryUUID) setSelectedShippingCountry(data.ShippingCountryUUID);
-      if (data?.ShippingStateUUID) setSelectedShippingState(data.ShippingStateUUID);
-      if (data?.ShippingCityUUID) setSelectedShippingCity(data.ShippingCityUUID);
+      // Set shipping UUID states for dropdowns - defer to useEffect for proper mapping
+      // Store UUIDs directly, let useEffect map them to proper objects when options load
+      // if (data?.ShippingCountryUUID) setSelectedShippingCountry(data.ShippingCountryUUID);
+      // if (data?.ShippingStateUUID) setSelectedShippingState(data.ShippingStateUUID);
+      // if (data?.ShippingCityUUID) setSelectedShippingCity(data.ShippingCityUUID);
 
       // Prefill IsShipAddrSame checkbox
       const shipSame = data?.IsShipAddrSame === true || data?.IsShipAddrSame === 'true' || data?.IsShipAddrSame === 'True' || data?.IsShipAddrSame === 1 || data?.Is_ShipAddrSame === true || data?.IsShipAddrSame === 'Y' || data?.IsShipAddrSame === 'y';
       setIsShippingSame(shipSame);
+      
+      // Copy billing to shipping if they're the same - this is handled above in the shipping form set
+      // No need for additional setTimeout as shipping form is already set correctly
 
       // Prefill project / payment term / payment method / sales inquiry display + UUIDs
       // Project
       const projUuid = data?.ProjectUUID || data?.ProjectId || data?.Project || data?.ProjectUuid || data?.Project_Id || null;
-      if (projUuid) {
+      if (projUuid && projUuid.trim() !== '') {
         setProjectUUID(projUuid);
         setProject(data?.ProjectTitle || data?.ProjectName || data?.Project || '');
+      } else {
+        // Clear project fields if UUID is empty
+        setProjectUUID('');
+        setProject('');
       }
 
       // Payment term
-      const pTermUuid = data?.PaymentTermUUID || data?.PaymentTermId || data?.PaymentTerm || data?.PaymentTermUuid || null;
-      if (pTermUuid) {
+      const pTermUuid = data?.PaymentTermUUID || data?.PaymentTermsUUID || data?.PaymentTermId || data?.PaymentTerm || data?.PaymentTermUuid || null;
+      if (pTermUuid && pTermUuid.trim() !== '') {
         setPaymentTermUuid(pTermUuid);
         setPaymentTerm(data?.PaymentTermName || data?.PaymentTerm || data?.Term || '');
+      } else {
+        // Clear payment term fields if UUID is empty
+        setPaymentTermUuid('');
+        setPaymentTerm('');
       }
 
       // Payment method
       const pMethodUuid = data?.PaymentMethodUUID || data?.PaymentMethodId || data?.PaymentMethod || data?.PaymentMethodUuid || null;
-      if (pMethodUuid) {
+      if (pMethodUuid && pMethodUuid.trim() !== '') {
         setPaymentMethodUUID(pMethodUuid);
         setPaymentMethod(data?.PaymentMethodName || data?.PaymentMethod || data?.Mode || '');
+      } else {
+        // Clear payment method fields if UUID is empty
+        setPaymentMethodUUID('');
+        setPaymentMethod('');
       }
 
       // Sales Inquiry display (support multiple key names and nested structures)
-      const sinqUuid = data?.SalesInquiryUUID || data?.SalesInquiryId || data?.SalesInquiry || data?.SalesInquiryUuid || data?.Header?.SalesInquiryUUID || data?.Header?.SalesInquiryId || null;
+      // InquiryNo from API response should be treated as the UUID for Sales Inquiry
+      const sinqUuid = data?.InquiryNo || data?.SalesInquiryUUID || data?.SalesInquiryId || data?.SalesInquiry || data?.SalesInquiryUuid || data?.Header?.SalesInquiryUUID || data?.Header?.SalesInquiryId || null;
       // immediate attempt to set SalesInquiry display value from many possible keys
       const immediateInquiryNo = data?.SalesInquiryNo || data?.SalesInquiryNumber || data?.SalesInquiry || data?.InquiryNo || data?.InquiryNumber || data?.Inquiry || data?.Header?.SalesInquiryNo || data?.Header?.InquiryNo || data?.Header?.SalesInquiryNumber || null;
       
-      if (sinqUuid) {
-        setHeaderForm(s => ({ ...s, SalesInquiryUUID: sinqUuid }));
+      if (sinqUuid && sinqUuid.trim() !== '') {
+        setHeaderForm(s => ({ ...s, SalesInquiryUUID: sinqUuid, SalesInquiryNo: immediateInquiryNo || sinqUuid }));
         // Only set the display name if we have it immediately, otherwise let useEffect handle UUID->name mapping
-        if (immediateInquiryNo) {
+        if (immediateInquiryNo && immediateInquiryNo.trim() !== '') {
           setSalesInquiry(immediateInquiryNo);
         } else {
           // Clear the display value so useEffect can map UUID to name from salesInquiryNosOptions
           setSalesInquiry('');
         }
-      } else if (immediateInquiryNo) {
+      } else if (immediateInquiryNo && immediateInquiryNo.trim() !== '') {
         // If we have name but no UUID, set the name
         setSalesInquiry(immediateInquiryNo);
+        setHeaderForm(s => ({ ...s, SalesInquiryUUID: immediateInquiryNo, SalesInquiryNo: immediateInquiryNo }));
+      } else {
+        // Clear sales inquiry fields if both are empty
+        setSalesInquiry('');
+        setHeaderForm(s => ({ ...s, SalesInquiryUUID: '', SalesInquiryNo: '' }));
       }
 
       // Dates: robust parsing for various server date formats -> UI format dd-MMM-yyyy
@@ -373,6 +412,8 @@ const ManageSalesOrder = () => {
         if (!d && d !== 0) return null;
         if (typeof d === 'number') return new Date(d);
         if (typeof d === 'string') {
+          // Direct dd-MMM-yyyy format (already in UI format)
+          if (/^\d{2}-[A-Za-z]{3}-\d{4}$/.test(d)) return d; // Return as-is if already in UI format
           // MS JSON format: /Date(1234567890)/
           const ms = d.match(/\/Date\((\d+)(?:[+-]\d+)?\)\//);
           if (ms) return new Date(parseInt(ms[1], 10));
@@ -915,6 +956,7 @@ const ManageSalesOrder = () => {
           SalesInquiryUUID: '',
           SalesInquiryNo: '',
           CustomerUUID: '',
+          CustomerName: '',
           SalesOrderNo: '',
           DueDays: '',
         });
@@ -1397,8 +1439,19 @@ const ManageSalesOrder = () => {
     }
   }, [shippingForm?.city, shippingCitiesOptions]);
 
-  // Map project / payment term / payment method / sales inquiry when lookup options load
+  // Map project / payment term / payment method / sales inquiry / customer when lookup options load
   React.useEffect(() => {
+    // Customer - Map UUID to display name
+    if (headerForm?.CustomerUUID && !headerForm?.CustomerName && Array.isArray(customersOptions) && customersOptions.length) {
+      const found = customersOptions.find(c => (
+        c?.UUID === headerForm.CustomerUUID || c?.Id === headerForm.CustomerUUID || String(c?.UUID) === String(headerForm.CustomerUUID)
+      ));
+      if (found) {
+        const customerDisplayName = found?.CustomerName || found?.Name || found?.DisplayName || String(found);
+        setHeaderForm(s => ({ ...s, CustomerName: customerDisplayName }));
+      }
+    }
+
     // Project
     if (!project && projectUUID && Array.isArray(projectsOptions) && projectsOptions.length) {
       const found = projectsOptions.find(p => (
@@ -1432,10 +1485,15 @@ const ManageSalesOrder = () => {
       }
     }
 
-    // Sales Inquiry - Map UUID to display name
+    // Sales Inquiry - Map UUID/InquiryNo to display name
     if (headerForm?.SalesInquiryUUID && Array.isArray(salesInquiryNosOptions) && salesInquiryNosOptions.length) {
       const found = salesInquiryNosOptions.find(s => (
-        s?.UUID === headerForm.SalesInquiryUUID || s?.Uuid === headerForm.SalesInquiryUUID || s?.Id === headerForm.SalesInquiryUUID || String(s?.UUID) === String(headerForm.SalesInquiryUUID)
+        s?.UUID === headerForm.SalesInquiryUUID || 
+        s?.Uuid === headerForm.SalesInquiryUUID || 
+        s?.Id === headerForm.SalesInquiryUUID || 
+        s?.InquiryNo === headerForm.SalesInquiryUUID ||
+        String(s?.UUID) === String(headerForm.SalesInquiryUUID) ||
+        String(s?.InquiryNo) === String(headerForm.SalesInquiryUUID)
       ));
       if (found) {
         const inquiryDisplayName = found?.InquiryNo || found?.SalesInqNo || found?.SalesInquiryNo || found?.Name || String(found);
@@ -1443,10 +1501,16 @@ const ManageSalesOrder = () => {
         if (!SalesInquiryNo || SalesInquiryNo === '' || SalesInquiryNo === headerForm.SalesInquiryUUID || SalesInquiryNo !== inquiryDisplayName) {
           setSalesInquiry(inquiryDisplayName);
         }
-        setHeaderForm(s => ({ ...s, SalesInquiryUUID: found?.UUID || found?.Uuid || found?.Id || headerForm?.SalesInquiryUUID }));
+        // Update both SalesInquiryNo and ensure UUID is properly set
+        const properUUID = found?.UUID || found?.Uuid || found?.Id || found?.InquiryNo || headerForm?.SalesInquiryUUID;
+        setHeaderForm(s => ({ 
+          ...s, 
+          SalesInquiryUUID: properUUID,
+          SalesInquiryNo: inquiryDisplayName
+        }));
       }
     }
-  }, [projectsOptions, paymentTermsOptions, paymentMethodsOptions, salesInquiryNosOptions, projectUUID, paymentTermUuid, paymentMethodUUID, headerForm?.SalesInquiryUUID, project, paymentTerm, paymentMethod, SalesInquiryNo]);
+  }, [customersOptions, projectsOptions, paymentTermsOptions, paymentMethodsOptions, salesInquiryNosOptions, headerForm?.CustomerUUID, headerForm?.CustomerName, projectUUID, paymentTermUuid, paymentMethodUUID, headerForm?.SalesInquiryUUID, project, paymentTerm, paymentMethod, SalesInquiryNo]);
 
   // Keep loader until mapping of header -> lookup objects completes (or timeout)
   React.useEffect(() => {
@@ -1464,6 +1528,9 @@ const ManageSalesOrder = () => {
         if (shippingForm?.state && !selectedShippingState) return false;
         if (shippingForm?.city && !selectedShippingCity) return false;
 
+        // Customer mapping
+        if (headerForm?.CustomerUUID && (!headerForm?.CustomerName || String(headerForm.CustomerName).trim() === '')) return false;
+
         // Project / payment / inquiry mapping (these are strings after mapping)
         if (projectUUID && (!project || String(project).trim() === '')) return false;
         if (paymentTermUuid && (!paymentTerm || String(paymentTerm).trim() === '')) return false;
@@ -1478,13 +1545,51 @@ const ManageSalesOrder = () => {
 
     if (mappingReady()) {
       setIsPrefilling(false);
+      setReloadAttempts(0); // Reset reload attempts on success
       return undefined;
     }
 
-    // wait up to 5s for lookups to arrive and mapping to complete
-    const timeout = setTimeout(() => setIsPrefilling(false), 5000);
+    // Auto-reload mechanism: if mapping is not ready after timeout and we haven't exceeded max attempts
+    const timeout = setTimeout(() => {
+      console.log(`[ManageSalesOrder] Mapping not ready after timeout, reload attempt: ${reloadAttempts + 1}/${MAX_RELOAD_ATTEMPTS}`);
+      
+      if (reloadAttempts < MAX_RELOAD_ATTEMPTS) {
+        // Check if we have prefill data that should be mapped
+        const shouldReload = (
+          (headerForm?.CustomerUUID && !headerForm?.CustomerName) ||
+          (projectUUID && !project) ||
+          (paymentTermUuid && !paymentTerm) ||
+          (paymentMethodUUID && !paymentMethod) ||
+          (headerForm?.SalesInquiryUUID && (!SalesInquiryNo || !headerForm?.SalesInquiryNo)) ||
+          (billingForm?.country && !selectedBillingCountry) ||
+          (shippingForm?.country && !selectedShippingCountry)
+        );
+
+        if (shouldReload) {
+          setReloadAttempts(prev => prev + 1);
+          // Force re-trigger the prefill process by re-calling prefillFromData
+          const prefillData = route?.params?.prefillHeader?.Data || route?.params?.prefillHeader;
+          if (prefillData) {
+            console.log('[ManageSalesOrder] Auto-reloading prefill data...');
+            setTimeout(() => {
+              try {
+                prefillFromData(prefillData);
+              } catch (e) {
+                console.warn('[ManageSalesOrder] Auto-reload prefill failed:', e);
+              }
+            }, 500);
+          }
+        } else {
+          setIsPrefilling(false);
+        }
+      } else {
+        console.warn('[ManageSalesOrder] Max reload attempts reached, stopping auto-reload');
+        setIsPrefilling(false);
+      }
+    }, 3000); // Reduced timeout to 3 seconds for faster reloads
+    
     return () => clearTimeout(timeout);
-  }, [isPrefilling, billingForm?.country, billingForm?.state, billingForm?.city, shippingForm?.country, shippingForm?.state, shippingForm?.city, selectedBillingCountry, selectedBillingState, selectedBillingCity, selectedShippingCountry, selectedShippingState, selectedShippingCity, projectUUID, project, paymentTermUuid, paymentTerm, paymentMethodUUID, paymentMethod, headerForm?.SalesInquiryUUID, SalesInquiryNo, headerHasDates, invoiceDate, dueDate]);
+  }, [isPrefilling, reloadAttempts, billingForm?.country, billingForm?.state, billingForm?.city, shippingForm?.country, shippingForm?.state, shippingForm?.city, selectedBillingCountry, selectedBillingState, selectedBillingCity, selectedShippingCountry, selectedShippingState, selectedShippingCity, headerForm?.CustomerUUID, headerForm?.CustomerName, projectUUID, project, paymentTermUuid, paymentTerm, paymentMethodUUID, paymentMethod, headerForm?.SalesInquiryUUID, SalesInquiryNo, headerHasDates, invoiceDate, dueDate]);
 
   const computeSubtotal = () => {
     const sum = items.reduce((acc, r) => acc + (parseFloat(r.amount) || 0), 0);
@@ -1822,73 +1927,9 @@ const ManageSalesOrder = () => {
       // reload lines to ensure totals reflect server
       try { await loadSalesOrderLines(data?.UUID || data?.Id || data?.HeaderUUID || headerResponse?.UUID); } catch (e) { /* ignore */ }
       
-      // Clear all form states after successful submission
-      setHeaderForm({
-        SalesInquiryUUID: '',
-        SalesInquiryNo: '',
-        CustomerUUID: '',
-        SalesOrderNo: '',
-        DueDays: '',
-      });
-      setDueDays('');
-      setBillingForm({
-        buildingNo: '',
-        street1: '',
-        street2: '',
-        postalCode: '',
-        country: '',
-        state: '',
-        city: '',
-      });
-      setShippingForm({
-        buildingNo: '',
-        street1: '',
-        street2: '',
-        postalCode: '',
-        country: '',
-        state: '',
-        city: '',
-      });
-      setIsShippingSame(false);
-      setItems([]);
-      setInvoiceDate('');
-      setDueDate('');
-      setSalesInquiry('');
-      setProject('');
-      setProjectUUID('');
-      setPaymentTerm('');
-      setPaymentTermUuid(null);
-      setPaymentMethod('');
-      setPaymentMethodUUID('');
-      setNotes('');
-      setTerms('');
-      setShippingCharges('0');
-      setAdjustments('0');
-      setAdjustmentLabel('Adjustments');
-      setTotalTax('0');
-      setServerTotalAmount('');
-      setSelectedBillingCountry(null);
-      setSelectedBillingState(null);
-      setSelectedBillingCity(null);
-      setSelectedShippingCountry(null);
-      setSelectedShippingState(null);
-      setSelectedShippingCity(null);
-      setHeaderResponse(null);
-      setHeaderSaved(false);
+      // Don't clear form data in edit mode to preserve prefilled information
+      // Only reset edit states
       setIsEditingHeader(false);
-      setIsGeneratingPDF(false);
-      setCurrentItem({
-        itemType: '',
-        itemTypeUuid: null,
-        itemName: '',
-        itemNameUuid: null,
-        quantity: '',
-        unit: '',
-        unitUuid: null,
-        desc: '',
-        hsn: '',
-        rate: '',
-      });
       setEditItemId(null);
     } catch (err) {
       console.error('handleCreateOrder error ->', err);
@@ -1931,7 +1972,94 @@ const ManageSalesOrder = () => {
     }
   };
 
-  const onCancel = () => { };
+  const onCancel = () => {
+    // Reset header form to initial empty values
+    setHeaderForm({
+      SalesInquiryUUID: '',
+      SalesInquiryNo: '',
+      CustomerUUID: '',
+      CustomerName: '',
+      SalesOrderNo: '',
+      DueDays: '',
+    });
+    setDueDays('');
+
+    // Reset billing/shipping
+    setBillingForm({ buildingNo: '', street1: '', street2: '', postalCode: '', country: '', state: '', city: '' });
+    setShippingForm({ buildingNo: '', street1: '', street2: '', postalCode: '', country: '', state: '', city: '' });
+    setIsShippingSame(false);
+
+    // Clear line items and current line editor
+    setItems([]);
+    setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
+    setEditItemId(null);
+
+    // Reset dates, totals and other header-level state
+    setInvoiceDate('');
+    setDueDate('');
+    setHeaderHasDates(false);
+    setOpenDatePicker(false);
+    setDatePickerField(null);
+    setDatePickerSelectedDate(new Date());
+
+    setPaymentTerm('');
+    setPaymentTermUuid(null);
+    setPaymentMethod('');
+    setPaymentMethodUUID(null);
+    setProject('');
+    setProjectUUID('');
+    setNotes('');
+    setTerms('');
+    setShippingCharges('0');
+    setAdjustments('0');
+    setAdjustmentLabel('Adjustments');
+    setTotalTax('0');
+    setServerTotalAmount('');
+
+    // Clear file and UI flags
+    setFile(null);
+    setShowShippingTip(false);
+    setShowAdjustmentTip(false);
+    setHeaderSaved(false);
+    setHeaderResponse(null);
+    setIsPrefilling(false);
+    setIsSavingHeader(false);
+    setIsEditingHeader(false);
+    setIsInitialLoading(false);
+    setReloadAttempts(0);
+    setIsGeneratingPDF(false);
+
+    // Clear dropdown option caches (keep lookups if you prefer caching)
+    setCustomersOptions([]);
+    setPaymentTermsOptions([]);
+    setPaymentMethodsOptions([]);
+    setProjectsOptions([]);
+    setCountriesOptions([]);
+    setSalesInquiryNosOptions([]);
+    setStatesOptions([]);
+    setCitiesOptions([]);
+    setShippingStatesOptions([]);
+    setShippingCitiesOptions([]);
+
+    setSelectedBillingCountry(null);
+    setSelectedBillingState(null);
+    setSelectedBillingCity(null);
+    setSelectedShippingCountry(null);
+    setSelectedShippingState(null);
+    setSelectedShippingCity(null);
+
+    // Reset table/pagination/search
+    setTableSearch('');
+    setPage(1);
+    setPageSize(10);
+
+    // Navigate directly to the Sales Order list to avoid landing on unrelated screens
+    try {
+      navigation.replace('ViewSalesOrder');
+    } catch (e) {
+      try { navigation.navigate('ViewSalesOrder'); } catch (err) { /* ignore */ }
+    }
+  };
 
   // File attachment functions
   const pickFile = async () => {
@@ -1995,10 +2123,15 @@ const ManageSalesOrder = () => {
 
   return (
     <>
-      <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      <View style={{ flex: 1, backgroundColor: themeColors.bg }}>
         {(isPrefilling || isInitialLoading) && (
-          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.75)', zIndex: 9999 }}>
-            <ActivityIndicator size="large" color={COLORS?.primary || '#000'} />
+          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: themeColors.bg + '75', zIndex: 9999 }}>
+            <ActivityIndicator size="large" color={themeColors?.primary || '#000'} />
+            {reloadAttempts > 0 && (
+              <Text style={{ marginTop: 10, fontSize: 14, color: themeColors?.primary || '#000' }}>
+                Loading attempt {reloadAttempts}/{MAX_RELOAD_ATTEMPTS}
+              </Text>
+            )}
           </View>
         )}
         <AppHeader
@@ -2028,7 +2161,7 @@ const ManageSalesOrder = () => {
                   <Icon name="check-circle" size={rf(4)} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => { setIsEditingHeader(true); setHeaderSaved(false); setExpandedIds([1]); }}>
-                  <Icon name="edit" size={rf(4)} color={COLORS.success} />
+                  <Icon name="edit" size={rf(4)} color={themeColors.success} />
                 </TouchableOpacity>
               </View>
             ) : null}
@@ -2043,13 +2176,26 @@ const ManageSalesOrder = () => {
                 ) : (
                   <Dropdown
                     placeholder="Sales Inquiry No*"
-                    value={SalesInquiryNo}
+                    value={(() => {
+                      // Find the selected inquiry object from options based on UUID or InquiryNo
+                      if (headerForm?.SalesInquiryUUID && salesInquiryNosOptions?.length) {
+                        return salesInquiryNosOptions.find(opt => 
+                          opt?.UUID === headerForm.SalesInquiryUUID || 
+                          opt?.Id === headerForm.SalesInquiryUUID ||
+                          opt?.InquiryNo === headerForm.SalesInquiryUUID ||
+                          String(opt?.UUID) === String(headerForm.SalesInquiryUUID) ||
+                          String(opt?.InquiryNo) === String(headerForm.SalesInquiryUUID)
+                        );
+                      }
+                      return null;
+                    })()}
                     options={salesInquiryNosOptions}
                     getLabel={c => (c?.InquiryNo || c?.SalesInqNo || c?.SalesInquiryNo || c?.Name || String(c))}
-                    getKey={c => (c?.UUID || c?.Id || c)}
+                    getKey={c => (c?.UUID || c?.Id || c?.InquiryNo || c)}
                     onSelect={v => {
                       const inquiryNo = v?.InquiryNo || v?.SalesInqNo || v?.SalesInquiryNo || v;
-                      const inquiryUUID = v?.UUID || v?.Id || (typeof v === 'string' ? v : '');
+                      // For UUID, prefer actual UUID field, fallback to InquiryNo if UUID not available
+                      const inquiryUUID = v?.UUID || v?.Id || v?.InquiryNo || (typeof v === 'string' ? v : '');
                       
                       setHeaderForm(s => ({
                         ...s,
@@ -2177,7 +2323,7 @@ const ManageSalesOrder = () => {
                 ) : (
                   <View style={[inputStyles.box]}>
                     <TextInput
-                      style={inputStyles.input}
+                      style={[inputStyles.input, { color: themeColors.text }]}
                       value={dueDays}
                       onChangeText={t => {
                         const cleanValue = String(t).replace(/[^0-9]/g, '');
@@ -2185,7 +2331,7 @@ const ManageSalesOrder = () => {
                         setHeaderForm(s => ({ ...s, DueDays: cleanValue }));
                       }}
                       placeholder="Days"
-                      placeholderTextColor={COLORS.textLight}
+                      placeholderTextColor={themeColors.textLight}
                       keyboardType="number-pad"
                       returnKeyType="done"
                     />
@@ -2324,13 +2470,13 @@ const ManageSalesOrder = () => {
                   <Text style={inputStyles.label}>Building No.</Text>
                   <View style={[inputStyles.box]} pointerEvents="box-none">
                     <TextInput
-                      style={[inputStyles.input, { flex: 1 }]}
+                      style={[inputStyles.input, { flex: 1, color: themeColors.text }]}
                       value={billingForm.buildingNo}
                       onChangeText={v =>
                         setBillingForm(s => ({ ...s, buildingNo: v }))
                       }
                       placeholder="eg."
-                      placeholderTextColor={COLORS.textLight}
+                      placeholderTextColor={themeColors.textLight}
                     />
                   </View>
                 </View>
@@ -2668,11 +2814,11 @@ const ManageSalesOrder = () => {
                   <View style={{ width: '100%', marginBottom: hp(1) }}>
                     <Text style={inputStyles.label}>Description</Text>
                     <TextInput
-                      style={[styles.descInput, { minHeight: hp(10), width: '100%' }]}
+                      style={[styles.descInput, { minHeight: hp(10), width: '100%', color: themeColors.text }]}
                       value={currentItem.desc || ''}
                       onChangeText={t => setCurrentItem(ci => ({ ...ci, desc: t }))}
                       placeholder="Enter description"
-                      placeholderTextColor={COLORS.textLight}
+                      placeholderTextColor={themeColors.textLight}
                       multiline
                       numberOfLines={3}
                     />
@@ -2919,7 +3065,7 @@ const ManageSalesOrder = () => {
                       value={String(shippingCharges)}
                       onChangeText={setShippingCharges}
                       keyboardType="numeric"
-                      style={[styles.inputBox, { color: '#000000' }]}
+                      style={[styles.inputBox, { color: themeColors.text }]}
                     />
 
                     {/* Question Icon with Tooltip */}
@@ -3088,7 +3234,7 @@ const ManageSalesOrder = () => {
                     <TextInput
                       style={[inputStyles.input, { fontSize: rf(4.2) }]}
                       placeholder="Attach file"
-                      placeholderTextColor="#9ca3af"
+                      placeholderTextColor={COLORS.textLight}
                       value={file?.name || ''}
                       editable={false}
                     />
@@ -3155,27 +3301,6 @@ const ManageSalesOrder = () => {
               </TouchableOpacity>
               
               {/* PDF Download Button - Show only if header is saved */}
-              {/* {headerResponse?.UUID && (
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  style={[formStyles.primaryBtn, { 
-                    paddingVertical: hp(1.4), 
-                    backgroundColor: isGeneratingPDF ? '#6c757d' : '#17a2b8',
-                    paddingHorizontal: wp(3)
-                  }]}
-                  onPress={handleDownloadPDF}
-                  disabled={isGeneratingPDF}
-                >
-                  {isGeneratingPDF ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Icon name="download" size={rf(4)} color="#fff" style={{ marginRight: wp(1) }} />
-                      <Text style={[formStyles.primaryBtnText, { fontSize: rf(3.2) }]}>PDF</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              )} */}
             </View>
             
             <TouchableOpacity
@@ -3210,7 +3335,7 @@ const styles = StyleSheet.create({
   container: {
     padding: wp(3.5),
     // paddingBottom: hp(6),
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bg,
   },
   line: {
     borderBottomColor: COLORS.border,
@@ -3229,7 +3354,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     backgroundColor: COLORS.bg,
-    shadowColor: '#000',
+    shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 6,
@@ -3318,7 +3443,7 @@ const styles = StyleSheet.create({
     borderRadius: wp(1.2),
     borderWidth: 1,
     borderColor: COLORS.border,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bg,
     alignItems: 'center',
     justifyContent: 'center',
   },

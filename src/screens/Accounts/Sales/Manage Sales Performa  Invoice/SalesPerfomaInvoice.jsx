@@ -9,7 +9,7 @@ import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles'; 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
-import { getSalesPerformaInvoiceHeaders, deleteSalesPerformaInvoiceHeader, getSalesPerformaInvoiceSlip } from '../../../../api/authServices';
+import { getSalesPerformaInvoiceHeaders, deleteSalesPerformaInvoiceHeader, getSalesPerformaInvoiceSlip, convertSalesPerformaToInvoice } from '../../../../api/authServices';
 
 const SalesPerfomaInvoice = () => {
     const navigation = useNavigation();
@@ -165,6 +165,59 @@ const SalesPerfomaInvoice = () => {
         if (actionLabel === 'Download') {
             handleDownloadPerformaPDF(order);
         }
+        if (actionLabel === 'Forward') {
+            // Convert performa invoice to invoice and navigate to AddSalesInvoice
+            try {
+                setLoading(true);
+                const performaUuid = order?.raw?.UUID || order?.id;
+                if (!performaUuid) throw new Error('Performa UUID not found');
+                
+                const [envUuid, cmpUuid, userUuid] = await Promise.all([
+                    getENVUUID(),
+                    getCMPUUID(),
+                    getUUID()
+                ]);
+                
+                const response = await convertSalesPerformaToInvoice({
+                    performaUuid,
+                    EnvUUID: envUuid,
+                    CmpUUID: cmpUuid,
+                    UserUUID: userUuid
+                });
+                
+                console.log('Convert performa to invoice response:', response);
+                
+                // Navigate to AddSalesInvoice with headerUuid from response and prefill data
+                const headerUuid = response?.Data?.UUID || response?.UUID || response?.headerUuid;
+                if (headerUuid) {
+                    navigation.navigate('AddSalesInvoice', {
+                        headerUuid,
+                        prefillHeader: {
+                            Data: response?.Data || response,
+                            ...order.raw
+                        }
+                    });
+                } else {
+                    // Fallback navigation with just prefill data
+                    navigation.navigate('AddSalesInvoice', {
+                        prefillHeader: {
+                            Data: response?.Data || response,
+                            ...order.raw
+                        }
+                    });
+                }
+                
+                Alert.alert('Success', 'Performa invoice converted to invoice successfully');
+            } catch (err) {
+                console.error('Convert performa to invoice error:', err);
+                // Extract the error message properly - the API error handling already provides user-friendly message
+                const errorMessage = err?.message || 'Unable to convert performa invoice to sales invoice. Please try again.';
+                console.log('Error message extracted:', errorMessage);
+                Alert.alert('Conversion Failed', errorMessage);
+            } finally {
+                setLoading(false);
+            }
+        }
 
     };
 
@@ -172,7 +225,7 @@ const SalesPerfomaInvoice = () => {
         const buttons = [
             { icon: 'delete-outline', label: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
             { icon: 'file-download', label: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
-            { icon: 'chat-bubble-outline', label: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
+            { icon: 'logout', label: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
             { icon: 'visibility', label: 'View', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
             { icon: 'edit', label: 'Edit', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
         ];

@@ -80,7 +80,7 @@ const AccordionSection = ({
     );
 };
 
-const AddSalesPerfomaInvoice = () => {
+const AddSalesInvoice = () => {
     // Keep header closed by default; only open when user clicks Edit
     const [expandedId, setExpandedId] = useState(null);
     const navigation = useNavigation();
@@ -342,9 +342,13 @@ const AddSalesPerfomaInvoice = () => {
 
     // Fetch header data by UUID when headerUuid is present in route params (edit mode)
     useEffect(() => {
-        const paramHeaderUuid = route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.UUID;
+        const paramHeaderUuid = route?.params?.prefillHeader?.Data?.HeaderUUID || route?.params?.HeaderUUID || route?.params?.UUID;
         const candidateHeaderUuid = route?.params?.candidateHeaderUuid || route?.params?.candidateHeaderUUID || null;
         const prefill = route?.params?.prefillHeader || null;
+
+        console.log('AddSalesInvoice headerUuid useEffect - paramHeaderUuid:', paramHeaderUuid);
+        console.log('AddSalesInvoice headerUuid useEffect - candidateHeaderUuid:', candidateHeaderUuid);
+        console.log('AddSalesInvoice headerUuid useEffect - prefill:', prefill);
 
         let resolvedHeaderUuid = paramHeaderUuid || null;
 
@@ -406,9 +410,11 @@ const AddSalesPerfomaInvoice = () => {
 
                 // proceed to fetch header details by resolvedHeaderUuid
                 setPrefillLoading(true);
-                console.log('Fetching header data for UUID:', resolvedHeaderUuid);
+                console.log('🔄 AddSalesInvoice: Fetching header data for UUID:', resolvedHeaderUuid);
+                console.log('🔄 AddSalesInvoice: API params - headerUuid:', resolvedHeaderUuid, 'cmpUuid:', cmpUuid, 'envUuid:', envUuid);
+                
                 const resp = await getSalesInvoiceHeaderById({ headerUuid: resolvedHeaderUuid, cmpUuid, envUuid });
-                console.log('getSalesInvoiceHeaderById response ->', resp);
+                console.log('✅ AddSalesInvoice: getSalesInvoiceHeaderById response ->', resp);
 
                 const data = resp?.Data || resp || null;
                 if (!data) {
@@ -418,20 +424,36 @@ const AddSalesPerfomaInvoice = () => {
                 // continue with existing prefill logic
                 // Extract Sales Inquiry UUID
                 const inquiryUuid = data?.SalesInqNoUUID || data?.SalesInquiryUUID || data?.SalesInquiryId || data?.SalesInquiryUuid || null;
+                console.log('🔍 AddSalesInvoice: Extracted Sales Inquiry UUID:', inquiryUuid);
                 if (inquiryUuid) {
                     setSalesInquiryUuid(inquiryUuid);
+                    console.log('✅ AddSalesInvoice: Set salesInquiryUuid state to:', inquiryUuid);
+                    
+                    // Force trigger mapping check after setting UUID
+                    setTimeout(() => {
+                        console.log('🔄 AddSalesInvoice: Forced mapping check - salesInquiryNosOptions length:', salesInquiryNosOptions?.length || 0);
+                        if (salesInquiryNosOptions && salesInquiryNosOptions.length > 0) {
+                            console.log('📋 AddSalesInvoice: Available inquiry options sample:', salesInquiryNosOptions.slice(0, 3));
+                        }
+                    }, 100);
                     // If salesInquiry options already loaded, map uuid -> InquiryNo immediately
                     try {
                         const found = (salesInquiryNosOptions || []).find(s =>
                             s?.UUID === inquiryUuid || s?.Uuid === inquiryUuid || s?.Id === inquiryUuid || String(s?.UUID) === String(inquiryUuid)
                         );
-                        if (found && found.InquiryNo) setHeaderForm(s => ({ ...s, salesInquiry: found.InquiryNo }));
-                    } catch (e) { /* ignore */ }
+                        if (found && found.InquiryNo) {
+                            console.log('🎯 AddSalesInvoice: Found matching inquiry:', found.InquiryNo, 'for UUID:', inquiryUuid);
+                            setHeaderForm(s => ({ ...s, salesInquiry: found.InquiryNo }));
+                        } else {
+                            console.log('⏳ AddSalesInvoice: No matching inquiry found yet, will map via useEffect when options load');
+                        }
+                    } catch (e) { console.warn('Sales Inquiry mapping error:', e); }
                 }
 
                 // Prefill SalesInqNoUUID directly in headerForm for reference
                 const salesInqUuid = data?.SalesInqNoUUID || null;
                 if (salesInqUuid) {
+                    console.log('📝 AddSalesInvoice: Setting salesInquiryUUID in headerForm:', salesInqUuid);
                     setHeaderForm(s => ({ ...s, salesInquiryUUID: salesInqUuid }));
                 }
 
@@ -464,12 +486,19 @@ const AddSalesPerfomaInvoice = () => {
                 const fetchedInquiryNo = data?.SalesInqNo || data?.SalesInquiryNo || data?.InquiryNo || '';
                 const isFetchedInquiryUuid = fetchedInquiryNo && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(fetchedInquiryNo);
 
+                console.log('📋 AddSalesInvoice: Setting headerForm with API data...');
+                console.log('   - fetchedSalesInv:', fetchedSalesInv);
+                console.log('   - fetchedInquiryNo:', fetchedInquiryNo);
+                console.log('   - isFetchedInquiryUuid:', isFetchedInquiryUuid);
+                
                 setHeaderForm(s => ({
                     ...s,
                     salesInquiryText: fetchedSalesInv || s.salesInquiryText || '',
                     salesInquiry: (!isFetchedInquiryUuid && fetchedInquiryNo) ? fetchedInquiryNo : s.salesInquiry || '',
+                    salesInquiryUUID: data?.SalesInqNoUUID || s.salesInquiryUUID || null,
                     clientName: data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || s.clientName || '',
                     salesOrderNo: data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || s.salesOrderNo || '',
+                    salesOrderUUID: data?.SalesOrderUUID || data?.SalesOrderId || s.salesOrderUUID || null,
                     CustomerUUID: data?.CustomerUUID || data?.CustomerId || s.CustomerUUID || null,
                     CustomerName: data?.CustomerName || data?.Customer || s.CustomerName || '',
                 }));
@@ -575,14 +604,29 @@ const AddSalesPerfomaInvoice = () => {
 
     // Map Sales Inquiry UUID to InquiryNo when options are loaded (for edit mode and prefill mode)
     useEffect(() => {
-        if (!salesInquiryUuid || !salesInquiryNosOptions || salesInquiryNosOptions.length === 0 || !headerForm) return;
+        console.log('🔄 AddSalesInvoice: Sales Inquiry mapping useEffect triggered');
+        console.log('   - salesInquiryUuid:', salesInquiryUuid);
+        console.log('   - salesInquiryNosOptions length:', salesInquiryNosOptions?.length || 0);
+        console.log('   - headerForm.salesInquiry:', headerForm?.salesInquiry);
+        
+        if (!salesInquiryUuid || !salesInquiryNosOptions || salesInquiryNosOptions.length === 0 || !headerForm) {
+            console.log('⏹️ AddSalesInvoice: Skipping mapping - missing requirements');
+            return;
+        }
 
         const currentInquiry = headerForm?.salesInquiry || '';
         // Check if currentInquiry is a UUID (should be replaced) or empty (needs to be filled)
         const isUuid = currentInquiry && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(currentInquiry);
+        
+        console.log('   - currentInquiry:', currentInquiry);
+        console.log('   - isUuid:', isUuid);
+        console.log('   - should update:', !currentInquiry || isUuid);
 
         // Update if salesInquiry is empty, is a UUID, or doesn't match the found InquiryNo
         if (!currentInquiry || isUuid) {
+            console.log('🔍 AddSalesInvoice: Searching for inquiry in options...');
+            console.log('   - Available options sample:', salesInquiryNosOptions.slice(0, 3));
+            
             const found = salesInquiryNosOptions.find(s =>
                 s?.UUID === salesInquiryUuid ||
                 s?.Uuid === salesInquiryUuid ||
@@ -590,12 +634,23 @@ const AddSalesPerfomaInvoice = () => {
                 String(s?.UUID) === String(salesInquiryUuid) ||
                 String(s?.Uuid) === String(salesInquiryUuid)
             );
+            
+            console.log('   - Found inquiry:', found);
+            
             if (found && found.InquiryNo) {
+                console.log('✅ AddSalesInvoice: Mapping UUID to InquiryNo:', salesInquiryUuid, '->', found.InquiryNo);
                 // Only update if the current value is different from what we found
                 if (currentInquiry !== found.InquiryNo) {
                     setHeaderForm(s => ({ ...s, salesInquiry: found.InquiryNo }));
+                    console.log('✨ AddSalesInvoice: Updated salesInquiry field to:', found.InquiryNo);
+                } else {
+                    console.log('ℹ️ AddSalesInvoice: InquiryNo already set correctly');
                 }
+            } else {
+                console.log('❌ AddSalesInvoice: No matching inquiry found for UUID:', salesInquiryUuid);
             }
+        } else {
+            console.log('ℹ️ AddSalesInvoice: Skipping mapping - salesInquiry already has non-UUID value:', currentInquiry);
         }
     }, [salesInquiryUuid, salesInquiryNosOptions, headerForm]);
 
@@ -604,23 +659,48 @@ const AddSalesPerfomaInvoice = () => {
     useEffect(() => {
         let mounted = true;
         (async () => {
-            if (!salesInquiryUuid) return;
-            if (salesInquiryNosOptions && salesInquiryNosOptions.length > 0) return; // already handled
+            console.log('🔄 AddSalesInvoice: Fallback inquiry mapping useEffect');
+            console.log('   - salesInquiryUuid:', salesInquiryUuid);
+            console.log('   - salesInquiryNosOptions length:', salesInquiryNosOptions?.length || 0);
+            
+            if (!salesInquiryUuid) {
+                console.log('⏹️ AddSalesInvoice: No salesInquiryUuid, skipping fallback');
+                return;
+            }
+            if (salesInquiryNosOptions && salesInquiryNosOptions.length > 0) {
+                console.log('⏹️ AddSalesInvoice: Options already loaded, skipping fallback');
+                return; // already handled
+            }
+            
             try {
+                console.log('🔍 AddSalesInvoice: Fetching inquiry numbers for fallback mapping...');
                 const cmp = await getCMPUUID();
                 const env = await getENVUUID();
                 const resp = await getAllInquiryNumbers({ cmpUuid: cmp, envUuid: env });
                 const list = resp?.Data || resp || [];
                 const records = Array.isArray(list?.Records) ? list.Records : (Array.isArray(list) ? list : []);
+                
+                console.log('   - Fetched records count:', records.length);
+                console.log('   - Sample records:', records.slice(0, 2));
+                
                 const found = records.find(r =>
                     r?.UUID === salesInquiryUuid || r?.Uuid === salesInquiryUuid || r?.Id === salesInquiryUuid || String(r?.UUID) === String(salesInquiryUuid)
                 );
+                
+                console.log('   - Found matching record:', found);
+                
                 if (mounted && found) {
                     const inquiryNo = found?.SalesInqNo || found?.SalesInquiryNo || found?.InquiryNo || found?.Name || found?.Title || String(found);
-                    if (inquiryNo) setHeaderForm(s => ({ ...s, salesInquiry: inquiryNo }));
+                    console.log('✅ AddSalesInvoice: Fallback mapping successful:', salesInquiryUuid, '->', inquiryNo);
+                    if (inquiryNo) {
+                        setHeaderForm(s => ({ ...s, salesInquiry: inquiryNo }));
+                        console.log('✨ AddSalesInvoice: Updated salesInquiry via fallback to:', inquiryNo);
+                    }
+                } else {
+                    console.log('❌ AddSalesInvoice: No matching record found in fallback for UUID:', salesInquiryUuid);
                 }
             } catch (e) {
-                console.warn('Failed to resolve sales inquiry UUID via fallback', e?.message || e);
+                console.warn('❌ AddSalesInvoice: Failed to resolve sales inquiry UUID via fallback', e?.message || e);
             }
         })();
         return () => { mounted = false; };
@@ -2446,7 +2526,7 @@ const AddSalesPerfomaInvoice = () => {
     );
 };
 
-export default AddSalesPerfomaInvoice;
+export default AddSalesInvoice;
 
 const styles = StyleSheet.create({
     container: {

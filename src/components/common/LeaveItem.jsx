@@ -50,8 +50,7 @@ const StatusIcon = ({ status }) => {
   const statusBgColor = getStatusBgColor(status);
 
   return (
-    <View style={[styles.statusIcon, { backgroundColor: statusColor }]}>
-    </View>
+    <View style={[styles.statusIcon, { backgroundColor: statusColor }]} />
   );
 };
 const StatusBadge = ({ label  }) => {

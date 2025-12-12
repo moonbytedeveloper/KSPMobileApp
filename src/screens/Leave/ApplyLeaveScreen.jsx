@@ -531,7 +531,7 @@ to: formatAnyToDdMmmYyyy(it.LeaveEndDate) || '-',
     return obj.Message ?? obj.message ?? obj.error ?? obj.Error;
   };
 
-  let msg = undefined;
+  let msg;
   if (typeof data === 'string') {
     msg = data;
   } else if (data && typeof data === 'object') {

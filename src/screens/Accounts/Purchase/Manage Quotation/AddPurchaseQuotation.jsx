@@ -22,7 +22,7 @@ import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
-import { getPurchasequotationVendor, getItems, postAddPurchaseQuotationHeader, addPurchaseOrder, updatePurchaseOrder, updatePurchaseQuotationHeader, addPurchaseQuotationLine, updatePurchaseQuotationLine,  deletePurchaseQuotationLine, getPurchaseOrderLines, getProjects } from '../../../../api/authServices';
+import { getPurchasequotationVendor, getItems, postAddPurchaseQuotationHeader, addPurchaseOrder, updatePurchaseOrder, updatePurchaseQuotationHeader, addPurchaseQuotationLine, updatePurchaseQuotationLine,  deletePurchaseQuotationLine, getPurchaseOrderLines, fetchProjects } from '../../../../api/authServices';
 import { publish } from '../../../../utils/eventBus';
 import { getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { pick, types, isCancel } from '@react-native-documents/picker';
@@ -88,7 +88,7 @@ const AddPurchaseQuotation = () => {
 
   const addItem = () => {
     // Open the Create Order section and reset the line editor for a new item
-    setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', rate: '' });
+    setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
     setEditItemId(null);
     setExpandedId(4);
   };
@@ -165,6 +165,7 @@ const AddPurchaseQuotation = () => {
     unit: '',
     unitUuid: null,
     desc: '',
+    hsn: '',
     rate: '',
   });
   const [editItemId, setEditItemId] = useState(null);
@@ -187,6 +188,7 @@ const AddPurchaseQuotation = () => {
   const [notes, setNotes] = useState('');
   const [terms, setTerms] = useState('');
   const [projectName, setProjectName] = useState('');
+  const [projectUUID, setProjectUUID] = useState('');
   const [vendor, setVendor] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [shippingCharges, setShippingCharges] = useState('0');
@@ -493,6 +495,7 @@ const AddPurchaseQuotation = () => {
       unit: it.unit || '',
       unitUuid: it.unitUuid || null,
       desc: it.desc || it.desc || '',
+      hsn: it.hsn || '',
       rate: it.rate || '',
     });
     setEditItemId(id);
@@ -529,7 +532,7 @@ const AddPurchaseQuotation = () => {
         sku: master ? master.sku : '',
         rate: rate,
         desc: currentItem.desc && currentItem.desc.length ? currentItem.desc : (master ? master.desc || '' : ''),
-        hsn: master ? master.hsn || '' : '',
+        hsn: currentItem.hsn && currentItem.hsn.length ? currentItem.hsn : (master ? master.hsn || '' : ''),
         qty: qty,
         tax: 'IGST',
         amount: amount,
@@ -545,6 +548,7 @@ const AddPurchaseQuotation = () => {
             ItemUUID: (master && master.uuid) || currentItem.itemNameUuid || null,
             Quantity: Number(qty) || 0,
             Description: newItem.desc || '',
+            HSNSACNO: newItem.hsn || '',
             Rate: Number(rate) || 0,
           };
           let resp;
@@ -558,22 +562,26 @@ const AddPurchaseQuotation = () => {
                 ItemUUID: (master && master.uuid) || currentItem.itemNameUuid || null,
                 Quantity: Number(qty) || 0,
                 Description: newItem.desc || '',
+                HSNSACNO: newItem.hsn || '',
                 Rate: Number(rate) || 0,
               };
               // Detect if anything actually changed compared to local `existing` values.
               const existingItemUUID = existing.itemUuid || existing.itemNameUuid || existing.sku || null;
               const existingQty = Number(existing.qty || 0);
               const existingDesc = String(existing.desc || '');
+              const existingHsn = String(existing.hsn || '');
               const existingRate = Number(existing.rate || 0);
               const newItemUUID = upayload.ItemUUID || null;
               const newQty = Number(upayload.Quantity || 0);
               const newDesc = String(upayload.Description || '');
+              const newHsn = String(upayload.HSNSACNO || '');
               const newRate = Number(upayload.Rate || 0);
 
               const changed = (
                 String(existingItemUUID) !== String(newItemUUID) ||
                 Number(existingQty) !== Number(newQty) ||
                 String(existingDesc) !== String(newDesc) ||
+                String(existingHsn) !== String(newHsn) ||
                 Number(existingRate) !== Number(newRate)
               );
 
@@ -677,7 +685,7 @@ const AddPurchaseQuotation = () => {
       }
 
       // reset editor
-      setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', rate: '' });
+      setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
     } catch (e) {
       console.warn('handleAddLineItem error', e);
       setIsAddingLine(false);
@@ -707,7 +715,7 @@ const AddPurchaseQuotation = () => {
         InquiryNo: headerForm.companyName || '',
         Vendor_UUID: vendor || headerForm.clientName || '',
         VendorUUID: vendor || headerForm.clientName || '',
-        ProjectUUID: projectName || '',
+        ProjectUUID: projectUUID || '',
         PaymentTermUUID: paymentTerm || '',
         PaymentTerm: paymentTerm || '',
         PaymentMethodUUID: paymentMethod || '',
@@ -800,7 +808,7 @@ const AddPurchaseQuotation = () => {
         InquiryNo: headerForm.companyName || '',
         Vendor_UUID: vendor || headerForm.clientName || '',
         VendorUUID: vendor || headerForm.clientName || '',
-        ProjectUUID: projectName || '',
+        ProjectUUID: projectUUID || '',
         PaymentTermUUID: paymentTerm || '',
         PaymentMethodUUID: paymentMethod || '',
         PaymentTerm: paymentTerm || '',
@@ -845,6 +853,8 @@ const AddPurchaseQuotation = () => {
       }
 
       const data = resp?.Data || resp || {};
+      console.log(payload,811);
+      
       setHeaderResponse(data);
       setHeaderSaved(true);
 
@@ -858,7 +868,6 @@ const AddPurchaseQuotation = () => {
               setHeaderEditable(false);
               setExpandedId(4);
               await loadPurchaseOrderLines(data?.UUID || data?.Id || data?.HeaderUUID || headerResponse?.UUID);
-              try { navigation.goBack(); } catch (_) {}
             } catch (e) {
               /* ignore */
             }
@@ -892,7 +901,7 @@ const AddPurchaseQuotation = () => {
         InquiryNo: headerForm.companyName || '',
         Vendor_UUID: vendor || headerForm.clientName || '',
         VendorUUID: vendor || headerForm.clientName || '',
-        ProjectUUID: projectName || '',
+        ProjectUUID: projectUUID || '',
         PaymentTermUUID: paymentTerm || '',
         PaymentMethodUUID: paymentMethod || '',
         PaymentTerm: paymentTerm || '',
@@ -1176,7 +1185,7 @@ const AddPurchaseQuotation = () => {
     let mounted = true;
     const loadProjects = async () => {
       try {
-        const resp = await getProjects();
+        const resp = await fetchProjects();
         const raw = resp?.Data ?? resp ?? [];
         const list = Array.isArray(raw) ? raw : (raw?.Records || raw?.List || raw?.Items || []);
         const safeLabel = (raw) => {
@@ -1193,12 +1202,17 @@ const AddPurchaseQuotation = () => {
           if (!it) return null;
           const rawLabel = it?.ProjectTitle ?? it?.ProjectName ?? it?.Name ?? it?.Title ?? it?.DisplayName ?? it?.Value ?? (typeof it === 'string' ? it : '');
           const labelStr = safeLabel(rawLabel).trim();
-          let value = it?.UUID ?? it?.ProjectUUID ?? it?.Id ?? it?.ProjectId ?? it?.projectId ?? it?.uuid ?? it?.id ?? null;
+          // Extract UUID with proper case-sensitive field names
+          let value = it?.Uuid ?? it?.UUID ?? it?.ProjectUUID ?? it?.Id ?? it?.ProjectId ?? it?.projectId ?? it?.uuid ?? it?.id ?? null;
           if (value && typeof value === 'object') {
             // try to extract common id fields
-            value = value?.UUID || value?.Id || value?.projectId || JSON.stringify(value);
+            value = value?.Uuid || value?.UUID || value?.Id || value?.projectId || JSON.stringify(value);
           }
-          if (value === null || typeof value === 'undefined' || value === '') value = labelStr || String(Math.random());
+          // Only use label as value if no proper UUID found and generate a unique ID
+          if (value === null || typeof value === 'undefined' || value === '' || value === labelStr) {
+            value = 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+          }
+          console.log('Normalized project:', { label: labelStr, value, original: it });
           return { label: labelStr || String(value), value };
         }).filter(Boolean);
         if (!mounted) return;
@@ -1219,7 +1233,7 @@ const AddPurchaseQuotation = () => {
           }
         }
       } catch (err) {
-        console.error('getProjects error ->', err && (err.message || err));
+        console.error('fetchProjects error ->', err && (err.message || err));
         if (mounted) setProjects([]);
       }
     };
@@ -1250,7 +1264,13 @@ const AddPurchaseQuotation = () => {
         }));
 
         setVendor(hdr.VendorName || hdr.Vendor || hdr.CustomerName || hdr.Vendor_UUID || hdr.VendorUUID || '');
-        setProjectName(hdr.ProjectUUID || hdr.ProjectName || hdr.Project || hdr.Project_Id || hdr.ProjectId || '');
+        
+        // Set project name for display and UUID for API
+        const projectDisplayName = hdr.ProjectName || hdr.Project || hdr.ProjectTitle || '';
+        const projectId = hdr.ProjectUUID || hdr.Project_Id || hdr.ProjectId || '';
+        setProjectName(projectDisplayName); // Use name for display
+        setProjectUUID(projectId); // Use UUID for API
+        
         setPaymentTerm(hdr.PaymentTermUUID || hdr.PaymentTerm || hdr.PaymentTermUUID || '');
         setPaymentMethod(hdr.PaymentMethodUUID || hdr.PaymentMethod || hdr.PaymentMethodUUID || '');
 
@@ -1414,11 +1434,20 @@ const AddPurchaseQuotation = () => {
                     getKey={p => p?.value}
                     onSelect={opt => {
                       if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
-                      // Dropdown passes the selected item object; store its `value` (UUID/id)
+                      // Extract UUID for API and name for display
                       try {
-                        const selectedValue = opt && (opt.value ?? opt?.ProjectUUID ?? opt?.UUID ?? opt?.Id ?? opt?.id ?? opt);
-                        setProjectName(selectedValue);
+                        console.log('Selected project option:', opt);
+                        const selectedUUID = opt?.value || '';
+                        const selectedName = opt?.label || '';
+                        
+                        console.log('Final UUID being set:', selectedUUID);
+                        console.log('Selected name:', selectedName);
+                        
+                        setProjectUUID(selectedUUID); // Store UUID for API
+                        setProjectName(selectedName); // Store name for display
                       } catch (e) {
+                        console.log('Error in project selection:', e);
+                        setProjectUUID('');
                         setProjectName(opt);
                       }
                     }}
@@ -1864,7 +1893,7 @@ const AddPurchaseQuotation = () => {
                       getKey={it => (it?.sku || it)}
                       onSelect={v => {
                         if (v && typeof v === 'object') {
-                          setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.sku || v, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '' }));
+                          setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.sku || v, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '', hsn: v?.hsn || ci?.hsn || '' }));
                         } else {
                           setCurrentItem(ci => ({ ...ci, itemName: v, itemNameUuid: null }));
                         }
@@ -1886,6 +1915,17 @@ const AddPurchaseQuotation = () => {
                     placeholderTextColor={COLORS.textLight}
                     multiline
                     numberOfLines={3}
+                  />
+                </View>
+
+                <View style={{ width: '100%', marginBottom: hp(1) }}>
+                  <Text style={inputStyles.label}>HSN/SAC</Text>
+                  <TextInput
+                    style={[inputStyles.box, { width: '100%' }]}
+                    value={currentItem.hsn || ''}
+                    onChangeText={t => setCurrentItem(ci => ({ ...ci, hsn: t }))}
+                    placeholder="Enter HSN/SAC code"
+                    placeholderTextColor={COLORS.textLight}
                   />
                 </View>
 
@@ -1999,7 +2039,8 @@ const AddPurchaseQuotation = () => {
                           <View style={styles.tr}>
                             <Text style={[styles.th, { width: wp(10) }]}>Sr.No</Text>
                             <Text style={[styles.th, { width: wp(30) }]}>Item Details</Text>
-                            <Text style={[styles.th, { width: wp(30) }]}>Description</Text>
+                            <Text style={[styles.th, { width: wp(25) }]}>Description</Text>
+                            <Text style={[styles.th, { width: wp(20) }]}>HSN/SAC</Text>
                             <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
                             <Text style={[styles.th, { width: wp(20) }]}>Rate</Text>
                             <Text style={[styles.th, { width: wp(20) }]}>Amount</Text>
@@ -2014,7 +2055,8 @@ const AddPurchaseQuotation = () => {
                               return (
                                 String(it.name || '').toLowerCase().includes(q) ||
                                 String(it.itemType || '').toLowerCase().includes(q) ||
-                                String(it.desc || '').toLowerCase().includes(q)
+                                String(it.desc || '').toLowerCase().includes(q) ||
+                                String(it.hsn || '').toLowerCase().includes(q)
                               );
                             }) : items;
                             const total = filtered.length;
@@ -2035,8 +2077,11 @@ const AddPurchaseQuotation = () => {
                                     <View style={[styles.td, { width: wp(30),   paddingLeft: wp(2) }]}>
                                       <Text style={styles.tdText}>{item.name}</Text>
                                     </View>
-                                     <View style={[styles.td, { width: wp(30) }]}>
+                                     <View style={[styles.td, { width: wp(25) }]}>
                                       <Text style={styles.tdText}>{item.desc}</Text>
+                                    </View>
+                                    <View style={[styles.td, { width: wp(20), paddingVertical: hp(0.5), minHeight: hp(4) }]}>
+                                      <Text style={[styles.tdText, { fontSize: rf(2.8), lineHeight: rf(3.2) }]} numberOfLines={2} ellipsizeMode="tail">{item.hsn || ''}</Text>
                                     </View>
                                     <View style={[styles.td, { width: wp(20) }]}>
                                       <Text style={styles.tdText}>{item.qty}</Text>
