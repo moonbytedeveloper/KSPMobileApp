@@ -1,15 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
 import Dropdown from '../../../../components/common/Dropdown';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import Icon from 'react-native-vector-icons/MaterialIcons'; 
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
-import { getPurchaseHeaderInquiries, deleteSalesHeader } from '../../../../api/authServices';
+import { getPurchaseHeaderInquiries, deletePurchaseInquiryHeader, convertInquiryToPurchaseOrder } from '../../../../api/authServices'; 
+
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
-import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 
 const ViewPurchaseInquiry = () => {
     const navigation = useNavigation();
@@ -37,7 +37,9 @@ const ViewPurchaseInquiry = () => {
         }
     }, [totalPages, currentPage]);
 
-    const fetchPurchaseInquiries = useCallback(async () => {
+    const isFocused = useIsFocused();
+
+    async function fetchInquiries() {
         try {
             setLoading(true);
             setError(null);
@@ -46,80 +48,149 @@ const ViewPurchaseInquiry = () => {
                 length: itemsPerPage,
                 searchValue: searchQuery.trim(),
             });
-            console.log(response, 'viewpurchaseinquiry')
             const records = response?.Data?.Records || [];
-            const normalized = records.map((record, idx) => ({
-                id: record?.UUID || record?.InquiryNo || `row-${idx}`,
-                inquiryNo: record?.InquiryNo || 'N/A',
-                title: record?.Title || 'N/A',
-                requestDate: record?.RequestDate || '—',
-                // prefer explicit PurchaseDate, fall back to ExpectedPurchaseDate or '—'
-                expectedPurchaseDate: record?.PurchaseDate || record?.ExpectedPurchaseDate || '—',
-                // normalize currency fields from possible API keys
-                currency: record?.CurrencyName || record?.Currency || record?.Currency_Name || '—',
-                status: record?.Status || 'Visible',
-                raw: record,
+            const normalized = records.map((record, idx) => {
+                // Pick title from multiple possible keys returned by different APIs/backends
+                const title = record?.Title || record?.RequestTitle || record?.Request_Title || record?.CustomerName || record?.VendorName || record?.InquiryTitle || record?.Inquiry_Tile || record?.Name || record?.customerName || 'N/A';
 
-            }));
+                // Pick date from multiple possible keys and format to a compact readable form.
+                // We intentionally format as `DD-MMM-YYYY` and insert a zero-width space before the year
+                // so the final digit can wrap/appear if the UI container clips horizontally.
+                const rawDate = record?.OrderDate || record?.InquiryDate || record?.RequestDate || record?.CreatedOn || record?.CreatedAt || record?.DocDate || record?.DocumentDate || record?.Date || null;
+                let inquiryDate = '—';
+                if (rawDate) {
+                    try {
+                        const zwsp = '\u200B'; // zero-width space: invisible but allows wrapping so last digit isn't clipped
+                        const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+                        // If it's already in the expected short format like "20-Nov-2025", keep it and ensure zwsp before year
+                        if (typeof rawDate === 'string' && /^\d{1,2}-[A-Za-z]{3}-\d{4}$/.test(rawDate.trim())) {
+                            inquiryDate = rawDate.trim().replace(/-(\d{4})$/, `-${zwsp}$1`);
+                        } else {
+                            const d = new Date(rawDate);
+                            if (!isNaN(d.getTime())) {
+                                const yyyy = d.getFullYear();
+                                const mmStr = monthNames[d.getMonth()] || String(d.getMonth() + 1).padStart(2, '0');
+                                const dd = String(d.getDate()).padStart(2, '0');
+                                inquiryDate = `${dd}-${mmStr}-${yyyy}`.replace(/-(\d{4})$/, `-${zwsp}$1`);
+                            } else if (typeof rawDate === 'string') {
+                                // Fallback: try to keep as much of the string as sensible but ensure year visibility
+                                const s = rawDate.trim();
+                                inquiryDate = s.replace(/-(\d{4})$/, `-${zwsp}$1`).substring(0, 20);
+                            }
+                        }
+                    } catch (_e) {
+                        inquiryDate = String(rawDate).trim().replace(/-(\d{4})$/, `-\u200B$1`).substring(0, 20);
+                    }
+                }
+
+                return {
+                    id: record?.UUID || record?.InquiryNo || record?.Id || `row-${idx}`,
+                    inquiryNo: record?.InquiryNo || record?.Inquiry_No || record?.InquiryNumber || record?.Number || 'N/A',
+                    customerName: title,
+                    inquiryDate,
+                    status: record?.Status || record?.status || 'Visible',
+                    raw: record,
+                };
+            });
             setInquiries(normalized);
             setTotalRecords(typeof response?.Data?.TotalCount === 'number' ? response.Data.TotalCount : normalized.length);
         } catch (err) {
-            console.error('Failed to fetch purchase inquiries', err);
-            setError('Failed to fetch purchase inquiries. Please try again.');
+            console.error('Failed to fetch inquiries', err);
+            setError('Failed to fetch inquiries. Please try again.');
             setInquiries([]);
             setTotalRecords(0);
         } finally {
             setLoading(false);
         }
-    }, [currentPage, itemsPerPage, searchQuery]);
+    }
 
+    // Refresh when screen is focused or when pagination/search changes
     useEffect(() => {
-        fetchPurchaseInquiries();
-    }, [fetchPurchaseInquiries]);
+        if (isFocused) fetchInquiries();
+    }, [isFocused, currentPage, itemsPerPage, searchQuery]);
 
     const rangeStart = totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1;
     const rangeEnd = totalRecords === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, totalRecords);
 
-    const handleQuickAction = async (order, actionLabel) => {
-        // Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.inquiryNo}`);
-        if (actionLabel == 'Delete') {
-
-            try {
-                const [cmpUuid, envUuid] = await Promise.all([getCMPUUID(), getENVUUID()]);
-                await deleteSalesHeader({
-                    overrides: {
-                        userUuid: takerUuid || (await getUUID()),
-                        cmpUuid,
-                        envUuid,
-                        UUID: headerUuid
-                    }
-                });
-                // Refresh from API instead of local state update
-            } catch (e) {
-            } finally {
-                setDeleteConfirmVisible(false);
-                setFollowUpToDelete(null);
-            }
-        }
-
+    const handleQuickAction = (order, actionLabel) => {
+        Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.inquiryNo}`);
     };
 
     const renderFooterActions = (order) => {
         const buttons = [
             { icon: 'delete-outline', label: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
-            { icon: 'chat-bubble-outline', label: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
-            { icon: 'visibility', label: 'View', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
+            { icon: 'logout', label: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
             { icon: 'edit', label: 'Edit', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
         ];
 
         return (
             <View style={styles.cardActionRow}>
-                {buttons.map((btn) => (
+                        {buttons.map((btn) => (
                     <TouchableOpacity
                         key={`${order.id}-${btn.icon}`}
                         activeOpacity={0.85}
                         style={[styles.cardActionBtn, { backgroundColor: btn.bg, borderColor: btn.border }]}
-                        onPress={() => handleQuickAction(order, btn.label)}
+                        onPress={async () => {
+                            // Delete action: confirm and call deleteSalesHeader
+                            if (btn.label === 'Delete') {
+                                const headerUuid = order.raw?.UUID || order.raw?.Id || order.raw?.Data?.UUID || order.raw?.Data?.UUIDString || order.id;
+                                Alert.alert(
+                                    'Confirm delete',
+                                    `Delete purchase inquiry ${order.inquiryNo}?`,
+                                    [
+                                        { text: 'Cancel', style: 'cancel' },
+                                        { text: 'Delete', style: 'destructive', onPress: async () => {
+                                            try {
+                                                console.log('ViewPurchaseInquiry -> deleting header ->', headerUuid);
+                                                await deletePurchaseInquiryHeader({ headerUuid: headerUuid });
+                                                Alert.alert('Deleted', 'Purchase inquiry deleted successfully');
+                                                // refresh list
+                                                fetchInquiries();
+                                            } catch (err) {
+                                                console.error('Failed to delete header', err);
+                                                Alert.alert('Error', err?.message || 'Failed to delete purchase inquiry');
+                                            }
+                                        } }
+                                    ]
+                                );
+                                return;
+                            }
+                            // Convert inquiry to purchase order when Forward is clicked
+                            if (btn.label === 'Forward') {
+                                const headerUuid = order.raw?.UUID || order.raw?.Id || order.raw?.Data?.UUID || order.raw?.Data?.UUIDString || order.id;
+                                try {
+                                    console.log('ViewPurchaseInquiry -> converting inquiry to purchase order ->', headerUuid);
+                                    const response = await convertInquiryToPurchaseOrder({ inquiryUuid: headerUuid });
+                                    
+                                    // Show success message from API
+                                    const successMessage = response?.Message || response?.message || 'Purchase inquiry converted to order successfully';
+                                    Alert.alert('Success', successMessage);
+                                    
+                                    // Get the new order UUID from response (based on your API response structure)
+                                    const newOrderUuid = response?.Data?.headerUUID || response?.Data?.HeaderUUID || response?.Data?.UUID || response?.headerUUID || response?.HeaderUUID || response?.UUID;
+                                    console.log('ViewPurchaseInquiry -> New Order UUID from conversion:', newOrderUuid);
+                                    
+                                    // Navigate to ManagePurchaseOrder with the headerUuid - the screen will automatically call getPurchaseOrderHeaderById
+                                    navigation.navigate('ManagePurchaseOrder', { headerUuid: newOrderUuid });
+                                    
+                                } catch (err) {
+                                    console.error('Failed to convert inquiry', err);
+                                    Alert.alert('Error', err?.message || 'Failed to convert purchase inquiry to order');
+                                }
+                                return;
+                            }
+                            // Navigate to AddSalesInquiry when Edit is clicked, passing header UUID
+                            if (btn.label === 'Edit') {
+                                const headerUuid = order.raw?.UUID || order.raw?.Id || order.raw?.Data?.UUID || order.raw?.Data?.UUIDString || order.id;
+                                console.log('ManageInquiry -> navigating to ManagePurchaseInquiry with headerUuid ->', headerUuid);
+                                // Navigate passing only the canonical `headerUuid` param so the target screen
+                                // can fetch and autofill the header by UUID.
+                                navigation.navigate('ManagePurchaseInquiry', { headerUuid });
+                                return;
+                            }
+                            handleQuickAction(order, btn.label);
+                        }}
                     >
                         <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
                     </TouchableOpacity>
@@ -155,7 +226,7 @@ const ViewPurchaseInquiry = () => {
             <AppHeader
                 title="View Purchase Inquiry"
                 onLeftPress={() => navigation.goBack()}
-                onRightPress={() => navigation.navigate('ManagePurchaseInquiry')}
+                onRightPress={() => navigation.push('ManagePurchaseInquiry')}
                 rightButtonLabel="Add Purchase Inquiry"
                 showRight
             />
@@ -165,9 +236,11 @@ const ViewPurchaseInquiry = () => {
                 <View style={styles.showEntriesRow}>
                     <Text style={styles.showEntriesLabel}>Show</Text>
                     <Dropdown
-                        placeholder={String(itemsPerPage)}
+                        placeholder="Show entries"
                         value={String(itemsPerPage)}
                         options={ITEMS_PER_PAGE_OPTIONS}
+                        getLabel={v => v}
+                        getKey={v => v}
                         onSelect={(value) => {
                             const parsed = parseInt(value, 10);
                             if (!Number.isNaN(parsed)) {
@@ -176,11 +249,9 @@ const ViewPurchaseInquiry = () => {
                             }
                         }}
                         hideSearch
-                        getLabel={v => String(v)}
-                        getKey={(v, i) => String(v) + '-' + i}
                         renderInModal={true}
-                        dropdownListStyle={{ width: wp(18) }}
                         inputBoxStyle={styles.dropdownInput}
+                        dropdownListStyle={{ width: wp(18) }}
                         style={styles.dropdownWrapper}
                     />
                     <Text style={styles.showEntriesLabel}>entries</Text>
@@ -199,49 +270,45 @@ const ViewPurchaseInquiry = () => {
                     />
                 </View>
             </View>
-            {error && <Text style={styles.errorText}>{error}</Text>}
+            {error && (
+                <Text style={styles.errorText}>{error}</Text>
+            )}
 
             <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-                {inquiries.map((item) => (
+                {inquiries.map((order) => (
                     <AccordionItem
-                        key={item.id}
-
+                        key={order.id}
                         item={{
-                            soleExpenseCode: item.id,
-                            expenseName: item.inquiryNo,
-                            amount: item.title,
-                            status: item.status,
+                            soleExpenseCode: order.id,
+                            expenseName: order.inquiryNo,
+                            amount: order.customerName,
+                            status: order.status,
                         }}
-
-                        isActive={activeOrderId === item.id}
-                        onToggle={() => setActiveOrderId(prev => prev === item.id ? null : item.id)}
+                        isActive={activeOrderId === order.id}
+                        onToggle={() => setActiveOrderId(prev => prev === order.id ? null : order.id)}
 
                         customRows={[
-                            { label: "Inquiry No.", value: item.inquiryNo },
-                            { label: "Request Title", value: item.title },
-                            { label: "Request Date", value: item.requestDate },
-                            { label: "Expected Purchase Date", value: item.expectedPurchaseDate },
-                            { label: "Currency", value: item.currency },
-                            { label: "Status", value: item.status, isStatus: true }
+                            { label: "Inquiry No.", value: order.inquiryNo },
+                            { label: "Request Title", value: order.customerName },
+                            { label: "Request Date", value: order.inquiryDate },
+                            { label: "Status", value: order.status, isStatus: true }
                         ]}
 
                         headerLeftLabel="Inquiry No."
                         headerRightLabel="Request Title"
-
-                        footerComponent={renderFooterActions(item)}
+                        footerComponent={renderFooterActions(order)}
                         headerRightContainerStyle={styles.headerRightContainer}
                     />
-
 
 
                 ))}
 
                 {!loading && inquiries.length === 0 && (
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyStateTitle}>No purchase inquiries found</Text>
-                        <Text style={styles.emptyStateSubtitle}>
-                            Try adjusting your search keyword or create a new sales inquiry.
-                        </Text>
+                                <Text style={styles.emptyStateTitle}>No purchase inquiries found</Text>
+                                <Text style={styles.emptyStateSubtitle}>
+                                    Try adjusting your search keyword or create a new purchase inquiry.
+                                </Text>
                     </View>
                 )}
                 {loading && (

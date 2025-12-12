@@ -2,13 +2,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
 import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
-import { getpurchaseQuotationHeaders } from '../../../../api/authServices';
+import { getpurchaseQuotationHeaders, deletePurchaseQuotationHeader, getPurchasequotationVendor, convertPurchaseQuotationToOrder } from '../../../../api/authServices';
+import { subscribe, publish } from '../../../../utils/eventBus';
 
 const SALES_ORDERS = [
     {
@@ -76,8 +77,23 @@ const ViewPurchaseQuotation = () => {
     const [itemsPerPage, setItemsPerPage] = useState(Number(ITEMS_PER_PAGE_OPTIONS[1]));
     const [currentPage, setCurrentPage] = useState(0);
     const [orders, setOrders] = useState([]);
+    const [vendorMap, setVendorMap] = useState({});
+
+    function resolveVendorName(it) {
+        if (!it) return '';
+        const name = it?.VendorName || it?.Vendor || it?.CompanyName || it?.CustomerName || it?.Customer || it?.Name;
+        if (name && typeof name === 'string' && name.trim() !== '') return name;
+        const uuid = it?.VendorUUID || it?.Vendor_UUID || it?.VendorId || it?.Vendor_Id || it?.CustomerUUID || it?.Customer_Id || it?.UUID || it?.Uuid;
+        if (uuid) {
+            const keyed = String(uuid);
+            if (vendorMap && vendorMap[keyed]) return vendorMap[keyed];
+            return keyed;
+        }
+        return '';
+    }
     const [loadingOrders, setLoadingOrders] = useState(false);
     const [ordersError, setOrdersError] = useState(null);
+    const route = useRoute();
 
     const filteredOrders = useMemo(() => {
         const source = (orders && orders.length) ? orders : SALES_ORDERS;
@@ -122,7 +138,7 @@ const ViewPurchaseQuotation = () => {
                     // Primary fields from API
                     quotationNumber: it?.QuotationNo || it?.QuotationNumber || it?.Quotation_No || it?.QuotationNo || it?.Quotation || it?.Number || '',
                     quotationTitle: it?.QuotationTitle || it?.Title || it?.Quotation_Title || it?.SalesOrderTitle || '',
-                    customerName: it?.VendorName || it?.Vendor || it?.CompanyName || it?.CustomerName || '',
+                    customerName: resolveVendorName(it),
                     // Purchase Request - API may use different keys; include common fallbacks
                     purchaseRequestNumber: it?.PurchaseRequestNumber || it?.PurchaseRequestNo || it?.PurchaseRequest || it?.PRNumber || it?.InquiryNo || it?.InquiryNumber || it?.ReferenceNumber || it?.SalesInvoiceNumber || it?.salesInvoiceNumber || '',
                     // Backwards-compatible alias
@@ -144,6 +160,148 @@ const ViewPurchaseQuotation = () => {
         return () => { mounted = false; };
     }, []);
 
+    // Load vendors once to map UUID -> name for cases where API returns UUID only
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                const resp = await getPurchasequotationVendor();
+                const raw = resp?.Data ?? resp ?? [];
+                const list = Array.isArray(raw) ? raw : (raw?.Records || raw?.List || []);
+                const map = {};
+                (list || []).forEach(v => {
+                    const uuid = v?.UUID || v?.Uuid || v?.Id || v?.VendorUUID || v?.Vendor_Id || v?.VendorId;
+                    const name = v?.VendorName || v?.Name || v?.label || v?.CompanyName || v?.Vendor || '';
+                    if (uuid) map[String(uuid)] = name || '';
+                });
+                if (mounted) setVendorMap(map);
+            } catch (e) {
+                console.warn('Failed to load vendors for mapping ->', e?.message || e);
+            }
+        })();
+        return () => { mounted = false; };
+    }, []);
+
+    // If navigated back from AddPurchaseQuotation with a newly added quotation, insert it into the list
+    useEffect(() => {
+        try {
+            const added = route?.params?.addedQuotation;
+            if (added) {
+                const mapped = {
+                    id: added?.UUID || added?.Uuid || added?.Id || String(Math.random()),
+                    quotationNumber: added?.QuotationNo || added?.QuotationNumber || added?.Quotation_No || added?.Quotation || '',
+                    quotationTitle: added?.QuotationTitle || added?.Title || '',
+                    customerName: resolveVendorName(added),
+                    purchaseRequestNumber: added?.PurchaseRequestNumber || added?.PurchaseRequestNo || added?.InquiryNo || '',
+                    salesOrderNumber: added?.QuotationNo || added?.QuotationNumber || '',
+                    status: added?.Status || added?.ApprovalStatus || '',
+                    deliveryDate: added?.DeliveryDate || '',
+                    dueDate: added?.DueDate || '',
+                    _raw: added,
+                };
+
+                setOrders(prev => {
+                    // avoid duplicates
+                    if (prev.some(p => String(p.id) === String(mapped.id))) return prev;
+                    return [mapped, ...(prev || [])];
+                });
+
+                // reset page to show the newest entry
+                setCurrentPage(0);
+
+                // clear the param so we don't re-add on future focuses
+                try { navigation.setParams({ addedQuotation: undefined }); } catch (_) {}
+            }
+        } catch (e) {
+            console.warn('Failed to insert addedQuotation param into list', e);
+        }
+    }, [route?.params?.addedQuotation]);
+
+            // Subscribe to quick add/update events from AddPurchaseQuotation so list updates in-place
+            useEffect(() => {
+                const unsubAdd = subscribe('purchaseQuotation.added', (payload) => {
+                    try {
+                        const mapped = {
+                            id: payload?.UUID || payload?.Uuid || payload?.Id || String(Math.random()),
+                            quotationNumber: payload?.QuotationNo || payload?.QuotationNumber || '',
+                            quotationTitle: payload?.QuotationTitle || payload?.Title || '',
+                            customerName: resolveVendorName(payload?._raw || payload),
+                            purchaseRequestNumber: payload?.PurchaseRequestNumber || payload?.PurchaseRequestNo || payload?.InquiryNo || '',
+                            salesOrderNumber: payload?.QuotationNo || payload?.QuotationNumber || '',
+                            status: payload?.Status || payload?.ApprovalStatus || '',
+                            deliveryDate: payload?.DeliveryDate || '',
+                            dueDate: payload?.DueDate || '',
+                            _raw: payload?._raw || payload,
+                        };
+                        setOrders(prev => {
+                            if (prev && prev.some(p => String(p.id) === String(mapped.id))) return prev;
+                            return [mapped, ...(prev || [])];
+                        });
+                        setCurrentPage(0);
+                    } catch (e) { console.warn('event added handler error', e); }
+                });
+
+                const unsubUpdate = subscribe('purchaseQuotation.updated', (payload) => {
+                    try {
+                        const mapped = {
+                            id: payload?.UUID || payload?.Uuid || payload?.Id || String(Math.random()),
+                            quotationNumber: payload?.QuotationNo || payload?.QuotationNumber || '',
+                            quotationTitle: payload?.QuotationTitle || payload?.Title || '',
+                            customerName: resolveVendorName(payload?._raw || payload),
+                            purchaseRequestNumber: payload?.PurchaseRequestNumber || payload?.PurchaseRequestNo || payload?.InquiryNo || '',
+                            salesOrderNumber: payload?.QuotationNo || payload?.QuotationNumber || '',
+                            status: payload?.Status || payload?.ApprovalStatus || '',
+                            deliveryDate: payload?.DeliveryDate || '',
+                            dueDate: payload?.DueDate || '',
+                            _raw: payload?._raw || payload,
+                        };
+
+                        setOrders(prev => {
+                            if (!prev || prev.length === 0) return [mapped];
+                            const replaced = prev.map(p => (String(p.id) === String(mapped.id) ? mapped : p));
+                            const found = prev.some(p => String(p.id) === String(mapped.id));
+                            return found ? replaced : [mapped, ...prev];
+                        });
+                    } catch (e) { console.warn('event updated handler error', e); }
+                });
+
+                return () => { try { unsubAdd && unsubAdd(); unsubUpdate && unsubUpdate(); } catch(_){} };
+            }, []);
+
+    // If navigated back with an updated quotation, replace the matching entry in the list
+    useEffect(() => {
+        try {
+            const updated = route?.params?.updatedQuotation;
+            if (!updated) return;
+
+            const mapped = {
+                id: updated?.UUID || updated?.Uuid || updated?.Id || String(Math.random()),
+                quotationNumber: updated?.QuotationNo || updated?.QuotationNumber || updated?.Quotation_No || updated?.Quotation || '',
+                quotationTitle: updated?.QuotationTitle || updated?.Title || '',
+                customerName: resolveVendorName(updated),
+                purchaseRequestNumber: updated?.PurchaseRequestNumber || updated?.PurchaseRequestNo || updated?.InquiryNo || '',
+                salesOrderNumber: updated?.QuotationNo || updated?.QuotationNumber || '',
+                status: updated?.Status || updated?.ApprovalStatus || '',
+                deliveryDate: updated?.DeliveryDate || '',
+                dueDate: updated?.DueDate || '',
+                _raw: updated,
+            };
+
+            setOrders(prev => {
+                if (!prev || prev.length === 0) return [mapped];
+                // replace existing matching id, otherwise prepend
+                const replaced = prev.map(p => (String(p.id) === String(mapped.id) ? mapped : p));
+                const found = prev.some(p => String(p.id) === String(mapped.id));
+                return found ? replaced : [mapped, ...prev];
+            });
+
+            // clear param to avoid repeated updates
+            try { navigation.setParams({ updatedQuotation: undefined }); } catch (_) {}
+        } catch (e) {
+            console.warn('Failed to apply updatedQuotation param into list', e);
+        }
+    }, [route?.params?.updatedQuotation]);
+
     const paginatedOrders = useMemo(() => {
         const start = currentPage * itemsPerPage;
         return filteredOrders.slice(start, start + itemsPerPage);
@@ -152,17 +310,101 @@ const ViewPurchaseQuotation = () => {
     const rangeStart = filteredOrders.length === 0 ? 0 : currentPage * itemsPerPage + 1;
     const rangeEnd = filteredOrders.length === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, filteredOrders.length);
 
-    const handleQuickAction = (order, actionLabel) => {
+    const handleQuickAction = async (order, actionLabel) => {
+        if (actionLabel === 'Delete') {
+            Alert.alert(
+                'Confirm',
+                'Are you sure you want to delete this purchase quotation?',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: async () => {
+                            try {
+                                setLoadingOrders(true);
+                                const headerUuid = order._raw?.UUID || order.id || null;
+                                if (!headerUuid) throw new Error('Header UUID not found');
+                                const resp = await deletePurchaseQuotationHeader({ headerUuid });
+                                console.log('deletePurchaseQuotationHeader resp ->', resp);
+                                // remove locally from list
+                                setOrders(prev => prev.filter(o => o.id !== order.id));
+                                Alert.alert('Success', 'Purchase quotation deleted');
+                            } catch (err) {
+                                console.error('deletePurchaseQuotationHeader error ->', err);
+                                try { Alert.alert('Error', err?.message || 'Unable to delete purchase quotation'); } catch (_) {}
+                            } finally {
+                                setLoadingOrders(false);
+                            }
+                        }
+                    }
+                ],
+                { cancelable: true }
+            );
+            return;
+        }
+
+        if (actionLabel === 'Convert to Order') {
+            try {
+                setLoadingOrders(true);
+                const quotationUUID = order._raw?.UUID || order.id || null;
+                if (!quotationUUID) throw new Error('Quotation UUID not found');
+                
+                console.log('Converting quotation to order with UUID:', quotationUUID);
+                const resp = await convertPurchaseQuotationToOrder({ quotationUUID });
+                console.log('convertPurchaseQuotationToOrder resp ->', resp);
+                
+                // Extract header UUID from response for navigation
+                const headerUuid = resp?.Data?.HeaderUUID || resp?.HeaderUUID || resp?.UUID || resp?.Data?.UUID || null;
+                
+                if (headerUuid) {
+                    // Show success message from API response
+                    const successMessage = resp?.Message || resp?.Data?.Message || 'Quotation converted to purchase order successfully';
+                    Alert.alert('Success', successMessage, [
+                        {
+                            text: 'OK',
+                            onPress: () => {
+                                // Navigate to ManagePurchaseOrder with prefill data
+                                navigation.navigate('ManagePurchaseOrder', {
+                                    headerUuid,
+                                    prefillHeader: resp?.Data || resp,
+                                    fromConversion: true,
+                                    sourceType: 'quotation'
+                                });
+                            }
+                        }
+                    ]);
+                }
+            } catch (err) {
+                console.error('convertPurchaseQuotationToOrder error ->', err);
+                try { Alert.alert('Error', err?.message || 'Unable to convert quotation to order'); } catch (_) {}
+            } finally {
+                setLoadingOrders(false);
+            }
+            return;
+        }
+
+        if (actionLabel === 'Edit') {
+            try {
+                const headerUuid = order._raw?.UUID || order.id || null;
+                navigation.navigate('AddPurchaseQuotation', { headerUuid, headerData: order._raw });
+            } catch (err) {
+                console.error('navigate to AddPurchaseQuotation error ->', err);
+                Alert.alert('Error', 'Unable to open edit screen');
+            }
+            return;
+        }
+
         Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber}`);
     };
 
     const renderFooterActions = (order) => {
         const buttons = [
-            { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444', action: 'Delete' },
-            { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6', action: 'Download' },
-            { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280', action: 'Forward' },
-            { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E', action: 'View' },
-            // { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316', action: 'Update Status'  },
+            { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
+            // { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
+            { icon: 'logout', action: 'Convert to Order', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
+            // { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
+            { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316'  },
         ];
 
         return (
@@ -260,20 +502,19 @@ const ViewPurchaseQuotation = () => {
                 ) : (
                     paginatedOrders.map((order) => (
                         <AccordionItem
-                            key={order.id}
-                            item={{
-                                soleExpenseCode: order.id,
-                                expenseName: order.customerName, // show Vendor Name in heading
-                                amount: order.purchaseRequestNumber || order._raw?.PurchaseRequestNumber || order._raw?.PurchaseRequestNo || order._raw?.InquiryNo || order.quotationNumber || '', // show Purchase Request No (fallback to Quotation No.)
-                                headerTitle: order.quotationTitle,
-                            }}
+                                key={order.id}
+                                item={{
+                                    soleExpenseCode: order.id,
+                                    expenseName: order.customerName,
+                                    amount: order.purchaseRequestNumber || order._raw?.PurchaseRequestNumber || order._raw?.PurchaseRequestNo || order._raw?.InquiryNo || order.quotationNumber || '',
+                                    headerTitle: order.customerName || order.quotationTitle,
+                                }}
                             isActive={activeOrderId === order.id}
                             onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
                             customRows={[
                                 { label: 'Vendor Name', value: order.customerName },
                                 { label: 'Purchase Request Number', value: order.purchaseRequestNumber || order._raw?.PurchaseRequestNumber || order._raw?.PurchaseRequestNo || order._raw?.InquiryNo || order.quotationNumber || '—' },
                                 { label: 'Quotation Title', value: order.quotationTitle || order.salesOrderNumber || 'Title' },
-                                { label: 'Status', value: order.status, isStatus: true },
                                 // { label: 'Due Date', value: order.dueDate },
                             ]}
                             headerLeftLabel="Vendor Name"

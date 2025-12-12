@@ -24,7 +24,7 @@ import { useNavigation } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
-import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getCustomers, getCountries, getPurchaseOrderNumbers, addPurchaseInvoiceHeader, addPurchaseInvoiceLine, updatePurchaseInvoiceHeader, getPurchaseInvoiceHeaderById, getPurchaseInvoiceHeaders, getPurchaseInvoiceLines, updatePurchaseInvoiceLine, deletePurchaseInvoiceLine, getItems } from '../../../../api/authServices';
+import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getVendors, getCountries, getPurchaseOrderNumbers, addPurchaseInvoiceHeader, addPurchaseInvoiceLine, updatePurchaseInvoiceHeader, getPurchaseInvoiceHeaderById, getPurchaseInvoiceHeaders, getPurchaseInvoiceLines, updatePurchaseInvoiceLine, deletePurchaseInvoiceLine, getItems } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
 
 const COL_WIDTHS = {
@@ -155,7 +155,7 @@ const AddPurchaseInvoice = () => {
     const [paymentTermsOptions, setPaymentTermsOptions] = useState([]);
     const [paymentMethodsOptions, setPaymentMethodsOptions] = useState([]);
     const [projectsOptions, setProjectsOptions] = useState([]);
-    const [customersOptions, setCustomersOptions] = useState([]);
+    const [vendorsOptions, setVendorsOptions] = useState([]);
     const [salesInquiryNosOptions, setSalesInquiryNosOptions] = useState([]);
     const [salesOrderOptions, setSalesOrderOptions] = useState([]);
     const [salesOrderUuid, setSalesOrderUuid] = useState(null);
@@ -183,13 +183,14 @@ const AddPurchaseInvoice = () => {
         (async () => {
             try {
                 const [custResp, termsResp, methodsResp, projectsResp, inquiriesResp, salesOrdersResp] = await Promise.all([
-                    getCustomers(),
+                    getVendors(),
                     getPaymentTerms(),
                     getPaymentMethods(),
                     fetchProjects(),
                     getAllInquiryNumbers(),
                     getPurchaseOrderNumbers(),
                 ]);
+
 
                 const custList = extractArray(custResp);
                 const termsList = extractArray(termsResp);
@@ -205,7 +206,7 @@ const AddPurchaseInvoice = () => {
                     raw: r,
                 }));
 
-                setCustomersOptions(custList);
+                setVendorsOptions(custList);
                 setPaymentTermsOptions(termsList);
                 setPaymentMethodsOptions(methodsList);
                 setProjectsOptions(projectsList);
@@ -279,8 +280,8 @@ const AddPurchaseInvoice = () => {
             // Check if inquiryNo is actually a UUID - if so, treat it as salesInquiryUuid
             const isInquiryNoUuid = inquiryNo && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(inquiryNo);
 
-            // Prefill Sales Invoice number (SalesInvNo) first, then fallback to performa fields
-            const salesInvValue = data?.SalesInvNo || data?.SalesInvoiceNo || data?.SalesInv || data?.SalesPerInvNo || data?.PerformaInvoiceNo || data?.PerformaNo || data?.SalesPerformaNo || '';
+            // Prefill Purchase / Sales Invoice number: accept many possible keys including PurchaseInvoiceNo / InvoiceNo
+            const salesInvValue = data?.SalesInvNo || data?.SalesInvoiceNo || data?.SalesInv || data?.SalesPerInvNo || data?.PerformaInvoiceNo || data?.PerformaNo || data?.SalesPerformaNo || data?.PurchaseInvoiceNo || data?.PurchaseInvNo || data?.InvoiceNo || data?.InvoiceNumber || '';
 
             // If the API accidentally provided a UUID in place of the readable Sales Invoice number,
             // attempt to resolve it to a human-friendly invoice number before showing it in the input.
@@ -294,8 +295,9 @@ const AddPurchaseInvoice = () => {
                 // If we only have UUID, leave it empty - the mapping useEffect will fill it
                 salesInquiry: (inquiryNo && !isInquiryNoUuid) ? inquiryNo : '',
                 clientName: data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || s.clientName || '',
-                CustomerUUID: data?.CustomerUUID || data?.CustomerId || s.CustomerUUID || null,
-                CustomerName: data?.CustomerName || s.CustomerName || '',
+                // Vendor/Customer: accept vendor keys as well (prefill from ManagePurchaseInvoice row)
+                CustomerUUID: data?.CustomerUUID || data?.CustomerId || data?.VendorUUID || data?.VendorId || s.CustomerUUID || null,
+                CustomerName: data?.CustomerName || data?.VendorName || data?.Vendor || s.CustomerName || '',
             }));
 
             if (isSalesInvUuid) {
@@ -348,6 +350,15 @@ const AddPurchaseInvoice = () => {
         const prefill = route?.params?.prefillHeader || null;
 
         let resolvedHeaderUuid = paramHeaderUuid || null;
+
+        // Enhanced debug logging for headerUuid format
+        console.log('🔄 [AddPurchaseInvoice] headerUuid received from route params:', {
+            paramHeaderUuid,
+            candidateHeaderUuid,
+            prefill: prefill ? 'present' : 'null',
+            resolvedHeaderUuid,
+            fullParams: route?.params
+        });
 
         (async () => {
             // if we don't have a usable header UUID from params, attempt to resolve using candidate or search
@@ -454,38 +465,94 @@ const AddPurchaseInvoice = () => {
                     setSalesOrderUuid(soUuid);
                 }
 
-                // Prefill header form
-                const fetchedSalesInv = data?.SalesInvNo || data?.SalesInvoiceNo || data?.SalesInv || data?.SalesPerInvNo || data?.PerformaInvoiceNo || data?.PerformaNo || data?.SalesPerformaNo || '';
-                const fetchedInquiryNo = data?.SalesInqNo || data?.SalesInquiryNo || data?.InquiryNo || '';
+                // Comprehensive prefill for Purchase Invoice fields
+                console.log('🔄 [AddPurchaseInvoice] Prefilling with comprehensive data:', data);
+
+                // Extract invoice number from multiple possible fields
+                const fetchedInvoiceNo = data?.InvoiceNo || data?.PurchaseInvoiceNo || data?.PurchaseInvNo || data?.SalesInvNo || data?.SalesInvoiceNo || data?.SalesInv || data?.SalesPerInvNo || data?.PerformaInvoiceNo || data?.PerformaNo || data?.SalesPerformaNo || data?.InvoiceNumber || '';
+
+                // Extract inquiry number and check if it's a UUID
+                const fetchedInquiryNo = data?.SalesInqNo || data?.SalesInquiryNo || data?.InquiryNo || data?.PurchaseInqNo || data?.PurchaseInquiryNo || '';
                 const isFetchedInquiryUuid = fetchedInquiryNo && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(fetchedInquiryNo);
 
+                // Extract Purchase Order Number (for client name field)
+                const purchaseOrderNo = data?.PurchaseOrderNo || data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || '';
+
+                // Prefill header form with comprehensive mapping
                 setHeaderForm(s => ({
                     ...s,
-                    salesInquiryText: fetchedSalesInv || s.salesInquiryText || '',
+                    // Map invoice number to salesInquiryText field (based on your form structure)
+                    salesInquiryText: fetchedInvoiceNo || s.salesInquiryText || '',
+                    // Only set salesInquiry if we have a valid InquiryNo (not a UUID)
                     salesInquiry: (!isFetchedInquiryUuid && fetchedInquiryNo) ? fetchedInquiryNo : s.salesInquiry || '',
-                    clientName: data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || s.clientName || '',
-                    CustomerUUID: data?.CustomerUUID || data?.CustomerId || s.CustomerUUID || null,
-                    CustomerName: data?.CustomerName || data?.Customer || s.CustomerName || '',
+                    // Map Purchase Order Number to client name
+                    clientName: purchaseOrderNo || s.clientName || '',
+                    // Map vendor/customer information
+                    CustomerUUID: data?.VendorUUID || data?.CustomerUUID || data?.CustomerId || data?.VendorId || s.CustomerUUID || null,
+                    CustomerName: data?.VendorName || data?.CustomerName || data?.Vendor || data?.Customer || s.CustomerName || '',
                 }));
+
+                // Set UUIDs for dropdown mapping
+                if (data?.VendorUUID) {
+                    console.log('🔄 [AddPurchaseInvoice] Setting VendorUUID for mapping:', data.VendorUUID);
+                    setHeaderForm(s => ({ ...s, CustomerUUID: data.VendorUUID }));
+                }
+
+                if (data?.ProjectUUID) {
+                    console.log('🔄 [AddPurchaseInvoice] Setting ProjectUUID for mapping:', data.ProjectUUID);
+                    setProjectUUID(data.ProjectUUID);
+                    // Also set the project name if available
+                    if (data?.ProjectName) {
+                        setProject(data.ProjectName);
+                    }
+                }
+
+                if (data?.PaymentTerm) {
+                    console.log('🔄 [AddPurchaseInvoice] Setting PaymentTerm UUID for mapping:', data.PaymentTerm);
+                    setPaymentTermUuid(data.PaymentTerm);
+                }
+
+                if (data?.PaymentMode) {
+                    console.log('🔄 [AddPurchaseInvoice] Setting PaymentMode UUID for mapping:', data.PaymentMode);
+                    setPaymentMethodUUID(data.PaymentMode);
+                }
+
+                if (data?.PurchaseInqNoUUID && data.PurchaseInqNoUUID.trim() !== '') {
+                    console.log('🔄 [AddPurchaseInvoice] Setting PurchaseInqNoUUID for mapping:', data.PurchaseInqNoUUID);
+                    setSalesInquiryUuid(data.PurchaseInqNoUUID);
+                }
 
                 if (isFetchedInquiryUuid) setSalesInquiryUuid(fetchedInquiryNo);
 
-                // Prefill other fields
+                // Comprehensive prefill for date, financial, and other fields
+                console.log('🔄 [AddPurchaseInvoice] Prefilling dates and financial data');
+
+                // Handle OrderDate (can be in various formats)
                 if (data?.OrderDate) {
                     const orderDate = data.OrderDate;
-                    // Convert API date format to UI format if needed
-                    if (orderDate.includes('-') && orderDate.length === 10) {
-                        // Assume YYYY-MM-DD format, convert to dd-MMM-yyyy
-                        const [yyyy, mm, dd] = orderDate.split('-');
-                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                        setInvoiceDate(`${dd}-${months[parseInt(mm) - 1]}-${yyyy}`);
+                    console.log('🔄 [AddPurchaseInvoice] Setting OrderDate:', orderDate);
+
+                    // Handle different date formats
+                    if (orderDate.includes('-')) {
+                        if (orderDate.length === 10) {
+                            // YYYY-MM-DD format, convert to dd-MMM-yyyy
+                            const [yyyy, mm, dd] = orderDate.split('-');
+                            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                            setInvoiceDate(`${dd}-${months[parseInt(mm) - 1]}-${yyyy}`);
+                        } else {
+                            // Already in dd-MMM-yyyy format
+                            setInvoiceDate(orderDate);
+                        }
                     } else {
                         setInvoiceDate(orderDate);
                     }
                 }
 
+                // Handle DueDate
                 if (data?.DueDate) {
                     const dueDate = data.DueDate;
+                    console.log('🔄 [AddPurchaseInvoice] Setting DueDate:', dueDate);
+
                     if (dueDate.includes('-') && dueDate.length === 10) {
                         const [yyyy, mm, dd] = dueDate.split('-');
                         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -495,20 +562,41 @@ const AddPurchaseInvoice = () => {
                     }
                 }
 
-                setShippingCharges(String(data?.ShippingCharges ?? data?.ShippingCharge ?? 0));
-                setAdjustments(String(data?.AdjustmentPrice ?? data?.Adjustment ?? 0));
-                setTerms(data?.TermsConditions || data?.Terms || '');
-                setNotes(data?.CustomerNotes || data?.Notes || '');
-                setHeaderUUID(data?.UUID || data?.Id || data?.HeaderUUID || headerUuid);
+                // Financial fields - comprehensive mapping
+                const shippingAmount = data?.ShippingCharges ?? data?.ShippingCharge ?? data?.Shipping ?? 0;
+                const adjustmentAmount = data?.AdjustmentPrice ?? data?.Adjustment ?? data?.Adjustments ?? data?.Discount ?? 0;
+                const taxAmount = data?.TotalTax ?? data?.TaxAmount ?? data?.HeaderTotalTax ?? data?.Tax ?? 0;
+                const totalAmount = data?.TotalAmount ?? data?.Total ?? data?.HeaderTotalAmount ?? data?.TotalPrice ?? data?.SubTotal ?? null;
 
-                // Populate tax and server total if provided by API
-                const headerTax = data?.TotalTax ?? data?.TaxAmount ?? data?.HeaderTotalTax ?? 0;
-                setTotalTax(String(headerTax));
+                console.log('🔄 [AddPurchaseInvoice] Setting financial data:', {
+                    shipping: shippingAmount,
+                    adjustment: adjustmentAmount,
+                    tax: taxAmount,
+                    total: totalAmount,
+                    subTotal: data?.SubTotal
+                });
 
-                const headerTotal = data?.TotalAmount ?? data?.Total ?? data?.HeaderTotalAmount ?? data?.TotalPrice ?? null;
-                if (headerTotal !== null && typeof headerTotal !== 'undefined') {
-                    setServerTotalAmount(String(headerTotal));
+                setShippingCharges(String(shippingAmount));
+                setAdjustments(String(adjustmentAmount));
+                setTotalTax(String(taxAmount));
+
+                // Set server total amount if available
+                if (totalAmount !== null && typeof totalAmount !== 'undefined') {
+                    setServerTotalAmount(String(totalAmount));
                 }
+
+                // Notes and Terms
+                const termsData = data?.TermsConditions || data?.Terms || data?.TermsAndConditions || '';
+                const notesData = data?.Note || data?.Notes || data?.CustomerNotes || data?.Comments || '';
+
+                console.log('🔄 [AddPurchaseInvoice] Setting terms and notes:', { terms: termsData, notes: notesData });
+                setTerms(termsData);
+                setNotes(notesData);
+
+                // Set Header UUID for edit operations
+                const headerUuidFromData = data?.UUID || data?.Id || data?.HeaderUUID || resolvedHeaderUuid;
+                console.log('🔄 [AddPurchaseInvoice] Setting HeaderUUID:', headerUuidFromData);
+                setHeaderUUID(headerUuidFromData);
 
                 if (data?.FilePath) {
                     setFile({ uri: data.FilePath, name: data.FilePath });
@@ -534,7 +622,7 @@ const AddPurchaseInvoice = () => {
                             itemUuid: l?.ItemUUID || l?.ItemId || l?.Item || null,
                             rate: String(rate ?? 0),
                             desc: l?.Description || l?.Desc || '',
-                            hsn: l?.HSN || l?.HSNCode || '',
+                            hsn: l?.HSN || l?.HSNCode || l?.HSNSACNO || '',
                             qty: String(qty ?? 1),
                             tax: l?.TaxType || l?.Tax || 'IGST',
                             amount: String(Number(amount || 0).toFixed(2)),
@@ -664,24 +752,93 @@ const AddPurchaseInvoice = () => {
         }
     }, [paymentMethodUUID, paymentMethodsOptions, paymentMethod]);
 
-    // Map Customer UUID to Customer Name when options are loaded (for edit mode)
+    // Map Customer/Vendor UUID to Name when options are loaded (enhanced for purchase invoices)
     useEffect(() => {
-        if (!headerForm || !headerForm.CustomerUUID || !customersOptions || customersOptions.length === 0) return;
+        if (!headerForm || !headerForm.CustomerUUID || !vendorsOptions || vendorsOptions.length === 0) return;
         if (!headerForm.CustomerName) {
-            const found = customersOptions.find(c =>
+            console.log('🔄 [AddPurchaseInvoice] Mapping CustomerUUID to name:', headerForm.CustomerUUID);
+            const found = vendorsOptions.find(c =>
                 c?.UUID === headerForm.CustomerUUID ||
                 c?.Uuid === headerForm.CustomerUUID ||
                 c?.Id === headerForm.CustomerUUID ||
                 String(c?.UUID) === String(headerForm.CustomerUUID)
             );
             if (found) {
+                const displayName = found?.VendorName || found?.CustomerName || found?.Name || found?.DisplayName || String(found);
+                console.log('✅ [AddPurchaseInvoice] Found vendor name for UUID:', displayName);
                 setHeaderForm(s => ({
                     ...s,
-                    CustomerName: found?.CustomerName || found?.Name || found?.DisplayName || String(found)
+                    CustomerName: displayName
                 }));
+            } else {
+                console.log('⚠️ [AddPurchaseInvoice] No vendor found for UUID:', headerForm.CustomerUUID);
             }
         }
-    }, [headerForm, customersOptions]);
+    }, [headerForm, vendorsOptions]);
+
+    // Enhanced mapping for Project UUID to Project Name
+    useEffect(() => {
+        if (!projectUUID || !projectsOptions || projectsOptions.length === 0) return;
+        if (!project) {
+            console.log('🔄 [AddPurchaseInvoice] Mapping ProjectUUID to name:', projectUUID);
+            const found = projectsOptions.find(p =>
+                p?.Uuid === projectUUID ||
+                p?.UUID === projectUUID ||
+                p?.Id === projectUUID ||
+                String(p?.Uuid) === String(projectUUID) ||
+                String(p?.UUID) === String(projectUUID)
+            );
+            if (found) {
+                const projectName = found?.ProjectTitle || found?.Name || found?.Title || String(found);
+                console.log('✅ [AddPurchaseInvoice] Found project name for UUID:', projectName);
+                setProject(projectName);
+            } else {
+                console.log('⚠️ [AddPurchaseInvoice] No project found for UUID:', projectUUID);
+            }
+        }
+    }, [projectUUID, projectsOptions, project]);
+
+    // Enhanced mapping for Payment Term UUID to Payment Term Name
+    useEffect(() => {
+        if (!paymentTermUuid || !paymentTermsOptions || paymentTermsOptions.length === 0) return;
+        if (!paymentTerm) {
+            console.log('🔄 [AddPurchaseInvoice] Mapping PaymentTermUUID to name:', paymentTermUuid);
+            const found = paymentTermsOptions.find(p =>
+                p?.UUID === paymentTermUuid ||
+                p?.Uuid === paymentTermUuid ||
+                p?.Id === paymentTermUuid ||
+                String(p?.UUID) === String(paymentTermUuid)
+            );
+            if (found) {
+                const termName = found?.Name || found?.Title || found?.PaymentTerm || String(found);
+                console.log('✅ [AddPurchaseInvoice] Found payment term name for UUID:', termName);
+                setPaymentTerm(termName);
+            } else {
+                console.log('⚠️ [AddPurchaseInvoice] No payment term found for UUID:', paymentTermUuid);
+            }
+        }
+    }, [paymentTermUuid, paymentTermsOptions, paymentTerm]);
+
+    // Enhanced mapping for Payment Method UUID to Payment Method Name
+    useEffect(() => {
+        if (!paymentMethodUUID || !paymentMethodsOptions || paymentMethodsOptions.length === 0) return;
+        if (!paymentMethod) {
+            console.log('🔄 [AddPurchaseInvoice] Mapping PaymentMethodUUID to name:', paymentMethodUUID);
+            const found = paymentMethodsOptions.find(p =>
+                p?.UUID === paymentMethodUUID ||
+                p?.Uuid === paymentMethodUUID ||
+                p?.Id === paymentMethodUUID ||
+                String(p?.UUID) === String(paymentMethodUUID)
+            );
+            if (found) {
+                const methodName = found?.Name || found?.Title || found?.PaymentMethod || String(found);
+                console.log('✅ [AddPurchaseInvoice] Found payment method name for UUID:', methodName);
+                setPaymentMethod(methodName);
+            } else {
+                console.log('⚠️ [AddPurchaseInvoice] No payment method found for UUID:', paymentMethodUUID);
+            }
+        }
+    }, [paymentMethodUUID, paymentMethodsOptions, paymentMethod]);
 
     // Master items (loaded from server)
     const [masterItems, setMasterItems] = useState([]);
@@ -982,7 +1139,7 @@ const AddPurchaseInvoice = () => {
     };
 
     // State & handlers used by the Item Details form (Section 4)
-    const [currentItem, setCurrentItem] = useState({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', rate: '' });
+    const [currentItem, setCurrentItem] = useState({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
     const [editItemId, setEditItemId] = useState(null);
     const [isAddingLine, setIsAddingLine] = useState(false);
     const [linesLoading, setLinesLoading] = useState(false);
@@ -1076,6 +1233,7 @@ const AddPurchaseInvoice = () => {
             const qty = Number(currentItem.quantity || '1');
             const rate = Number(currentItem.rate || '0');
             const description = currentItem.desc || '';
+            const hsnSacNo = currentItem.hsn || '';
 
             // If editing an existing line
             if (editItemId) {
@@ -1092,6 +1250,7 @@ const AddPurchaseInvoice = () => {
                     Quantity: qty,
                     Rate: rate,
                     Description: description,
+                    HSNSACNO: hsnSacNo,
                 };
 
                 // If serverLineUuid exists, call update API, otherwise just update locally
@@ -1099,12 +1258,12 @@ const AddPurchaseInvoice = () => {
                     const resp = await updatePurchaseInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
                     console.log('update line resp ->', resp);
                     const updatedLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || existing.serverLineUuid;
-                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid }) : it));
+                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: hsnSacNo || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid }) : it));
                     // refresh header totals from server after update
                     await refreshHeaderTotals(headerUUID);
                 } else {
                     // local-only line - update in state
-                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', qty: String(qty), amount: computeAmount(qty, rate) }) : it));
+                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: hsnSacNo || '', qty: String(qty), amount: computeAmount(qty, rate) }) : it));
                     // Clear serverTotalAmount so UI will compute Total Amount from local subtotal
                     setServerTotalAmount('');
                 }
@@ -1121,6 +1280,7 @@ const AddPurchaseInvoice = () => {
                     Quantity: qty,
                     Rate: rate,
                     Description: description,
+                    HSNSACNO: hsnSacNo,
                 };
 
                 console.log('Posting line payload ->', payload);
@@ -1130,10 +1290,10 @@ const AddPurchaseInvoice = () => {
                 // on success, update local items list (assign local id and keep server uuid if returned)
                 const nextId = items.length ? (items[items.length - 1].id + 1) : 1;
                 const serverLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || null;
-                setItems(prev => ([...prev, { id: nextId, selectedItem: null, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: '', qty: String(qty), tax: 'IGST', amount: computeAmount(qty, rate), serverLineUuid }]));
+                setItems(prev => ([...prev, { id: nextId, selectedItem: null, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: hsnSacNo || '', qty: String(qty), tax: 'IGST', amount: computeAmount(qty, rate), serverLineUuid }]));
 
                 // reset line form
-                setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', rate: '' });
+                setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
                 // After server add, refresh header totals from server
                 await refreshHeaderTotals(headerUUID || (resp?.Data?.HeaderUUID || resp?.HeaderUUID || null));
             }
@@ -1148,7 +1308,7 @@ const AddPurchaseInvoice = () => {
     const handleEditItem = id => {
         const it = items.find(x => x.id === id);
         if (!it) return;
-        setCurrentItem({ itemType: it.itemType || '', itemTypeUuid: it.itemTypeUuid || null, itemName: it.name || '', itemNameUuid: it.itemUuid || it.sku || null, quantity: it.qty || '1', unit: it.unit || '', unitUuid: it.unitUuid || null, desc: it.desc || '', rate: it.rate || '' });
+        setCurrentItem({ itemType: it.itemType || '', itemTypeUuid: it.itemTypeUuid || null, itemName: it.name || '', itemNameUuid: it.itemUuid || it.sku || null, quantity: it.qty || '1', unit: it.unit || '', unitUuid: it.unitUuid || null, desc: it.desc || '', hsn: it.hsn || '', rate: it.rate || '' });
         setEditItemId(id);
     };
 
@@ -1403,20 +1563,22 @@ const AddPurchaseInvoice = () => {
                         }
                     >
                         <View style={styles.row}>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Sales Invoice Number.</Text>
+                            {(headerUUID || route?.params?.prefillHeader) ? (
+                                <View style={styles.col}>
+                                    <Text style={inputStyles.label}>Invoice Number.</Text>
 
-                                <View style={[inputStyles.box]} pointerEvents="box-none">
-                                    <TextInput
-                                        style={[inputStyles.input, { flex: 1, color: '#000000' }]}
-                                        value={headerForm.salesInquiryText}
-                                        onChangeText={v => setHeaderForm(s => ({ ...s, salesInquiryText: v }))}
-                                        placeholder="eg."
-                                        placeholderTextColor={COLORS.textLight}
-                                        editable={headerEditable}
-                                    />
+                                    <View style={[inputStyles.box]} pointerEvents="box-none">
+                                        <TextInput
+                                            style={[inputStyles.input, { flex: 1, color: '#000000' }]}
+                                            value={headerForm.salesInquiryText}
+                                            onChangeText={v => setHeaderForm(s => ({ ...s, salesInquiryText: v }))}
+                                            placeholder="eg."
+                                            placeholderTextColor={COLORS.textLight}
+                                            editable={false}
+                                        />
+                                    </View>
                                 </View>
-                            </View>
+                            ) : null}
                             {/* <View style={styles.col}> */}
                             {/* <Text style={inputStyles.label}>Customer Name* </Text> */}
 
@@ -1493,19 +1655,19 @@ const AddPurchaseInvoice = () => {
                             {/* )} */}
 
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Customer Name* </Text>
+                                <Text style={inputStyles.label}>Vendor Name* </Text>
 
                                 <View style={{ zIndex: 9998, elevation: 20 }}>
                                     <Dropdown
-                                        placeholder="Customer Name*"
+                                        placeholder="Vendor Name*"
                                         value={headerForm.CustomerName || headerForm.opportunityTitle}
-                                        options={customersOptions}
-                                        getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
+                                        options={vendorsOptions}
+                                        getLabel={c => (c?.VendorName || c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
                                         getKey={c => (c?.UUID || c?.Id || c)}
                                         onSelect={v => {
                                             if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
                                             if (v && typeof v === 'object') {
-                                                setHeaderForm(s => ({ ...s, CustomerName: v?.CustomerName || v?.Name || v, CustomerUUID: v?.UUID || v?.Id || null }));
+                                                setHeaderForm(s => ({ ...s, CustomerName: v?.VendorName || v?.CustomerName || v?.Name || v, CustomerUUID: v?.UUID || v?.Id || null }));
                                             } else {
                                                 setHeaderForm(s => ({ ...s, CustomerName: v, CustomerUUID: null }));
                                             }
@@ -1545,7 +1707,7 @@ const AddPurchaseInvoice = () => {
                             </View>
 
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>payment Tearm* </Text>
+                                <Text style={inputStyles.label}>Payment Term* </Text>
 
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
@@ -1729,7 +1891,7 @@ const AddPurchaseInvoice = () => {
                                             getKey={it => (it?.uuid || it?.sku || it)}
                                             onSelect={v => {
                                                 if (v && typeof v === 'object') {
-                                                    setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.uuid || v?.UUID || v?.sku || null, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '' }));
+                                                    setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.uuid || v?.UUID || v?.sku || null, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '', hsn: v?.hsn || ci?.hsn || '' }));
                                                 } else {
                                                     setCurrentItem(ci => ({ ...ci, itemName: v, itemNameUuid: null }));
                                                 }
@@ -1741,8 +1903,8 @@ const AddPurchaseInvoice = () => {
                                     </View>
                                 </View>
 
-                                {/* Description full width */}
-                                <View style={{ width: '100%', marginBottom: hp(1) }}>
+                                {/* Description and HSN/SAC in one line */}
+                                <View style={{ width: '100%' }}>
                                     <Text style={inputStyles.label}>Description</Text>
                                     <TextInput
                                         style={[styles.descInput, { minHeight: hp(10), width: '100%' }]}
@@ -1753,6 +1915,19 @@ const AddPurchaseInvoice = () => {
                                         multiline
                                         numberOfLines={3}
                                     />
+                                </View>
+
+                                <View style={{ width: '100%', marginTop: hp(0.5) }}>
+                                    <Text style={inputStyles.label}>HSN/SAC</Text>
+                                    <View style={[inputStyles.box, { marginTop: hp(0.5), width: '100%' }]}>
+                                        <TextInput
+                                            style={[inputStyles.input]}
+                                            value={currentItem.hsn || ''}
+                                            onChangeText={t => setCurrentItem(ci => ({ ...ci, hsn: t }))}
+                                            placeholder="HSN/SAC"
+                                            placeholderTextColor={COLORS.textLight}
+                                        />
+                                    </View> 
                                 </View>
 
                                 {/* Two fields in one line: Quantity & Rate */}
@@ -1870,7 +2045,8 @@ const AddPurchaseInvoice = () => {
                                                 return (
                                                     String(it.name || '').toLowerCase().includes(q) ||
                                                     String(it.itemType || '').toLowerCase().includes(q) ||
-                                                    String(it.desc || '').toLowerCase().includes(q)
+                                                    String(it.desc || '').toLowerCase().includes(q) ||
+                                                    String(it.hsn || '').toLowerCase().includes(q)
                                                 );
                                             }) : items;
                                             const total = filtered.length;
@@ -1888,7 +2064,8 @@ const AddPurchaseInvoice = () => {
                                                         <View style={styles.tr}>
                                                             <Text style={[styles.th, { width: wp(10) }]}>Sr.No</Text>
                                                             <Text style={[styles.th, { width: wp(30) }]}>Item Details</Text>
-                                                            <Text style={[styles.th, { width: wp(30) }]}>Description</Text>
+                                                            <Text style={[styles.th, { width: wp(25) }]}>Description</Text>
+                                                            <Text style={[styles.th, { width: wp(20) }]}>HSN/SAC</Text>
                                                             <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
                                                             <Text style={[styles.th, { width: wp(20) }]}>Rate</Text>
                                                             <Text style={[styles.th, { width: wp(20) }]}>Amount</Text>
@@ -1905,8 +2082,11 @@ const AddPurchaseInvoice = () => {
                                                                 <View style={[styles.td, { width: wp(30), paddingLeft: wp(2) }]}>
                                                                     <Text style={styles.tdText}>{item.name}</Text>
                                                                 </View>
-                                                                <View style={[styles.td, { width: wp(30) }]}>
+                                                                <View style={[styles.td, { width: wp(25) }]}>
                                                                     <Text style={styles.tdText}>{item.desc}</Text>
+                                                                </View>
+                                                                <View style={[styles.td, { width: wp(20) }]}>
+                                                                    <Text style={styles.tdText}>{item.hsn || ''}</Text>
                                                                 </View>
                                                                 <View style={[styles.td, { width: wp(20) }]}>
                                                                     <Text style={styles.tdText}>{item.qty}</Text>

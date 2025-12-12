@@ -1023,18 +1023,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'visible',
   },
-  approveButton: {
-    backgroundColor: '#ef4444',
-  },
-  rejectButton: {
-    backgroundColor: '#10b981',
-  },
-  viewButton: {
-    backgroundColor: '#6b7280',
-  },
-  approvalDetailsButton: {
-    backgroundColor: '#6b7280',
-  },
+  
   emptyBox: {
     alignItems: 'center',
     paddingVertical: hp(4),

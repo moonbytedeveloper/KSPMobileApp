@@ -267,9 +267,7 @@ const SplashScreen = ({ onFinish }) => {
         </View>
 
         {/* Text under logo */}
-        <Animated.View style={getFloatStyle(floatText, 7)}>
-          
-        </Animated.View>
+        <Animated.View style={getFloatStyle(floatText, 7)} />
         {/* Around icons */}
         <Animated.View style={[getFloatStyle(float1, 8), styles.iconTop]}>
             <MCIcon name="briefcase-variant" size={42} color={COLORS.primary} />

@@ -10,7 +10,7 @@ import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
 import api from '../../../../api/axios';
-import { getSalesInvoiceHeaders } from '../../../../api/authServices';
+import { getSalesInvoiceHeaders, getSalesInvoiceSlip } from '../../../../api/authServices';
 
 // server-backed list state will be used instead of static sample data
 
@@ -27,6 +27,7 @@ const ManageSalesInvoice = () => {
     const [totalRecords, setTotalRecords] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
     const totalPages = useMemo(() => {
         if (totalRecords === 0) return 0;
@@ -105,10 +106,66 @@ const ManageSalesInvoice = () => {
     const rangeStart = totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1;
     const rangeEnd = totalRecords === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, totalRecords);
 
+    const handleDownloadInvoicePDF = async (order) => {
+        try {
+            setIsGeneratingPDF(true);
+            const headerUuidCandidate = extractServerUuid(order?.raw) || order?.UUID || order?.id || '';
+            console.log('🔍 [PDF Debug] headerUuidCandidate:', headerUuidCandidate);
+            console.log('🔍 [PDF Debug] order.raw:', order?.raw);
+            
+            if (!headerUuidCandidate) {
+                Alert.alert('Error', 'Unable to determine sales invoice identifier');
+                return;
+            }
+
+            const cmp = await getCMPUUID();
+            const env = await getENVUUID();
+            const user = await getUUID();
+            
+            console.log('🔍 [PDF Debug] API params:', { headerUuid: headerUuidCandidate, cmpUuid: cmp, envUuid: env, userUuid: user });
+            
+            const pdfBase64 = await getSalesInvoiceSlip({
+                headerUuid: headerUuidCandidate,
+                cmpUuid: cmp,
+                envUuid: env,
+                userUuid: user,
+            });
+            
+            console.log('🔍 [PDF Debug] pdfBase64 length:', pdfBase64?.length || 0);
+            console.log('🔍 [PDF Debug] pdfBase64 first 100 chars:', pdfBase64?.substring(0, 100));
+            
+            if (!pdfBase64 || pdfBase64.length === 0) {
+                Alert.alert('Error', 'No PDF data received from server');
+                return;
+            }
+            
+            const invoiceNumber = order?.salesInvoiceNumber || 'Unknown';
+            console.log('🔍 [PDF Debug] Navigating to FileViewerScreen with:', {
+                pdfBase64Length: pdfBase64.length,
+                fileName: `SalesInvoice_${invoiceNumber}`,
+            });
+            
+            navigation.navigate('FileViewerScreen', {
+                pdfBase64: pdfBase64,
+                fileName: `SalesInvoice_${invoiceNumber}`,
+            });
+        } catch (error) {
+            console.warn('Download PDF error:', error);
+            Alert.alert('Error', error?.message || 'Failed to generate PDF');
+        } finally {
+            setIsGeneratingPDF(false);
+        }
+    };
+
     const handleQuickAction = async (order, actionLabel) => {
         // prefer salesInvoiceNumber for messages
         const idLabel = order?.salesInvoiceNumber || order?.id;
         try {
+            if (actionLabel === 'Download') {
+                await handleDownloadInvoicePDF(order);
+                return;
+            }
+            
             if (actionLabel === 'Delete') {
                 Alert.alert(
                     'Delete Sales Invoice',
@@ -180,25 +237,42 @@ const ManageSalesInvoice = () => {
 
     const renderFooterActions = (order) => {
         const buttons = [
-            { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444', action: 'Delete' },
-            { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6', action: 'Download' },
-            { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280', action: 'Forward' },
-            { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E', action: 'View' },
-            { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316'  },
+            { icon: 'delete-outline', label: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
+            { icon: 'file-download', label: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
+            // { icon: 'chat-bubble-outline', label: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
+            { icon: 'visibility', label: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
+            { icon: 'edit', label: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316' },
         ];
 
         return (
             <View style={styles.cardActionRow}>
-                {buttons.map((btn) => (
-                    <TouchableOpacity
-                        key={`${order.id}-${btn.icon}`}
-                        activeOpacity={0.85}
-                        style={[styles.cardActionBtn , { backgroundColor: btn.bg, borderColor: btn.border }]}
-                        onPress={() => handleQuickAction(order, btn.action)}
-                    >
-                        <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
-                    </TouchableOpacity>
-                ))}
+                {buttons.map((btn) => {
+                    const isDownloadButton = btn.label === 'Download';
+                    const isDisabled = isDownloadButton && isGeneratingPDF;
+                    
+                    return (
+                        <TouchableOpacity
+                            key={`${order.id}-${btn.icon}`}
+                            activeOpacity={0.85}
+                            style={[
+                                styles.cardActionBtn,
+                                { 
+                                    backgroundColor: btn.bg, 
+                                    borderColor: btn.border,
+                                    opacity: isDisabled ? 0.6 : 1
+                                }
+                            ]}
+                            onPress={() => handleQuickAction(order, btn.label)}
+                            disabled={isDisabled}
+                        >
+                            {isDownloadButton && isGeneratingPDF ? (
+                                <ActivityIndicator size="small" color={btn.color} />
+                            ) : (
+                                <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
+                            )}
+                        </TouchableOpacity>
+                    );
+                })}
             </View>
         );
     };

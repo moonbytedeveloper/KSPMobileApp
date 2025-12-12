@@ -7,7 +7,7 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons'; 
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
-import { getSalesHeaderInquiries, deleteSalesHeader } from '../../../../api/authServices'; 
+import { getSalesHeaderInquiries, deleteSalesHeader, convertInquiryToSalesOrder } from '../../../../api/authServices'; 
 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 
@@ -84,7 +84,7 @@ const ManageInquiry = () => {
     const renderFooterActions = (order) => {
         const buttons = [
                             { icon: 'delete-outline', label: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
-            { icon: 'chat-bubble-outline', label: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
+            { icon: 'logout', label: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
             { icon: 'edit', label: 'Edit', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
         ];
 
@@ -95,7 +95,7 @@ const ManageInquiry = () => {
                         key={`${order.id}-${btn.icon}`}
                         activeOpacity={0.85}
                         style={[styles.cardActionBtn, { backgroundColor: btn.bg, borderColor: btn.border }]}
-                        onPress={() => {
+                        onPress={async () => {
                             // Delete action: confirm and call deleteSalesHeader
                             if (btn.label === 'Delete') {
                                 const headerUuid = order.raw?.UUID || order.raw?.Id || order.raw?.Data?.UUID || order.raw?.Data?.UUIDString || order.id;
@@ -132,6 +132,33 @@ const ManageInquiry = () => {
                                     uuid: headerUuid,
                                     headerRaw: order.raw,
                                 });
+                                return;
+                            }
+                            // Forward action: convert inquiry to sales order
+                            if (btn.label === 'Forward') {
+                                const inquiryUuid = order.raw?.UUID || order.raw?.Id || order.raw?.Data?.UUID || order.raw?.Data?.UUIDString || order.id;
+                                try {
+                                    console.log('ManageInquiry -> converting inquiry to sales order ->', inquiryUuid);
+                                    const response = await  convertInquiryToSalesOrder({ inquiryUuid });
+                                    
+                                    const headerUuid = response?.headerUuid || response?.HeaderUUID || response?.Data?.headerUuid || response?.Data?.HeaderUUID || null;
+                                    
+                                    if (headerUuid) {
+                                        Alert.alert('Success', 'Inquiry converted to Sales Order successfully');
+                                        // Navigate to ManageSalesOrder with headerUuid for prefill
+                                        navigation.navigate('ManageSalesOrder', {
+                                            headerUuid,
+                                            HeaderUUID: headerUuid,
+                                            prefillHeader: true
+                                        });
+                                    } else {
+                                        Alert.alert('Error', 'Conversion successful but no header UUID received');
+                                    }
+                                } catch (err) {
+                                    console.error('Failed to convert inquiry', err);
+                                    const errorMessage = err?.message || 'Unable to convert inquiry to sales order. Please try again.';
+                                    Alert.alert('Conversion Failed', errorMessage);
+                                }
                                 return;
                             }
                             handleQuickAction(order, btn.label);

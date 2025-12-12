@@ -169,15 +169,52 @@ const AddSalesPerfomaInvoice = () => {
                 const salesOrdersList = extractArray(salesOrdersResp);
                 console.log(salesOrdersList, 'salesordernum');
 
-                const normalizedInquiries = (Array.isArray(inquiriesList) ? inquiriesList : []).map((r) => ({
-                    UUID: r?.UUID || r?.Uuid || r?.Id || r?.InquiryUUID || r?.SalesInquiryUUID || null,
-                    InquiryNo: r?.SalesInqNo || r?.SalesInquiryNo || r?.InquiryNo || r?.Name || r?.Title || String(r),
-                    raw: r,
-                }));
+                // Normalize vendors/customers
+                const normalizedCustomers = (Array.isArray(custList) ? custList : []).map((r) => {
+                    console.log('Raw vendor data:', r);
+                    const customerName = r?.CustomerName || r?.VendorName || r?.Name || r?.DisplayName || String(r);
+                    return {
+                        UUID: r?.UUID || r?.Uuid || r?.Id || r?.CustomerUUID || r?.VendorUUID || customerName,
+                        CustomerName: customerName,
+                        raw: r,
+                    };
+                });
 
-                setCustomersOptions(custList);
-                setPaymentTermsOptions(termsList);
-                setPaymentMethodsOptions(methodsList);
+                // Normalize payment terms
+                const normalizedPaymentTerms = (Array.isArray(termsList) ? termsList : []).map((r) => {
+                    console.log('Raw payment term data:', r);
+                    const name = r?.Name || r?.Title || r?.PaymentTerm || String(r);
+                    return {
+                        UUID: r?.UUID || r?.Uuid || r?.Id || r?.PaymentTermUUID || name,
+                        Name: name,
+                        raw: r,
+                    };
+                });
+
+                // Normalize payment methods
+                const normalizedPaymentMethods = (Array.isArray(methodsList) ? methodsList : []).map((r) => {
+                    console.log('Raw payment method data:', r);
+                    const name = r?.Name || r?.Title || r?.PaymentMethod || String(r);
+                    return {
+                        UUID: r?.UUID || r?.Uuid || r?.Id || r?.PaymentMethodUUID || name,
+                        Name: name,
+                        raw: r,
+                    };
+                });
+
+                const normalizedInquiries = (Array.isArray(inquiriesList) ? inquiriesList : []).map((r) => {
+                    console.log('Raw inquiry data:', r);
+                    const inquiryNo = r?.SalesInqNo || r?.SalesInquiryNo || r?.InquiryNo || r?.Name || r?.Title || String(r);
+                    return {
+                        UUID: r?.UUID || r?.Uuid || r?.Id || r?.InquiryUUID || r?.SalesInquiryUUID || inquiryNo,
+                        InquiryNo: inquiryNo,
+                        raw: r,
+                    };
+                });
+
+                setCustomersOptions(normalizedCustomers);
+                setPaymentTermsOptions(normalizedPaymentTerms);
+                setPaymentMethodsOptions(normalizedPaymentMethods);
                 setProjectsOptions(projectsList);
                 setSalesInquiryNosOptions(normalizedInquiries);
                 const normalizedSalesOrders = (Array.isArray(salesOrdersList) ? salesOrdersList : []).map((r) => {
@@ -221,7 +258,9 @@ const AddSalesPerfomaInvoice = () => {
                 // Normalize Purchase Orders
                 const purchaseOrdersList = extractArray(purchaseOrdersResp);
                 const normalizedPurchaseOrders = (Array.isArray(purchaseOrdersList) ? purchaseOrdersList : []).map((r) => {
-                    const uuid = r?.UUID || r?.Uuid || r?.Id || r?.PurchaseOrderUUID || r?.PurchaseOrderId || null;
+                    console.log('Raw purchase order data:', r);
+                    const orderNo = r?.PurchaseOrderNo ?? r?.PurchaseOrderNumber ?? r?.OrderNumber ?? r?.OrderNo ?? r?.Name ?? r?.Title ?? String(r);
+                    const uuid = r?.UUID || r?.Uuid || r?.Id || r?.PurchaseOrderUUID || r?.PurchaseOrderId || orderNo;
                     const rawCandidate = r?.PurchaseOrderNo ?? r?.PurchaseOrderNumber ?? r?.OrderNumber ?? r?.OrderNo ?? r?.Name ?? r?.Title ?? r;
                     const extractString = (val) => {
                         if (val === null || val === undefined) return '';
@@ -268,7 +307,10 @@ const AddSalesPerfomaInvoice = () => {
 
             setHeaderForm(s => ({
                 ...s,
-                salesInquiryText: data?.SalesPerInvNo || data?.PerformaInvoiceNo || data?.PerformaNo || data?.SalesPerformaNo || data?.SalesPerInvNo || s.salesInquiryText || '',
+                salesInquiryText: data?.SalesPerInvNo || data?.PerformaInvoiceNumber || data?.PerformaInvoiceNo || data?.PerformaInvoice || data?.PerformaNo || data?.SalesPerformaNo || data?.SalesPerInvNo || data?.InvoiceNo || data?.InvoiceNumber || s.salesInquiryText || '',
+                // Also store common variants explicitly so UI can read a stable key
+                PerformaInvoiceNo: data?.PerformaInvoiceNo || data?.PerformaInvoiceNumber || data?.PerformaInvoice || data?.PerformaNo || data?.InvoiceNo || data?.InvoiceNumber || s.PerformaInvoiceNo || '',
+                performaInvoiceNumber: data?.PerformaInvoiceNumber || data?.PerformaInvoiceNo || data?.PerformaInvoice || data?.PerformaNo || data?.InvoiceNumber || data?.InvoiceNo || s.performaInvoiceNumber || '',
                 // Only set salesInquiry if we have a valid InquiryNo (not a UUID)
                 // If we only have UUID, leave it empty - the mapping useEffect will fill it
                 salesInquiry: (inquiryNo && !isInquiryNoUuid) ? inquiryNo : '',
@@ -360,7 +402,9 @@ const AddSalesPerfomaInvoice = () => {
                 // Prefill header form
                 setHeaderForm(s => ({
                     ...s,
-                    salesInquiryText: data?.SalesPerInvNo || data?.PerformaInvoiceNo || data?.PerformaNo || data?.SalesPerformaNo || s.salesInquiryText || '',
+                    salesInquiryText: data?.SalesPerInvNo || data?.PerformaInvoiceNumber || data?.PerformaInvoiceNo || data?.PerformaInvoice || data?.PerformaNo || data?.SalesPerformaNo || data?.SalesPerInvNo || data?.InvoiceNo || data?.InvoiceNumber || s.salesInquiryText || '',
+                    PerformaInvoiceNo: data?.PerformaInvoiceNo || data?.PerformaInvoiceNumber || data?.PerformaInvoice || data?.PerformaNo || data?.InvoiceNo || data?.InvoiceNumber || s.PerformaInvoiceNo || '',
+                    performaInvoiceNumber: data?.PerformaInvoiceNumber || data?.PerformaInvoiceNo || data?.PerformaInvoice || data?.PerformaNo || data?.InvoiceNumber || data?.InvoiceNo || s.performaInvoiceNumber || '',
                     salesInquiry: data?.SalesInqNo || data?.SalesInquiryNo || data?.InquiryNo || s.salesInquiry || '',
                     clientName: data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || s.clientName || '',
                     CustomerUUID: data?.CustomerUUID || data?.CustomerId || s.CustomerUUID || null,
@@ -431,7 +475,7 @@ const AddSalesPerfomaInvoice = () => {
                             itemUuid: l?.ItemUUID || l?.ItemId || l?.Item || null,
                             rate: String(rate ?? 0),
                             desc: l?.Description || l?.Desc || '',
-                            hsn: l?.HSN || l?.HSNCode || '',
+                            hsn: l?.HSN || l?.HSNCode || l?.HSNSACNO ||'',
                             qty: String(qty ?? 1),
                             tax: l?.TaxType || l?.Tax || 'IGST',
                             amount: String(Number(amount || 0).toFixed(2)),
@@ -575,7 +619,7 @@ const AddSalesPerfomaInvoice = () => {
                     sku: it?.SKU || it?.sku || it?.Sku || it?.ItemCode || '',
                     rate: (it?.Rate ?? it?.rate ?? it?.Price) || 0,
                     desc: it?.Description || it?.description || it?.Desc || '',
-                    hsn: it?.HSNCode || it?.HSN || it?.hsn || '',
+                    hsn: it?.HSNCode || it?.HSN || it?.hsn || it?.HSNSACNO || '',
                     uuid: it?.UUID || it?.Uuid || it?.uuid || it?.Id || it?.id || null,
                     raw: it,
                 }));
@@ -647,6 +691,21 @@ const AddSalesPerfomaInvoice = () => {
     const [showShippingTip, setShowShippingTip] = useState(false);
     const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
     const [prefillLoading, setPrefillLoading] = useState(false);
+
+    // Show Proforma Invoice Number only when editing / prefilling an existing header
+    const [showProformaInvoiceNoField, setShowProformaInvoiceNoField] = useState(false);
+
+    // If navigated with an existing header (edit/prefill), show the Proforma Invoice Number field
+    useEffect(() => {
+        try {
+            const p = route?.params || {};
+            if (p?.prefillHeader || p?.headerUuid || p?.headerData || p?.header) {
+                setShowProformaInvoiceNoField(true);
+            }
+        } catch (e) {
+            // ignore
+        }
+    }, [route?.params]);
 
     // Permission handling for Android
     const requestStoragePermissionAndroid = async () => {
@@ -853,7 +912,7 @@ const AddSalesPerfomaInvoice = () => {
     };
 
     // State & handlers used by the Item Details form (Section 4)
-    const [currentItem, setCurrentItem] = useState({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', rate: '' });
+    const [currentItem, setCurrentItem] = useState({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
     const [editItemId, setEditItemId] = useState(null);
     const [isAddingLine, setIsAddingLine] = useState(false);
     const [linesLoading, setLinesLoading] = useState(false);
@@ -963,6 +1022,7 @@ const AddSalesPerfomaInvoice = () => {
                     Quantity: qty,
                     Rate: rate,
                     Description: description,
+                    HSNSACNO: currentItem.hsn || '',
                 };
 
                 // If serverLineUuid exists, call update API, otherwise just update locally
@@ -970,18 +1030,18 @@ const AddSalesPerfomaInvoice = () => {
                     const resp = await updatePurchasePerformaInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
                     console.log('update line resp ->', resp);
                     const updatedLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || existing.serverLineUuid;
-                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid }) : it));
+                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid }) : it));
                     // refresh header totals from server after update
                     await refreshHeaderTotals(headerUUID);
                 } else {
                     // local-only line - update in state
-                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', qty: String(qty), amount: computeAmount(qty, rate) }) : it));
+                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate) }) : it));
                     // Clear serverTotalAmount so UI will compute Total Amount from local subtotal
                     setServerTotalAmount('');
                 }
 
                 // reset edit state
-                setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', rate: '' });
+                setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
                 setEditItemId(null);
             } else {
                 // Build payload expected by backend
@@ -992,6 +1052,7 @@ const AddSalesPerfomaInvoice = () => {
                     Quantity: qty,
                     Rate: rate,
                     Description: description,
+                    HSNSACNO: currentItem.hsn || '',
                 };
 
                 console.log('Posting line payload ->', payload);
@@ -1001,10 +1062,10 @@ const AddSalesPerfomaInvoice = () => {
                 // on success, update local items list (assign local id and keep server uuid if returned)
                 const nextId = items.length ? (items[items.length - 1].id + 1) : 1;
                 const serverLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || null;
-                setItems(prev => ([...prev, { id: nextId, selectedItem: null, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: '', qty: String(qty), tax: 'IGST', amount: computeAmount(qty, rate), serverLineUuid }]));
+                setItems(prev => ([...prev, { id: nextId, selectedItem: null, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), tax: 'IGST', amount: computeAmount(qty, rate), serverLineUuid }]));
 
                 // reset line form
-                setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', rate: '' });
+                setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
                 // After server add, refresh header totals from server
                 await refreshHeaderTotals(headerUUID || (resp?.Data?.HeaderUUID || resp?.HeaderUUID || null));
             }
@@ -1019,7 +1080,7 @@ const AddSalesPerfomaInvoice = () => {
     const handleEditItem = id => {
         const it = items.find(x => x.id === id);
         if (!it) return;
-        setCurrentItem({ itemType: it.itemType || '', itemTypeUuid: it.itemTypeUuid || null, itemName: it.name || '', itemNameUuid: it.itemUuid || it.sku || null, quantity: it.qty || '1', unit: it.unit || '', unitUuid: it.unitUuid || null, desc: it.desc || '', rate: it.rate || '' });
+        setCurrentItem({ itemType: it.itemType || '', itemTypeUuid: it.itemTypeUuid || null, itemName: it.name || '', itemNameUuid: it.itemUuid || it.sku || null, quantity: it.qty || '1', unit: it.unit || '', unitUuid: it.unitUuid || null, desc: it.desc || '', hsn: it.hsn || '', rate: it.rate || '' });
         setEditItemId(id);
     };
 
@@ -1091,17 +1152,27 @@ const AddSalesPerfomaInvoice = () => {
     const submitHeader = async () => {
         setHeaderSubmitting(true);
         try {
+            console.log('=== UUID Debug Info ===');
+            console.log('salesInquiryUuid:', salesInquiryUuid);
+            console.log('purchaseOrderUuid:', purchaseOrderUuid);
+            console.log('headerForm.CustomerUUID:', headerForm.CustomerUUID);
+            console.log('paymentTermUuid:', paymentTermUuid);
+            console.log('paymentMethodUUID:', paymentMethodUUID);
+            console.log('======================');
+            
             const payload = {
                 UUID: headerUUID || headerForm.UUID || '',
                 InvoiceNo: headerForm.salesInquiryText || '',
                 PurchaseInqNoUUID: salesInquiryUuid || headerForm.salesInquiryUUID || '',
-                PurchaseOrderNo: purchaseOrderUuid || salesOrderUuid || headerForm.clientName || '',
-                VendorUUID: headerForm.CustomerUUID || headerForm.CustomerUUID || '',
-                VendorName: headerForm.CustomerName || headerForm.CustomerName || '',
+                PurchaseOrderUUID: purchaseOrderUuid || salesOrderUuid || '',
+                VendorUUID: headerForm.CustomerUUID || '',
+                VendorName: headerForm.CustomerName || '',
                 ProjectUUID: projectUUID || project || '',
                 ProjectName: project || '',
-                PaymentTerm: paymentTermUuid || paymentTerm || '',
-                PaymentMode: paymentMethodUUID || paymentMethod || '',
+                PaymentTermUUID: paymentTermUuid || '',
+                PaymentTerm: paymentTerm || '',
+                PaymentMethodUUID: paymentMethodUUID || '',
+                PaymentMode: paymentMethod || '',
                 OrderDate: uiDateToApiDate(invoiceDate),
                 // DueDate: uiDateToApiDate(dueDate),
                 Note: notes || '',
@@ -1157,13 +1228,15 @@ const AddSalesPerfomaInvoice = () => {
                 UUID: headerUUID || headerForm.UUID || '',
                 InvoiceNo: headerForm.salesInquiryText || '',
                 PurchaseInqNoUUID: salesInquiryUuid || headerForm.salesInquiryUUID || '',
-                PurchaseOrderNo: purchaseOrderUuid || salesOrderUuid || headerForm.clientName || '',
-                VendorUUID: headerForm.CustomerUUID || headerForm.CustomerUUID || '',
-                VendorName: headerForm.CustomerName || headerForm.CustomerName || '',
+                PurchaseOrderUUID: purchaseOrderUuid || salesOrderUuid || '',
+                VendorUUID: headerForm.CustomerUUID || '',
+                VendorName: headerForm.CustomerName || '',
                 ProjectUUID: projectUUID || project || '',
                 ProjectName: project || '',
-                PaymentTerm: paymentTermUuid || paymentTerm || '',
-                PaymentMode: paymentMethodUUID || paymentMethod || '',
+                PaymentTermUUID: paymentTermUuid || '',
+                PaymentTerm: paymentTerm || '',
+                PaymentMethodUUID: paymentMethodUUID || '',
+                PaymentMode: paymentMethod || '',
                 OrderDate: uiDateToApiDate(invoiceDate),
                 Note: notes || '',
                 TermsConditions: terms || '',
@@ -1277,34 +1350,21 @@ const AddSalesPerfomaInvoice = () => {
                     <AccordionSection
                         id={1}
                         title="Header"
-                        expanded={expandedId === 1}
+                        expanded={expandedId === 1} 
                         onToggle={headerSubmitted && !headerEditable ? () => { } : toggleSection}
                         rightActions={
                             headerSubmitted && !headerEditable ? (
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
                                     <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
-                                    <TouchableOpacity onPress={() => { setHeaderEditable(true); setExpandedId(1); }}>
+                                    <TouchableOpacity onPress={() => { setHeaderEditable(true); setExpandedId(1); setShowProformaInvoiceNoField(true); }}>
                                         <Icon name="edit" size={rf(5)} color={COLORS.primary} />
                                     </TouchableOpacity>
                                 </View>
                             ) : null
                         }
                     >
-                        <View style={styles.row}>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Purchase Invoice Number.</Text>
 
-                                <View style={[inputStyles.box]} pointerEvents="box-none">
-                                    <TextInput
-                                        style={[inputStyles.input, { flex: 1, color: '#000000' }]}
-                                        value={headerForm.salesInquiryText}
-                                        onChangeText={v => setHeaderForm(s => ({ ...s, salesInquiryText: v }))}
-                                        placeholder="eg."
-                                        placeholderTextColor={COLORS.textLight}
-                                        editable={headerEditable}
-                                    />
-                                </View>
-                            </View>
+                        <View style={styles.row}>
                             {/* <View style={styles.col}> */}
                             {/* <Text style={inputStyles.label}>Customer Name* </Text> */}
 
@@ -1334,9 +1394,16 @@ const AddSalesPerfomaInvoice = () => {
                                     getKey={s => s?.UUID || s}
                                     onSelect={v => {
                                         if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
+                                        console.log('Purchase Inquiry selected:', v);
                                         if (v && typeof v === 'object') {
-                                            setHeaderForm(s => ({ ...s, salesInquiry: v?.InquiryNo || String(v) }));
-                                            setSalesInquiryUuid(v?.UUID || null);
+                                            const inquiryNo = v?.InquiryNo || String(v);
+                                            const inquiryUuid = v?.UUID || null;
+                                            console.log('Inquiry UUID being set:', inquiryUuid);
+                                            setHeaderForm(s => ({ 
+                                                ...s, 
+                                                salesInquiry: inquiryNo
+                                            }));
+                                            setSalesInquiryUuid(inquiryUuid);
                                         } else {
                                             setHeaderForm(s => ({ ...s, salesInquiry: v }));
                                             setSalesInquiryUuid(null);
@@ -1346,6 +1413,21 @@ const AddSalesPerfomaInvoice = () => {
                                     textStyle={inputStyles.input}
                                 />
                             </View>
+                            {(headerEditable || route?.params?.prefillHeader || route?.params?.headerData) && (
+                                <View style={styles.col}>
+                                    <Text style={inputStyles.label}>Proforma Invoice No.</Text>
+                                    <View style={[inputStyles.box]} pointerEvents="box-none">
+                                        <TextInput
+                                            style={[inputStyles.input, { flex: 1, color: '#000000' }]}
+                                            value={headerForm.salesInquiryText || headerForm.PerformaInvoiceNo || headerForm.performaInvoiceNumber || ''}
+                                            placeholder="Auto-generated"
+                                            placeholderTextColor={COLORS.textLight}
+                                            editable={false}
+                                            pointerEvents="none"
+                                        />
+                                    </View>
+                                </View>
+                            )}
                         </View>
 
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
@@ -1367,9 +1449,12 @@ const AddSalesPerfomaInvoice = () => {
                                             getKey={p => (p?.UUID || p)}
                                             onSelect={v => {
                                                 if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
+                                                console.log('Purchase Order selected:', v);
                                                 if (v && typeof v === 'object') {
+                                                    const orderUuid = v?.UUID || v?.Id || null;
+                                                    console.log('Order UUID being set:', orderUuid);
                                                     setHeaderForm(s => ({ ...s, SalesOrderNo: v?.OrderNo || v?.PurchaseOrderNo || String(v) }));
-                                                    setPurchaseOrderUuid(v?.UUID || v?.Id || null);
+                                                    setPurchaseOrderUuid(orderUuid);
                                                 } else {
                                                     setHeaderForm(s => ({ ...s, SalesOrderNo: v }));
                                                     setPurchaseOrderUuid(null);
@@ -1396,8 +1481,11 @@ const AddSalesPerfomaInvoice = () => {
                                         getKey={c => (c?.UUID || c?.Id || c)}
                                         onSelect={v => {
                                             if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
+                                            console.log('Vendor selected:', v);
                                             if (v && typeof v === 'object') {
-                                                setHeaderForm(s => ({ ...s, CustomerName: v?.CustomerName || v?.Name || v, CustomerUUID: v?.UUID || v?.Id || null }));
+                                                const vendorUuid = v?.UUID || v?.Id || null;
+                                                console.log('Vendor UUID being set:', vendorUuid);
+                                                setHeaderForm(s => ({ ...s, CustomerName: v?.CustomerName || v?.Name || v, CustomerUUID: vendorUuid }));
                                             } else {
                                                 setHeaderForm(s => ({ ...s, CustomerName: v, CustomerUUID: null }));
                                             }
@@ -1613,7 +1701,7 @@ const AddSalesPerfomaInvoice = () => {
                                             getKey={it => (it?.uuid || it?.sku || it)}
                                             onSelect={v => {
                                                 if (v && typeof v === 'object') {
-                                                    setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.uuid || v?.UUID || v?.sku || null, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '' }));
+                                                    setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.uuid || v?.UUID || v?.sku || null, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '', hsn: v?.hsn || ci?.hsn || '' }));
                                                 } else {
                                                     setCurrentItem(ci => ({ ...ci, itemName: v, itemNameUuid: null }));
                                                 }
@@ -1625,18 +1713,33 @@ const AddSalesPerfomaInvoice = () => {
                                     </View>
                                 </View>
 
-                                {/* Description full width */}
-                                <View style={{ width: '100%', marginBottom: hp(1) }}>
-                                    <Text style={inputStyles.label}>Description</Text>
-                                    <TextInput
-                                        style={[styles.descInput, { minHeight: hp(10), width: '100%' }]}
-                                        value={currentItem.desc || ''}
-                                        onChangeText={t => setCurrentItem(ci => ({ ...ci, desc: t }))}
-                                        placeholder="Enter description"
-                                        placeholderTextColor={COLORS.textLight}
-                                        multiline
-                                        numberOfLines={3}
-                                    />
+                                {/* Description and HSN/SAC in a row */}
+                                <View style={[ {marginBottom: hp(1) }]}>
+                                    <View style={[{ width: '100%', marginBottom: hp(1) } ]}>
+                                        <Text style={inputStyles.label}>Description</Text>
+                                        <TextInput
+                                            style={[styles.descInput, { minHeight: hp(10), width: '100%' }]}
+                                            value={currentItem.desc || ''}
+                                            onChangeText={t => setCurrentItem(ci => ({ ...ci, desc: t }))}
+                                            placeholder="Enter description"
+                                            placeholderTextColor={COLORS.textLight}
+                                            multiline
+                                            numberOfLines={3}
+                                        />
+                                    </View>
+
+                                    <View style={{ width: '100%' }}>
+                                        <Text style={inputStyles.label}>HSN/SAC Code</Text>
+                                        <View style={[inputStyles.box, { marginTop: hp(0.5), width: '100%' }]}>
+                                            <TextInput
+                                                style={[inputStyles.input]}
+                                                value={currentItem.hsn || ''}
+                                                onChangeText={t => setCurrentItem(ci => ({ ...ci, hsn: t }))}
+                                                placeholder="HSN/SAC"
+                                                placeholderTextColor={COLORS.textLight}
+                                            />
+                                        </View>
+                                    </View>
                                 </View>
 
                                 {/* Two fields in one line: Quantity & Rate */}
@@ -1754,7 +1857,8 @@ const AddSalesPerfomaInvoice = () => {
                                                 return (
                                                     String(it.name || '').toLowerCase().includes(q) ||
                                                     String(it.itemType || '').toLowerCase().includes(q) ||
-                                                    String(it.desc || '').toLowerCase().includes(q)
+                                                    String(it.desc || '').toLowerCase().includes(q) ||
+                                                    String(it.hsn || '').toLowerCase().includes(q)
                                                 );
                                             }) : items;
                                             const total = filtered.length;
@@ -1771,12 +1875,13 @@ const AddSalesPerfomaInvoice = () => {
                                                     <View style={styles.thead}>
                                                         <View style={styles.tr}>
                                                             <Text style={[styles.th, { width: wp(10) }]}>Sr.No</Text>
-                                                            <Text style={[styles.th, { width: wp(30) }]}>Item Details</Text>
-                                                            <Text style={[styles.th, { width: wp(30) }]}>Description</Text>
-                                                            <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
-                                                            <Text style={[styles.th, { width: wp(20) }]}>Rate</Text>
-                                                            <Text style={[styles.th, { width: wp(20) }]}>Amount</Text>
-                                                            <Text style={[styles.th, { width: wp(40) }]}>Action</Text>
+                                                            <Text style={[styles.th, { width: wp(25) }]}>Item Details</Text>
+                                                            <Text style={[styles.th, { width: wp(25) }]}>Description</Text>
+                                                            <Text style={[styles.th, { width: wp(20) }]}>HSN/SAC</Text>
+                                                            <Text style={[styles.th, { width: wp(15) }]}>Quantity</Text>
+                                                            <Text style={[styles.th, { width: wp(15) }]}>Rate</Text>
+                                                            <Text style={[styles.th, { width: wp(15) }]}>Amount</Text>
+                                                            <Text style={[styles.th, { width: wp(35) }]}>Action</Text>
                                                         </View>
                                                     </View>
 
@@ -1786,22 +1891,25 @@ const AddSalesPerfomaInvoice = () => {
                                                                 <View style={[styles.td, { width: wp(10) }]}>
                                                                     <Text style={styles.tdText}>{start + idx + 1}</Text>
                                                                 </View>
-                                                                <View style={[styles.td, { width: wp(30), paddingLeft: wp(2) }]}>
+                                                                <View style={[styles.td, { width: wp(25), paddingLeft: wp(2) }]}>
                                                                     <Text style={styles.tdText}>{item.name}</Text>
                                                                 </View>
-                                                                <View style={[styles.td, { width: wp(30) }]}>
+                                                                <View style={[styles.td, { width: wp(25) }]}>
                                                                     <Text style={styles.tdText}>{item.desc}</Text>
                                                                 </View>
                                                                 <View style={[styles.td, { width: wp(20) }]}>
+                                                                    <Text style={[styles.tdText]}>{item.hsn || 'N/A'}</Text>
+                                                                </View>
+                                                                <View style={[styles.td, { width: wp(15) }]}>
                                                                     <Text style={styles.tdText}>{item.qty}</Text>
                                                                 </View>
-                                                                <View style={[styles.td, { width: wp(20) }]}>
+                                                                <View style={[styles.td, { width: wp(15) }]}>
                                                                     <Text style={styles.tdText}>₹{item.rate}</Text>
                                                                 </View>
-                                                                <View style={[styles.td, { width: wp(20) }]}>
+                                                                <View style={[styles.td, { width: wp(15) }]}>
                                                                     <Text style={[styles.tdText, { fontWeight: '600' }]}>₹{item.amount}</Text>
                                                                 </View>
-                                                                <View style={[styles.tdAction, { width: wp(40) }, { flexDirection: 'row', paddingLeft: wp(2) }]}>
+                                                                <View style={[styles.tdAction, { width: wp(35) }, { flexDirection: 'row', paddingLeft: wp(2) }]}>
                                                                     <TouchableOpacity style={styles.actionButton} onPress={() => handleEditItem(item.id)}>
                                                                         <Icon name="edit" size={rf(3.6)} color="#fff" />
                                                                     </TouchableOpacity>

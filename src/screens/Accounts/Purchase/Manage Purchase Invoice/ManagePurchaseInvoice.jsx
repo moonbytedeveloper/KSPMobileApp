@@ -1,11 +1,11 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
 import Dropdown from '../../../../components/common/Dropdown';
-import { getPurchaseInvoiceHeaders, deletePurchaseInvoiceHeader } from '../../../../api/authServices';
+import { getPurchaseInvoiceHeaders, deletePurchaseInvoiceHeader, getPurchaseInvoiceSlip } from '../../../../api/authServices';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
@@ -24,6 +24,7 @@ const ManagePurchaseInvoice = () => {
     const [orders, setOrders] = useState([]);
     const [totalCount, setTotalCount] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
     const totalPages = useMemo(() => {
         if (totalCount === 0) return 0;
@@ -80,6 +81,7 @@ const ManagePurchaseInvoice = () => {
                 HeaderUuid: headerCandidate,
                 HeaderUUID: headerCandidate,
                 UUID: headerCandidate,
+                prefillHeader: order,
                 from: 'ManagePurchaseInvoice',
             });
             return;
@@ -111,14 +113,55 @@ const ManagePurchaseInvoice = () => {
             );
             return;
         }
+        if (actionLabel === 'Download') {
+            handleDownloadPDF(order);
+            return;
+        }
         Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber || headerCandidate}`);
+    };
+
+    const handleDownloadPDF = async (order) => {
+        try {
+            const headerUuid = order.HeaderUuid || order.HeaderUUID || order.Header_UUID || order.headerUuid || order.UUID || order.Uuid || order.Id || order.id;
+            if (!headerUuid) {
+                Alert.alert('Error', 'Header UUID not found');
+                return;
+            }
+
+            setIsGeneratingPDF(true);
+            const pdfBase64 = await getPurchaseInvoiceSlip({ headerUuid });
+            
+            console.log('📋 [handleDownloadPDF] PDF Base64 received:', !!pdfBase64);
+            console.log('📋 [handleDownloadPDF] PDF Base64 length:', pdfBase64?.length);
+            console.log('📋 [handleDownloadPDF] PDF Base64 starts with:', pdfBase64?.substring(0, 50));
+            
+            if (pdfBase64) {
+                const navigationParams = {
+                    pdfBase64,
+                    fileName: `Purchase_Invoice_${order.InvoiceNo || order.InvoiceNumber || headerUuid}.pdf`,
+                    opportunityTitle: order.InvoiceNo || order.InvoiceNumber || 'Purchase Invoice',
+                    companyName: order.VendorName || order.Vendor || '',
+                };
+                console.log('📋 [handleDownloadPDF] Navigation params:', navigationParams);
+                
+                // Navigate to FileViewerScreen with the PDF data
+                navigation.navigate('FileViewerScreen', navigationParams);
+            } else {
+                Alert.alert('Error', 'Failed to generate PDF');
+            }
+        } catch (error) {
+            console.error('PDF generation error:', error);
+            Alert.alert('Error', error.message || 'Failed to generate PDF');
+        } finally {
+            setIsGeneratingPDF(false);
+        }
     };
 
     const renderFooterActions = (order) => {
         const buttons = [
             { icon: 'delete-outline', label: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
             { icon: 'file-download', label: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
-            { icon: 'chat-bubble-outline', label: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
+            // { icon: 'chat-bubble-outline', label: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
             { icon: 'visibility', label: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
             { icon: 'edit', label: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316' },
         ];
@@ -131,9 +174,14 @@ const ManagePurchaseInvoice = () => {
                         key={`${safeKey}-${btn.icon}`}
                         activeOpacity={0.85}
                         style={[styles.cardActionBtn , { backgroundColor: btn.bg, borderColor: btn.border }]}
+                        disabled={btn.label === 'Download' && isGeneratingPDF}
                         onPress={() => handleQuickAction(order, btn.label)}
                     >
-                        <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
+                        {btn.label === 'Download' && isGeneratingPDF ? (
+                            <ActivityIndicator size="small" color={btn.color} />
+                        ) : (
+                            <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
+                        )}
                     </TouchableOpacity>
                 ))}
             </View>
@@ -239,7 +287,7 @@ const ManagePurchaseInvoice = () => {
                                 { label: 'Order Date', value: orderDate },
                                 { label: 'Total Amount', value: order.TotalAmount || order.Total || order.Amount || '' },
                             ]}
-                            headerLeftLabel="Project"
+                            headerLeftLabel="Project Name"
                             headerRightLabel="Purchase Invoice Number"
                             footerComponent={renderFooterActions(order)}
                             headerRightContainerStyle={styles.headerRightContainer}

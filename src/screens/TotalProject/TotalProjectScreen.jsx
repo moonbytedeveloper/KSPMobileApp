@@ -87,6 +87,7 @@ const TotalProjectScreen = ({ navigation }) => {
     }
   }, [currentPage, itemsPerPage, searchValue]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchPage(0, itemsPerPage, false);
     onRefresh.current = () => {

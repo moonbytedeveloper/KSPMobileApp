@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
 import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
-import { getPurchasePerformaInvoiceHeaders, deletePurchasePerformaInvoiceHeader } from '../../../../api/authServices';
+import { getPurchasePerformaInvoiceHeaders, deletePurchasePerformaInvoiceHeader, getPurchasePerformaInvoiceSlip, convertPurchasePerformaToInvoice } from '../../../../api/authServices';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 
 const SALES_ORDERS = [
@@ -84,6 +84,7 @@ const ViewPerfomaPurchaseInvoice = () => {
     const [orders, setOrders] = useState([]);
     const [totalCount, setTotalCount] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
     // Orders are fetched from API; filtering/search handled server-side via `searchQuery` param
     const filteredOrders = orders || [];
@@ -147,11 +148,41 @@ const ViewPerfomaPurchaseInvoice = () => {
         Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber}`);
     };
 
+    const handleDownloadPDF = async (order) => {
+        try {
+            const headerUuid = order.UUID || order.HeaderUUID || order.PerformaInvoiceHeaderUUID || order.id;
+            if (!headerUuid) {
+                Alert.alert('Error', 'Header UUID not found');
+                return;
+            }
+
+            setIsGeneratingPDF(true);
+            const pdfBase64 = await getPurchasePerformaInvoiceSlip({ headerUuid });
+            
+            if (pdfBase64) {
+                // Navigate to FileViewerScreen with the PDF data
+                navigation.navigate('FileViewerScreen', {
+                    pdfBase64,
+                    fileName: `Purchase_Performa_Invoice_${order.PerformaInvoiceNumber || order.HeaderNumber || headerUuid}.pdf`,
+                    opportunityTitle: order.PerformaInvoiceNumber || order.HeaderNumber || 'Purchase Performa Invoice',
+                    companyName: order.VendorName || order.SupplierName || order.CustomerName || '',
+                });
+            } else {
+                Alert.alert('Error', 'Failed to generate PDF');
+            }
+        } catch (error) {
+            console.error('PDF generation error:', error);
+            Alert.alert('Error', error.message || 'Failed to generate PDF');
+        } finally {
+            setIsGeneratingPDF(false);
+        }
+    };
+
     const renderFooterActions = (order) => {
         const buttons = [
             { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
             { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
-            // { icon: 'chat-bubble-outline', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
+            { icon: 'logout', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
             { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
             { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316' },
         ];
@@ -163,6 +194,7 @@ const ViewPerfomaPurchaseInvoice = () => {
                         key={`${order.UUID || order.HeaderUUID || order.id || JSON.stringify(order)}-${btn.icon}`}
                         activeOpacity={0.85}
                         style={[styles.cardActionBtn , { backgroundColor: btn.bg, borderColor: btn.border }]}
+                        disabled={btn.action === 'Download' && isGeneratingPDF}
                         onPress={() => {
                             if (btn.action === 'Edit') {
                                 try {
@@ -208,10 +240,57 @@ const ViewPerfomaPurchaseInvoice = () => {
                                 return;
                             }
 
+                            if (btn.action === 'Download') {
+                                handleDownloadPDF(order);
+                                return;
+                            }
+
+                            if (btn.action === 'Forward') {
+                                // Convert performa to invoice when Forward is clicked
+                                const headerUuid = order.UUID || order.HeaderUUID || order.PerformaInvoiceHeaderUUID || order.id;
+                                Alert.alert(
+                                    'Convert to Invoice',
+                                    'Do you want to convert this performa to invoice?',
+                                    [
+                                        { text: 'Cancel', style: 'cancel' },
+                                        {
+                                            text: 'Convert',
+                                            onPress: async () => {
+                                                try {
+                                                    console.log('ViewPerfomaPurchaseInvoice -> converting performa to invoice ->', headerUuid);
+                                                    const response = await convertPurchasePerformaToInvoice({ performaUuid: headerUuid });
+                                                    
+                                                    // Show success message from API
+                                                    const successMessage = response?.Message || response?.message || 'Performa converted to invoice successfully';
+                                                    Alert.alert('Success', successMessage);
+                                                    
+                                                    // Optionally navigate to invoice screen with new invoice UUID
+                                                    const newInvoiceUuid = response?.Data?.headerUUID || response?.Data?.HeaderUUID || response?.Data?.UUID || response?.headerUUID || response?.HeaderUUID || response?.UUID;
+                                                    if (newInvoiceUuid) {
+                                                        console.log('ViewPerfomaPurchaseInvoice -> New Invoice UUID from conversion:', newInvoiceUuid);
+                                                        // Navigate to ManagePurchaseInvoice with the headerUuid
+                                                        navigation.navigate('AddPurchaseInvoice', { headerUuid: newInvoiceUuid });
+                                                    }
+                                                    
+                                                } catch (err) {
+                                                    console.error('Failed to convert performa', err);
+                                                    Alert.alert('Error', err?.message || 'Failed to convert performa to invoice');
+                                                }
+                                            }
+                                        }
+                                    ]
+                                );
+                                return;
+                            }
+
                             handleQuickAction(order, btn.action);
                         }}
                     >
-                        <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
+                        {btn.action === 'Download' && isGeneratingPDF ? (
+                            <ActivityIndicator size="small" color={btn.color} />
+                        ) : (
+                            <Icon name={btn.icon} size={rf(3.8)} color={btn.color} />
+                        )}
                     </TouchableOpacity>
                 ))}
             </View>
@@ -292,7 +371,7 @@ const ViewPerfomaPurchaseInvoice = () => {
                 {paginatedOrders.map((order) => {
                     const id = order.HeaderUUID || order.UUID || order.id || order.headerUuid || order.HeaderId || order.Id || (order.PerformaInvoiceHeaderUUID || null);
                     const salesOrderNumber = order.SalesOrderNumber || order.PurchaseOrderNumber || order.HeaderNumber || order.DocumentNo || order.Code || order.salesOrderNumber || '';
-                    const customerName = order.VendorName || order.SupplierName || order.CustomerName || order.PartyName || order.customerName || '';
+                    const customerName = order.VendorName || order.SupplierName || order.CustomerName || order.PartyName || order.customerName || order?.VendorUUID || order.CustomerUUID || '';
                     const deliveryDate = order.DeliveryDate || order.DueDate || order.deliveryDate || '';
                     const performaInvoiceNumber = order.PerformaInvoiceNumber || order.PerformaInvoiceNo || order.PerformaInvoice || order.performaInvoiceNumber || '';
                     const amount = order.GrandTotal || order.Amount || order.Total || order.amount || '';
@@ -309,7 +388,7 @@ const ViewPerfomaPurchaseInvoice = () => {
                                 soleExpenseCode: id,
                                 // Show project name in the left header; fallback to purchase order no.
                                 expenseName: projectName || PurchaseOrderNo,
-                                amount: invoiceNo,
+                                amount: order.TotalAmount || order.GrandTotal || order.Amount || order.Total || amount || '0',
                             }}
                             isActive={activeOrderId === id}
                             onToggle={() => setActiveOrderId((prev) => (prev === id ? null : id))}
@@ -319,7 +398,7 @@ const ViewPerfomaPurchaseInvoice = () => {
                                 { label: 'Order Date', value: orderDate },
                             ]}
                             headerLeftLabel="Project"
-                            headerRightLabel="Perfoma Invoice No."
+                            headerRightLabel="Amount"
                             footerComponent={renderFooterActions(order)}
                             headerRightContainerStyle={styles.headerRightContainer}
                         />
