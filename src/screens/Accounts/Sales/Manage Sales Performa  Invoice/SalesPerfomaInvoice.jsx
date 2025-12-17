@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
@@ -9,7 +9,7 @@ import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles'; 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
-import { getSalesPerformaInvoiceHeaders, deleteSalesPerformaInvoiceHeader, getSalesPerformaInvoiceSlip, convertSalesPerformaToInvoice } from '../../../../api/authServices';
+import { getSalesPerformaInvoiceHeaders, deleteSalesPerformaInvoiceHeader, getSalesPerformaInvoiceSlip, convertSalesPerformaToInvoice, getSalesProformaRelatedDocuments, getSalesOrderSlip, getSalesInvoiceSlip } from '../../../../api/authServices';
 
 const SalesPerfomaInvoice = () => {
     const navigation = useNavigation();
@@ -48,7 +48,7 @@ const SalesPerfomaInvoice = () => {
             const resp = await getSalesPerformaInvoiceHeaders({ cmpUuid: cmp, envUuid: env, start, length: pageSize, searchValue: q });
             const data = resp?.Data || resp || {};
             const records = Array.isArray(data?.Records) ? data.Records : (Array.isArray(data) ? data : []);
-            // normalize server records into UI items
+                // normalize server records into UI items
             const normalized = records.map((r, idx) => ({
                 id: r?.UUID || r?.Id || `pi-${start + idx + 1}`,
                 // Prefer SalesOrderNo, fallback to SalesInqNo or other order/inquiry identifiers
@@ -219,6 +219,15 @@ const SalesPerfomaInvoice = () => {
             }
         }
 
+        if (actionLabel === 'View') {
+            try {
+                await openRelatedDocuments(order);
+            } catch (e) {
+                console.warn('openRelatedDocuments failed', e);
+                Alert.alert('Error', 'Unable to open related documents');
+            }
+        }
+
     };
 
     const renderFooterActions = (order) => {
@@ -249,6 +258,99 @@ const SalesPerfomaInvoice = () => {
                 ))}
             </View>
         );
+    };
+
+    // Related documents bottom sheet state and fetch
+    const [relatedDocsModalVisible, setRelatedDocsModalVisible] = useState(false);
+    const [relatedDocsLoading, setRelatedDocsLoading] = useState(false);
+    const [relatedDocsData, setRelatedDocsData] = useState({ SalesOrders: [], SalesInvoices: [] });
+
+    const openRelatedDocuments = async (order) => {
+        try {
+            setRelatedDocsData({ SalesOrders: [], SalesInvoices: [] });
+            setRelatedDocsLoading(true);
+            setRelatedDocsModalVisible(true);
+            await fetchRelatedDocuments(order);
+        } catch (e) {
+            console.warn('openRelatedDocuments error', e);
+            setRelatedDocsModalVisible(false);
+            Alert.alert('Error', 'Unable to load related documents');
+        } finally {
+            setRelatedDocsLoading(false);
+        }
+    };
+
+    const fetchRelatedDocuments = async (order) => {
+        try {
+            const salesProformaUuid = order?.raw?.UUID || order?.id || '';
+            if (!salesProformaUuid) {
+                console.warn('fetchRelatedDocuments: no salesProformaUuid');
+                setRelatedDocsData({ SalesOrders: [], SalesInvoices: [] });
+                return;
+            }
+            const cmp = await getCMPUUID();
+            const env = await getENVUUID();
+            const resp = await getSalesProformaRelatedDocuments({ salesProformaUuid, cmpUuid: cmp, envUuid: env });
+            const data = resp?.Data || resp || {};
+            setRelatedDocsData({ SalesOrders: Array.isArray(data?.SalesOrders) ? data.SalesOrders : [], SalesInvoices: Array.isArray(data?.SalesInvoices) ? data.SalesInvoices : [] });
+        } catch (e) {
+            console.warn('fetchRelatedDocuments error', e?.message || e);
+            setRelatedDocsData({ SalesOrders: [], SalesInvoices: [] });
+        }
+    };
+
+    const handleOpenSalesOrderSlip = async (so) => {
+        try {
+            if (!so) return;
+            setIsGeneratingPDF(true);
+            const headerUuid = so?.UUID || so?.Uuid || so?.SalesOrderUUID || so?.SalesOrderId || so?.Id || so?.id || '';
+            if (!headerUuid) {
+                Alert.alert('Error', 'Unable to determine Sales Order identifier');
+                return;
+            }
+            const cmp = await getCMPUUID();
+            const env = await getENVUUID();
+            const user = await getUUID();
+            const pdfBase64 = await getSalesOrderSlip({ headerUuid, cmpUuid: cmp, envUuid: env, userUuid: user });
+            if (!pdfBase64) {
+                Alert.alert('Error', 'No PDF returned for Sales Order');
+                return;
+            }
+            const fileName = `SalesOrder_${so?.SalesOrderNo || headerUuid}`;
+            navigation.navigate('FileViewerScreen', { pdfBase64, fileName });
+        } catch (e) {
+            console.warn('open sales order slip error', e);
+            Alert.alert('Error', e?.message || 'Unable to open sales order PDF');
+        } finally {
+            setIsGeneratingPDF(false);
+        }
+    };
+
+    const handleOpenSalesInvoiceSlip = async (inv) => {
+        try {
+            if (!inv) return;
+            setIsGeneratingPDF(true);
+            const headerUuid = inv?.UUID || inv?.Uuid || inv?.SalesInvoiceUUID || inv?.SalesInvoiceId || inv?.Id || inv?.id || '';
+            if (!headerUuid) {
+                Alert.alert('Error', 'Unable to determine Sales Invoice identifier');
+                return;
+            }
+            const cmp = await getCMPUUID();
+            const env = await getENVUUID();
+            const user = await getUUID();
+            const pdfBase64 = await getSalesInvoiceSlip({ headerUuid, cmpUuid: cmp, envUuid: env, userUuid: user });
+            if (!pdfBase64) {
+                Alert.alert('Error', 'No PDF returned for Sales Invoice');
+                return;
+            }
+            const fileName = `SalesInvoice_${inv?.SalesInvoiceNo || headerUuid}`;
+            navigation.navigate('FileViewerScreen', { pdfBase64, fileName });
+        } catch (e) {
+            console.warn('open sales invoice slip error', e);
+            Alert.alert('Error', e?.message || 'Unable to open sales invoice PDF');
+        } finally {
+            setIsGeneratingPDF(false);
+        }
     };
 
     const pageItems = useMemo(() => {
@@ -431,6 +533,55 @@ const SalesPerfomaInvoice = () => {
                     </View>
                 </View>
             )}
+            {/* Related Documents Modal */}
+            <Modal visible={relatedDocsModalVisible} transparent animationType="slide" onRequestClose={() => setRelatedDocsModalVisible(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalBox}>
+                        <View style={styles.modalHeaderRow}>
+                            <Text style={[styles.modalTitle, { fontWeight: '700', marginVertical: hp(1) }]}>Sales Performa Documents</Text>
+                            <TouchableOpacity onPress={() => setRelatedDocsModalVisible(false)} style={{ padding: wp(1.2) }}>
+                                <Icon name="close" size={rf(3.6)} color={COLORS.text} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={[styles.modalBody, { paddingBottom: hp(2) }]}>
+                            {relatedDocsLoading && (
+                                <View style={{ paddingVertical: hp(2), alignItems: 'center' }}>
+                                    <ActivityIndicator />
+                                </View>
+                            )}
+
+                            {!relatedDocsLoading && (
+                                <View>
+                                    <Text style={{ fontWeight: '600', color: COLORS.textMuted, marginBottom: hp(1) }}>Sales Orders</Text>
+                                    {Array.isArray(relatedDocsData.SalesOrders) && relatedDocsData.SalesOrders.length > 0 ? (
+                                        relatedDocsData.SalesOrders.map((o, i) => (
+                                            <TouchableOpacity key={`so-${i}`} onPress={() => handleOpenSalesOrderSlip(o)} style={{ paddingVertical: hp(0.6) }}>
+                                                <Text style={{ color: COLORS.primary }}>{o.SalesOrderNo} - Date: {o.SalesOrderDate}</Text>
+                                            </TouchableOpacity>
+                                        ))
+                                    ) : (
+                                        <Text style={{ color: COLORS.textLight }}>No sales orders found</Text>
+                                    )}
+
+                                    <View style={{ height: hp(1) }} />
+
+                                    <Text style={{ fontWeight: '600', color: COLORS.textMuted, marginBottom: hp(1) }}>Sales Invoices</Text>
+                                    {Array.isArray(relatedDocsData.SalesInvoices) && relatedDocsData.SalesInvoices.length > 0 ? (
+                                        relatedDocsData.SalesInvoices.map((inv, j) => (
+                                            <TouchableOpacity key={`si-${j}`} onPress={() => handleOpenSalesInvoiceSlip(inv)} style={{ paddingVertical: hp(0.6) }}>
+                                                <Text style={{ color: COLORS.text }}>{inv.SalesInvoiceNo || inv.InvoiceNo || inv.SalesInvNo || '—'}</Text>
+                                            </TouchableOpacity>
+                                        ))
+                                    ) : (
+                                        <Text style={{ color: COLORS.textLight }}>No sales invoices found</Text>
+                                    )}
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
@@ -609,6 +760,34 @@ const styles = StyleSheet.create({
         fontSize: rf(3),
         paddingHorizontal: wp(4),
         marginBottom: hp(1),
+    },
+    modalOverlay: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        backgroundColor: 'rgba(0,0,0,0.4)',
+    },
+    modalBox: {
+        backgroundColor: '#fff',
+        width: '100%',
+        borderTopLeftRadius: wp(4),
+        borderTopRightRadius: wp(4),
+        paddingHorizontal: wp(4),
+        paddingTop: hp(1.2),
+        paddingBottom: hp(3),
+        maxHeight: hp(70),
+    },
+    modalHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    modalTitle: {
+        fontSize: rf(3.6),
+        color: COLORS.text,
+        fontFamily: TYPOGRAPHY.fontFamilyBold,
+    },
+    modalBody: {
+        marginTop: hp(1),
     },
 });
 

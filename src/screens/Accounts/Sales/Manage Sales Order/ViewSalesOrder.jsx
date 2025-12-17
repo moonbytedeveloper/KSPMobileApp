@@ -7,7 +7,8 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
-import { getSalesOrderHeaders, getSalesHeader, deleteSalesOrderHeader, getSalesOrderSlip, convertSalesOrderToInvoice } from '../../../../api/authServices';
+import { getSalesOrderHeaders, getSalesHeader, deleteSalesOrderHeader, getSalesOrderSlip, convertSalesOrderToInvoice, getSalesOrderRelatedDocuments, getSalesInvoiceSlip, getSalesPerformaInvoiceSlip } from '../../../../api/authServices';
+import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
 
 // sales orders will be fetched from API
 
@@ -24,6 +25,9 @@ const ViewSalesOrder = () => {
     const [loading, setLoading] = useState(false);
     const [isFetchingHeader, setIsFetchingHeader] = useState(false);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+    const [orderRelatedModalVisible, setOrderRelatedModalVisible] = useState(false);
+    const [orderRelatedLoading, setOrderRelatedLoading] = useState(false);
+    const [orderRelatedData, setOrderRelatedData] = useState({ SalesInvoices: [], ProformaInvoices: [] });
 
     const filteredOrders = useMemo(() => {
         const query = searchQuery.trim().toLowerCase();
@@ -92,8 +96,92 @@ const ViewSalesOrder = () => {
                 const errorMessage = error?.message || 'Unable to convert sales order to invoice. Please try again.';
                 Alert.alert('Conversion Failed', errorMessage);
             }
+        } else if (actionLabel === 'View') {
+            try {
+                setOrderRelatedData({ SalesInvoices: [], ProformaInvoices: [] });
+                setOrderRelatedLoading(true);
+                setOrderRelatedModalVisible(true);
+                await fetchSalesOrderRelatedDocuments(order);
+            } catch (e) {
+                console.warn('openOrderRelated error', e);
+                setOrderRelatedModalVisible(false);
+                Alert.alert('Error', 'Unable to load related documents');
+            } finally {
+                setOrderRelatedLoading(false);
+            }
         } else {
             Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber}`);
+        }
+    };
+
+    const fetchSalesOrderRelatedDocuments = async (order) => {
+        try {
+            const salesOrderUuid = order?.raw?.UUID || order?.id || order?.UUID || '';
+            if (!salesOrderUuid) {
+                console.warn('fetchSalesOrderRelatedDocuments: no sales order UUID');
+                setOrderRelatedData({ SalesInvoices: [], ProformaInvoices: [] });
+                return;
+            }
+            const cmp = await getCMPUUID();
+            const env = await getENVUUID();
+            const resp = await getSalesOrderRelatedDocuments({ salesOrderUuid, cmpUuid: cmp, envUuid: env });
+            const data = resp?.Data || resp || {};
+            setOrderRelatedData({ SalesInvoices: Array.isArray(data?.SalesInvoices) ? data.SalesInvoices : [], ProformaInvoices: Array.isArray(data?.ProformaInvoices) ? data.ProformaInvoices : [] });
+        } catch (e) {
+            console.warn('fetchSalesOrderRelatedDocuments error', e?.message || e);
+            setOrderRelatedData({ SalesInvoices: [], ProformaInvoices: [] });
+        }
+    };
+
+    const handleOpenSalesInvoiceSlip = async (si) => {
+        try {
+            setIsGeneratingPDF(true);
+            const headerUuid = si?.UUID || si?.Uuid || si?.HeaderUUID || si?.SalesInvoiceUUID || si?.Id || '';
+            if (!headerUuid) {
+                Alert.alert('Error', 'Unable to determine Sales Invoice identifier');
+                return;
+            }
+            const cmp = await getCMPUUID();
+            const env = await getENVUUID();
+            const user = await getUUID();
+            const pdfBase64 = await getSalesInvoiceSlip({ headerUuid, cmpUuid: cmp, envUuid: env, userUuid: user });
+            if (!pdfBase64) {
+                Alert.alert('Error', 'No PDF returned for Sales Invoice');
+                return;
+            }
+            const fileName = `SalesInvoice_${si?.DocumentNumber || si?.SalesInvoiceNo || headerUuid}`;
+            navigation.navigate('FileViewerScreen', { pdfBase64, fileName });
+        } catch (e) {
+            console.warn('open sales invoice slip error', e);
+            Alert.alert('Error', e?.message || 'Unable to open sales invoice PDF');
+        } finally {
+            setIsGeneratingPDF(false);
+        }
+    };
+
+    const handleOpenProformaSlip = async (pf) => {
+        try {
+            setIsGeneratingPDF(true);
+            const headerUuid = pf?.UUID || pf?.Uuid || pf?.HeaderUUID || pf?.SalesPerInvUUID || pf?.Id || '';
+            if (!headerUuid) {
+                Alert.alert('Error', 'Unable to determine Proforma identifier');
+                return;
+            }
+            const cmp = await getCMPUUID();
+            const env = await getENVUUID();
+            const user = await getUUID();
+            const pdfBase64 = await getSalesPerformaInvoiceSlip({ headerUuid, cmpUuid: cmp, envUuid: env, userUuid: user });
+            if (!pdfBase64) {
+                Alert.alert('Error', 'No PDF returned for Proforma');
+                return;
+            }
+            const fileName = `SalesProforma_${pf?.DocumentNumber || pf?.SalesPerInvNo || headerUuid}`;
+            navigation.navigate('FileViewerScreen', { pdfBase64, fileName });
+        } catch (e) {
+            console.warn('open proforma slip error', e);
+            Alert.alert('Error', e?.message || 'Unable to open proforma PDF');
+        } finally {
+            setIsGeneratingPDF(false);
         }
     };
 
@@ -598,6 +686,25 @@ const styles = StyleSheet.create({
         paddingHorizontal: wp(5),
         fontFamily: TYPOGRAPHY.fontFamilyRegular,
     },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalBox: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: wp(3),
+        borderTopRightRadius: wp(3),
+        padding: wp(4),
+        maxHeight: hp(85),
+    },
+    modalHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    modalTitle: { fontSize: rf(3.6), fontWeight: '700', color: COLORS.text },
+    modalBody: { marginTop: hp(1) },
 });
 
 export default ViewSalesOrder;

@@ -505,12 +505,17 @@ const AddSalesPerfomaInvoice = () => {
                         const rate = (l?.Rate ?? l?.RateAmount ?? l?.Price ?? 0);
                         const hsn = l?.HSNCode || l?.HSN || l?.hsn || l?.HSNSACNO || '-';
                         const amount = (l?.Amount ?? l?.Total ?? (Number(qty || 0) * Number(rate || 0)));
+                        // capture employee fields if server returned them
+                        const employeeName = l?.EmployeeName || l?.Employee || l?.AssignedTo || '';
+                        const employeeUuid = l?.EmployeeUUID || l?.EmployeeId || l?.EmployeeUuid || null;
                         return {
                             id: idx + 1,
                             selectedItem: null,
                             name: l?.ItemName || l?.Name || l?.Item || l?.ItemTitle || String(l?.RawItem || '') || '',
                             sku: l?.ItemCode || l?.SKU || l?.Sku || null,
                             itemUuid: l?.ItemUUID || l?.ItemId || l?.Item || null,
+                            employeeName: employeeName || '',
+                            employeeUuid: employeeUuid || null,
                             rate: String(rate ?? 0),
                             desc: l?.Description || l?.Desc || '',
                             hsn: hsn || '-',
@@ -1190,7 +1195,7 @@ const AddSalesPerfomaInvoice = () => {
             const description = currentItem.desc || '';
 
             // If editing an existing line
-            if (editItemId) {
+                    if (editItemId) {
                 const existing = items.find(x => x.id === editItemId);
                 if (!existing) {
                     Alert.alert('Error', 'Line to edit not found');
@@ -1200,28 +1205,29 @@ const AddSalesPerfomaInvoice = () => {
                 const payload = {
                     UUID: existing.serverLineUuid || '',
                     HeaderUUID: headerUUID,
-                    ItemUUID: currentItem.itemNameUuid || null,
+                    ItemUUID: selectedProjectData?.IsTimesheetBased ? (currentItem.employeeUuid || null) : (currentItem.itemNameUuid || null),
                     Quantity: qty,
                     Rate: rate,
                     Description: description,
                     HSNSACNO: currentItem.hsn || '',
-                    // Pass assigned employee data when available
-                    EmployeeUUID: currentItem.employeeUuid || null,
-                    EmployeeUuid: currentItem.employeeUuid || null,
-                    EmployeeName: currentItem.employeeName || '',
                 };
+console.log(payload,'0909');
 
                 // If serverLineUuid exists, call update API, otherwise just update locally
-                if (existing.serverLineUuid) {
+                    if (existing.serverLineUuid) {
                     const resp = await updateSalesPerformaInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
                     console.log('update line resp ->', resp);
                     const updatedLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || existing.serverLineUuid;
-                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid }) : it));
+                    const nameVal = selectedProjectData?.IsTimesheetBased ? (currentItem.employeeName || '') : (currentItem.itemName || '');
+                    const uuidVal = selectedProjectData?.IsTimesheetBased ? (currentItem.employeeUuid || currentItem.itemNameUuid || null) : (currentItem.itemNameUuid || null);
+                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: nameVal, employeeName: currentItem.employeeName || '', employeeUuid: currentItem.employeeUuid || null, sku: uuidVal || null, itemUuid: uuidVal || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid }) : it));
                     // refresh header totals from server after update
                     await refreshHeaderTotals(headerUUID);
                 } else {
                     // local-only line - update in state
-                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate) }) : it));
+                    const nameVal = selectedProjectData?.IsTimesheetBased ? (currentItem.employeeName || '') : (currentItem.itemName || '');
+                    const uuidVal = selectedProjectData?.IsTimesheetBased ? (currentItem.employeeUuid || currentItem.itemNameUuid || null) : (currentItem.itemNameUuid || null);
+                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: nameVal, employeeName: currentItem.employeeName || '', employeeUuid: currentItem.employeeUuid || null, sku: uuidVal || null, itemUuid: uuidVal || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate) }) : it));
                     // Clear serverTotalAmount so UI will compute Total Amount from local subtotal
                     setServerTotalAmount('');
                 }
@@ -1234,15 +1240,11 @@ const AddSalesPerfomaInvoice = () => {
                 const payload = {
                     UUID: '', // empty to create new line on server
                     HeaderUUID: headerUUID,
-                    ItemUUID: currentItem.itemNameUuid || null,
+                    ItemUUID: selectedProjectData?.IsTimesheetBased ? (currentItem.employeeUuid || null) : (currentItem.itemNameUuid || null),
                     Quantity: qty,
                     Rate: rate,
                     Description: description,
                     HSNSACNO: currentItem.hsn || '',
-                    // include selected employee for timesheet-based projects
-                    EmployeeUUID: currentItem.employeeUuid || null,
-                    EmployeeUuid: currentItem.employeeUuid || null,
-                    EmployeeName: currentItem.employeeName || '',
                 };
 
                 console.log('Posting line payload ->', payload);
@@ -1252,7 +1254,9 @@ const AddSalesPerfomaInvoice = () => {
                 // on success, update local items list (assign local id and keep server uuid if returned)
                 const nextId = items.length ? (items[items.length - 1].id + 1) : 1;
                 const serverLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || null;
-                setItems(prev => ([...prev, { id: nextId, selectedItem: null, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), tax: 'IGST', amount: computeAmount(qty, rate), serverLineUuid }]));
+                const nameVal = selectedProjectData?.IsTimesheetBased ? (currentItem.employeeName || '') : (currentItem.itemName || '');
+                const uuidVal = selectedProjectData?.IsTimesheetBased ? (currentItem.employeeUuid || currentItem.itemNameUuid || null) : (currentItem.itemNameUuid || null);
+                setItems(prev => ([...prev, { id: nextId, selectedItem: null, name: nameVal, employeeName: currentItem.employeeName || '', employeeUuid: currentItem.employeeUuid || null, sku: uuidVal || null, itemUuid: uuidVal || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), tax: 'IGST', amount: computeAmount(qty, rate), serverLineUuid }]));
 
                 // reset line form
                 setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
@@ -1270,7 +1274,20 @@ const AddSalesPerfomaInvoice = () => {
     const handleEditItem = id => {
         const it = items.find(x => x.id === id);
         if (!it) return;
-        setCurrentItem({ itemType: it.itemType || '', itemTypeUuid: it.itemTypeUuid || null, itemName: it.name || '', itemNameUuid: it.itemUuid || it.sku || null, quantity: it.qty || '1', unit: it.unit || '', unitUuid: it.unitUuid || null, desc: it.desc || '', hsn: it.hsn || '', rate: it.rate || '' });
+        setCurrentItem({
+            itemType: it.itemType || '',
+            itemTypeUuid: it.itemTypeUuid || null,
+            itemName: it.name || '',
+            itemNameUuid: it.itemUuid || it.sku || null,
+            quantity: it.qty || '1',
+            unit: it.unit || '',
+            unitUuid: it.unitUuid || null,
+            desc: it.desc || '',
+            hsn: it.hsn || '',
+            rate: it.rate || '',
+            employeeName: it.employeeName || '',
+            employeeUuid: it.employeeUuid || null,
+        });
         setEditItemId(id);
     };
 
@@ -1646,7 +1663,7 @@ const AddSalesPerfomaInvoice = () => {
                                             setProject(v?.ProjectTitle || v?.Name || String(v));
                                             setProjectUUID(v?.Uuid || v?.UUID || v?.Id || null);
                                             setSelectedProjectData(v);
-                                            // Clear start/end dates if project is not timesheet-based
+                                            // Clear from/to dates if project is not timesheet-based
                                             if (!v?.IsTimesheetBased) {
                                                 setStartDate('');
                                                 setEndDate('');
@@ -1670,7 +1687,7 @@ const AddSalesPerfomaInvoice = () => {
                                     style={{ marginTop: hp(0.8), opacity: headerEditable ? 1 : 0.6 }}
                                     disabled={!headerEditable}
                                 >
-                                    <Text style={inputStyles.label}>Start Date</Text>
+                                    <Text style={inputStyles.label}>From Date</Text>
 
                                     <View
                                         style={[
@@ -1694,7 +1711,7 @@ const AddSalesPerfomaInvoice = () => {
                                                 },
                                             ]}
                                         >
-                                            {startDate || 'Start Date'}
+                                            {startDate || 'From Date'}
                                         </Text>
                                         <View
                                             style={[
@@ -1718,7 +1735,7 @@ const AddSalesPerfomaInvoice = () => {
                                     style={{ marginTop: hp(0.8), opacity: headerEditable ? 1 : 0.6 }}
                                     disabled={!headerEditable}
                                 >
-                                    <Text style={inputStyles.label}>End Date</Text>
+                                    <Text style={inputStyles.label}>To Date</Text>
 
                                     <View
                                         style={[
@@ -1742,7 +1759,7 @@ const AddSalesPerfomaInvoice = () => {
                                                 },
                                             ]}
                                         >
-                                            {endDate || 'End Date'}
+                                            {endDate || 'To Date'}
                                         </Text>
                                         <View
                                             style={[
@@ -2231,10 +2248,10 @@ const AddSalesPerfomaInvoice = () => {
                                                     <View style={styles.thead}>
                                                         <View style={styles.tr}>
                                                             <Text style={[styles.th, { width: wp(10) }]}>Sr.No</Text>
-                                                            <Text style={[styles.th, { width: wp(30) }]}>Item Details</Text>
+                                                            <Text style={[styles.th, { width: wp(30) }]}>{selectedProjectData?.IsTimesheetBased ? 'Employee' : 'Item Details'}</Text>
                                                             <Text style={[styles.th, { width: wp(30) }]}>Description</Text>
-                                                            <Text style={[styles.th, { width: wp(25) }]}>HSN/SAC</Text>
-                                                            <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
+                                                            {!selectedProjectData?.IsTimesheetBased && (<Text style={[styles.th, { width: wp(25) }]}>HSN/SAC</Text>)}
+                                                            <Text style={[styles.th, { width: wp(20) }]}>{selectedProjectData?.IsTimesheetBased ? 'Total Hours Worked' : 'Quantity'}</Text>
                                                             <Text style={[styles.th, { width: wp(20) }]}>Rate</Text>
                                                             <Text style={[styles.th, { width: wp(20) }]}>Amount</Text>
                                                             <Text style={[styles.th, { width: wp(40) }]}>Action</Text>
@@ -2247,18 +2264,20 @@ const AddSalesPerfomaInvoice = () => {
                                                                 <View style={[styles.td, { width: wp(10) }]}>
                                                                     <Text style={styles.tdText}>{start + idx + 1}</Text>
                                                                 </View>
-                                                                <View style={[styles.td, { width: wp(30), paddingLeft: wp(2) }]}>
-                                                                    <Text style={styles.tdText}>{item.name}</Text>
-                                                                </View>
-                                                                <View style={[styles.td, { width: wp(30) }]}>
-                                                                    <Text style={styles.tdText}>{item.desc}</Text>
-                                                                </View>
-                                                                <View style={[styles.td, { width: wp(25) }]}>
-                                                                    <Text style={styles.tdText}>{item.hsn || '-'}</Text>
-                                                                </View>
-                                                                <View style={[styles.td, { width: wp(20) }]}>
-                                                                    <Text style={styles.tdText}>{item.qty}</Text>
-                                                                </View>
+                                                                    <View style={[styles.td, { width: wp(30), paddingLeft: wp(2) }]}>
+                                                                        <Text style={styles.tdText}>{selectedProjectData?.IsTimesheetBased ? (item.employeeName || item.name) : item.name}</Text>
+                                                                    </View>
+                                                                    <View style={[styles.td, { width: wp(30) }]}>
+                                                                        <Text style={styles.tdText}>{item.desc}</Text>
+                                                                    </View>
+                                                                    {!selectedProjectData?.IsTimesheetBased && (
+                                                                        <View style={[styles.td, { width: wp(25) }]}>
+                                                                            <Text style={styles.tdText}>{item.hsn || '-'}</Text>
+                                                                        </View>
+                                                                    )}
+                                                                    <View style={[styles.td, { width: wp(20) }]}>
+                                                                        <Text style={styles.tdText}>{item.qty}</Text>
+                                                                    </View>
                                                                 <View style={[styles.td, { width: wp(20) }]}>
                                                                     <Text style={styles.tdText}>₹{item.rate}</Text>
                                                                 </View>

@@ -1,6 +1,8 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal } from 'react-native';
+import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
+import { pick, types, isCancel } from '@react-native-documents/picker';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
@@ -10,7 +12,8 @@ import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
 import api from '../../../../api/axios';
-import { getSalesInvoiceHeaders, getSalesInvoiceSlip } from '../../../../api/authServices';
+import { getSalesInvoiceHeaders, getSalesInvoiceSlip, getSalesInvoicePaymentHistory, getSalesInvoiceRelatedDocuments, getSalesOrderSlip, getSalesPerformaInvoiceSlip } from '../../../../api/authServices';
+import { Linking } from 'react-native';
 
 // server-backed list state will be used instead of static sample data
 
@@ -84,7 +87,7 @@ const ManageSalesInvoice = () => {
     // Helper to extract server-side UUID from varied payload shapes
     const extractServerUuid = (raw) => {
         if (!raw) return '';
-        const keys = ['UUID','Uuid','uuid','Id','id','HeaderUUID','HeaderId','SalesInvoiceUUID','SalesInvoiceId','InvoiceUUID','InvoiceId','HeaderUuid','SalesInvUUID'];
+        const keys = ['UUID', 'Uuid', 'uuid', 'Id', 'id', 'HeaderUUID', 'HeaderId', 'SalesInvoiceUUID', 'SalesInvoiceId', 'InvoiceUUID', 'InvoiceId', 'HeaderUuid', 'SalesInvUUID'];
         for (const k of keys) {
             if (raw[k]) return raw[k];
         }
@@ -112,7 +115,7 @@ const ManageSalesInvoice = () => {
             const headerUuidCandidate = extractServerUuid(order?.raw) || order?.UUID || order?.id || '';
             console.log('🔍 [PDF Debug] headerUuidCandidate:', headerUuidCandidate);
             console.log('🔍 [PDF Debug] order.raw:', order?.raw);
-            
+
             if (!headerUuidCandidate) {
                 Alert.alert('Error', 'Unable to determine sales invoice identifier');
                 return;
@@ -121,30 +124,30 @@ const ManageSalesInvoice = () => {
             const cmp = await getCMPUUID();
             const env = await getENVUUID();
             const user = await getUUID();
-            
+
             console.log('🔍 [PDF Debug] API params:', { headerUuid: headerUuidCandidate, cmpUuid: cmp, envUuid: env, userUuid: user });
-            
+
             const pdfBase64 = await getSalesInvoiceSlip({
                 headerUuid: headerUuidCandidate,
                 cmpUuid: cmp,
                 envUuid: env,
                 userUuid: user,
             });
-            
+
             console.log('🔍 [PDF Debug] pdfBase64 length:', pdfBase64?.length || 0);
             console.log('🔍 [PDF Debug] pdfBase64 first 100 chars:', pdfBase64?.substring(0, 100));
-            
+
             if (!pdfBase64 || pdfBase64.length === 0) {
                 Alert.alert('Error', 'No PDF data received from server');
                 return;
             }
-            
+
             const invoiceNumber = order?.salesInvoiceNumber || 'Unknown';
             console.log('🔍 [PDF Debug] Navigating to FileViewerScreen with:', {
                 pdfBase64Length: pdfBase64.length,
                 fileName: `SalesInvoice_${invoiceNumber}`,
             });
-            
+
             navigation.navigate('FileViewerScreen', {
                 pdfBase64: pdfBase64,
                 fileName: `SalesInvoice_${invoiceNumber}`,
@@ -165,35 +168,37 @@ const ManageSalesInvoice = () => {
                 await handleDownloadInvoicePDF(order);
                 return;
             }
-            
+
             if (actionLabel === 'Delete') {
                 Alert.alert(
                     'Delete Sales Invoice',
                     'Are you sure you want to delete this sales invoice?',
                     [
                         { text: 'Cancel', style: 'cancel' },
-                        { text: 'Delete', style: 'destructive', onPress: async () => {
-                            try {
-                                const headerUuidCandidate = extractServerUuid(order?.raw) || order?.UUID || order?.id || '';
-                                if (!headerUuidCandidate) {
-                                    Alert.alert('Error', 'Unable to determine sales invoice identifier');
-                                    return;
+                        {
+                            text: 'Delete', style: 'destructive', onPress: async () => {
+                                try {
+                                    const headerUuidCandidate = extractServerUuid(order?.raw) || order?.UUID || order?.id || '';
+                                    if (!headerUuidCandidate) {
+                                        Alert.alert('Error', 'Unable to determine sales invoice identifier');
+                                        return;
+                                    }
+                                    const cmp = await getCMPUUID();
+                                    const env = await getENVUUID();
+                                    const user = await getUUID();
+                                    const params = { uuid: headerUuidCandidate, cmpUuid: cmp, envUuid: env, userUuid: user };
+                                    const PATH = '/api/Account/DeleteSalesInvoiceHeader';
+                                    const resp = await api.delete(PATH, { params });
+                                    console.log('deleteSalesInvoiceHeader resp ->', resp && resp.status, resp?.data);
+                                    // refresh the list after deletion
+                                    await fetchSalesInvoices(currentPage, itemsPerPage, searchQuery);
+                                    Alert.alert('Success', 'Sales invoice deleted');
+                                } catch (e) {
+                                    console.warn('delete sales invoice header error', e);
+                                    Alert.alert('Error', e?.message || 'Unable to delete sales invoice');
                                 }
-                                const cmp = await getCMPUUID();
-                                const env = await getENVUUID();
-                                const user = await getUUID();
-                                const params = { uuid: headerUuidCandidate, cmpUuid: cmp, envUuid: env, userUuid: user };
-                                const PATH = '/api/Account/DeleteSalesInvoiceHeader';
-                                const resp = await api.delete(PATH, { params });
-                                console.log('deleteSalesInvoiceHeader resp ->', resp && resp.status, resp?.data);
-                                // refresh the list after deletion
-                                await fetchSalesInvoices(currentPage, itemsPerPage, searchQuery);
-                                Alert.alert('Success', 'Sales invoice deleted');
-                            } catch (e) {
-                                console.warn('delete sales invoice header error', e);
-                                Alert.alert('Error', e?.message || 'Unable to delete sales invoice');
                             }
-                        } }
+                        }
                     ],
                     { cancelable: true }
                 );
@@ -227,6 +232,48 @@ const ManageSalesInvoice = () => {
                 return;
             }
 
+            // Open Payment History when user clicks payment
+            if (actionLabel === 'payment') {
+                await openPaymentHistory(order);
+                return;
+            }
+
+            // Open Forward bottom sheet when user clicks Forward
+            if (actionLabel === 'Forward') {
+                // prefill simple values
+                setForwardForm({
+                    customerName: order?.customerName || '',
+                    paymentDate: '',
+                    tdsAmount: '',
+                    amountAfterTds: '',
+                    remark: '',
+                    transactionDetails: '',
+                    fileName: '',
+                });
+                setForwardTarget(order || null);
+                setForwardModalVisible(true);
+                // fetch payment summary for this invoice
+                fetchSalesInvoicePayment(order);
+                return;
+            }
+
+            // Open Related Documents when user clicks View
+            if (actionLabel === 'View') {
+                try {
+                    setInvoiceRelatedData({ SalesOrders: [], SalesProformas: [] });
+                    setInvoiceRelatedLoading(true);
+                    setInvoiceRelatedModalVisible(true);
+                    await fetchSalesInvoiceRelatedDocuments(order);
+                } catch (e) {
+                    console.warn('openSalesInvoiceRelatedDocuments error', e);
+                    setInvoiceRelatedModalVisible(false);
+                    Alert.alert('Error', 'Unable to load related documents');
+                } finally {
+                    setInvoiceRelatedLoading(false);
+                }
+                return;
+            }
+
             // fallback debug message for other actions
             Alert.alert('Action Triggered', `${actionLabel} clicked for ${idLabel}`);
         } catch (err) {
@@ -239,9 +286,10 @@ const ManageSalesInvoice = () => {
         const buttons = [
             { icon: 'delete-outline', label: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
             { icon: 'file-download', label: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
-            // { icon: 'chat-bubble-outline', label: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
+            { icon: 'chat-bubble-outline', label: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
             { icon: 'visibility', label: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
             { icon: 'edit', label: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316' },
+            { icon: 'payment', label: 'payment', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
         ];
 
         return (
@@ -249,15 +297,15 @@ const ManageSalesInvoice = () => {
                 {buttons.map((btn) => {
                     const isDownloadButton = btn.label === 'Download';
                     const isDisabled = isDownloadButton && isGeneratingPDF;
-                    
+
                     return (
                         <TouchableOpacity
                             key={`${order.id}-${btn.icon}`}
                             activeOpacity={0.85}
                             style={[
                                 styles.cardActionBtn,
-                                { 
-                                    backgroundColor: btn.bg, 
+                                {
+                                    backgroundColor: btn.bg,
                                     borderColor: btn.border,
                                     opacity: isDisabled ? 0.6 : 1
                                 }
@@ -294,6 +342,279 @@ const ManageSalesInvoice = () => {
         return items;
     }, [currentPage, totalPages]);
 
+    // Forward (chat) bottom sheet state
+    const [forwardModalVisible, setForwardModalVisible] = useState(false);
+    const [forwardTarget, setForwardTarget] = useState(null);
+    const [forwardForm, setForwardForm] = useState({ customerName: '', paymentDate: '', tdsAmount: '', amountAfterTds: '', remark: '', transactionDetails: '', fileName: '', fileObj: null });
+    const [forwardPaymentSummary, setForwardPaymentSummary] = useState({ totalAmount: '0', amountPaid: '0', remaining: '0' });
+    const [forwardOpenDatePicker, setForwardOpenDatePicker] = useState(false);
+    const [forwardDatePickerSelectedDate, setForwardDatePickerSelectedDate] = useState(new Date());
+
+    const formatUiDate = (date) => {
+        if (!date) return '';
+        try {
+            const d = (date instanceof Date) ? date : new Date(date);
+            if (isNaN(d)) return '';
+            const dd = String(d.getDate()).padStart(2, '0');
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const mmm = months[d.getMonth()];
+            const yyyy = String(d.getFullYear());
+            return `${dd}-${mmm}-${yyyy}`;
+        } catch (e) { return ''; }
+    };
+
+    const openForwardDatePicker = () => {
+        let initial = new Date();
+        const cur = forwardForm.paymentDate;
+        if (cur) {
+            const parsed = new Date(cur);
+            if (!isNaN(parsed)) initial = parsed;
+        }
+        setForwardDatePickerSelectedDate(initial);
+        // hide the parent modal so the bottom sheet can present on top
+        setForwardModalVisible(false);
+        // small delay to ensure modal is dismissed before presenting sheet
+        setTimeout(() => setForwardOpenDatePicker(true), 120);
+    };
+
+    const closeForwardDatePicker = () => {
+        setForwardOpenDatePicker(false);
+    };
+
+    const handleForwardDateSelect = (date) => {
+        const formatted = formatUiDate(date);
+        setForwardForm(f => ({ ...f, paymentDate: formatted }));
+        // close picker then reopen the forward modal after a short delay
+        setForwardOpenDatePicker(false);
+        setTimeout(() => setForwardModalVisible(true), 160);
+    };
+
+    const closeForwardModal = () => {
+        setForwardModalVisible(false);
+        setForwardTarget(null);
+    };
+
+    const [forwardSubmitting, setForwardSubmitting] = useState(false);
+
+    // Payment history bottom sheet/modal state
+    const [paymentHistoryModalVisible, setPaymentHistoryModalVisible] = useState(false);
+    const [paymentHistory, setPaymentHistory] = useState([]);
+    const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false);
+
+    // Related documents for Sales Invoice (View action)
+    const [invoiceRelatedModalVisible, setInvoiceRelatedModalVisible] = useState(false);
+    const [invoiceRelatedLoading, setInvoiceRelatedLoading] = useState(false);
+    const [invoiceRelatedData, setInvoiceRelatedData] = useState({ SalesOrders: [], SalesProformas: [] });
+
+    const uiDateToIsoDatetime = (uiDateStr) => {
+        if (!uiDateStr) return '';
+        try {
+            const parts = uiDateStr.split('-');
+            if (parts.length !== 3) return '';
+            const [dd, mmm, yyyy] = parts;
+            const months = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
+            const mm = months[mmm] || '01';
+            // return ISO datetime at start of day UTC
+            return `${yyyy}-${mm}-${dd}T00:00:00Z`;
+        } catch (e) { return ''; }
+    };
+
+    const handleForwardSubmit = async () => {
+        // basic validation
+        if (!forwardForm.customerName) {
+            Alert.alert('Validation', 'Please enter Customer Name');
+            return;
+        }
+        if (!forwardForm.paymentDate) {
+            Alert.alert('Validation', 'Please enter Payment Date');
+            return;
+        }
+        if (!forwardForm.amountAfterTds) {
+            Alert.alert('Validation', 'Please enter Amount After TDS');
+            return;
+        }
+
+        setForwardSubmitting(true);
+        try {
+            const invoiceUuid = extractServerUuid(forwardTarget?.raw) || forwardTarget?.id || forwardTarget?.UUID || '';
+            const cmp = await getCMPUUID();
+            const env = await getENVUUID();
+            const user = await getUUID();
+
+            // If file attached, send multipart/form-data
+            if (forwardForm.fileObj) {
+                const fd = new FormData();
+                fd.append('InvoiceUUID', invoiceUuid);
+                fd.append('PaymentDate', uiDateToIsoDatetime(forwardForm.paymentDate));
+                fd.append('TDSAmount', String(Number(forwardForm.tdsAmount) || 0));
+                fd.append('TransactionDetails', forwardForm.transactionDetails || '');
+                fd.append('Remark', forwardForm.remark || '');
+                fd.append('AmountPaid', String(Number(forwardForm.amountAfterTds) || 0));
+                // fileObj from picker may include uri, name, type
+                const file = forwardForm.fileObj;
+                fd.append('uploadedFile', { uri: file.uri || file.uri, name: file.name || file.fileName || 'file.pdf', type: file.type || 'application/pdf' });
+
+                console.log('UpdateSalesInvoicePayment multipart payload ->', fd);
+                const resp = await api.post('/api/Account/UpdateSalesInvoicePayment', fd, { params: { cmpUuid: cmp, envUuid: env, userUuid: user }, headers: { 'Content-Type': 'multipart/form-data' } });
+                console.log('UpdateSalesInvoicePayment resp ->', resp?.data || resp);
+            } else {
+                const payload = {
+                    InvoiceUUID: invoiceUuid,
+                    PaymentDate: uiDateToIsoDatetime(forwardForm.paymentDate),
+                    TDSAmount: Number(forwardForm.tdsAmount) || 0,
+                    TransactionDetails: forwardForm.transactionDetails || '',
+                    Remark: forwardForm.remark || '',
+                    AmountPaid: Number(forwardForm.amountAfterTds) || 0,
+                    uploadedFile: '',
+                };
+                console.log('UpdateSalesInvoicePayment payload ->', payload);
+                const resp = await api.post('/api/Account/UpdateSalesInvoicePayment', payload, { params: { cmpUuid: cmp, envUuid: env, userUuid: user } });
+                console.log('UpdateSalesInvoicePayment resp ->', resp?.data || resp);
+            }
+
+            Alert.alert('Success', 'Payment updated successfully');
+            // refresh summary
+            fetchSalesInvoicePayment(forwardTarget);
+            closeForwardModal();
+        } catch (e) {
+            console.warn('UpdateSalesInvoicePayment error', e);
+            Alert.alert('Error', e?.message || 'Unable to update payment');
+        } finally {
+            setForwardSubmitting(false);
+        }
+    };
+
+    const openPaymentHistory = async (order) => {
+        try {
+            setPaymentHistory([]);
+            setPaymentHistoryLoading(true);
+            setPaymentHistoryModalVisible(true);
+            await fetchSalesInvoicePaymentHistory(order);
+        } catch (e) {
+            console.warn('openPaymentHistory error', e);
+            setPaymentHistoryModalVisible(false);
+            Alert.alert('Error', 'Unable to load payment history');
+        } finally {
+            setPaymentHistoryLoading(false);
+        }
+    };
+
+    const fetchSalesInvoicePaymentHistory = async (order) => {
+        try {
+            const invoiceUuid = extractServerUuid(order?.raw) || order?.id || order?.UUID || '';
+            if (!invoiceUuid) {
+                console.warn('fetchSalesInvoicePaymentHistory: no invoice UUID');
+                setPaymentHistory([]);
+                return;
+            }
+            const cmp = await getCMPUUID();
+            const env = await getENVUUID();
+            const resp = await getSalesInvoicePaymentHistory({ invoiceUUID: invoiceUuid, cmpUuid: cmp, envUuid: env });
+            const data = resp?.Data || resp || [];
+            // ensure array
+            const arr = Array.isArray(data) ? data : (Array.isArray(data?.Data) ? data.Data : (data?.Payments || []));
+            setPaymentHistory(arr);
+        } catch (e) {
+            console.warn('fetchSalesInvoicePaymentHistory error', e?.message || e);
+            setPaymentHistory([]);
+        }
+    };
+
+    const fetchSalesInvoiceRelatedDocuments = async (order) => {
+        try {
+            const invoiceUuid = extractServerUuid(order?.raw) || order?.id || order?.UUID || '';
+            if (!invoiceUuid) {
+                console.warn('fetchSalesInvoiceRelatedDocuments: no invoice UUID');
+                setInvoiceRelatedData({ SalesOrders: [], SalesProformas: [] });
+                return;
+            }
+            const cmp = await getCMPUUID();
+            const env = await getENVUUID();
+            const resp = await getSalesInvoiceRelatedDocuments({ salesInvoiceUuid: invoiceUuid, cmpUuid: cmp, envUuid: env });
+            const data = resp?.Data || resp || {};
+            setInvoiceRelatedData({ SalesOrders: Array.isArray(data?.SalesOrders) ? data.SalesOrders : [], SalesProformas: Array.isArray(data?.SalesProformas) ? data.SalesProformas : [] });
+        } catch (e) {
+            console.warn('fetchSalesInvoiceRelatedDocuments error', e?.message || e);
+            setInvoiceRelatedData({ SalesOrders: [], SalesProformas: [] });
+        }
+    };
+
+    const handleOpenSalesOrderSlip = async (so) => {
+        try {
+            setIsGeneratingPDF(true);
+            const headerUuid = extractServerUuid(so) || so?.UUID || so?.Uuid || so?.SalesOrderUUID || so?.SalesOrderId || '';
+            if (!headerUuid) {
+                Alert.alert('Error', 'Unable to determine Sales Order identifier');
+                return;
+            }
+            const cmp = await getCMPUUID();
+            const env = await getENVUUID();
+            const user = await getUUID();
+            const pdfBase64 = await getSalesOrderSlip({ headerUuid, cmpUuid: cmp, envUuid: env, userUuid: user });
+            if (!pdfBase64) {
+                Alert.alert('Error', 'No PDF returned for Sales Order');
+                return;
+            }
+            const fileName = `SalesOrder_${so?.SalesOrderNo || so?.SalesOrderNo || headerUuid}`;
+            navigation.navigate('FileViewerScreen', { pdfBase64, fileName });
+        } catch (e) {
+            console.warn('open sales order slip error', e);
+            Alert.alert('Error', e?.message || 'Unable to open sales order PDF');
+        } finally {
+            setIsGeneratingPDF(false);
+        }
+    };
+
+    const handleOpenSalesPerformaSlip = async (pf) => {
+        try {
+            setIsGeneratingPDF(true);
+            const headerUuid = extractServerUuid(pf) || pf?.UUID || pf?.Uuid || pf?.SalesPerInvoiceUUID || pf?.SalesPerInvUUID || '';
+            if (!headerUuid) {
+                Alert.alert('Error', 'Unable to determine Performa identifier');
+                return;
+            }
+            const cmp = await getCMPUUID();
+            const env = await getENVUUID();
+            const user = await getUUID();
+            const pdfBase64 = await getSalesPerformaInvoiceSlip({ headerUuid, cmpUuid: cmp, envUuid: env, userUuid: user });
+            if (!pdfBase64) {
+                Alert.alert('Error', 'No PDF returned for Performa Invoice');
+                return;
+            }
+            const fileName = `SalesPerforma_${pf?.SalesPerInvNo || pf?.SalesPerformaNo || headerUuid}`;
+            navigation.navigate('FileViewerScreen', { pdfBase64, fileName });
+        } catch (e) {
+            console.warn('open sales performa slip error', e);
+            Alert.alert('Error', e?.message || 'Unable to open performa PDF');
+        } finally {
+            setIsGeneratingPDF(false);
+        }
+    };
+
+    const fetchSalesInvoicePayment = async (order) => {
+        try {
+            const invoiceUuid = extractServerUuid(order?.raw) || order?.id || order?.UUID || '';
+            if (!invoiceUuid) {
+                console.warn('fetchSalesInvoicePayment: no invoice UUID');
+                setForwardPaymentSummary({ totalAmount: '0', amountPaid: '0', remaining: '0' });
+                return;
+            }
+            const cmp = await getCMPUUID();
+            const env = await getENVUUID();
+            const resp = await api.get('/api/Account/GetSalesInvoicePayment', { params: { invoiceUUID: invoiceUuid, cmpUuid: cmp, envUuid: env } });
+            console.log(resp, '99999');
+
+            const data = resp?.data?.Data || resp || {};
+            const total = data?.TotalAmount ?? data?.Total ?? data?.InvoiceTotal ?? 0;
+            const paid = data?.TotalPaid ?? data?.Paid ?? data?.AmountPaidTillNow ?? 0;
+            const remaining = data?.RemainingPayment ?? data?.Remaining ?? (Number(total || 0) - Number(paid || 0));
+            setForwardPaymentSummary({ totalAmount: String(total || 0), amountPaid: String(paid || 0), remaining: String(remaining || 0) });
+        } catch (e) {
+            console.warn('fetchSalesInvoicePayment error', e?.message || e);
+            setForwardPaymentSummary({ totalAmount: '0', amountPaid: '0', remaining: '0' });
+        }
+    };
+
     const handlePageChange = (pageIndex) => {
         const nextPage = Math.max(0, Math.min(pageIndex, Math.max(totalPages - 1, 0)));
         setCurrentPage(nextPage);
@@ -301,7 +622,7 @@ const ManageSalesInvoice = () => {
 
     return (
         <View style={styles.screen}>
-                <AppHeader
+            <AppHeader
                 title="View Sales Invoice"
                 onLeftPress={() => navigation.goBack()}
                 onRightPress={() => navigation.navigate('AddSalesInvoice')}
@@ -446,6 +767,236 @@ const ManageSalesInvoice = () => {
                     </View>
                 </View>
             )}
+            {/* Forward / Chat Bottom Sheet Modal */}
+            <Modal visible={forwardModalVisible} transparent animationType="slide" onRequestClose={closeForwardModal}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalBox}>
+                        <View style={styles.modalHeaderRow}>
+                            <Text style={[styles.modalTitle, { marginVertical: hp(1) }]}>Update Payment Status</Text>
+                            <TouchableOpacity onPress={closeForwardModal}>
+                                <Text style={{ color: COLORS.primary }}>Close</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.modalBody}>
+                            <View style={{ marginBottom: hp(1.2) }}>
+                                <Text style={{ fontWeight: '700', color: COLORS.text }}>Total Amount: {forwardPaymentSummary.totalAmount}</Text>
+                                <Text style={{ fontWeight: '700', color: COLORS.text, marginTop: hp(0.4) }}>Amount Paid: {forwardPaymentSummary.amountPaid}</Text>
+                                <Text style={{ fontWeight: '700', color: COLORS.text, marginTop: hp(0.4) }}>Remaining Payment: {forwardPaymentSummary.remaining}</Text>
+                            </View>
+                            <View style={styles.twoColRow}>
+                                <View style={styles.colLeft}>
+                                    <Text style={[styles.inputLabel, { fontWeight: '600' }]}>Customer Name*</Text>
+                                    <TextInput style={styles.modalInput} value={forwardForm.customerName} onChangeText={v => setForwardForm(f => ({ ...f, customerName: v }))} placeholder="Customer" />
+                                </View>
+                                <View style={styles.colRight}>
+                                    <Text style={[styles.inputLabel, { fontWeight: '600' }]}>Payment Date*</Text>
+                                    <TouchableOpacity style={[styles.modalInput, { justifyContent: 'center' }]} onPress={openForwardDatePicker}>
+                                        <Text style={{ color: forwardForm.paymentDate ? COLORS.text : COLORS.textLight }}>{forwardForm.paymentDate || 'eg.'}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            <View style={[styles.twoColRow, { marginTop: hp(1) }]}>
+                                <View style={styles.colLeft}>
+                                    <Text style={[styles.inputLabel, { fontWeight: '600' }]}>TDS Amount*</Text>
+                                    <TextInput style={styles.modalInput} value={forwardForm.tdsAmount} onChangeText={v => setForwardForm(f => ({ ...f, tdsAmount: v }))} placeholder="eg." keyboardType="numeric" />
+                                </View>
+                                <View style={styles.colRight}>
+                                    <Text style={[styles.inputLabel, { fontWeight: '600' }]}>Amount After TDS*</Text>
+                                    <TextInput style={styles.modalInput} value={forwardForm.amountAfterTds} onChangeText={v => setForwardForm(f => ({ ...f, amountAfterTds: v }))} placeholder="eg." keyboardType="numeric" />
+                                </View>
+                            </View>
+
+                            <View style={{ marginTop: hp(1) }}>
+                                <Text style={[styles.inputLabel, { fontWeight: '600' }]}>Upload Document</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2), marginTop: hp(0.5), borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.sm, padding: wp(1) }}>
+                                    <TouchableOpacity style={styles.fileButton} onPress={async () => {
+                                        try {
+                                            const [selected] = await pick({ type: [types.pdf], allowMultiSelection: false });
+                                            if (!selected) return;
+                                            // Basic validation
+                                            const allowedTypes = ['application/pdf'];
+                                            if (selected.type && !allowedTypes.includes(selected.type)) {
+                                                Alert.alert('Invalid file', 'Please select a PDF file');
+                                                return;
+                                            }
+                                            setForwardForm(f => ({ ...f, fileName: selected.name || selected.fileName || 'file.pdf', fileObj: selected }));
+                                        } catch (err) {
+                                            if (isCancel && isCancel(err)) return;
+                                            console.warn('pick file error', err);
+                                            Alert.alert('Error', 'Unable to pick file');
+                                        }
+                                    }}>
+                                        <Text style={{ color: '#000' }}>Choose File</Text>
+                                    </TouchableOpacity>
+                                    <Text style={{ color: COLORS.textLight }}>{forwardForm.fileName || 'No file chosen'}</Text>
+                                </View>
+                            </View>
+
+                            <View style={{ marginTop: hp(1) }}>
+                                <Text style={[styles.inputLabel, { fontWeight: '600' }]}>Remark</Text>
+                                <TextInput style={[styles.modalInput, { height: hp(10), textAlignVertical: 'top' }]} value={forwardForm.remark} onChangeText={v => setForwardForm(f => ({ ...f, remark: v }))} multiline placeholder="eg." />
+                            </View>
+
+                            <View style={{ marginTop: hp(1) }}>
+                                <Text style={[styles.inputLabel, { fontWeight: '600' }]}>Transaction Details</Text>
+                                <TextInput style={[styles.modalInput, { height: hp(10), textAlignVertical: 'top' }]} value={forwardForm.transactionDetails} onChangeText={v => setForwardForm(f => ({ ...f, transactionDetails: v }))} multiline placeholder="eg." />
+                            </View>
+                        </View>
+
+                        <View style={styles.modalFooterRow}>
+                            <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#e5e7eb' }]} onPress={closeForwardModal}>
+                                <Text>Close</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.modalBtn, { backgroundColor: COLORS.primary }]} onPress={handleForwardSubmit}>
+                                <Text style={{ color: '#fff' }}>Submit</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+            {/* Sales Invoice - Related Documents Modal */}
+            <Modal visible={invoiceRelatedModalVisible} transparent animationType="slide" onRequestClose={() => setInvoiceRelatedModalVisible(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalBox}>
+                        <View style={styles.modalHeaderRow}>
+                            <Text style={[styles.modalTitle, { marginVertical: hp(1) }]}>Related Documents</Text>
+                            <TouchableOpacity onPress={() => setInvoiceRelatedModalVisible(false)} style={{ padding: wp(1.2) }}>
+                                <Icon name="close" size={rf(3.6)} color={COLORS.text} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={[styles.modalBody, { paddingBottom: hp(2) }]}>
+                            {invoiceRelatedLoading && (
+                                <View style={{ paddingVertical: hp(2), alignItems: 'center' }}>
+                                    <ActivityIndicator />
+                                </View>
+                            )}
+
+                            {!invoiceRelatedLoading && (
+                                <View>
+                                    <Text style={{ fontWeight: '700', color: COLORS.text, marginBottom: hp(1) }}>Sales Orders</Text>
+                                    {Array.isArray(invoiceRelatedData.SalesOrders) && invoiceRelatedData.SalesOrders.length > 0 ? (
+                                        invoiceRelatedData.SalesOrders.map((o, i) => (
+                                            <TouchableOpacity key={`so-${i}`} onPress={() => handleOpenSalesOrderSlip(o)} style={{ paddingVertical: hp(0.6) }}>
+                                                <Text style={{ color: COLORS.primary }}>{o.SalesOrderNo} - Date: {o.SalesOrderDate}</Text>
+                                            </TouchableOpacity>
+                                        ))
+                                    ) : (
+                                        <Text style={{ color: COLORS.textLight }}>No sales orders found</Text>
+                                    )}
+
+                                    <View style={{ height: hp(1) }} />
+
+                                    <Text style={{ fontWeight: '700', color: COLORS.text, marginBottom: hp(1) }}>Sales Proformas</Text>
+                                    {Array.isArray(invoiceRelatedData.SalesProformas) && invoiceRelatedData.SalesProformas.length > 0 ? (
+                                        invoiceRelatedData.SalesProformas.map((pf, j) => (
+                                            <TouchableOpacity key={`pf-${j}`} onPress={() => handleOpenSalesPerformaSlip(pf)} style={{ paddingVertical: hp(0.6) }}>
+                                                <Text style={{ color: COLORS.text }}>{pf.SalesPerInvNo || pf.PerformaInvoiceNo || pf.SalesPerformaNo || pf.SalesProformaNo || '—'}</Text>
+                                            </TouchableOpacity>
+                                        ))
+                                    ) : (
+                                        <Text style={{ color: COLORS.textLight }}>No sales proformas found</Text>
+                                    )}
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+            {/* Payment History Bottom Sheet Modal */}
+            <Modal visible={paymentHistoryModalVisible} transparent animationType="slide" onRequestClose={() => setPaymentHistoryModalVisible(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalBox}>
+                        <View style={styles.modalHeaderRow}>
+                            <Text style={[styles.modalTitle, { marginVertical: hp(1) }]}>Payment History</Text>
+                            <TouchableOpacity onPress={() => setPaymentHistoryModalVisible(false)} style={{ padding: wp(1.2) }}>
+                                <Icon name="close" size={rf(3.6)} color={COLORS.text} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={[styles.modalBody, { paddingBottom: hp(2) }]}>
+                            {paymentHistoryLoading && (
+                                <View style={{ paddingVertical: hp(2), alignItems: 'center' }}>
+                                    <ActivityIndicator />
+                                </View>
+                            )}
+
+                            {!paymentHistoryLoading && Array.isArray(paymentHistory) && paymentHistory.length === 0 && (
+                                <View style={{ paddingVertical: hp(2) }}>
+                                    <Text style={{ color: COLORS.textLight }}>No payment records found.</Text>
+                                </View>
+                            )}
+
+                            {!paymentHistoryLoading && Array.isArray(paymentHistory) && paymentHistory.map((p, idx) => (
+                                <View key={`ph-${idx}`} style={{ borderBottomWidth: 1, borderBottomColor: COLORS.border, paddingVertical: hp(1.2) }}>
+                                    {/* Row: Payment Date (label left, value right) */}
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Text style={{ color: COLORS.textMuted, fontWeight: '600' }}>Payment Date</Text>
+                                        <Text style={{ color: COLORS.text }}>{p.PaymentDate || p.paymentDate || ''}</Text>
+                                    </View>
+
+                                    {/* Row: Amount heading on right (show After TDS as main) */}
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: hp(0.6) }}>
+                                        <Text style={{ color: COLORS.textMuted, fontWeight: '600' }}>Amount</Text>
+                                        {/* <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={{ fontWeight: '800', fontSize: rf(3.6), color: COLORS.text }}>{p.AfterTdsAmount ?? p.AfterTDSAmount ?? p.afterTdsAmount ?? p.AfterTds ?? '0'}</Text>
+                                            <Text style={{ color: COLORS.textLight, marginTop: hp(0.2) }}>TDS: {p.TdsAmount ?? p.TDSAmount ?? p.tdsAmount ?? p.Tds ?? '0'}</Text>
+                                        </View> */}
+                                    </View>
+
+                                    {/* TDS and After TDS rows (label left, value right) */}
+                                    <View style={{ marginTop: hp(0.6) }}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Text style={{ color: COLORS.textMuted, fontWeight: '600' }}>TDS Amount</Text>
+                                            <Text style={{ color: COLORS.text }}>{p.TdsAmount ?? p.TDSAmount ?? p.tdsAmount ?? '0'}</Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: hp(0.4) }}>
+                                            <Text style={{ color: COLORS.textMuted, fontWeight: '600' }}>After TDS</Text>
+                                            <Text style={{ color: COLORS.text }}>{p.AfterTdsAmount ?? p.AfterTDSAmount ?? p.afterTdsAmount ?? '0'}</Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Transaction Details */}
+                                    <View style={{ marginTop: hp(0.6), flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Text style={{ color: COLORS.textMuted, fontWeight: '600' }}>Transaction Details</Text>
+                                        <Text style={{ color: COLORS.text }}>{p.TransactionDetails || p.transactionDetails || ''}</Text>
+                                    </View>
+
+                                    {/* Remark row */}
+                                    <View style={{ marginTop: hp(0.6) }}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Text style={{ color: COLORS.textMuted, fontWeight: '600' }}>Remark</Text>
+                                            <Text style={{ color: COLORS.text }}>{p.Remark || p.remark || ''}</Text>
+                                        </View>
+                                        {/* Attachment row */}
+                                        <View style={{ marginTop: hp(0.6), flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Text style={{ color: COLORS.textMuted, fontWeight: '600' }}>Attachment</Text>
+                                            {p.AttachmentUrl || p.attachmentUrl ? (
+                                                <TouchableOpacity onPress={() => {
+                                                    try { Linking.openURL(p.AttachmentUrl || p.attachmentUrl); } catch (e) { Alert.alert('Error', 'Unable to open attachment'); }
+                                                }} style={{ paddingVertical: hp(0.6), paddingHorizontal: wp(3), backgroundColor: '#f3f4f6', borderRadius: wp(1) }}>
+                                                    <Text style={{ color: COLORS.primary }}>View</Text>
+                                                </TouchableOpacity>
+                                            ) : (
+                                                <Text style={{ color: COLORS.textLight }}>No Attachment</Text>
+                                            )}
+                                        </View>
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+            <DatePickerBottomSheet
+                isVisible={forwardOpenDatePicker}
+                onClose={closeForwardDatePicker}
+                selectedDate={forwardDatePickerSelectedDate}
+                onDateSelect={handleForwardDateSelect}
+                title="Select Payment Date"
+            />
         </View>
     );
 };
@@ -560,6 +1111,33 @@ const styles = StyleSheet.create({
     pageNumberTextActive: {
         color: '#fff',
     },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalBox: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: wp(3),
+        borderTopRightRadius: wp(3),
+        padding: wp(4),
+        maxHeight: hp(85),
+    },
+    modalHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    modalTitle: { fontSize: rf(3.6), fontWeight: '700', color: COLORS.text },
+    modalBody: { marginTop: hp(1) },
+    twoColRow: { flexDirection: 'row', justifyContent: 'space-between' },
+    colLeft: { width: '48%' },
+    colRight: { width: '48%' },
+    inputLabel: { color: COLORS.textMuted, marginBottom: hp(0.6) },
+    modalInput: { borderWidth: 1, borderColor: COLORS.border, borderRadius: wp(1.2), padding: wp(2), backgroundColor: '#fff' },
+    fileButton: { backgroundColor: '#f3f4f6', paddingVertical: hp(0.8), paddingHorizontal: wp(3), borderRadius: wp(1) },
+    modalFooterRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: hp(1.5), gap: wp(2) },
+    modalBtn: { paddingVertical: hp(1), paddingHorizontal: wp(4), borderRadius: wp(1) },
     pageDots: {
         paddingHorizontal: wp(2),
         alignItems: 'center',

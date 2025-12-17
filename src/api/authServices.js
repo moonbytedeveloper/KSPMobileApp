@@ -1370,6 +1370,70 @@ export async function getSalesInvoiceLines({ headerUuid, cmpUuid, envUuid, userU
     return resp.data;
 }
 
+// Get payment history for a sales invoice
+export async function getSalesInvoicePaymentHistory({ invoiceUUID, cmpUuid, envUuid, userUuid } = {}) {
+    if (!invoiceUUID) throw new Error('invoiceUUID is required');
+    try {
+        const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+        const params = { invoiceUUID, cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] getSalesInvoicePaymentHistory params ->', params);
+        const resp = await api.get('/api/Account/GetSalesInvoicePaymentHistory', { params });
+        console.log('[authServices] getSalesInvoicePaymentHistory resp ->', resp);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] getSalesInvoicePaymentHistory error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Get related documents for a sales proforma
+export async function getSalesProformaRelatedDocuments({ salesProformaUuid, cmpUuid, envUuid, userUuid } = {}) {
+    if (!salesProformaUuid) throw new Error('salesProformaUuid is required');
+    try {
+        const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+        const params = { salesProformaUuid, cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] getSalesProformaRelatedDocuments params ->', params);
+        const resp = await api.get('/api/Account/GetSalesProformaRelatedDocuments', { params });
+        console.log('[authServices] getSalesProformaRelatedDocuments resp ->', resp);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] getSalesProformaRelatedDocuments error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Get related documents for a sales invoice
+export async function getSalesInvoiceRelatedDocuments({ salesInvoiceUuid, cmpUuid, envUuid, userUuid } = {}) {
+    if (!salesInvoiceUuid) throw new Error('salesInvoiceUuid is required');
+    try {
+        const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+        const params = { salesInvoiceUuid, cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] getSalesInvoiceRelatedDocuments params ->', params);
+        const resp = await api.get('/api/Account/GetSalesInvoiceRelatedDocuments', { params });
+        console.log('[authServices] getSalesInvoiceRelatedDocuments resp ->', resp);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] getSalesInvoiceRelatedDocuments error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Get related documents for a sales order
+export async function getSalesOrderRelatedDocuments({ salesOrderUuid, cmpUuid, envUuid, userUuid } = {}) {
+    if (!salesOrderUuid) throw new Error('salesOrderUuid is required');
+    try {
+        const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+        const params = { salesOrderUuid, cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] getSalesOrderRelatedDocuments params ->', params);
+        const resp = await api.get('/api/Account/GetSalesOrderRelatedDocuments', { params });
+        console.log('[authServices] getSalesOrderRelatedDocuments resp ->', resp);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] getSalesOrderRelatedDocuments error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
 // Get lines for a sales invoice header
 export async function getPurchaseInvoiceLines({ headerUuid, cmpUuid, envUuid, userUuid, start = 0, length = 100 } = {}) {
     if (!headerUuid) throw new Error('headerUuid is required');

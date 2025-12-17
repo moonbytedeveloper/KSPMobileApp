@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useRoute } from '@react-navigation/native';
 import {
@@ -24,7 +25,7 @@ import { useNavigation } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
-import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getCustomers, getCountries, getSalesOrderNumbers, addSalesInvoiceHeader, addSalesInvoiceLine, updateSalesInvoiceHeader, getSalesInvoiceHeaderById, getSalesInvoiceHeaders, getSalesInvoiceLines, updateSalesInvoiceLine, deleteSalesInvoiceLine, getItems } from '../../../../api/authServices';
+import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getCustomers, getCountries, getSalesOrderNumbers, addSalesInvoiceHeader, addSalesInvoiceLine, updateSalesInvoiceHeader, getSalesInvoiceHeaderById, getSalesInvoiceHeaders, getSalesInvoiceLines, updateSalesInvoiceLine, deleteSalesInvoiceLine, getItems, getEmployees } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
 
 const COL_WIDTHS = {
@@ -134,6 +135,24 @@ const AddSalesInvoice = () => {
         setExpandedId(prev => (prev === id ? null : id));
     };
 
+    // Helper to convert UI date to ISO timestamp (UTC, 00:00:00)
+    const uiDateToIsoTimestamp = uiDateStr => {
+        if (!uiDateStr) return '';
+        try {
+            const parts = uiDateStr.split('-');
+            if (parts.length !== 3) return '';
+            const [dd, mmm, yyyy] = parts;
+            const months = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+            const mm = months[mmm];
+            if (typeof mm === 'undefined') return '';
+            // Date in UTC at midnight
+            const dateObj = new Date(Date.UTC(Number(yyyy), mm, Number(dd), 0, 0, 0, 0));
+            return dateObj.toISOString();
+        } catch (e) {
+            return '';
+        }
+    };
+
     // Demo options for dropdowns
     const paymentTerms = ['Monthly'];
     const projects = ['Mobile App',];
@@ -168,6 +187,8 @@ const AddSalesInvoice = () => {
     const [paymentMethodUUID, setPaymentMethodUUID] = useState(null);
     const [projectUUID, setProjectUUID] = useState(null);
     const [salesInquiryUuid, setSalesInquiryUuid] = useState(null);
+    // State to control visibility of From/To Date fields
+    const [showTimesheetDates, setShowTimesheetDates] = useState(false);
 
     // Fetch lookups (payment terms, methods, projects, inquiries) similar to ManageSalesOrder
     React.useEffect(() => {
@@ -719,6 +740,9 @@ const AddSalesInvoice = () => {
             );
             if (found) {
                 setProject(found?.ProjectTitle || found?.Name || String(found));
+                // Show/hide From/To dates when loading existing project in edit/prefill mode
+                const isTimesheet = found?.IsTimesheetBased === true || found?.IsTimesheetBased === 'true' || found?.isTimesheetBased === true || found?.isTimesheetBased === 'true' || found?.timesheetBased === true || found?.timesheetBased === 'true';
+                setShowTimesheetDates(!!isTimesheet);
             }
         }
     }, [projectUUID, projectsOptions, project]);
@@ -777,6 +801,8 @@ const AddSalesInvoice = () => {
     // Master items (loaded from server)
     const [masterItems, setMasterItems] = useState([]);
     const [masterItemsLoading, setMasterItemsLoading] = useState(false);
+    const [employeesOptions, setEmployeesOptions] = useState([]);
+    const [employeesLoading, setEmployeesLoading] = useState(false);
 
     // Load master items from API on mount
     useEffect(() => {
@@ -784,12 +810,16 @@ const AddSalesInvoice = () => {
         const load = async () => {
             try {
                 setMasterItemsLoading(true);
+                setEmployeesLoading(true);
                 const c = await getCMPUUID();
                 const e = await getENVUUID();
-                const resp = await getItems({ cmpUuid: c, envUuid: e });
-                console.log('getItems raw response ->', JSON.stringify(resp, null, 2));
-                const rawList = resp?.Data?.Records || resp?.Data || resp || [];
-                console.log('getItems rawList ->', JSON.stringify(rawList && (Array.isArray(rawList) ? rawList.slice(0, 5) : rawList), null, 2));
+                const [itemsResp, employeesResp] = await Promise.all([
+                    getItems({ cmpUuid: c, envUuid: e }).catch(err => { console.warn('getItems failed', err); return null; }),
+                    (typeof getEmployees === 'function') ? getEmployees({ cmpUuid: c, envUuid: e }).catch(err => { console.warn('getEmployees failed', err); return null; }) : Promise.resolve(null),
+                ]);
+
+                // normalize items
+                const rawList = itemsResp?.Data?.Records || itemsResp?.Data || itemsResp || [];
                 const list = Array.isArray(rawList) ? rawList : [];
                 const normalized = list.map(it => ({
                     name: it?.Name || it?.name || it?.ItemName || '',
@@ -800,13 +830,28 @@ const AddSalesInvoice = () => {
                     uuid: it?.UUID || it?.Uuid || it?.uuid || it?.Id || it?.id || null,
                     raw: it,
                 }));
-                console.log('getItems normalized sample ->', JSON.stringify(normalized && normalized[0], null, 2));
                 if (mounted) setMasterItems(normalized);
+
+                // normalize employees
+                const empRaw = employeesResp?.Data || employeesResp || [];
+                const empList = Array.isArray(empRaw) ? empRaw : [];
+                const normalizedEmps = empList.map(emp => ({
+                    UUID: emp?.UUID || emp?.Uuid || emp?.Id || emp?.uuid || null,
+                    FullName: emp?.FullName || emp?.Name || emp?.EmployeeName || emp?.Full_Name || String(emp),
+                    raw: emp,
+                }));
+                if (mounted) setEmployeesOptions(normalizedEmps);
             } catch (err) {
-                console.warn('getItems failed', err);
-                if (mounted) setMasterItems([]);
+                console.warn('load items/employees failed', err);
+                if (mounted) {
+                    setMasterItems([]);
+                    setEmployeesOptions([]);
+                }
             } finally {
-                if (mounted) setMasterItemsLoading(false);
+                if (mounted) {
+                    setMasterItemsLoading(false);
+                    setEmployeesLoading(false);
+                }
             }
         };
         load();
@@ -848,9 +893,11 @@ const AddSalesInvoice = () => {
     const [items, setItems] = useState([]);
     const [invoiceDate, setInvoiceDate] = useState('');
     const [dueDate, setDueDate] = useState('');
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
     const [dueDays, setDueDays] = useState('');
     const [openDatePicker, setOpenDatePicker] = useState(false);
-    const [datePickerField, setDatePickerField] = useState(null); // 'invoice' | 'due'
+    const [datePickerField, setDatePickerField] = useState(null); // 'invoice' | 'due' | 'from' | 'to'
     const [datePickerSelectedDate, setDatePickerSelectedDate] = useState(
         new Date(),
     );
@@ -950,6 +997,14 @@ const AddSalesInvoice = () => {
             const parsed = new Date(dueDate);
             if (!isNaN(parsed)) initial = parsed;
         }
+        if (field === 'from' && fromDate) {
+            const parsed = new Date(fromDate);
+            if (!isNaN(parsed)) initial = parsed;
+        }
+        if (field === 'to' && toDate) {
+            const parsed = new Date(toDate);
+            if (!isNaN(parsed)) initial = parsed;
+        }
         setDatePickerSelectedDate(initial);
         setDatePickerField(field);
         setOpenDatePicker(true);
@@ -970,6 +1025,8 @@ const AddSalesInvoice = () => {
             }
         }
         if (datePickerField === 'due') setDueDate(formatted);
+        if (datePickerField === 'from') setFromDate(formatted);
+        if (datePickerField === 'to') setToDate(formatted);
         setOpenDatePicker(false);
         setDatePickerField(null);
     };
@@ -1150,7 +1207,7 @@ const AddSalesInvoice = () => {
     };
 
     // State & handlers used by the Item Details form (Section 4)
-    const [currentItem, setCurrentItem] = useState({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
+    const [currentItem, setCurrentItem] = useState({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '', employeeName: '', employeeUuid: null });
     const [editItemId, setEditItemId] = useState(null);
     const [isAddingLine, setIsAddingLine] = useState(false);
     const [linesLoading, setLinesLoading] = useState(false);
@@ -1197,6 +1254,8 @@ const AddSalesInvoice = () => {
         setItems([]);
         setInvoiceDate('');
         setDueDate('');
+        setFromDate('');
+        setToDate('');
         setPaymentTerm('');
         setNotes('');
         setTerms('');
@@ -1207,7 +1266,7 @@ const AddSalesInvoice = () => {
         setAdjustmentLabel('Adjustments');
         setFile(null);
         setExpandedId(null);
-        setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
+        setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '', employeeName: '', employeeUuid: null });
         setEditItemId(null);
         setIsAddingLine(false);
         setLinesLoading(false);
@@ -1229,10 +1288,17 @@ const AddSalesInvoice = () => {
     }, [navigation]);
 
     const handleAddLineItem = async () => {
-        // Basic validation
-        if (!currentItem.itemName || String(currentItem.itemName).trim() === '') {
-            Alert.alert('Validation', 'Please select an item');
-            return;
+        // Basic validation: require employee when project is timesheet-based, otherwise require item
+        if (showTimesheetDates) {
+            if (!currentItem.employeeName || String(currentItem.employeeName).trim() === '') {
+                Alert.alert('Validation', 'Please select an employee');
+                return;
+            }
+        } else {
+            if (!currentItem.itemName || String(currentItem.itemName).trim() === '') {
+                Alert.alert('Validation', 'Please select an item');
+                return;
+            }
         }
         // Require header UUID (submit header first)
         if (!headerUUID) {
@@ -1256,37 +1322,38 @@ const AddSalesInvoice = () => {
                 const payload = {
                     UUID: existing.serverLineUuid || '',
                     HeaderUUID: headerUUID,
-                    ItemUUID: currentItem.itemNameUuid || null,
+                    ItemUUID: currentItem.itemNameUuid || currentItem.employeeUuid || null,
                     Quantity: qty,
                     Rate: rate,
                     Description: description,
                     HSNSACNO: currentItem.hsn || '',
                 };
-
+            console.log(payload,'090');
+            
                 // If serverLineUuid exists, call update API, otherwise just update locally
                 if (existing.serverLineUuid) {
                     const resp = await updateSalesInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
                     console.log('update line resp ->', resp);
                     const updatedLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || existing.serverLineUuid;
-                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid }) : it));
+                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, employeeName: currentItem.employeeName || '', sku: currentItem.itemNameUuid || currentItem.employeeUuid || null, itemUuid: currentItem.itemNameUuid || currentItem.employeeUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid }) : it));
                     // refresh header totals from server after update
                     await refreshHeaderTotals(headerUUID);
                 } else {
                     // local-only line - update in state
-                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate) }) : it));
+                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, employeeName: currentItem.employeeName || '', sku: currentItem.itemNameUuid || currentItem.employeeUuid || null, itemUuid: currentItem.itemNameUuid || currentItem.employeeUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate) }) : it));
                     // Clear serverTotalAmount so UI will compute Total Amount from local subtotal
                     setServerTotalAmount('');
                 }
 
                 // reset edit state
-                setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
+                setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '', employeeName: '', employeeUuid: null });
                 setEditItemId(null);
             } else {
                 // Build payload expected by backend
                 const payload = {
                     UUID: '', // empty to create new line on server
                     HeaderUUID: headerUUID,
-                    ItemUUID: currentItem.itemNameUuid || null,
+                    ItemUUID: currentItem.itemNameUuid || currentItem.employeeUuid || null,
                     Quantity: qty,
                     Rate: rate,
                     Description: description,
@@ -1300,10 +1367,10 @@ const AddSalesInvoice = () => {
                 // on success, update local items list (assign local id and keep server uuid if returned)
                 const nextId = items.length ? (items[items.length - 1].id + 1) : 1;
                 const serverLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || null;
-                setItems(prev => ([...prev, { id: nextId, selectedItem: null, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), tax: 'IGST', amount: computeAmount(qty, rate), serverLineUuid }]));
+                setItems(prev => ([...prev, { id: nextId, selectedItem: null, name: currentItem.itemName, employeeName: currentItem.employeeName || '', sku: currentItem.itemNameUuid || currentItem.employeeUuid || null, itemUuid: currentItem.itemNameUuid || currentItem.employeeUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), tax: 'IGST', amount: computeAmount(qty, rate), serverLineUuid }]));
 
                 // reset line form
-                setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
+                setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '', employeeName: '', employeeUuid: null });
                 // After server add, refresh header totals from server
                 await refreshHeaderTotals(headerUUID || (resp?.Data?.HeaderUUID || resp?.HeaderUUID || null));
             }
@@ -1341,6 +1408,8 @@ const AddSalesInvoice = () => {
                 PaymentMethodUUID: paymentMethodUUID || paymentMethod || '',
                 OrderDate: uiDateToApiDate(invoiceDate),
                 DueDate: uiDateToApiDate(dueDate),
+                FromDate: uiDateToIsoTimestamp(fromDate),
+                ToDate: uiDateToIsoTimestamp(toDate),
                 CustomerNotes: notes || '',
                 ShippingCharges: parseFloat(shippingCharges) || 0,
                 AdjustmentField: adjustmentLabel || '',
@@ -1401,6 +1470,8 @@ const AddSalesInvoice = () => {
                 PaymentMethodUUID: paymentMethodUUID || paymentMethod || '',
                 OrderDate: uiDateToApiDate(invoiceDate),
                 DueDate: uiDateToApiDate(dueDate),
+                FromDate: uiDateToIsoTimestamp(fromDate),
+                ToDate: uiDateToIsoTimestamp(toDate),
                 Days: parseInt(dueDays) || 0,
                 CustomerNotes: notes || '',
                 ShippingCharges: parseFloat(shippingCharges) || 0,
@@ -1458,6 +1529,8 @@ const AddSalesInvoice = () => {
                 PaymentMethodUUID: paymentMethodUUID || paymentMethod || '',
                 OrderDate: uiDateToApiDate(invoiceDate),
                 DueDate: uiDateToApiDate(dueDate),
+                FromDate: uiDateToIsoTimestamp(fromDate),
+                ToDate: uiDateToIsoTimestamp(toDate),
                 Days: parseInt(dueDays) || 0,
                 CustomerNotes: notes || '',
                 ShippingCharges: parseFloat(shippingCharges) || 0,
@@ -1582,6 +1655,9 @@ const AddSalesInvoice = () => {
                                         <Icon name="edit" size={rf(5)} color={COLORS.primary} />
                                     </TouchableOpacity>
                                 </View>
+
+                                
+                                
                             ) : null
                         }
                     >
@@ -1685,7 +1761,14 @@ const AddSalesInvoice = () => {
                                         getKey={p => (p?.Uuid || p?.Id || p)}
                                         onSelect={v => {
                                             if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
-                                            setProject(v?.ProjectTitle || v); setProjectUUID(v?.Uuid || v);
+                                            setProject(v?.ProjectTitle || v);
+                                            setProjectUUID(v?.Uuid || v);
+                                            // Check IsTimesheetBased property
+                                            if (v && (v.IsTimesheetBased === true || v.IsTimesheetBased === 'true' || v.isTimesheetBased === true || v.isTimesheetBased === 'true')) {
+                                                setShowTimesheetDates(true);
+                                            } else {
+                                                setShowTimesheetDates(false);
+                                            }
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
@@ -1696,6 +1779,104 @@ const AddSalesInvoice = () => {
 
 
                         </View>
+                        {showTimesheetDates && (
+                            <View style={[styles.row, { marginTop: hp(1.5) }]}> 
+                                <View style={styles.col}>
+                                    <TouchableOpacity
+                                        activeOpacity={0.7}
+                                        onPress={() => { if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; } openDatePickerFor('from'); }}
+                                        style={{ marginTop: hp(0.8), opacity: headerEditable ? 1 : 0.6 }}
+                                        disabled={!headerEditable}
+                                    >
+                                        <Text style={inputStyles.label}>From Date</Text>
+                                        <View
+                                            style={[
+                                                inputStyles.box,
+                                                styles.innerFieldBox,
+                                                styles.datePickerBox,
+                                                { alignItems: 'center' },
+                                            ]}
+                                        >
+                                            <Text
+                                                style={[
+                                                    inputStyles.input,
+                                                    styles.datePickerText,
+                                                    !fromDate && {
+                                                        color: COLORS.textLight,
+                                                        fontFamily: TYPOGRAPHY.fontFamilyRegular,
+                                                    },
+                                                    fromDate && {
+                                                        color: COLORS.text,
+                                                        fontFamily: TYPOGRAPHY.fontFamilyMedium,
+                                                    },
+                                                ]}
+                                            >
+                                                {fromDate || 'From Date'}
+                                            </Text>
+                                            <View
+                                                style={[
+                                                    styles.calendarIconContainer,
+                                                    fromDate && styles.calendarIconContainerSelected,
+                                                ]}
+                                            >
+                                                <Icon
+                                                    name="calendar-today"
+                                                    size={rf(3.2)}
+                                                    color={fromDate ? COLORS.primary : COLORS.textLight}
+                                                />
+                                            </View>
+                                        </View>
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={styles.col}>
+                                    <TouchableOpacity
+                                        activeOpacity={0.7}
+                                        onPress={() => { if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; } openDatePickerFor('to'); }}
+                                        style={{ marginTop: hp(0.8), opacity: headerEditable ? 1 : 0.6 }}
+                                        disabled={!headerEditable}
+                                    >
+                                        <Text style={inputStyles.label}>To Date</Text>
+                                        <View
+                                            style={[
+                                                inputStyles.box,
+                                                styles.innerFieldBox,
+                                                styles.datePickerBox,
+                                                { alignItems: 'center' },
+                                            ]}
+                                        >
+                                            <Text
+                                                style={[
+                                                    inputStyles.input,
+                                                    styles.datePickerText,
+                                                    !toDate && {
+                                                        color: COLORS.textLight,
+                                                        fontFamily: TYPOGRAPHY.fontFamilyRegular,
+                                                    },
+                                                    toDate && {
+                                                        color: COLORS.text,
+                                                        fontFamily: TYPOGRAPHY.fontFamilyMedium,
+                                                    },
+                                                ]}
+                                            >
+                                                {toDate || 'To Date'}
+                                            </Text>
+                                            <View
+                                                style={[
+                                                    styles.calendarIconContainer,
+                                                    toDate && styles.calendarIconContainerSelected,
+                                                ]}
+                                            >
+                                                <Icon
+                                                    name="calendar-today"
+                                                    size={rf(3.2)}
+                                                    color={toDate ? COLORS.primary : COLORS.textLight}
+                                                />
+                                            </View>
+                                        </View>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        )}
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>payment Tearm* </Text>
@@ -1960,29 +2141,55 @@ const AddSalesInvoice = () => {
 
                             {/* LINE form: Item | Description | Quantity | Rate | Amount */}
                             <View style={{ marginBottom: hp(1.5) }}>
-                                {/* Item dropdown full width */}
-                                <View style={{ width: '100%', marginBottom: hp(1) }}>
-                                    <Text style={inputStyles.label}>Item*</Text>
-                                    <View style={{ zIndex: 9999, elevation: 20 }}>
-                                        <Dropdown
-                                            placeholder="Select Item"
-                                            value={currentItem.itemName}
-                                            options={masterItems}
-                                            getLabel={it => (it?.name || String(it))}
-                                            getKey={it => (it?.uuid || it?.sku || it)}
-                                            onSelect={v => {
-                                                if (v && typeof v === 'object') {
-                                                    setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.uuid || v?.UUID || v?.sku || null, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '', hsn: v?.hsn || ci?.hsn || '' }));
-                                                } else {
-                                                    setCurrentItem(ci => ({ ...ci, itemName: v, itemNameUuid: null }));
-                                                }
-                                            }}
-                                            renderInModal={true}
-                                            inputBoxStyle={[inputStyles.box, { width: '100%' }]}
-                                            textStyle={inputStyles.input}
-                                        />
+                                {!showTimesheetDates ? (
+                                    <View style={{ width: '100%', marginBottom: hp(1) }}>
+                                        <Text style={inputStyles.label}>Item*</Text>
+                                        <View style={{ zIndex: 9999, elevation: 20 }}>
+                                            <Dropdown
+                                                placeholder="Select Item"
+                                                value={currentItem.itemName}
+                                                options={masterItems}
+                                                getLabel={it => (it?.name || String(it))}
+                                                getKey={it => (it?.uuid || it?.sku || it)}
+                                                onSelect={v => {
+                                                    if (v && typeof v === 'object') {
+                                                        setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.uuid || v?.UUID || v?.sku || null, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '', hsn: v?.hsn || ci?.hsn || '' }));
+                                                    } else {
+                                                        setCurrentItem(ci => ({ ...ci, itemName: v, itemNameUuid: null }));
+                                                    }
+                                                }}
+                                                renderInModal={true}
+                                                inputBoxStyle={[inputStyles.box, { width: '100%' }]}
+                                                textStyle={inputStyles.input}
+                                            />
+                                        </View>
                                     </View>
-                                </View>
+                                ) : null}
+
+                                {showTimesheetDates ? (
+                                    <View style={{ width: '100%', marginBottom: hp(1) }}>
+                                        <Text style={inputStyles.label}>Employee</Text>
+                                        <View style={{ zIndex: 9999, elevation: 20 }}>
+                                            <Dropdown
+                                                placeholder="Select Employee"
+                                                value={currentItem.employeeName}
+                                                options={employeesOptions}
+                                                getLabel={emp => (emp?.FullName || emp?.Name || String(emp))}
+                                                getKey={emp => (emp?.UUID || emp?.Uuid || emp?.Id || emp)}
+                                                onSelect={v => {
+                                                    if (v && typeof v === 'object') {
+                                                        setCurrentItem(ci => ({ ...ci, employeeName: v?.FullName || v?.Name || String(v), employeeUuid: v?.UUID || v?.Uuid || v?.Id || null }));
+                                                    } else {
+                                                        setCurrentItem(ci => ({ ...ci, employeeName: v, employeeUuid: null }));
+                                                    }
+                                                }}
+                                                renderInModal={true}
+                                                inputBoxStyle={[inputStyles.box, { width: '100%' }]}
+                                                textStyle={inputStyles.input}
+                                            />
+                                        </View>
+                                    </View>
+                                ) : null}
 
                                 {/* Description full width */}
                                 <View style={{ width: '100%', marginBottom: hp(1) }}>
@@ -1998,24 +2205,25 @@ const AddSalesInvoice = () => {
                                     />
                                 </View>
 
-                                {/* HSN/SAC field */}
-                                <View style={{ width: '100%', marginBottom: hp(1) }}>
-                                    <Text style={inputStyles.label}>HSN/SAC</Text>
-                                    <View style={[inputStyles.box, { marginTop: hp(0.5), width: '100%' }]}>
-                                        <TextInput
-                                            style={[inputStyles.input]}
-                                            value={currentItem.hsn || ''}
-                                            onChangeText={t => setCurrentItem(ci => ({ ...ci, hsn: t }))}
-                                            placeholder="Enter HSN/SAC code"
-                                            placeholderTextColor={COLORS.textLight}
-                                        />
+                                {!showTimesheetDates ? (
+                                    <View style={{ width: '100%', marginBottom: hp(1) }}>
+                                        <Text style={inputStyles.label}>HSN/SAC</Text>
+                                        <View style={[inputStyles.box, { marginTop: hp(0.5), width: '100%' }]}>
+                                            <TextInput
+                                                style={[inputStyles.input]}
+                                                value={currentItem.hsn || ''}
+                                                onChangeText={t => setCurrentItem(ci => ({ ...ci, hsn: t }))}
+                                                placeholder="Enter HSN/SAC code"
+                                                placeholderTextColor={COLORS.textLight}
+                                            />
+                                        </View>
                                     </View>
-                                </View>
+                                ) : null}
 
                                 {/* Two fields in one line: Quantity & Rate */}
                                 <View style={[styles.row, { justifyContent: 'space-between' }]}>
                                     <View style={{ width: '48%' }}>
-                                        <Text style={inputStyles.label}>Quantity*</Text>
+                                        <Text style={inputStyles.label}>{showTimesheetDates ? 'Total Hour Worked*' : 'Quantity*'}</Text>
                                         <View style={[inputStyles.box, { marginTop: hp(0.5), width: '100%' }]}>
                                             <TextInput
                                                 style={[inputStyles.input, { textAlign: 'center' }]}
@@ -2069,7 +2277,7 @@ const AddSalesInvoice = () => {
                                             <TouchableOpacity
                                                 activeOpacity={0.8}
                                                 style={[styles.addBtn, { backgroundColor: '#6c757d', marginLeft: wp(3) }]}
-                                                onPress={() => { setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' }); setEditItemId(null); }}
+                                                onPress={() => { setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null, desc: '', hsn: '', rate: '', employeeName: '', employeeUuid: null }); setEditItemId(null); }}
                                             >
                                                 <Text style={styles.addBtnText}>Cancel</Text>
                                             </TouchableOpacity>
@@ -2144,10 +2352,10 @@ const AddSalesInvoice = () => {
                                                     <View style={styles.thead}>
                                                         <View style={styles.tr}>
                                                             <Text style={[styles.th, { width: wp(10) }]}>Sr.No</Text>
-                                                            <Text style={[styles.th, { width: wp(30) }]}>Item Details</Text>
+                                                            <Text style={[styles.th, { width: wp(30) }]}>{showTimesheetDates ? 'Employee' : 'Item Details'}</Text>
                                                             <Text style={[styles.th, { width: wp(30) }]}>Description</Text>
-                                                            <Text style={[styles.th, { width: wp(25) }]}>HSN/SAC</Text>
-                                                            <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
+                                                            {!showTimesheetDates && <Text style={[styles.th, { width: wp(25) }]}>HSN/SAC</Text>}
+                                                            <Text style={[styles.th, { width: wp(20) }]}>{showTimesheetDates ? 'Total Hours Worked' : 'Quantity'}</Text>
                                                             <Text style={[styles.th, { width: wp(20) }]}>Rate</Text>
                                                             <Text style={[styles.th, { width: wp(20) }]}>Amount</Text>
                                                             <Text style={[styles.th, { width: wp(40) }]}>Action</Text>
@@ -2161,14 +2369,16 @@ const AddSalesInvoice = () => {
                                                                     <Text style={styles.tdText}>{start + idx + 1}</Text>
                                                                 </View>
                                                                 <View style={[styles.td, { width: wp(30), paddingLeft: wp(2) }]}>
-                                                                    <Text style={styles.tdText}>{item.name}</Text>
+                                                                    <Text style={styles.tdText}>{showTimesheetDates ? (item.employeeName || item.name || '-') : (item.name || '-')}</Text>
                                                                 </View>
                                                                 <View style={[styles.td, { width: wp(30) }]}>
                                                                     <Text style={styles.tdText}>{item.desc}</Text>
                                                                 </View>
-                                                                <View style={[styles.td, { width: wp(25) }]}>
-                                                                    <Text style={styles.tdText}>{item.hsn || '-'}</Text>
-                                                                </View>
+                                                                {!showTimesheetDates && (
+                                                                    <View style={[styles.td, { width: wp(25) }]}>
+                                                                        <Text style={styles.tdText}>{item.hsn || '-'}</Text>
+                                                                    </View>
+                                                                )}
                                                                 <View style={[styles.td, { width: wp(20) }]}>
                                                                     <Text style={styles.tdText}>{item.qty}</Text>
                                                                 </View>
