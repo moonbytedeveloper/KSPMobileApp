@@ -24,7 +24,7 @@ import { useNavigation } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
-import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getVendors, getCountries, getPurchaseOrderNumbers, addPurchasePerformaInvoiceHeader, addPurchasePerformaInvoiceLine, updatePurchasePerformaInvoiceHeader, getPurchasePerformaInvoiceHeaderById, getPurchasePerformaInvoiceLines, updatePurchasePerformaInvoiceLine, deletePurchasePerformaInvoiceLine, getItems } from '../../../../api/authServices';
+import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllPurchaseInquiryNumbers, getVendors, getCountries, getPurchaseOrderNumbers, addPurchasePerformaInvoiceHeader, addPurchasePerformaInvoiceLine, updatePurchasePerformaInvoiceHeader, getPurchasePerformaInvoiceHeaderById, getPurchasePerformaInvoiceLines, updatePurchasePerformaInvoiceLine, deletePurchasePerformaInvoiceLine, getItems, uploadFiles } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
 
 const COL_WIDTHS = {
@@ -111,7 +111,11 @@ const AddSalesPerfomaInvoice = () => {
     const customers = ['Acme Corp', 'Beta Ltd'];
     const state = ['Gujarat', 'Delhi', 'Mumbai'];
     const city = ['vadodara', 'surat',];
-
+    const screenTheme = {
+        text: COLORS.text,
+        textLight: COLORS.textLight,
+        bg: '#fff',
+    };
     const paymentMethods = [
         'Cash',
         'Bank Transfer',
@@ -132,7 +136,13 @@ const AddSalesPerfomaInvoice = () => {
     const [headerSubmitting, setHeaderSubmitting] = useState(false);
     const [headerUUID, setHeaderUUID] = useState(null);
     const [headerSubmitted, setHeaderSubmitted] = useState(false);
-    const [headerEditable, setHeaderEditable] = useState(true);
+    const [headerEditable, setHeaderEditable] = useState(() => {
+        // If this screen was opened with a prefill/header UUID, start in view mode.
+        // Otherwise (creating a new header), allow editing by default so header can open.
+        const hasPrefill = !!(route?.params?.prefillHeader || route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.UUID);
+        return !hasPrefill;
+    });
+    const [uploadedFilePath, setUploadedFilePath] = useState(null);
     const [paymentTermUuid, setPaymentTermUuid] = useState(null);
     const [paymentMethodUUID, setPaymentMethodUUID] = useState(null);
     const [projectUUID, setProjectUUID] = useState(null);
@@ -156,7 +166,7 @@ const AddSalesPerfomaInvoice = () => {
                     getPaymentTerms(),
                     getPaymentMethods(),
                     fetchProjects(),
-                    getAllInquiryNumbers(),
+                    getAllPurchaseInquiryNumbers(),
                     getPurchaseOrderNumbers(),
                     getPurchaseOrderNumbers(),
                 ]);
@@ -259,21 +269,34 @@ const AddSalesPerfomaInvoice = () => {
                 const purchaseOrdersList = extractArray(purchaseOrdersResp);
                 const normalizedPurchaseOrders = (Array.isArray(purchaseOrdersList) ? purchaseOrdersList : []).map((r) => {
                     console.log('Raw purchase order data:', r);
-                    const orderNo = r?.PurchaseOrderNo ?? r?.PurchaseOrderNumber ?? r?.OrderNumber ?? r?.OrderNo ?? r?.Name ?? r?.Title ?? String(r);
-                    const uuid = r?.UUID || r?.Uuid || r?.Id || r?.PurchaseOrderUUID || r?.PurchaseOrderId || orderNo;
-                    const rawCandidate = r?.PurchaseOrderNo ?? r?.PurchaseOrderNumber ?? r?.OrderNumber ?? r?.OrderNo ?? r?.Name ?? r?.Title ?? r;
-                    const extractString = (val) => {
-                        if (val === null || val === undefined) return '';
-                        if (typeof val === 'string') return val;
-                        if (typeof val === 'number' || typeof val === 'boolean') return String(val);
-                        try {
-                            const sub = val?.Name || val?.PurchaseOrderNo || val?.PurchaseOrderNumber || val?.OrderNo || val?.DisplayName || val?.Title;
-                            if (typeof sub === 'string' && sub.trim() !== '') return sub;
-                        } catch (e) { }
-                        try { return JSON.stringify(val); } catch (e) { return String(val); }
-                    };
-                    const orderNoStr = extractString(rawCandidate);
-                    return { UUID: uuid, OrderNo: orderNoStr, raw: r };
+                    const uuid = r?.UUID || r?.Uuid || r?.Id || r?.PurchaseOrderUUID || r?.PurchaseOrderId || null;
+                    // Prefer explicit readable fields; handle shapes like { Uuid: '...', Number: '1-003' }
+                    const orderNoCandidates = [
+                        r?.PurchaseOrderNo,
+                        r?.PurchaseOrderNumber,
+                        r?.OrderNumber,
+                        r?.OrderNo,
+                        r?.Number,
+                        r?.DocumentNumber,
+                        r?.Name,
+                        r?.Title,
+                    ];
+                    let orderNoStr = '';
+                    for (const c of orderNoCandidates) {
+                        if (c === null || c === undefined) continue;
+                        if (typeof c === 'string' && c.trim() !== '') { orderNoStr = c; break; }
+                        if (typeof c === 'number' || typeof c === 'boolean') { orderNoStr = String(c); break; }
+                    }
+                    // Fallback: if r itself is a small object with a Number field, try that
+                    if (!orderNoStr && r && typeof r === 'object') {
+                        if (r?.Number && typeof r.Number === 'string') orderNoStr = r.Number;
+                        else if (r?.DocumentNumber && typeof r.DocumentNumber === 'string') orderNoStr = r.DocumentNumber;
+                    }
+                    // Final fallback: prefer UUID if present, otherwise a short placeholder
+                    if (!orderNoStr) {
+                        orderNoStr = uuid || 'Unknown Purchase Order';
+                    }
+                    return { UUID: uuid || null, OrderNo: orderNoStr, raw: r };
                 });
                 setPurchaseOrderOptions(normalizedPurchaseOrders);
 
@@ -337,7 +360,7 @@ const AddSalesPerfomaInvoice = () => {
             // If headerUUID exists, it's edit mode - make it editable by default
             // Otherwise, it's view mode - make it non-editable
             setHeaderSubmitted(true);
-            setHeaderEditable(!!headerUuid); // true if headerUuid exists (edit mode), false otherwise (view mode)
+            setHeaderEditable(false); // always start prefill in view mode; user must click Edit to enable
             // Do not auto-open header on prefill; user must click Edit to open
         } catch (e) {
             console.warn('prefill header failed', e);
@@ -475,7 +498,7 @@ const AddSalesPerfomaInvoice = () => {
                             itemUuid: l?.ItemUUID || l?.ItemId || l?.Item || null,
                             rate: String(rate ?? 0),
                             desc: l?.Description || l?.Desc || '',
-                            hsn: l?.HSN || l?.HSNCode || l?.HSNSACNO ||'',
+                            hsn: l?.HSN || l?.HSNCode || l?.HSNSACNO || '',
                             qty: String(qty ?? 1),
                             tax: l?.TaxType || l?.Tax || 'IGST',
                             amount: String(Number(amount || 0).toFixed(2)),
@@ -490,9 +513,9 @@ const AddSalesPerfomaInvoice = () => {
                     setLinesLoading(false);
                 }
 
-                // Mark as submitted and editable (for edit mode)
+                // Mark as submitted (view mode). Keep edit disabled until user clicks Edit
                 setHeaderSubmitted(true);
-                setHeaderEditable(true);
+                setHeaderEditable(false);
                 // Do not auto-open header here; user must click Edit to make changes
             } catch (e) {
                 console.error('Error fetching header data:', e);
@@ -926,7 +949,7 @@ const AddSalesPerfomaInvoice = () => {
         setHeaderSubmitting(false);
         setHeaderUUID(null);
         setHeaderSubmitted(false);
-        setHeaderEditable(true);
+        setHeaderEditable(false);
         setHeaderForm({
             companyName: '',
             opportunityTitle: '',
@@ -1096,7 +1119,8 @@ const AddSalesPerfomaInvoice = () => {
                 UUID: headerUUID,
                 SalesInvNo: headerForm.salesInquiryText || '',
                 SalesInqNoUUID: salesInquiryUuid || headerForm.salesInquiryUUID || '',
-                SalesOrderNo: salesOrderUuid || headerForm.clientName || '',
+                // pass the selected order UUID to server (prefer purchaseOrderUuid)
+                SalesOrderNo: purchaseOrderUuid || salesOrderUuid || headerForm.clientName || '',
                 CustomerUUID: headerForm.CustomerUUID || headerForm.CustomerUUID || '',
                 ProjectUUID: projectUUID || project || '',
                 PaymentTermUUID: paymentTermUuid || paymentTerm || '',
@@ -1111,7 +1135,7 @@ const AddSalesPerfomaInvoice = () => {
                 SubTotal: parseFloat(computeSubtotal()) || 0,
                 TotalTax: parseFloat(totalTax) || 0,
                 TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) - (parseFloat(discount) || 0) + (parseFloat(totalTax) || 0),
-                FilePath: file?.uri || file?.name || '',
+                FilePath: uploadedFilePath || file?.uri || file?.name || '',
                 Notes: notes || '',
             };
 
@@ -1133,7 +1157,10 @@ const AddSalesPerfomaInvoice = () => {
             setHeaderSubmitting(false);
         }
     };
-    const onCancel = () => { };
+    const onCancel = () => {
+        resetFormState();
+        try { navigation.goBack(); } catch (e) { }
+    };
 
     const uiDateToApiDate = uiDateStr => {
         if (!uiDateStr) return '';
@@ -1159,7 +1186,7 @@ const AddSalesPerfomaInvoice = () => {
             console.log('paymentTermUuid:', paymentTermUuid);
             console.log('paymentMethodUUID:', paymentMethodUUID);
             console.log('======================');
-            
+
             const payload = {
                 UUID: headerUUID || headerForm.UUID || '',
                 InvoiceNo: headerForm.salesInquiryText || '',
@@ -1182,7 +1209,7 @@ const AddSalesPerfomaInvoice = () => {
                 TermsConditions: terms || '',
                 Discount: parseFloat(discount) || 0,
                 OrderDate: uiDateToApiDate(invoiceDate),
-                FilePath: file?.uri || file?.name || '',
+                FilePath: uploadedFilePath || file?.uri || file?.name || '',
                 SubTotal: parseFloat(computeSubtotal()) || 0,
                 TotalTax: parseFloat(totalTax) || 0,
                 TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) - (parseFloat(discount) || 0) + (parseFloat(totalTax) || 0),
@@ -1240,7 +1267,7 @@ const AddSalesPerfomaInvoice = () => {
                 OrderDate: uiDateToApiDate(invoiceDate),
                 Note: notes || '',
                 TermsConditions: terms || '',
-                FilePath: file?.uri || file?.name || '',
+                FilePath: uploadedFilePath || file?.uri || file?.name || '',
                 SubTotal: parseFloat(computeSubtotal()) || 0,
                 TotalTax: parseFloat(totalTax) || 0,
                 TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) - (parseFloat(discount) || 0) + (parseFloat(totalTax) || 0),
@@ -1311,6 +1338,30 @@ const AddSalesPerfomaInvoice = () => {
                     type: selectedFile.type,
                     size: selectedFile.size,
                 });
+
+                // Immediately upload the picked file to server with fixed Filepath
+                try {
+                    const fileObj = {
+                        name: selectedFile.name || selectedFile.fileName || 'attachment',
+                        uri: selectedFile.uri || selectedFile.fileUri || selectedFile.uriString,
+                        type: selectedFile.type || selectedFile.mime || 'application/octet-stream',
+                        size: selectedFile.size,
+                    };
+                    // reset any previous uploaded path while uploading
+                    setUploadedFilePath(null);
+                    const upResp = await uploadFiles(fileObj, { filepath: 'PurchaseProformaInvoiceDocuments' });
+                    const upData = upResp?.Data || upResp || {};
+                    const uploaded = upData?.Files || upData?.files || upData?.UploadedFiles || upData?.FilePaths || upData || [];
+                    const finalRefs = Array.isArray(uploaded) ? uploaded : (uploaded ? [uploaded] : []);
+                    const paths = finalRefs.map(r => {
+                        try { return r?.RemoteResponse?.path || r?.path || r?.FilePath || r?.Path || (typeof r === 'string' ? r : null); } catch (_) { return null; }
+                    }).filter(Boolean);
+                    if (paths.length === 1) setUploadedFilePath(paths[0]);
+                    else if (paths.length > 1) setUploadedFilePath(paths);
+                } catch (e) {
+                    console.warn('upload file failed', e);
+                    Alert.alert('Upload failed', 'Unable to upload file. You can try again.');
+                }
             }
         } catch (err) {
             if (isCancel && isCancel(err)) {
@@ -1322,6 +1373,115 @@ const AddSalesPerfomaInvoice = () => {
 
     const removeFile = () => {
         setFile(null);
+        setUploadedFilePath(null);
+    };
+
+    // Reset all form state to initial defaults
+    const resetFormState = () => {
+        setHeaderForm({
+            companyName: '',
+            opportunityTitle: '',
+            salesInquiryText: '',
+            salesInquiry: '',
+            clientName: '',
+            phone: '',
+            email: '',
+        });
+        setBillingForm({ buildingNo: '', street1: '', street2: '', postalCode: '', country: '', state: '', city: '' });
+        setShippingForm({ buildingNo: '', street1: '', street2: '', postalCode: '', country: '', state: '', city: '' });
+        setIsShippingSame(false);
+        setItems([]);
+        setInvoiceDate('');
+        setDueDate('');
+        setOpenDatePicker(false);
+        setDatePickerField(null);
+        setDatePickerSelectedDate(new Date());
+        setPaymentTerm('');
+        setNotes('');
+        setTerms('');
+        setProject('');
+        setPaymentMethod('');
+        setShippingCharges('0');
+        setAdjustments('0');
+        setAdjustmentLabel('Adjustments');
+        setTotalTax('0');
+        setServerTotalAmount('');
+        setDiscount('0');
+        setFile(null);
+        setShowShippingTip(false);
+        setShowAdjustmentTip(false);
+        setPrefillLoading(false);
+        setShowProformaInvoiceNoField(false);
+        setHeaderUUID(null);
+        setHeaderSubmitted(false);
+        setHeaderEditable(false);
+        setExpandedId(null);
+    };
+
+    // When user clicks Edit, fetch header by UUID and prefill autogenerated fields
+    const handleEditPress = async () => {
+        try {
+            setHeaderEditable(true);
+            setExpandedId(1);
+            setShowProformaInvoiceNoField(true);
+
+            const headerUuid = headerUUID || headerForm?.UUID || route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.UUID || null;
+            if (!headerUuid) return;
+            setPrefillLoading(true);
+
+            const cmp = route?.params?.cmpUuid || route?.params?.cmpUUID || route?.params?.cmp || undefined;
+            const env = route?.params?.envUuid || route?.params?.envUUID || route?.params?.env || undefined;
+            const resp = await getPurchasePerformaInvoiceHeaderById({ headerUuid, cmpUuid: cmp, envUuid: env });
+            const data = resp?.Data || resp || null;
+            if (!data) return;
+
+            // Prefill only the autogenerated / header-identifying fields and a few common props
+            setHeaderForm(s => ({
+                ...s,
+                salesInquiryText: data?.SalesPerInvNo || data?.PerformaInvoiceNumber || data?.PerformaInvoiceNo || data?.PerformaInvoice || data?.PerformaNo || data?.InvoiceNo || s.salesInquiryText || '',
+                PerformaInvoiceNo: data?.PerformaInvoiceNo || data?.PerformaInvoiceNumber || data?.PerformaInvoice || data?.PerformaNo || data?.InvoiceNo || s.PerformaInvoiceNo || '',
+                performaInvoiceNumber: data?.PerformaInvoiceNumber || data?.PerformaInvoiceNo || data?.PerformaInvoice || data?.PerformaNo || data?.InvoiceNumber || s.performaInvoiceNumber || '',
+                salesInquiry: data?.SalesInqNo || data?.SalesInquiryNo || data?.InquiryNo || s.salesInquiry || '',
+                clientName: data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || s.clientName || '',
+                CustomerUUID: data?.CustomerUUID || data?.CustomerId || s.CustomerUUID || null,
+                CustomerName: data?.CustomerName || s.CustomerName || '',
+            }));
+
+            if (data?.OrderDate) {
+                const orderDate = data.OrderDate;
+                if (orderDate.includes('-') && orderDate.length === 10) {
+                    const [yyyy, mm, dd] = orderDate.split('-');
+                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    setInvoiceDate(`${dd}-${months[parseInt(mm) - 1]}-${yyyy}`);
+                } else {
+                    setInvoiceDate(data.OrderDate);
+                }
+            }
+            if (data?.DueDate) {
+                const dueDateVal = data.DueDate;
+                if (dueDateVal.includes('-') && dueDateVal.length === 10) {
+                    const [yyyy, mm, dd] = dueDateVal.split('-');
+                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    setDueDate(`${dd}-${months[parseInt(mm) - 1]}-${yyyy}`);
+                } else {
+                    setDueDate(data.DueDate);
+                }
+            }
+
+            setShippingCharges(String(data?.ShippingCharges ?? data?.ShippingCharge ?? 0));
+            setAdjustments(String(data?.AdjustmentPrice ?? data?.Adjustment ?? 0));
+            setTerms(data?.TermsConditions || data?.Terms || '');
+            setNotes(data?.CustomerNotes || data?.Notes || '');
+            setHeaderUUID(data?.UUID || data?.Id || data?.HeaderUUID || headerUuid);
+            if (data?.FilePath) setFile({ uri: data.FilePath, name: data.FilePath });
+            setHeaderSubmitted(true);
+            if (typeof setHeaderResponse === 'function') setHeaderResponse(data);
+        } catch (e) {
+            console.warn('handleEditPress failed', e);
+            Alert.alert('Error', 'Unable to load header for edit');
+        } finally {
+            setPrefillLoading(false);
+        }
     };
 
     if (prefillLoading) {
@@ -1338,6 +1498,7 @@ const AddSalesPerfomaInvoice = () => {
                 <AppHeader
                     title="Add Purchase Perfoma Invoice"
                     onLeftPress={() => {
+                        resetFormState();
                         navigation.goBack();
                     }}
                 />
@@ -1350,13 +1511,13 @@ const AddSalesPerfomaInvoice = () => {
                     <AccordionSection
                         id={1}
                         title="Header"
-                        expanded={expandedId === 1} 
+                        expanded={expandedId === 1}
                         onToggle={headerSubmitted && !headerEditable ? () => { } : toggleSection}
                         rightActions={
                             headerSubmitted && !headerEditable ? (
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
                                     <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
-                                    <TouchableOpacity onPress={() => { setHeaderEditable(true); setExpandedId(1); setShowProformaInvoiceNoField(true); }}>
+                                    <TouchableOpacity onPress={handleEditPress}>
                                         <Icon name="edit" size={rf(5)} color={COLORS.primary} />
                                     </TouchableOpacity>
                                 </View>
@@ -1399,8 +1560,8 @@ const AddSalesPerfomaInvoice = () => {
                                             const inquiryNo = v?.InquiryNo || String(v);
                                             const inquiryUuid = v?.UUID || null;
                                             console.log('Inquiry UUID being set:', inquiryUuid);
-                                            setHeaderForm(s => ({ 
-                                                ...s, 
+                                            setHeaderForm(s => ({
+                                                ...s,
                                                 salesInquiry: inquiryNo
                                             }));
                                             setSalesInquiryUuid(inquiryUuid);
@@ -1413,7 +1574,7 @@ const AddSalesPerfomaInvoice = () => {
                                     textStyle={inputStyles.input}
                                 />
                             </View>
-                            {(headerEditable || route?.params?.prefillHeader || route?.params?.headerData) && (
+                            {headerEditable && (
                                 <View style={styles.col}>
                                     <Text style={inputStyles.label}>Proforma Invoice No.</Text>
                                     <View style={[inputStyles.box]} pointerEvents="box-none">
@@ -1443,7 +1604,7 @@ const AddSalesPerfomaInvoice = () => {
                                     <View style={{ zIndex: 9999, elevation: 20 }}>
                                         <Dropdown
                                             placeholder="Select Purchase Order"
-                                            value={headerForm?.SalesOrderNo || headerForm?.PurchaseOrderNo}
+                                            value={headerForm?.SalesOrderNo?.Number || headerForm?.PurchaseOrderNo}
                                             options={purchaseOrderOptions}
                                             getLabel={p => (p?.OrderNo || String(p))}
                                             getKey={p => (p?.UUID || p)}
@@ -1453,11 +1614,15 @@ const AddSalesPerfomaInvoice = () => {
                                                 if (v && typeof v === 'object') {
                                                     const orderUuid = v?.UUID || v?.Id || null;
                                                     console.log('Order UUID being set:', orderUuid);
+                                                    // show only the order number to the user
                                                     setHeaderForm(s => ({ ...s, SalesOrderNo: v?.OrderNo || v?.PurchaseOrderNo || String(v) }));
+                                                    // store UUIDs for payload
                                                     setPurchaseOrderUuid(orderUuid);
+                                                    setSalesOrderUuid(orderUuid);
                                                 } else {
                                                     setHeaderForm(s => ({ ...s, SalesOrderNo: v }));
                                                     setPurchaseOrderUuid(null);
+                                                    setSalesOrderUuid(null);
                                                 }
                                             }}
                                             inputBoxStyle={[inputStyles.box, { marginTop: hp(1) }]}
@@ -1714,8 +1879,8 @@ const AddSalesPerfomaInvoice = () => {
                                 </View>
 
                                 {/* Description and HSN/SAC in a row */}
-                                <View style={[ {marginBottom: hp(1) }]}>
-                                    <View style={[{ width: '100%', marginBottom: hp(1) } ]}>
+                                <View style={[{ marginBottom: hp(1) }]}>
+                                    <View style={[{ width: '100%', marginBottom: hp(1) }]}>
                                         <Text style={inputStyles.label}>Description</Text>
                                         <TextInput
                                             style={[styles.descInput, { minHeight: hp(10), width: '100%' }]}
@@ -1874,14 +2039,14 @@ const AddSalesPerfomaInvoice = () => {
                                                 <View style={styles.table}>
                                                     <View style={styles.thead}>
                                                         <View style={styles.tr}>
-                                                            <Text style={[styles.th, { width: wp(10) }]}>Sr.No</Text>
-                                                            <Text style={[styles.th, { width: wp(25) }]}>Item Details</Text>
-                                                            <Text style={[styles.th, { width: wp(25) }]}>Description</Text>
-                                                            <Text style={[styles.th, { width: wp(20) }]}>HSN/SAC</Text>
-                                                            <Text style={[styles.th, { width: wp(15) }]}>Quantity</Text>
-                                                            <Text style={[styles.th, { width: wp(15) }]}>Rate</Text>
-                                                            <Text style={[styles.th, { width: wp(15) }]}>Amount</Text>
-                                                            <Text style={[styles.th, { width: wp(35) }]}>Action</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(10) }]}>Sr.No</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(25) }]}>Item Details</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(25) }]}>Description</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(20) }]}>HSN/SAC</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(15) }]}>Quantity</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(15) }]}>Rate</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(15) }]}>Amount</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(35) }]}>Action</Text>
                                                         </View>
                                                     </View>
 

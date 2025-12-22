@@ -308,7 +308,10 @@ const ManageSalesOrder = () => {
       if (data?.AdjustmentField !== undefined) setAdjustmentLabel(data.AdjustmentField || 'Adjustments');
       if (data?.AdjustmentPrice !== undefined) setAdjustments(String(data.AdjustmentPrice || 0));
       if (data?.TotalTax !== undefined) setTotalTax(String(data.TotalTax || 0));
-      if (data?.SubTotal !== undefined) setServerTotalAmount(String(data.SubTotal || ''));
+      try {
+        const headerTotal = data?.TotalAmount ?? data?.NetAmount ?? data?.HeaderTotalAmount ?? data?.SubTotal ?? null;
+        if (headerTotal !== null && typeof headerTotal !== 'undefined') setServerTotalAmount(String(headerTotal));
+      } catch (e) { /* ignore */ }
 
       // Set response data if this is a saved header
       if (data?.UUID) {
@@ -778,12 +781,8 @@ const ManageSalesOrder = () => {
 
       const subtotalNum = parseFloat(computeSubtotal()) || 0;
       const totalTaxNum = parseFloat(totalTax) || 0;
-      // If server returned a TotalAmount, treat it as the header lines total and
-      // add shipping charges and adjustments on top of it for display/submission.
-      const serverNum = (serverTotalAmount !== null && serverTotalAmount !== undefined && String(serverTotalAmount).trim() !== '') ? parseFloat(serverTotalAmount) : NaN;
-      const totalAmountNum = (!isNaN(serverNum))
-        ? (serverNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0))
-        : (subtotalNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + totalTaxNum);
+      // Always compute TotalAmount from subtotal + shipping + adjustments + tax
+      const totalAmountNum = subtotalNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + totalTaxNum;
 
       const payload = {
         UUID: headerResponse?.UUID || '',
@@ -1882,10 +1881,8 @@ const ManageSalesOrder = () => {
 
       const subtotalNum = parseFloat(computeSubtotal()) || 0;
       const totalTaxNum = parseFloat(totalTax) || 0;
-      const serverNum = (serverTotalAmount !== null && serverTotalAmount !== undefined && String(serverTotalAmount).trim() !== '') ? parseFloat(serverTotalAmount) : NaN;
-      const totalAmountNum = (!isNaN(serverNum))
-        ? (serverNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0))
-        : (subtotalNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + totalTaxNum);
+      // Always compute TotalAmount from subtotal + shipping + adjustments + tax
+      const totalAmountNum = subtotalNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + totalTaxNum;
 
       const payload = {
         UUID: headerResponse?.UUID || '',
@@ -2260,9 +2257,9 @@ const ManageSalesOrder = () => {
                     <Text style={inputStyles.input}>{renderLabel(headerForm.CustomerName, ['CustomerName', 'Name', 'DisplayName'])}</Text>
                   </View>
                 ) : (
-                  <Dropdown
+                    <Dropdown
                     placeholder="Customer Name*"
-                    value={headerForm.CustomerName}
+                    value={headerForm.CustomerUUID || headerForm.CustomerName}
                     options={customersOptions}
                     getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
                     getKey={c => (c?.UUID || c?.Id || c)}
@@ -3228,10 +3225,9 @@ const ManageSalesOrder = () => {
                   <Text style={styles.valueBold}>
                     ₹
                     {(() => {
-                      const serverNum = (serverTotalAmount !== null && serverTotalAmount !== undefined && String(serverTotalAmount).trim() !== '') ? parseFloat(serverTotalAmount) : NaN;
-                      const displayed = (!isNaN(serverNum))
-                        ? (serverNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0))
-                        : ((parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax || 0) || 0));
+                      const subtotal = parseFloat(computeSubtotal()) || 0;
+                      const tax = parseFloat(totalTax) || 0;
+                      const displayed = subtotal + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + tax;
                       return displayed.toFixed(2);
                     })()}
                   </Text>

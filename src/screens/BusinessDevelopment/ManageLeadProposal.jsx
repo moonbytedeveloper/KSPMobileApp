@@ -6,7 +6,7 @@ import { wp, hp, rf, safeAreaTop } from '../../utils/responsive';
 import Dropdown from '../../components/common/Dropdown';
 import AppHeader from '../../components/common/AppHeader';
 import BottomSheetConfirm from '../../components/common/BottomSheetConfirm';
-import { addLeadProposal, updateLeadProposal, deleteLeadProposal, getEmployees, getLeadProposalsList } from '../../api/authServices';
+import { addLeadProposal, updateLeadProposal, deleteLeadProposal, getEmployees, getLeadProposalsList, uploadFiles } from '../../api/authServices';
 import { getUUID, getCMPUUID, getENVUUID } from '../../api/tokenStorage';
 import DatePickerBottomSheet from '../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
@@ -168,6 +168,7 @@ const ManageLeadProposal = ({ navigation, route }) => {
   const [submittedVal, setSubmittedVal] = useState(new Date());
   const [followVal, setFollowVal] = useState(new Date());
   const [proposalDoc, setProposalDoc] = useState(null);
+  const [proposalFilePath, setProposalFilePath] = useState(null);
   const [errors, setErrors] = useState({});
   const [employees, setEmployees] = useState([]);
   const [pendingFollowUpTakerName, setPendingFollowUpTakerName] = useState('');
@@ -482,7 +483,7 @@ const ManageLeadProposal = ({ navigation, route }) => {
     if (!customerName) next.customerName = 'Customer name is required';
     if (!title) next.title = 'Title is required';
     if (!proposalNumber) next.proposalNumber = 'Proposal number is required';
-    if (!proposalDoc?.name) next.proposalDoc = 'Proposal document is required';
+    if (!proposalDoc?.name && !proposalFilePath) next.proposalDoc = 'Proposal document is required';
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -529,8 +530,8 @@ const ManageLeadProposal = ({ navigation, route }) => {
         Proposal_Number: proposalNumber,
         Title: title,
         Customer_Name: customerName,
-        // send file object for multipart
-        ProposalDocumentFile: proposalDoc ? { uri: proposalDoc?.uri, name: proposalDoc?.name, type: proposalDoc?.type } : undefined,
+        // server-returned file path (preferred) or local uri as fallback
+        ProposalDocument: proposalFilePath || (proposalDoc ? proposalDoc?.uri : undefined),
         Followup_Taker_Name: resolveEmployeeKey(followUpTaker) || '',
         Followup_Date: toApiDateISO(followUpDate),
         Submitted_Date: toApiDateISO(submittedDate),
@@ -548,6 +549,7 @@ const ManageLeadProposal = ({ navigation, route }) => {
       setErrors({});
       // Success-only cleanup: clear form fields
       setProposalDoc(null);
+      setProposalFilePath(null);
       setFollowUpTaker(null);
       setPendingFollowUpTakerName('');
       setSubmittedDate('');
@@ -596,13 +598,34 @@ const ManageLeadProposal = ({ navigation, route }) => {
           return;
         }
 
-        // Set the selected document
-        setProposalDoc({
+        // Set the selected document locally
+        const docObj = {
           name: file.name,
           uri: file.uri,
           type: file.type,
           size: file.size,
-        });
+        };
+        setProposalDoc(docObj);
+
+        // Immediately upload the file to server with fixed Filepath
+        try {
+          const uploadResp = await uploadFiles(docObj, { filepath: 'ProposalDocument' });
+          const upData = uploadResp?.Data || uploadResp || {};
+          const uploaded = upData?.Files || upData?.files || upData?.UploadedFiles || upData?.FilePaths || upData || [];
+          const finalRefs = Array.isArray(uploaded) ? uploaded : (uploaded ? [uploaded] : []);
+
+          const paths = finalRefs.map(r => {
+            try { return r?.RemoteResponse?.path || r?.path || r?.FilePath || (typeof r === 'string' ? r : null); } catch (_) { return null; }
+          }).filter(Boolean);
+
+          if (paths.length) {
+            // prefer single path; if multiple, join with comma
+            setProposalFilePath(paths.join(','));
+          }
+        } catch (uploadErr) {
+          console.warn('Proposal upload failed', uploadErr);
+          // Keep local file so user can retry on submit
+        }
       }
     } catch (err) {
       if (isCancel && isCancel(err)) {
@@ -615,6 +638,7 @@ const ManageLeadProposal = ({ navigation, route }) => {
 
   const clearProposalDocument = () => {
     setProposalDoc(null);
+    setProposalFilePath(null);
   };
 
 
@@ -691,12 +715,8 @@ const ManageLeadProposal = ({ navigation, route }) => {
         Submitted_Date: toApiDateISO(submittedDate),
         Amount: Number(amount),
         FinalProposal: Boolean(isFinal),
-        // Handle document update - if new document is selected, use it; otherwise keep existing
-        ProposalDocument: proposalDoc && proposalDoc.uri ? {
-          uri: proposalDoc.uri,
-          name: proposalDoc.name,
-          type: proposalDoc.type
-        } : undefined,
+        // Use uploaded server path when available, otherwise preserve existing uri/name
+        ProposalDocument: proposalFilePath || (proposalDoc && proposalDoc.uri ? proposalDoc.uri : (editingProposal?.documentUri || undefined)),
       };
 
       const [userUuid, cmpUuid, envUuid] = await Promise.all([getUUID(), getCMPUUID(), getENVUUID()]);
@@ -724,6 +744,7 @@ const ManageLeadProposal = ({ navigation, route }) => {
       setProposalNumber('');
       setIsFinal(false);
       setProposalDoc(null);
+      setProposalFilePath(null);
       setErrors({});
       // Also clear route params that might restore follow up taker from navigation
       if (navigation && navigation.setParams) {

@@ -24,7 +24,7 @@ import { useNavigation } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
-import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getVendors, getCountries, getPurchaseOrderNumbers, addPurchaseInvoiceHeader, addPurchaseInvoiceLine, updatePurchaseInvoiceHeader, getPurchaseInvoiceHeaderById, getPurchaseInvoiceHeaders, getPurchaseInvoiceLines, updatePurchaseInvoiceLine, deletePurchaseInvoiceLine, getItems } from '../../../../api/authServices';
+import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllPurchaseInquiryNumbers, getVendors, getCountries, getPurchaseOrderNumbers, addPurchaseInvoiceHeader, addPurchaseInvoiceLine, updatePurchaseInvoiceHeader, getPurchaseInvoiceHeaderById, getPurchaseInvoiceHeaders, getPurchaseInvoiceLines, updatePurchaseInvoiceLine, deletePurchaseInvoiceLine, getItems, uploadFiles } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
 
 const COL_WIDTHS = {
@@ -150,7 +150,11 @@ const AddPurchaseInvoice = () => {
         'Mobile App Development',
 
     ];
-
+   const screenTheme = { 
+    text: COLORS.text,
+    textLight: COLORS.textLight,
+    bg: '#fff',
+  };
     // Lookup option state (bound same as ManageSalesOrder)
     const [paymentTermsOptions, setPaymentTermsOptions] = useState([]);
     const [paymentMethodsOptions, setPaymentMethodsOptions] = useState([]);
@@ -175,6 +179,7 @@ const AddPurchaseInvoice = () => {
     const [headerUUID, setHeaderUUID] = useState(null);
     const [headerSubmitted, setHeaderSubmitted] = useState(false);
     const [headerEditable, setHeaderEditable] = useState(true);
+    const [uploadedFilePath, setUploadedFilePath] = useState(null);
     const [restrictToHeader, setRestrictToHeader] = useState(false);
     const [paymentTermUuid, setPaymentTermUuid] = useState(null);
     const [paymentMethodUUID, setPaymentMethodUUID] = useState(null);
@@ -199,7 +204,7 @@ const AddPurchaseInvoice = () => {
                     getPaymentTerms(),
                     getPaymentMethods(),
                     fetchProjects(),
-                    getAllInquiryNumbers(),
+                    getAllPurchaseInquiryNumbers(),
                     getPurchaseOrderNumbers(),
                 ]);
 
@@ -698,7 +703,7 @@ const AddPurchaseInvoice = () => {
             try {
                 const cmp = await getCMPUUID();
                 const env = await getENVUUID();
-                const resp = await getAllInquiryNumbers({ cmpUuid: cmp, envUuid: env });
+                const resp = await getAllPurchaseInquiryNumbers({ cmpUuid: cmp, envUuid: env });
                 const list = resp?.Data || resp || [];
                 const records = Array.isArray(list?.Records) ? list.Records : (Array.isArray(list) ? list : []);
                 const found = records.find(r =>
@@ -1351,7 +1356,7 @@ const AddPurchaseInvoice = () => {
                 SubTotal: parseFloat(computeSubtotal()) || 0,
                 TotalTax: parseFloat(totalTax) || 0,
                 TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax) || 0),
-                FilePath: file?.uri || file?.name || '',
+                FilePath: uploadedFilePath || file?.uri || file?.name || '',
                 Notes: notes || '',
             };
 
@@ -1425,7 +1430,7 @@ const AddPurchaseInvoice = () => {
                 TermsConditions: terms || '',
                 Discount: parseFloat(shippingCharges) || 0,
                 OrderDate: uiDateToApiDate(invoiceDate) ? new Date(uiDateToApiDate(invoiceDate)).toISOString() : '',
-                FilePath: file?.uri || file?.name || '',
+                FilePath: uploadedFilePath || file?.uri || file?.name || '',
             };
 
             console.log('submitHeader payload ->', payload);
@@ -1495,7 +1500,7 @@ const AddPurchaseInvoice = () => {
                 TermsConditions: terms || '',
                 Discount: parseFloat(shippingCharges) || 0,
                 OrderDate: uiDateToApiDate(invoiceDate) ? new Date(uiDateToApiDate(invoiceDate)).toISOString() : '',
-                FilePath: file?.uri || file?.name || '',
+                FilePath: uploadedFilePath || file?.uri || file?.name || '',
             };
             console.log('updateHeader payload ->', payload);
 
@@ -1560,6 +1565,29 @@ const AddPurchaseInvoice = () => {
                     type: selectedFile.type,
                     size: selectedFile.size,
                 });
+
+                // Immediately upload to server with fixed Filepath
+                try {
+                    const fileObj = {
+                        name: selectedFile.name || selectedFile.fileName || 'attachment',
+                        uri: selectedFile.uri || selectedFile.fileUri || selectedFile.uriString,
+                        type: selectedFile.type || selectedFile.mime || 'application/octet-stream',
+                        size: selectedFile.size,
+                    };
+                    setUploadedFilePath(null);
+                    const upResp = await uploadFiles(fileObj, { filepath: 'PurchaseInvoiceDocuments' });
+                    const upData = upResp?.Data || upResp || {};
+                    const uploaded = upData?.Files || upData?.files || upData?.UploadedFiles || upData?.FilePaths || upData || [];
+                    const finalRefs = Array.isArray(uploaded) ? uploaded : (uploaded ? [uploaded] : []);
+                    const paths = finalRefs.map(r => {
+                        try { return r?.RemoteResponse?.path || r?.path || r?.FilePath || r?.Path || (typeof r === 'string' ? r : null); } catch (_) { return null; }
+                    }).filter(Boolean);
+                    if (paths.length === 1) setUploadedFilePath(paths[0]);
+                    else if (paths.length > 1) setUploadedFilePath(paths);
+                } catch (e) {
+                    console.warn('upload file failed', e);
+                    Alert.alert('Upload failed', 'Unable to upload file. You can try again.');
+                }
             }
         } catch (err) {
             if (isCancel && isCancel(err)) {
@@ -1571,6 +1599,7 @@ const AddPurchaseInvoice = () => {
 
     const removeFile = () => {
         setFile(null);
+        setUploadedFilePath(null);
     };
 
     if (prefillLoading) {
@@ -2112,14 +2141,14 @@ const AddPurchaseInvoice = () => {
                                                 <View style={styles.table}>
                                                     <View style={styles.thead}>
                                                         <View style={styles.tr}>
-                                                            <Text style={[styles.th, { width: wp(10) }]}>Sr.No</Text>
-                                                            <Text style={[styles.th, { width: wp(30) }]}>Item Details</Text>
-                                                            <Text style={[styles.th, { width: wp(25) }]}>Description</Text>
-                                                            <Text style={[styles.th, { width: wp(20) }]}>HSN/SAC</Text>
-                                                            <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
-                                                            <Text style={[styles.th, { width: wp(20) }]}>Rate</Text>
-                                                            <Text style={[styles.th, { width: wp(20) }]}>Amount</Text>
-                                                            <Text style={[styles.th, { width: wp(40) }]}>Action</Text>
+                                                            <Text style={[styles.th, { color:screenTheme.text, width: wp(10) }]}>Sr.No</Text>
+                                                            <Text style={[styles.th, { color:screenTheme.text, width: wp(30) }]}>Item Details</Text>
+                                                            <Text style={[styles.th, { color:screenTheme.text, width: wp(25) }]}>Description</Text>
+                                                            <Text style={[styles.th, { color:screenTheme.text, width: wp(20) }]}>HSN/SAC</Text>
+                                                            <Text style={[styles.th, { color:screenTheme.text, width: wp(20) }]}>Quantity</Text>
+                                                            <Text style={[styles.th, { color:screenTheme.text, width: wp(20) }]}>Rate</Text>
+                                                            <Text style={[styles.th, { color:screenTheme.text, width: wp(20) }]}>Amount</Text>
+                                                            <Text style={[styles.th, { color:screenTheme.text, width: wp(40) }]}>Action</Text>
                                                         </View>
                                                     </View>
 

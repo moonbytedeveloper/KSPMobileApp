@@ -10,7 +10,7 @@ import BottomSheetConfirm from '../../components/common/BottomSheetConfirm';
 import DatePickerBottomSheet from '../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 import { COLORS, TYPOGRAPHY } from '../styles/styles';
-import { fetchUserProjects, fetchUserProjectTasks, fetchExpenseTypes, fetchCurrencies, fetchExpenseUnits, getCountries, getStates, getCities, addExpenseHeader, updateExpenseHeader, addExpenseLine, updateExpenseLine, deleteExpenseLine, fetchExpenseLinesByHeader, fetchExpenses } from '../../api/authServices';
+import { fetchUserProjects, fetchUserProjectTasks, fetchExpenseTypes, fetchCurrencies, fetchExpenseUnits, getCountries, getStates, getCities, addExpenseHeader, updateExpenseHeader, addExpenseLine, updateExpenseLine, deleteExpenseLine, fetchExpenseLinesByHeader, fetchExpenses, uploadFiles } from '../../api/authServices';
 import { getCMPUUID, getENVUUID, getUUID } from '../../api/tokenStorage';
 import Loader from '../../components/common/Loader';
 
@@ -164,6 +164,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
 
   const [applyForApproval, setApplyForApproval] = useState(false);
   const [selectedAttachment, setSelectedAttachment] = useState(null);
+  const [billFilePath, setBillFilePath] = useState(null);
 
   // Date state
   const [fromDate, setFromDate] = useState(null);
@@ -492,6 +493,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
     // Attachment
     if (lineItem.billUrl) {
       setSelectedAttachment({ name: 'Existing Bill', uri: lineItem.billUrl, type: 'application/pdf', size: 0 });
+      setBillFilePath(lineItem.billUrl);
     }
   };
   const scrollViewRef = useRef(null);  
@@ -584,12 +586,28 @@ const AddExpenseScreen = ({ navigation, route }) => {
           return;
         }
 
-        setSelectedAttachment({
+        const docObj = {
           name: file.name,
           uri: file.uri,
           type: mime,
           size: file.size,
-        });
+        };
+        setSelectedAttachment(docObj);
+
+        // Immediately upload to server with fixed Filepath 'BillUrl'
+        try {
+          const uploadResp = await uploadFiles(docObj, { filepath: 'BillUrl' });
+          const upData = uploadResp?.Data || uploadResp || {};
+          const uploaded = upData?.Files || upData?.files || upData?.UploadedFiles || upData?.FilePaths || upData || [];
+          const finalRefs = Array.isArray(uploaded) ? uploaded : (uploaded ? [uploaded] : []);
+          const paths = finalRefs.map(r => {
+            try { return r?.RemoteResponse?.path || r?.path || r?.FilePath || (typeof r === 'string' ? r : null); } catch (_) { return null; }
+          }).filter(Boolean);
+          if (paths.length) setBillFilePath(paths.join(','));
+        } catch (uErr) {
+          console.warn('Bill upload failed', uErr);
+          // keep local selection so user can retry on submit
+        }
       }
     } catch (err) {
       if (isCancel && isCancel(err)) {
@@ -1165,7 +1183,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
       Quantity: form.quantity,
       TaxAmount: form.taxAmount,
       Document_Date: dateOnly(documentDate || form.documentDate),
-      BillUrl: '',
+      BillUrl: billFilePath || '',
       Expense_Remarks: form.purpose,
       documentFile: selectedAttachment ? { uri: selectedAttachment.uri, name: selectedAttachment.name || 'bill', type: selectedAttachment.type || 'application/octet-stream' } : undefined,
     };
@@ -1207,7 +1225,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
       Quantity: form.quantity,
       TaxAmount: form.taxAmount,
       Document_Date: dateOnly(documentDate || form.documentDate),
-      BillUrl: '',
+      BillUrl: billFilePath || '',
       Expense_Remarks: form.purpose,
       documentFile: selectedAttachment ? { uri: selectedAttachment.uri, name: selectedAttachment.name || 'bill', type: selectedAttachment.type || 'application/octet-stream' } : undefined,
     };
@@ -1235,6 +1253,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
   const resetLineForm = () => {
     setSelectedUnitType(null);
     setSelectedAttachment(null);
+    setBillFilePath(null);
     setDocumentDate(null);
     setActiveCode(null);
     setForm(prev => ({
