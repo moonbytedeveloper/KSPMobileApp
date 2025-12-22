@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Modal, ActivityIndicator, RefreshControl } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
 import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -54,9 +54,16 @@ const ViewSalesOrder = () => {
     }, [totalPages, currentPage]);
 
     const paginatedOrders = useMemo(() => {
+        // If server-side pagination is used (server returns only the page records),
+        // the `orders` array will already contain only the current page's items
+        // and `totalRecords` will be > orders.length. In that case, don't slice again.
+        const serverPaged = totalRecords > 0 && orders.length <= itemsPerPage && orders.length <= totalRecords;
+        if (serverPaged) {
+            return filteredOrders;
+        }
         const start = currentPage * itemsPerPage;
         return filteredOrders.slice(start, start + itemsPerPage);
-    }, [filteredOrders, currentPage, itemsPerPage]);
+    }, [filteredOrders, orders, currentPage, itemsPerPage, totalRecords]);
 
     const rangeStart = totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1;
     const rangeEnd = totalRecords === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, totalRecords);
@@ -69,7 +76,7 @@ const ViewSalesOrder = () => {
                     Alert.alert('Error', 'Sales Order UUID not found');
                     return;
                 }
-                
+
                 console.log('Converting Sales Order to Invoice:', salesOrderUuid);
                 const result = await convertSalesOrderToInvoice({ salesOrderUuid });
                 console.log('Convert result:', result);
@@ -78,19 +85,21 @@ const ViewSalesOrder = () => {
                     Alert.alert('Error', 'Failed to retrieve Invoice UUID after conversion');
                     return;
                 }
-                console.log(HeaderUUID,'here is the header uuid');
-                
-                
+                console.log(HeaderUUID, 'here is the header uuid');
+
+
                 Alert.alert(
-                    'Success', 
+                    'Success',
                     'Sales Order converted to Invoice successfully',
                     [
-                        { text: 'OK', onPress: () => { 
-                            // Pass both headerUuid (lowercase) and HeaderUUID (uppercase)
-                            // and include the API response as prefillHeader so AddSalesInvoice can prefill immediately
-                            navigation.navigate('AddSalesInvoice', { headerUuid: HeaderUUID, HeaderUUID: HeaderUUID, prefillHeader: result, from: 'ViewSalesOrder' }); 
-                            fetchOrders(); 
-                        } }
+                        {
+                            text: 'OK', onPress: () => {
+                                // Pass both headerUuid (lowercase) and HeaderUUID (uppercase)
+                                // and include the API response as prefillHeader so AddSalesInvoice can prefill immediately
+                                navigation.navigate('AddSalesInvoice', { headerUuid: HeaderUUID, HeaderUUID: HeaderUUID, prefillHeader: result, from: 'ViewSalesOrder' });
+                                fetchOrders();
+                            }
+                        }
                     ]
                 );
             } catch (error) {
@@ -204,8 +213,16 @@ const ViewSalesOrder = () => {
 
     useEffect(() => {
         fetchOrders({ start: currentPage * itemsPerPage, length: itemsPerPage, searchValue: searchQuery.trim() });
-    }, [currentPage, itemsPerPage]);
+    }, [currentPage, itemsPerPage, searchQuery]);
 
+
+    // Refetch when screen comes into focus to reflect changes made on other screens
+    useFocusEffect(
+        useCallback(() => {
+            fetchOrders({ start: currentPage * itemsPerPage, length: itemsPerPage, searchValue: searchQuery.trim() });
+        }, [currentPage, itemsPerPage, searchQuery])
+    );
+    
     const onRefresh = async () => {
         try {
             setRefreshing(true);
@@ -267,7 +284,7 @@ const ViewSalesOrder = () => {
 
             setIsGeneratingPDF(true);
             const pdfBase64 = await getSalesOrderSlip({ headerUuid: order.id });
-            
+
             if (!pdfBase64) {
                 Alert.alert('Error', 'Sales order PDF is not available right now.');
                 return;
@@ -294,7 +311,7 @@ const ViewSalesOrder = () => {
             { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6', action: 'Download' },
             { icon: 'logout', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280', action: 'Forward' },
             { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E', action: 'View' },
-            { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316', action: 'Update Status'  },
+            { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316', action: 'Update Status' },
         ];
 
         return (
@@ -303,7 +320,7 @@ const ViewSalesOrder = () => {
                     <TouchableOpacity
                         key={`${order.id}-${btn.icon}`}
                         activeOpacity={0.85}
-                        style={[styles.cardActionBtn , { backgroundColor: btn.bg, borderColor: btn.border }]}
+                        style={[styles.cardActionBtn, { backgroundColor: btn.bg, borderColor: btn.border }]}
                         onPress={() => {
                             if (btn.icon === 'edit') {
                                 handleEditOrder(order);
@@ -352,21 +369,21 @@ const ViewSalesOrder = () => {
 
     return (
         <View style={styles.screen}>
-                <AppHeader
-                    title="View Sales Order"
-                    onLeftPress={() => {
-                        // Prevent GO_BACK action when there's no previous screen in the navigator
-                        if (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
-                            navigation.goBack();
-                        } else {
-                            // Fallback: navigate to a safe root screen. Change 'Dashboard' to your app's main screen name if needed.
-                            try { navigation.replace('Main'); } catch (e) { try { navigation.navigate('Main'); } catch (_) { /* ignore */ } }
-                        }
-                    }}
-                    onRightPress={() => navigation.navigate('ManageSalesOrder', { mode: 'add' })}
-                    rightButtonLabel="Add Sales Order"
-                    showRight
-                />
+            <AppHeader
+                title="View Sales Order"
+                onLeftPress={() => {
+                    // Prevent GO_BACK action when there's no previous screen in the navigator
+                    if (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
+                        navigation.goBack();
+                    } else {
+                        // Fallback: navigate to a safe root screen. Change 'Dashboard' to your app's main screen name if needed.
+                        try { navigation.replace('Main'); } catch (e) { try { navigation.navigate('Main'); } catch (_) { /* ignore */ } }
+                    }
+                }}
+                onRightPress={() => navigation.navigate('ManageSalesOrder', { mode: 'add' })}
+                rightButtonLabel="Add Sales Order"
+                showRight
+            />
             <View style={styles.headerSeparator} />
 
             <View style={styles.controlsWrapper}>
@@ -413,26 +430,26 @@ const ViewSalesOrder = () => {
                     </View>
                 )}
                 {paginatedOrders.map((order) => (
-                        <AccordionItem
-                            key={order.id}
-                            item={{
-                                soleExpenseCode: order.id,
-                                expenseName: order.salesOrderNumber,
-                                amount: order.amount,
-                            }}
-                            isActive={activeOrderId === order.id}
-                            onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
+                    <AccordionItem
+                        key={order.id}
+                        item={{
+                            soleExpenseCode: order.id,
+                            expenseName: order.salesOrderNumber,
+                            amount: order.amount,
+                        }}
+                        isActive={activeOrderId === order.id}
+                        onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
                         customRows={[
                             { label: 'Customer Name', value: order.customerName },
                             { label: 'Amount', value: order.amount },
                             { label: 'Delivery Date', value: order.deliveryDate },
                             { label: 'Due Date', value: order.dueDate },
-                        ]} 
-                            headerLeftLabel="Sales Order Number"
+                        ]}
+                        headerLeftLabel="Sales Order Number"
                         headerRightLabel="Amount"
-                            footerComponent={renderFooterActions(order)}
-                            headerRightContainerStyle={styles.headerRightContainer}
-                        />
+                        footerComponent={renderFooterActions(order)}
+                        headerRightContainerStyle={styles.headerRightContainer}
+                    />
                 ))}
 
                 {paginatedOrders.length === 0 && (
@@ -484,7 +501,7 @@ const ViewSalesOrder = () => {
                                                 </TouchableOpacity>
                                             ))
                                         ) : (
-                                            <Text style={{fontSize: rf(3), color: COLORS.textLight }}>No proforma invoice records found.</Text>
+                                            <Text style={{ fontSize: rf(3), color: COLORS.textLight }}>No proforma invoice records found.</Text>
                                         )}
                                     </View>
 
@@ -513,7 +530,7 @@ const ViewSalesOrder = () => {
             {filteredOrders.length > 0 && (
                 <View style={styles.paginationContainer}>
                     <Text style={styles.pageInfoText}>
-                        Showing {filteredOrders.length === 0 ? 0 : rangeStart} to {rangeEnd} of {filteredOrders.length} entries
+                        Showing {filteredOrders.length === 0 ? 0 : rangeStart} to {rangeEnd} of {totalRecords} entries
                     </Text>
                     <View style={styles.paginationButtons}>
                         {pageItems.map((item, idx) => {

@@ -25,7 +25,7 @@ import { useNavigation } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
-import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getCustomers, getCountries, getSalesOrderNumbers, addSalesInvoiceHeader, addSalesInvoiceLine, updateSalesInvoiceHeader, getSalesInvoiceHeaderById, getSalesInvoiceHeaders, getSalesInvoiceLines, updateSalesInvoiceLine, deleteSalesInvoiceLine, getItems, getEmployees } from '../../../../api/authServices';
+import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllSalesInquiryNumbers, getCustomers, getCountries, getSalesOrderNumbers, addSalesInvoiceHeader, addSalesInvoiceLine, updateSalesInvoiceHeader, getSalesInvoiceHeaderById, getSalesInvoiceHeaders, getSalesInvoiceLines, updateSalesInvoiceLine, deleteSalesInvoiceLine, getItems, getEmployees, uploadFiles } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
 
 const COL_WIDTHS = {
@@ -169,7 +169,11 @@ const AddSalesInvoice = () => {
         'Mobile App Development',
 
     ];
-
+    const screenTheme = {
+        text: COLORS.text,
+        textLight: COLORS.textLight,
+        bg: '#fff',
+    };
     // Lookup option state (bound same as ManageSalesOrder)
     const [paymentTermsOptions, setPaymentTermsOptions] = useState([]);
     const [paymentMethodsOptions, setPaymentMethodsOptions] = useState([]);
@@ -208,7 +212,7 @@ const AddSalesInvoice = () => {
                     getPaymentTerms(),
                     getPaymentMethods(),
                     fetchProjects(),
-                    getAllInquiryNumbers(),
+                    getAllSalesInquiryNumbers(),
                     getSalesOrderNumbers(),
                 ]);
 
@@ -433,7 +437,7 @@ const AddSalesInvoice = () => {
                 setPrefillLoading(true);
                 console.log('🔄 AddSalesInvoice: Fetching header data for UUID:', resolvedHeaderUuid);
                 console.log('🔄 AddSalesInvoice: API params - headerUuid:', resolvedHeaderUuid, 'cmpUuid:', cmpUuid, 'envUuid:', envUuid);
-                
+
                 const resp = await getSalesInvoiceHeaderById({ headerUuid: resolvedHeaderUuid, cmpUuid, envUuid });
                 console.log('✅ AddSalesInvoice: getSalesInvoiceHeaderById response ->', resp);
 
@@ -449,7 +453,7 @@ const AddSalesInvoice = () => {
                 if (inquiryUuid) {
                     setSalesInquiryUuid(inquiryUuid);
                     console.log('✅ AddSalesInvoice: Set salesInquiryUuid state to:', inquiryUuid);
-                    
+
                     // Force trigger mapping check after setting UUID
                     setTimeout(() => {
                         console.log('🔄 AddSalesInvoice: Forced mapping check - salesInquiryNosOptions length:', salesInquiryNosOptions?.length || 0);
@@ -511,7 +515,7 @@ const AddSalesInvoice = () => {
                 console.log('   - fetchedSalesInv:', fetchedSalesInv);
                 console.log('   - fetchedInquiryNo:', fetchedInquiryNo);
                 console.log('   - isFetchedInquiryUuid:', isFetchedInquiryUuid);
-                
+
                 setHeaderForm(s => ({
                     ...s,
                     salesInquiryText: fetchedSalesInv || s.salesInquiryText || '',
@@ -629,7 +633,7 @@ const AddSalesInvoice = () => {
         console.log('   - salesInquiryUuid:', salesInquiryUuid);
         console.log('   - salesInquiryNosOptions length:', salesInquiryNosOptions?.length || 0);
         console.log('   - headerForm.salesInquiry:', headerForm?.salesInquiry);
-        
+
         if (!salesInquiryUuid || !salesInquiryNosOptions || salesInquiryNosOptions.length === 0 || !headerForm) {
             console.log('⏹️ AddSalesInvoice: Skipping mapping - missing requirements');
             return;
@@ -638,7 +642,7 @@ const AddSalesInvoice = () => {
         const currentInquiry = headerForm?.salesInquiry || '';
         // Check if currentInquiry is a UUID (should be replaced) or empty (needs to be filled)
         const isUuid = currentInquiry && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(currentInquiry);
-        
+
         console.log('   - currentInquiry:', currentInquiry);
         console.log('   - isUuid:', isUuid);
         console.log('   - should update:', !currentInquiry || isUuid);
@@ -647,7 +651,7 @@ const AddSalesInvoice = () => {
         if (!currentInquiry || isUuid) {
             console.log('🔍 AddSalesInvoice: Searching for inquiry in options...');
             console.log('   - Available options sample:', salesInquiryNosOptions.slice(0, 3));
-            
+
             const found = salesInquiryNosOptions.find(s =>
                 s?.UUID === salesInquiryUuid ||
                 s?.Uuid === salesInquiryUuid ||
@@ -655,9 +659,9 @@ const AddSalesInvoice = () => {
                 String(s?.UUID) === String(salesInquiryUuid) ||
                 String(s?.Uuid) === String(salesInquiryUuid)
             );
-            
+
             console.log('   - Found inquiry:', found);
-            
+
             if (found && found.InquiryNo) {
                 console.log('✅ AddSalesInvoice: Mapping UUID to InquiryNo:', salesInquiryUuid, '->', found.InquiryNo);
                 // Only update if the current value is different from what we found
@@ -683,7 +687,7 @@ const AddSalesInvoice = () => {
             console.log('🔄 AddSalesInvoice: Fallback inquiry mapping useEffect');
             console.log('   - salesInquiryUuid:', salesInquiryUuid);
             console.log('   - salesInquiryNosOptions length:', salesInquiryNosOptions?.length || 0);
-            
+
             if (!salesInquiryUuid) {
                 console.log('⏹️ AddSalesInvoice: No salesInquiryUuid, skipping fallback');
                 return;
@@ -692,24 +696,24 @@ const AddSalesInvoice = () => {
                 console.log('⏹️ AddSalesInvoice: Options already loaded, skipping fallback');
                 return; // already handled
             }
-            
+
             try {
                 console.log('🔍 AddSalesInvoice: Fetching inquiry numbers for fallback mapping...');
                 const cmp = await getCMPUUID();
                 const env = await getENVUUID();
-                const resp = await getAllInquiryNumbers({ cmpUuid: cmp, envUuid: env });
+                const resp = await getAllSalesInquiryNumbers({ cmpUuid: cmp, envUuid: env });
                 const list = resp?.Data || resp || [];
                 const records = Array.isArray(list?.Records) ? list.Records : (Array.isArray(list) ? list : []);
-                
+
                 console.log('   - Fetched records count:', records.length);
                 console.log('   - Sample records:', records.slice(0, 2));
-                
+
                 const found = records.find(r =>
                     r?.UUID === salesInquiryUuid || r?.Uuid === salesInquiryUuid || r?.Id === salesInquiryUuid || String(r?.UUID) === String(salesInquiryUuid)
                 );
-                
+
                 console.log('   - Found matching record:', found);
-                
+
                 if (mounted && found) {
                     const inquiryNo = found?.SalesInqNo || found?.SalesInquiryNo || found?.InquiryNo || found?.Name || found?.Title || String(found);
                     console.log('✅ AddSalesInvoice: Fallback mapping successful:', salesInquiryUuid, '->', inquiryNo);
@@ -914,6 +918,7 @@ const AddSalesInvoice = () => {
     const [totalTax, setTotalTax] = useState('0');
     const [serverTotalAmount, setServerTotalAmount] = useState('');
     const [file, setFile] = useState(null);
+    const [uploadedFilePath, setUploadedFilePath] = useState(null);
     const [showShippingTip, setShowShippingTip] = useState(false);
     const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
     const [prefillLoading, setPrefillLoading] = useState(false);
@@ -1328,8 +1333,8 @@ const AddSalesInvoice = () => {
                     Description: description,
                     HSNSACNO: currentItem.hsn || '',
                 };
-            console.log(payload,'090');
-            
+                console.log(payload, '090');
+
                 // If serverLineUuid exists, call update API, otherwise just update locally
                 if (existing.serverLineUuid) {
                     const resp = await updateSalesInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
@@ -1418,7 +1423,7 @@ const AddSalesInvoice = () => {
                 SubTotal: parseFloat(computeSubtotal()) || 0,
                 TotalTax: parseFloat(totalTax) || 0,
                 TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax) || 0),
-                FilePath: file?.uri || file?.name || '',
+                FilePath: uploadedFilePath || '',
                 Notes: notes || '',
             };
 
@@ -1481,7 +1486,7 @@ const AddSalesInvoice = () => {
                 SubTotal: parseFloat(computeSubtotal()) || 0,
                 TotalTax: parseFloat(totalTax) || 0,
                 TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax) || 0),
-                FilePath: file?.uri || file?.name || '',
+                FilePath: uploadedFilePath || '',
             };
 
             console.log('submitHeader payload ->', payload);
@@ -1537,7 +1542,7 @@ const AddSalesInvoice = () => {
                 AdjustmentField: adjustmentLabel || '',
                 AdjustmentPrice: parseFloat(adjustments) || 0,
                 TermsConditions: terms || '',
-                FilePath: file?.uri || file?.name || '',
+                FilePath: uploadedFilePath || '',
                 SubTotal: parseFloat(computeSubtotal()) || 0,
                 TotalTax: parseFloat(totalTax) || 0,
                 TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax) || 0),
@@ -1600,12 +1605,36 @@ const AddSalesInvoice = () => {
                 }
 
                 // Set the selected file
-                setFile({
+                const fileObj = {
                     name: selectedFile.name,
                     uri: selectedFile.uri,
                     type: selectedFile.type,
                     size: selectedFile.size,
-                });
+                };
+                setFile(fileObj);
+
+                // Immediately upload to server with fixed Filepath 'SalesInv'
+                try {
+                    const uploadResp = await uploadFiles({ uri: fileObj.uri, name: fileObj.name, type: fileObj.type }, { filepath: 'SalesInv' });
+                    console.log('uploadFiles response (SalesInv):', uploadResp);
+                    const upData = uploadResp?.Data || uploadResp || {};
+                    const uploaded = upData?.Files || upData?.files || upData?.UploadedFiles || upData?.FilePaths || upData || [];
+                    const finalRefs = Array.isArray(uploaded) ? uploaded : (uploaded ? [uploaded] : []);
+                    try { console.log('Normalized upload refs ->', JSON.stringify(finalRefs, null, 2)); } catch (_) { console.log('Normalized upload refs ->', finalRefs); }
+                    const paths = finalRefs.map(r => { try { return r?.RemoteResponse?.path || r?.path || (typeof r === 'string' ? r : null); } catch (_) { return null; } }).filter(Boolean);
+                    if (paths.length > 0) {
+                        setUploadedFilePath(paths.length === 1 ? paths[0] : paths);
+                        try { console.log('Extracted uploaded file path(s):', JSON.stringify(paths, null, 2)); } catch (_) { console.log('Extracted uploaded file path(s):', paths); }
+                    } else {
+                        console.warn('Could not extract uploaded file path from response', uploadResp);
+                    }
+                } catch (upErr) {
+                    console.error('SalesInv file upload failed', upErr);
+                    Alert.alert('Upload Error', upErr?.message || 'Failed to upload file');
+                    // clear selection on failure
+                    setFile(null);
+                    setUploadedFilePath(null);
+                }
             }
         } catch (err) {
             if (isCancel && isCancel(err)) {
@@ -1617,6 +1646,7 @@ const AddSalesInvoice = () => {
 
     const removeFile = () => {
         setFile(null);
+        setUploadedFilePath(null);
     };
 
     if (prefillLoading) {
@@ -1656,8 +1686,8 @@ const AddSalesInvoice = () => {
                                     </TouchableOpacity>
                                 </View>
 
-                                
-                                
+
+
                             ) : null
                         }
                     >
@@ -1668,7 +1698,7 @@ const AddSalesInvoice = () => {
                                 <Text style={inputStyles.label}>Sales Inquiry No.</Text>
                                 <View style={{ zIndex: 9997, elevation: 19 }}>
                                     <Dropdown
-                                        placeholder="Sales Inquiry No."
+                                        placeholder="-Sales Inquiry No.-"
                                         value={headerForm.salesInquiry}
                                         options={salesInquiryNosOptions}
                                         getLabel={s => s?.InquiryNo || String(s)}
@@ -1685,17 +1715,17 @@ const AddSalesInvoice = () => {
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={inputStyles.box}
-                                        textStyle={inputStyles.input}
+                                    // textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
 
                             <View style={styles.col}>
-                                <Text style={[inputStyles.label]}>Sales Order Number* </Text>
+                                <Text style={[inputStyles.label]}>Sales Order No* </Text>
 
                                 <View style={{ zIndex: 9997, elevation: 19 }}>
                                     <Dropdown
-                                        placeholder="Sales Order Number*"
+                                        placeholder="Sales Order No.*"
                                         value={headerForm.salesOrderNo}
                                         options={salesOrderOptions}
                                         getLabel={so => (so?.OrderNo || so?.SalesOrderNo || so?.SalesOrderNumber || String(so))}
@@ -1712,7 +1742,7 @@ const AddSalesInvoice = () => {
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={inputStyles.box}
-                                        textStyle={inputStyles.input}
+                                    // textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -1729,7 +1759,7 @@ const AddSalesInvoice = () => {
 
                                 <View style={{ zIndex: 9998, elevation: 20 }}>
                                     <Dropdown
-                                        placeholder="Customer Name*"
+                                        placeholder="-select Customer-"
                                         value={headerForm.CustomerName || headerForm.opportunityTitle}
                                         options={customersOptions}
                                         getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
@@ -1744,7 +1774,7 @@ const AddSalesInvoice = () => {
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={inputStyles.box}
-                                        textStyle={inputStyles.input}
+                                    // textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -1754,7 +1784,7 @@ const AddSalesInvoice = () => {
 
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
-                                        placeholder="Select Project*"
+                                        placeholder="-Select Project-*"
                                         value={project}
                                         options={projectsOptions}
                                         getLabel={p => (p?.Name || p?.ProjectTitle || String(p))}
@@ -1773,7 +1803,7 @@ const AddSalesInvoice = () => {
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        textStyle={inputStyles.input}
+                                    // textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -1781,7 +1811,7 @@ const AddSalesInvoice = () => {
 
                         </View>
                         {showTimesheetDates && (
-                            <View style={[styles.row, { marginTop: hp(1.5) }]}> 
+                            <View style={[styles.row, { marginTop: hp(1.5) }]}>
                                 <View style={styles.col}>
                                     <TouchableOpacity
                                         activeOpacity={0.7}
@@ -1884,7 +1914,7 @@ const AddSalesInvoice = () => {
 
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
-                                        placeholder="Payment Term*"
+                                        placeholder="-Select Payment Term-"
                                         value={paymentTerm}
                                         options={paymentTermsOptions}
                                         getLabel={p => p?.Name || p?.Title || String(p)}
@@ -1901,7 +1931,7 @@ const AddSalesInvoice = () => {
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        textStyle={inputStyles.input}
+                                    // textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -1928,7 +1958,7 @@ const AddSalesInvoice = () => {
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        textStyle={inputStyles.input}
+                                    // textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -2352,14 +2382,14 @@ const AddSalesInvoice = () => {
                                                 <View style={styles.table}>
                                                     <View style={styles.thead}>
                                                         <View style={styles.tr}>
-                                                            <Text style={[styles.th, { width: wp(10) }]}>Sr.No</Text>
-                                                            <Text style={[styles.th, { width: wp(30) }]}>{showTimesheetDates ? 'Employee' : 'Item Details'}</Text>
-                                                            <Text style={[styles.th, { width: wp(30) }]}>Description</Text>
-                                                            {!showTimesheetDates && <Text style={[styles.th, { width: wp(25) }]}>HSN/SAC</Text>}
-                                                            <Text style={[styles.th, { width: wp(20) }]}>{showTimesheetDates ? 'Total Hours Worked' : 'Quantity'}</Text>
-                                                            <Text style={[styles.th, { width: wp(20) }]}>Rate</Text>
-                                                            <Text style={[styles.th, { width: wp(20) }]}>Amount</Text>
-                                                            <Text style={[styles.th, { width: wp(40) }]}>Action</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(10) }]}>Sr.No</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(30) }]}>{showTimesheetDates ? 'Employee' : 'Item Details'}</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(30) }]}>Description</Text>
+                                                            {!showTimesheetDates && <Text style={[styles.th, { color: screenTheme.text, width: wp(25) }]}>HSN/SAC</Text>}
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(20) }]}>{showTimesheetDates ? 'Total Hours Worked' : 'Quantity'}</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(20) }]}>Rate</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(20) }]}>Amount</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(40) }]}>Action</Text>
                                                         </View>
                                                     </View>
 

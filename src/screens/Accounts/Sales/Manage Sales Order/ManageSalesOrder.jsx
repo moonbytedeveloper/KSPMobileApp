@@ -22,7 +22,7 @@ import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
-import { addSalesOrder, updateSalesOrder, addSalesOrderLine, updateSalesOrderLine, getCustomers, getCountries, getStates, getCities, getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getSalesOrderHeaderById, getItems, getSalesLines, getSalesOrderLines, deleteSalesOrderLine, getSalesOrderSlip, uploadFiles } from '../../../../api/authServices';
+import { addSalesOrder, updateSalesOrder, addSalesOrderLine, updateSalesOrderLine, getCustomers, getCountries, getStates, getCities, getPaymentTerms, getPaymentMethods, fetchProjects, getAllSalesInquiryNumbers, getSalesOrderHeaderById, getItems, getSalesLines, getSalesOrderLines, deleteSalesOrderLine, getSalesOrderSlip, uploadFiles } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 
@@ -1076,10 +1076,12 @@ const ManageSalesOrder = () => {
           getPaymentMethods(),
           getCountries(),
           fetchProjects(),
-          getAllInquiryNumbers(),
+          getAllSalesInquiryNumbers(),
         ]);
 
         const custList = extractArray(custResp);
+        console.log(custList,'001');
+        
         const termsList = extractArray(termsResp);
         const methodsList = extractArray(methodsResp);
         const countriesList = extractArray(countriesResp);
@@ -2126,14 +2128,21 @@ const ManageSalesOrder = () => {
         try {
           const uploadResp = await uploadFiles({ uri: fileObj.uri, name: fileObj.name, type: fileObj.type }, { filepath: 'SalesOrders' });
           console.log('uploadFiles response (SalesOrders):', uploadResp);
-          // try common response shapes to extract path
-          let path = uploadResp?.RemoteResponse?.path || uploadResp?.Data?.FilePath || uploadResp?.Data?.path || uploadResp?.FilePath || uploadResp?.path || (uploadResp?.Data && uploadResp.Data);
-          if (typeof path === 'object') {
-            // if object, try to find string inside
-            path = path?.path || path?.FilePath || null;
-          }
-          if (path) {
-            setUploadedFilePath(path);
+          // Normalize common response shapes to an array of file refs
+          const upData = uploadResp?.Data || uploadResp || {};
+          const uploaded = upData?.Files || upData?.files || upData?.UploadedFiles || upData?.FilePaths || upData || [];
+          const finalRefs = Array.isArray(uploaded) ? uploaded : (uploaded ? [uploaded] : []);
+          try { console.log('Normalized upload refs ->', JSON.stringify(finalRefs, null, 2)); } catch (_) { console.log('Normalized upload refs ->', finalRefs); }
+
+          // Extract string paths from refs (support RemoteResponse.path, path, or plain string)
+          const paths = finalRefs.map(r => {
+            try { return r?.RemoteResponse?.path || r?.path || (typeof r === 'string' ? r : null); } catch (_) { return null; }
+          }).filter(Boolean);
+
+          if (paths.length > 0) {
+            // For sales orders we expect a single file; store string or array depending on count
+            setUploadedFilePath(paths.length === 1 ? paths[0] : paths);
+            try { console.log('Extracted uploaded file path(s):', JSON.stringify(paths, null, 2)); } catch (_) { console.log('Extracted uploaded file path(s):', paths); }
           } else {
             console.warn('Could not extract uploaded file path from response', uploadResp);
           }
@@ -2208,7 +2217,7 @@ const ManageSalesOrder = () => {
                   </View>
                 ) : (
                   <Dropdown
-                    placeholder="Sales Inquiry No*"
+                    placeholder="-Sales Inquiry No-"
                     value={(() => {
                       // Find the selected inquiry object from options based on UUID or InquiryNo
                       if (headerForm?.SalesInquiryUUID && salesInquiryNosOptions?.length) {
@@ -2238,7 +2247,7 @@ const ManageSalesOrder = () => {
                       setSalesInquiry(inquiryNo);
                     }}
                     inputBoxStyle={inputStyles.box}
-                    textStyle={inputStyles.input}
+                    // textStyle={inputStyles.input}
                   />
                 )}
               </View>
@@ -2263,7 +2272,7 @@ const ManageSalesOrder = () => {
                       CustomerUUID: v?.UUID || v?.Id || (typeof v === 'string' ? v : ''),
                     }))}
                     inputBoxStyle={inputStyles.box}
-                    textStyle={inputStyles.input}
+                    // textStyle={inputStyles.input}
                   />
                 )}
               </View>
@@ -2272,7 +2281,7 @@ const ManageSalesOrder = () => {
             <View style={[styles.row, { marginTop: hp(1.5) }]}>
 
               <View style={styles.col}>
-                <Text style={inputStyles.label}>Project Name </Text>
+                <Text style={inputStyles.label}>Project Name*</Text>
 
                 {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
                 <View style={{ zIndex: 9998, elevation: 20 }}>
@@ -2282,7 +2291,7 @@ const ManageSalesOrder = () => {
                     </View>
                   ) : (
                     <Dropdown
-                      placeholder="Select Project*"
+                      placeholder="-Select Project-"
                       value={project}
                       options={projectsOptions}
                       getLabel={p => (p?.Name || p?.ProjectTitle || String(p))}
@@ -2290,13 +2299,13 @@ const ManageSalesOrder = () => {
                       onSelect={v => { setProject(v?.ProjectTitle || v), setProjectUUID(v?.Uuid || v); }}
                       renderInModal={true}
                       inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                      textStyle={inputStyles.input}
+                      // textStyle={inputStyles.input}
                     />
                   )}
                 </View>
               </View>
               <View style={styles.col}>
-                <Text style={inputStyles.label}>Payment Term </Text>
+                <Text style={inputStyles.label}>Payment Term*</Text>
 
                 {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
                 <View style={{ zIndex: 9998, elevation: 20 }}>
@@ -2306,7 +2315,7 @@ const ManageSalesOrder = () => {
                     </View>
                   ) : (
                     <Dropdown
-                      placeholder="Select Payment Term*"
+                      placeholder="-Select Payment Term-"
                       value={paymentTerm}
                       options={paymentTermsOptions}
                       getLabel={p => (p?.Name || p?.Term || String(p))}
@@ -2314,7 +2323,7 @@ const ManageSalesOrder = () => {
                       onSelect={v => { setPaymentTerm(v?.Name || v), setPaymentTermUuid(v?.UUID || v) }}
                       renderInModal={true}
                       inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                      textStyle={inputStyles.input}
+                      // textStyle={inputStyles.input}
                     />
                   )}
                 </View>
@@ -2325,7 +2334,7 @@ const ManageSalesOrder = () => {
 
 
               <View style={styles.col}>
-                <Text style={inputStyles.label}>payment Method* </Text>
+                <Text style={inputStyles.label}>Payment Method*</Text>
 
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   {headerSaved && !isEditingHeader ? (
@@ -2334,7 +2343,7 @@ const ManageSalesOrder = () => {
                     </View>
                   ) : (
                     <Dropdown
-                      placeholder="Payment Method"
+                      placeholder="-Select Payment Method-"
                       value={paymentMethod}
                       options={paymentMethodsOptions}
                       getLabel={p => (p?.Name || p?.Mode || String(p))}
@@ -2342,13 +2351,13 @@ const ManageSalesOrder = () => {
                       onSelect={v => { setPaymentMethod(v?.Name || v), setPaymentMethodUUID(v?.UUID || v) }}
                       renderInModal={true}
                       inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                      textStyle={inputStyles.input}
+                      // textStyle={inputStyles.input}
                     />
                   )}
                 </View>
               </View>
               <View style={styles.col}>
-                <Text style={inputStyles.label}>Days</Text>
+                <Text style={inputStyles.label}>Days*</Text>
                 {headerSaved && !isEditingHeader ? (
                   <View style={[inputStyles.box]} pointerEvents="none">
                     <Text style={inputStyles.input}>{renderLabel(dueDays || headerForm.DueDays)}</Text>
@@ -2363,7 +2372,7 @@ const ManageSalesOrder = () => {
                         setDueDays(cleanValue);
                         setHeaderForm(s => ({ ...s, DueDays: cleanValue }));
                       }}
-                      placeholder="Days"
+                      placeholder="-Days-"
                       placeholderTextColor={screenTheme.textLight}
                       keyboardType="number-pad"
                       returnKeyType="done"
@@ -2407,7 +2416,7 @@ const ManageSalesOrder = () => {
                         },
                       ]}
                     >
-                      {invoiceDate || 'Order Date*'}
+                      {invoiceDate || 'Order Date'}
                     </Text>
                     <View
                       style={[
@@ -2454,7 +2463,7 @@ const ManageSalesOrder = () => {
                         },
                       ]}
                     >
-                      {dueDate || 'Due Date*'}
+                      {dueDate || 'Due Date'}
                     </Text>
                     <View
                       style={[
@@ -2476,7 +2485,7 @@ const ManageSalesOrder = () => {
             <View style={[styles.row, { marginTop: hp(1.5) }]}>
               {(headerForm?.SalesOrderNo && (headerSaved || isEditingHeader)) ? (
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>Sales Order Number* </Text>
+                  <Text style={inputStyles.label}>Sales Order Number*</Text>
 
                   {/* Show Sales Order Number only when editing an existing header or when viewing a saved header.
                    It must be read-only in both cases; hide it during Add-mode (creating new header). */}
@@ -2500,7 +2509,7 @@ const ManageSalesOrder = () => {
             >
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>Building No.</Text>
+                  <Text style={inputStyles.label}>Building No.*</Text>
                   <View style={[inputStyles.box]} pointerEvents="box-none">
                     <TextInput
                       style={[inputStyles.input, { flex: 1, color: screenTheme.text }]}
@@ -2514,7 +2523,7 @@ const ManageSalesOrder = () => {
                   </View>
                 </View>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>Street 1</Text>
+                  <Text style={inputStyles.label}>Street 1*</Text>
                   <View style={[inputStyles.box]} pointerEvents="box-none">
                     <TextInput
                       style={[inputStyles.input, { color: screenTheme.text, flex: 1 }]}
@@ -2545,7 +2554,7 @@ const ManageSalesOrder = () => {
                   </View>
                 </View>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>Postal Code</Text>
+                  <Text style={inputStyles.label}>Postal Code*</Text>
                   <View style={[inputStyles.box]} pointerEvents="box-none">
                     <TextInput
                       style={[inputStyles.input, { flex: 1 }]}
@@ -2562,7 +2571,7 @@ const ManageSalesOrder = () => {
 
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>Country Name</Text>
+                  <Text style={inputStyles.label}>Country Name*</Text>
                   <View style={{ zIndex: 9999, elevation: 20 }}>
                     <Dropdown
                       placeholder="Select Country*"
@@ -2578,7 +2587,7 @@ const ManageSalesOrder = () => {
                   </View>
                 </View>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>State Name</Text>
+                  <Text style={inputStyles.label}>State Name*</Text>
                   <View style={{ zIndex: 9999, elevation: 20 }}>
                     <Dropdown
                       placeholder="Select State*"
@@ -2597,7 +2606,7 @@ const ManageSalesOrder = () => {
 
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>City Name</Text>
+                  <Text style={inputStyles.label}>City Name*</Text>
                   <View style={{ zIndex: 9998, elevation: 20 }}>
                     <Dropdown
                       placeholder="- Select City -"
@@ -2654,7 +2663,7 @@ const ManageSalesOrder = () => {
             >
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>Building No.</Text>
+                  <Text style={inputStyles.label}>Building No.*</Text>
                   <View style={[inputStyles.box]} pointerEvents="box-none">
                     <TextInput
                       style={[inputStyles.input, { flex: 1 }]}
@@ -2668,7 +2677,7 @@ const ManageSalesOrder = () => {
                   </View>
                 </View>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>Street 1</Text>
+                  <Text style={inputStyles.label}>Street 1*</Text>
                   <View style={[inputStyles.box]} pointerEvents="box-none">
                     <TextInput
                       style={[inputStyles.input, { flex: 1 }]}
@@ -2699,7 +2708,7 @@ const ManageSalesOrder = () => {
                   </View>
                 </View>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>Postal Code</Text>
+                  <Text style={inputStyles.label}>Postal Code*</Text>
                   <View style={[inputStyles.box]} pointerEvents="box-none">
                     <TextInput
                       style={[inputStyles.input, { flex: 1 }]}
@@ -2716,7 +2725,7 @@ const ManageSalesOrder = () => {
 
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>Country Name</Text>
+                  <Text style={inputStyles.label}>Country Name*</Text>
                   <View style={{ zIndex: 9999, elevation: 20 }}>
                     <Dropdown
                       placeholder="- Select Country -"
@@ -2726,14 +2735,14 @@ const ManageSalesOrder = () => {
                       getKey={c => (c?.UUID || c?.Id || c)}
                       onSelect={handleShippingCountrySelect}
                       inputBoxStyle={inputStyles.box}
-                      textStyle={inputStyles.input}
+                      // textStyle={inputStyles.input}
                       style={{ marginBottom: hp(1.6) }}
                       renderInModal={true}
                     />
                   </View>
                 </View>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>State Name</Text>
+                  <Text style={inputStyles.label}>State Name*</Text>
                   <View style={{ zIndex: 9999, elevation: 20 }}>
                     <Dropdown
                       placeholder="- Select State -"
@@ -2743,7 +2752,7 @@ const ManageSalesOrder = () => {
                       getKey={c => (c?.UUID || c?.Id || c)}
                       onSelect={handleShippingStateSelect}
                       inputBoxStyle={inputStyles.box}
-                      textStyle={inputStyles.input}
+                      // textStyle={inputStyles.input}
                       style={{ marginBottom: hp(1.6) }}
                       renderInModal={true}
                     />
@@ -2753,7 +2762,7 @@ const ManageSalesOrder = () => {
 
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>City Name</Text>
+                  <Text style={inputStyles.label}>City Name*</Text>
                   <View style={{ zIndex: 9998, elevation: 20 }}>
                     <Dropdown
                       placeholder="- Select City -"
@@ -2766,7 +2775,7 @@ const ManageSalesOrder = () => {
                         setShippingForm(s => ({ ...s, city: c?.UUID || c }));
                       }}
                       inputBoxStyle={inputStyles.box}
-                      textStyle={inputStyles.input}
+                      // textStyle={inputStyles.input}
                       style={{ marginBottom: hp(1.6) }}
                       renderInModal={true}
                     />
@@ -2838,7 +2847,7 @@ const ManageSalesOrder = () => {
                         }}
                         renderInModal={true}
                         inputBoxStyle={[inputStyles.box, { width: '100%' }]}
-                        textStyle={inputStyles.input}
+                        // textStyle={inputStyles.input}
                       />
                     </View>
                   </View>
@@ -2942,14 +2951,14 @@ const ManageSalesOrder = () => {
 
               {/* Table container (search + pagination + table) */}
               {linesLoading ? (
-                <View style={{ paddingVertical: hp(4), alignItems: 'center' }}>
+                <View style={{ paddingVertical: hp(4), alignItems: 'center',  color: screenTheme.text }}>
                   <ActivityIndicator size="small" color={COLORS.primary} />
-                </View>
+                </View> 
               ) : items.length > 0 && (
                 <View>
                   <View style={styles.tableControlsRow}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={{ marginRight: wp(2) }}>Show</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center'}}>
+                      <Text style={{ marginRight: wp(2), color: screenTheme.text  }}>Show</Text>
                       <Dropdown
                         placeholder={String(pageSize)}
                         value={String(pageSize)}
@@ -2958,9 +2967,9 @@ const ManageSalesOrder = () => {
                         getKey={p => String(p)}
                         onSelect={v => { setPageSize(Number(v)); setPage(1); }}
                         inputBoxStyle={{ width: wp(18) }}
-                        textStyle={inputStyles.input}
+                        // textStyle={inputStyles.input}
                       />
-                      <Text style={{ marginLeft: wp(2) }}>entries</Text>
+                      <Text style={{ marginLeft: wp(2) , color: screenTheme.text }}>entries</Text>
                     </View>
 
                     <View style={{ flex: 1, alignItems: 'flex-end' }}>

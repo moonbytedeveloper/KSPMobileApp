@@ -178,7 +178,8 @@ const PATHS = {
     // delete purchase order header (uses same path but DELETE method)
     deletePurchaseOrderHeader: Config.API_DELETE_PURCHASE_ORDER_HEADER_PATH || '/api/Account/purchaseorderheader',
     updateSalesOrder: Config.API_UPDATE_SALES_ORDER_PATH || '/api/Account/UpdateSalesOrderHeader',
-    getAllInquiryNumbers: Config.API_GET_ALL_INQUIRY_NUMBERS_PATH || '/api/Account/GetAllInquiryNumbers',
+    getAllSalesInquiryNumbers: Config.API_GET_ALL_INQUIRY_NUMBERS_PATH || '/api/Account/GetSalesInquiryNumbers',
+    getAllPurchaseInquiryNumbers: Config.API_GET_ALL_INQUIRY_NUMBERS_PATH || '/api/Account/GetPurchaseInquiryNumbers',
     getSalesOrderNumbers: Config.API_GET_SALES_ORDER_NUMBERS_PATH || '/api/Account/GetSalesOrderNumbers',
     getPurchaseOrderNumbers: Config.API_GET_PURCHASE_ORDER_NUMBERS_PATH || '/api/Account/PurchaseorderNumbers',
     addSalesOrderLine: Config.API_ADD_SALES_ORDER_LINE_PATH || '/api/Account/AddSalesOrderLine',
@@ -3760,7 +3761,7 @@ export async function getEmployees({ companyUuid, envUuid } = {}) {
 }
 
 // Account: Get All Inquiry Numbers (for dropdowns)
-export async function getAllInquiryNumbers({ cmpUuid, envUuid } = {}) {
+export async function getAllSalesInquiryNumbers({ cmpUuid, envUuid } = {}) {
     if (!cmpUuid || !envUuid) {
         const [c, e] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID()]);
         cmpUuid = c; envUuid = e;
@@ -3769,12 +3770,26 @@ export async function getAllInquiryNumbers({ cmpUuid, envUuid } = {}) {
     if (!envUuid) throw new Error('Missing environment UUID');
 
     const params = { cmpUuid, envUuid };
-    const resp = await api.get(PATHS.getAllInquiryNumbers, { params });
+    const resp = await api.get(PATHS.getAllSalesInquiryNumbers, { params });
     console.log('Get All Inquiry Numbers response:', resp.data);
 
     return resp.data;
 }
+// Account: Get All Inquiry Numbers (for dropdowns)
+export async function getAllPurchaseInquiryNumbers({ cmpUuid, envUuid } = {}) {
+    if (!cmpUuid || !envUuid) {
+        const [c, e] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID()]);
+        cmpUuid = c; envUuid = e;
+    }
+    if (!cmpUuid) throw new Error('Missing company UUID');
+    if (!envUuid) throw new Error('Missing environment UUID');
 
+    const params = { cmpUuid, envUuid };
+    const resp = await api.get(PATHS.getAllPurchaseInquiryNumbers, { params });
+    console.log('Get All Inquiry Numbers response:', resp.data);
+
+    return resp.data;
+}
 // Account: Get Sales Order Numbers (for Sales Order dropdowns)
 export async function getSalesOrderNumbers({ cmpUuid, envUuid } = {}) {
     if (!cmpUuid || !envUuid) {

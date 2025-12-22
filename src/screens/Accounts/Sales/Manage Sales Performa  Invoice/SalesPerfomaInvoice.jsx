@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal, RefreshControl } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
 import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
-import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles'; 
+import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { getSalesPerformaInvoiceHeaders, deleteSalesPerformaInvoiceHeader, getSalesPerformaInvoiceSlip, convertSalesPerformaToInvoice, getSalesProformaRelatedDocuments, getSalesOrderSlip, getSalesInvoiceSlip } from '../../../../api/authServices';
@@ -49,7 +49,7 @@ const SalesPerfomaInvoice = () => {
             const resp = await getSalesPerformaInvoiceHeaders({ cmpUuid: cmp, envUuid: env, start, length: pageSize, searchValue: q });
             const data = resp?.Data || resp || {};
             const records = Array.isArray(data?.Records) ? data.Records : (Array.isArray(data) ? data : []);
-                // normalize server records into UI items
+            // normalize server records into UI items
             const normalized = records.map((r, idx) => ({
                 id: r?.UUID || r?.Id || `pi-${start + idx + 1}`,
                 // Prefer SalesOrderNo, fallback to SalesInqNo or other order/inquiry identifiers
@@ -67,8 +67,9 @@ const SalesPerfomaInvoice = () => {
             }));
 
             setInquiries(normalized);
-            // total count fallback to Data.TotalRecords or Data?.Total or records length
-            const total = Number(data?.TotalRecords ?? data?.Total ?? resp?.TotalRecords ?? resp?.Total ?? records.length) || records.length;
+            // Prefer Data.TotalCount (used in other screens), then common total keys, fallback to records length
+            const total = Number(data?.TotalCount ?? data?.TotalRecords ?? data?.Total ?? resp?.TotalRecords ?? resp?.Total ?? records.length) || records.length;
+            console.log('SalesPerfomaInvoice fetch ->', { page, pageSize, start: page * pageSize, recordsReturned: Array.isArray(records) ? records.length : 0, totalReported: total });
             setTotalRecords(total);
         } catch (err) {
             console.warn('getSalesPerformaInvoiceHeaders error', err?.message || err);
@@ -91,9 +92,14 @@ const SalesPerfomaInvoice = () => {
         }
     }, [fetchPurchaseInquiries, currentPage, itemsPerPage, searchQuery]);
 
+    const isFocused = useIsFocused();
+
+    // Refresh when screen is focused or when pagination/search changes (matches ManageInquiry behavior)
     useEffect(() => {
-        fetchPurchaseInquiries(currentPage, itemsPerPage, searchQuery);
-    }, [fetchPurchaseInquiries]);
+        if (isFocused) {
+            fetchPurchaseInquiries(currentPage, itemsPerPage, searchQuery);
+        }
+    }, [isFocused, currentPage, itemsPerPage, searchQuery, fetchPurchaseInquiries]);
 
     // Static base64 PDF string for demo purposes
     const handleDownloadPerformaPDF = async (order) => {
@@ -105,7 +111,7 @@ const SalesPerfomaInvoice = () => {
 
             setIsGeneratingPDF(true);
             const pdfBase64 = await getSalesPerformaInvoiceSlip({ headerUuid: order.id });
-            
+
             if (!pdfBase64) {
                 Alert.alert('Error', 'Performa invoice PDF is not available right now.');
                 return;
@@ -184,22 +190,22 @@ const SalesPerfomaInvoice = () => {
                 setLoading(true);
                 const performaUuid = order?.raw?.UUID || order?.id;
                 if (!performaUuid) throw new Error('Performa UUID not found');
-                
+
                 const [envUuid, cmpUuid, userUuid] = await Promise.all([
                     getENVUUID(),
                     getCMPUUID(),
                     getUUID()
                 ]);
-                
+
                 const response = await convertSalesPerformaToInvoice({
                     performaUuid,
                     EnvUUID: envUuid,
                     CmpUUID: cmpUuid,
                     UserUUID: userUuid
                 });
-                
+
                 console.log('Convert performa to invoice response:', response);
-                
+
                 // Navigate to AddSalesInvoice with headerUuid from response and prefill data
                 const headerUuid = response?.Data?.UUID || response?.UUID || response?.headerUuid;
                 if (headerUuid) {
@@ -219,7 +225,7 @@ const SalesPerfomaInvoice = () => {
                         }
                     });
                 }
-                
+
                 Alert.alert('Success', 'Performa invoice converted to invoice successfully');
             } catch (err) {
                 console.error('Convert performa to invoice error:', err);
@@ -443,15 +449,15 @@ const SalesPerfomaInvoice = () => {
                     <AccordionItem
                         key={item.id}
 
-                                item={{
-                                    soleExpenseCode: item.id,
-                                    // Show Performa Invoice No in the left header by using `title` here
-                                    expenseName: item.title,
-                                    // Show amount on the right header; prefer numeric amount if available
-                                    // Use a dummy amount '0.00' when the backend doesn't provide one
-                                    amount: item.amount != null ? item.amount : '0.00',
-                                    status: item.status,
-                                }}
+                        item={{
+                            soleExpenseCode: item.id,
+                            // Show Performa Invoice No in the left header by using `title` here
+                            expenseName: item.title,
+                            // Show amount on the right header; prefer numeric amount if available
+                            // Use a dummy amount '0.00' when the backend doesn't provide one
+                            amount: item.amount != null ? item.amount : '0.00',
+                            status: item.status,
+                        }}
 
                         isActive={activeOrderId === item.id}
                         onToggle={() => setActiveOrderId(prev => prev === item.id ? null : item.id)}

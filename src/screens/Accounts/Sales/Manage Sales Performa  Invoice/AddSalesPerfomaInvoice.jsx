@@ -24,7 +24,7 @@ import { useNavigation } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
-import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getCustomers, getEmployees, getCountries, getSalesOrderNumbers, addSalesPerformaInvoiceHeader, addSalesPerformaInvoiceLine, updateSalesPerformaInvoiceHeader, updateSalesInvoiceHeader, getSalesPerformaInvoiceHeaderById, getSalesPerformaInvoiceLines, updateSalesPerformaInvoiceLine, deleteSalesPerformaInvoiceLine, getItems } from '../../../../api/authServices';
+import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllSalesInquiryNumbers, getCustomers, getEmployees, getCountries, getSalesOrderNumbers, addSalesPerformaInvoiceHeader, addSalesPerformaInvoiceLine, updateSalesPerformaInvoiceHeader, updateSalesInvoiceHeader, getSalesPerformaInvoiceHeaderById, getSalesPerformaInvoiceLines, updateSalesPerformaInvoiceLine, deleteSalesPerformaInvoiceLine, getItems, uploadFiles } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
 
 const COL_WIDTHS = {
@@ -101,7 +101,11 @@ const AddSalesPerfomaInvoice = () => {
 
         setExpandedId(prev => (prev === id ? null : id));
     };
-
+    const screenTheme = {
+        text: COLORS.text,
+        textLight: COLORS.textLight,
+        bg: '#fff',
+    };
     // Demo options for dropdowns
     const paymentTerms = ['Monthly'];
     const projects = ['Mobile App',];
@@ -159,7 +163,7 @@ const AddSalesPerfomaInvoice = () => {
                     getPaymentMethods(),
                     getEmployees(),
                     fetchProjects(),
-                    getAllInquiryNumbers(),
+                    getAllSalesInquiryNumbers(),
                     getSalesOrderNumbers(),
                 ]);
 
@@ -265,13 +269,27 @@ const AddSalesPerfomaInvoice = () => {
                     CustomerName: data?.CustomerName || s.CustomerName || '',
                 }));
 
-                // Prefill dates and days
-                setInvoiceDate(data?.OrderDate || data?.PerformaDate || data?.InvoiceDate || '');
-                setDueDate(data?.DueDate || '');
-                setStartDate(data?.StartDate || '');
-                setEndDate(data?.EndDate || '');
-                setStartDate(data?.StartDate || '');
-                setEndDate(data?.EndDate || '');
+                // Prefill dates and days. Prefer FromDate/ToDate if present (common API variants)
+                const invoiceDt = data?.OrderDate || data?.PerformaDate || data?.InvoiceDate || '';
+                setInvoiceDate(invoiceDt);
+
+                const dueDt = data?.DueDate || '';
+                setDueDate(dueDt);
+
+                const rawFrom = data?.FromDate || data?.StartDate || data?.From_Date || data?.From || '';
+                const rawTo = data?.ToDate || data?.EndDate || data?.To_Date || data?.To || '';
+                // Convert YYYY-MM-DD -> dd-MMM-yyyy if needed, else keep as-is
+                const toUi = (dt) => {
+                    if (!dt) return '';
+                    if (typeof dt === 'string' && dt.includes('-') && dt.length === 10) {
+                        const [yyyy, mm, dd] = dt.split('-');
+                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        return `${dd}-${months[parseInt(mm, 10) - 1]}-${yyyy}`;
+                    }
+                    return dt;
+                };
+                setStartDate(toUi(rawFrom));
+                setEndDate(toUi(rawTo));
                 const daysValue = data?.Days || data?.DueDays || data?.PaymentDueDays || '';
                 if (daysValue) {
                     setDueDays(String(daysValue));
@@ -294,7 +312,7 @@ const AddSalesPerfomaInvoice = () => {
                     setProjectUUID(projUuid);
                     setProject(data?.ProjectTitle || data?.ProjectName || '');
                     // Find and set complete project data for IsTimesheetBased check
-                    const foundProject = projectsOptions.find(p => 
+                    const foundProject = projectsOptions.find(p =>
                         String(p?.Uuid || p?.UUID || p?.Id) === String(projUuid)
                     );
                     if (foundProject) {
@@ -316,7 +334,10 @@ const AddSalesPerfomaInvoice = () => {
 
                 const headerUuid = data?.UUID || data?.Id || data?.HeaderUUID || null;
                 setHeaderUUID(headerUuid);
-                if (data?.FilePath) setFile({ uri: data.FilePath, name: data.FilePath });
+                if (data?.FilePath) {
+                    setFile({ uri: data.FilePath, name: data.FilePath });
+                    setUploadedFilePath(data.FilePath);
+                }
                 // If headerUUID exists, it's edit mode - make it editable by default
                 // Otherwise, it's view mode - make it non-editable
                 setHeaderSubmitted(true);
@@ -419,27 +440,20 @@ const AddSalesPerfomaInvoice = () => {
                     }
                 }
 
-                if (data?.StartDate) {
-                    const startDate = data.StartDate;
-                    if (startDate.includes('-') && startDate.length === 10) {
-                        const [yyyy, mm, dd] = startDate.split('-');
+                // Support both StartDate/EndDate and FromDate/ToDate variants returned by API
+                const rawFrom = data?.StartDate || data?.FromDate || data?.From_Date || data?.From || '';
+                const rawTo = data?.EndDate || data?.ToDate || data?.To_Date || data?.To || '';
+                const toUi = (dt) => {
+                    if (!dt) return '';
+                    if (typeof dt === 'string' && dt.includes('-') && dt.length === 10) {
+                        const [yyyy, mm, dd] = dt.split('-');
                         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                        setStartDate(`${dd}-${months[parseInt(mm) - 1]}-${yyyy}`);
-                    } else {
-                        setStartDate(startDate);
+                        return `${dd}-${months[parseInt(mm, 10) - 1]}-${yyyy}`;
                     }
-                }
-
-                if (data?.EndDate) {
-                    const endDate = data.EndDate;
-                    if (endDate.includes('-') && endDate.length === 10) {
-                        const [yyyy, mm, dd] = endDate.split('-');
-                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                        setEndDate(`${dd}-${months[parseInt(mm) - 1]}-${yyyy}`);
-                    } else {
-                        setEndDate(endDate);
-                    }
-                }
+                    return dt;
+                };
+                setStartDate(toUi(rawFrom));
+                setEndDate(toUi(rawTo));
 
                 setShippingCharges(String(data?.ShippingCharges ?? data?.ShippingCharge ?? 0));
                 setAdjustments(String(data?.AdjustmentPrice ?? data?.Adjustment ?? 0));
@@ -459,7 +473,7 @@ const AddSalesPerfomaInvoice = () => {
                 if (data?.ProjectTitle || data?.ProjectName) {
                     setProject(data.ProjectTitle || data.ProjectName);
                     // Find complete project data by name
-                    const foundProject = projectsOptions.find(p => 
+                    const foundProject = projectsOptions.find(p =>
                         (p?.ProjectTitle || p?.Name) === (data.ProjectTitle || data.ProjectName)
                     );
                     if (foundProject) {
@@ -736,6 +750,7 @@ const AddSalesPerfomaInvoice = () => {
     const [totalTax, setTotalTax] = useState('0');
     const [serverTotalAmount, setServerTotalAmount] = useState('');
     const [file, setFile] = useState(null);
+    const [uploadedFilePath, setUploadedFilePath] = useState(null);
     const [showShippingTip, setShowShippingTip] = useState(false);
     const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
     const [prefillLoading, setPrefillLoading] = useState(false);
@@ -1195,7 +1210,7 @@ const AddSalesPerfomaInvoice = () => {
             const description = currentItem.desc || '';
 
             // If editing an existing line
-                    if (editItemId) {
+            if (editItemId) {
                 const existing = items.find(x => x.id === editItemId);
                 if (!existing) {
                     Alert.alert('Error', 'Line to edit not found');
@@ -1211,10 +1226,10 @@ const AddSalesPerfomaInvoice = () => {
                     Description: description,
                     HSNSACNO: currentItem.hsn || '',
                 };
-console.log(payload,'0909');
+                console.log(payload, '0909');
 
                 // If serverLineUuid exists, call update API, otherwise just update locally
-                    if (existing.serverLineUuid) {
+                if (existing.serverLineUuid) {
                     const resp = await updateSalesPerformaInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
                     console.log('update line resp ->', resp);
                     const updatedLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || existing.serverLineUuid;
@@ -1319,7 +1334,7 @@ console.log(payload,'0909');
                 SubTotal: parseFloat(computeSubtotal()) || 0,
                 TotalTax: parseFloat(totalTax) || 0,
                 TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax) || 0),
-                FilePath: file?.uri || file?.name || '',
+                FilePath: uploadedFilePath || file?.uri || file?.name || '',
                 Notes: notes || '',
             };
 
@@ -1382,7 +1397,7 @@ console.log(payload,'0909');
                 SubTotal: parseFloat(computeSubtotal()) || 0,
                 TotalTax: parseFloat(totalTax) || 0,
                 TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax) || 0),
-                FilePath: file?.uri || file?.name || '',
+                FilePath: uploadedFilePath || file?.uri || file?.name || '',
             };
 
             console.log('submitHeader payload ->', payload);
@@ -1438,7 +1453,7 @@ console.log(payload,'0909');
                 AdjustmentField: adjustmentLabel || '',
                 AdjustmentPrice: parseFloat(adjustments) || 0,
                 TermsConditions: terms || '',
-                FilePath: file?.uri || file?.name || '',
+                FilePath: uploadedFilePath || file?.uri || file?.name || '',
                 SubTotal: parseFloat(computeSubtotal()) || 0,
                 TotalTax: parseFloat(totalTax) || 0,
                 TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax) || 0),
@@ -1500,13 +1515,36 @@ console.log(payload,'0909');
                     return;
                 }
 
-                // Set the selected file
-                setFile({
+                // Set the selected file and immediately upload to server with fixed Filepath 'SalesPerInv'
+                const fileObj = {
                     name: selectedFile.name,
                     uri: selectedFile.uri,
                     type: selectedFile.type,
                     size: selectedFile.size,
-                });
+                };
+                setFile(fileObj);
+
+                try {
+                    const uploadResp = await uploadFiles({ uri: fileObj.uri, name: fileObj.name, type: fileObj.type }, { filepath: 'SalesPerInv' });
+                    console.log('uploadFiles response (SalesPerInv):', uploadResp);
+                    const upData = uploadResp?.Data || uploadResp || {};
+                    const uploaded = upData?.Files || upData?.files || upData?.UploadedFiles || upData?.FilePaths || upData || [];
+                    const finalRefs = Array.isArray(uploaded) ? uploaded : (uploaded ? [uploaded] : []);
+                    try { console.log('Normalized upload refs ->', JSON.stringify(finalRefs, null, 2)); } catch (_) { console.log('Normalized upload refs ->', finalRefs); }
+                    const paths = finalRefs.map(r => { try { return r?.RemoteResponse?.path || r?.path || (typeof r === 'string' ? r : null); } catch (_) { return null; } }).filter(Boolean);
+                    if (paths.length > 0) {
+                        setUploadedFilePath(paths.length === 1 ? paths[0] : paths);
+                        try { console.log('Extracted uploaded file path(s):', JSON.stringify(paths, null, 2)); } catch (_) { console.log('Extracted uploaded file path(s):', paths); }
+                    } else {
+                        console.warn('Could not extract uploaded file path from response', uploadResp);
+                    }
+                } catch (upErr) {
+                    console.error('SalesPerInv file upload failed', upErr);
+                    Alert.alert('Upload Error', upErr?.message || 'Failed to upload file');
+                    // clear selection on failure
+                    setFile(null);
+                    setUploadedFilePath(null);
+                }
             }
         } catch (err) {
             if (isCancel && isCancel(err)) {
@@ -1518,6 +1556,7 @@ console.log(payload,'0909');
 
     const removeFile = () => {
         setFile(null);
+        setUploadedFilePath(null);
     };
 
     if (prefillLoading) {
@@ -1571,7 +1610,7 @@ console.log(payload,'0909');
 
                                 {/* <Text style={[inputStyles.label, { fontWeight: '600' }]}>Sales Inquiry No.</Text> */}
                                 <Dropdown
-                                    placeholder="Sales Inquiry No."
+                                    placeholder="-Sales Inquiry No.-"
                                     value={headerForm.salesInquiry}
                                     options={salesInquiryNosOptions}
                                     getLabel={s => s?.InquiryNo || String(s)}
@@ -1587,15 +1626,15 @@ console.log(payload,'0909');
                                         }
                                     }}
                                     inputBoxStyle={inputStyles.box}
-                                    textStyle={inputStyles.input}
+                                // textStyle={inputStyles.input}
                                 />
                             </View>
                             <View style={styles.col}>
-                                <Text style={[inputStyles.label,]}>Sales Order Number</Text>
+                                <Text style={[inputStyles.label,]}>Sales Order No</Text>
 
                                 <View style={{ zIndex: 9997, elevation: 19 }}>
                                     <Dropdown
-                                        placeholder="Sales Order Number"
+                                        placeholder="-Sales Order No.-"
                                         value={headerForm.salesOrderNo}
                                         options={salesOrderOptions}
                                         getLabel={so => (so?.OrderNo || so?.SalesOrderNo || so?.SalesOrderNumber || String(so))}
@@ -1612,7 +1651,7 @@ console.log(payload,'0909');
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={inputStyles.box}
-                                        textStyle={inputStyles.input}
+                                    // textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -1623,11 +1662,11 @@ console.log(payload,'0909');
 
 
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Customer Name* </Text>
+                                <Text style={inputStyles.label}>Customer Name*</Text>
 
                                 <View style={{ zIndex: 9998, elevation: 20 }}>
                                     <Dropdown
-                                        placeholder="Customer Name*"
+                                        placeholder="-Select Customer-"
                                         value={headerForm.CustomerName || headerForm.opportunityTitle}
                                         options={customersOptions}
                                         getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
@@ -1642,7 +1681,7 @@ console.log(payload,'0909');
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={inputStyles.box}
-                                        textStyle={inputStyles.input}
+                                    // textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -1653,7 +1692,7 @@ console.log(payload,'0909');
 
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
-                                        placeholder="Select Project*"
+                                        placeholder="Select Project-"
                                         value={project}
                                         options={projectsOptions}
                                         getLabel={p => (p?.Name || p?.ProjectTitle || String(p))}
@@ -1671,7 +1710,7 @@ console.log(payload,'0909');
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box]}
-                                        textStyle={inputStyles.input}
+                                    // textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -1679,113 +1718,113 @@ console.log(payload,'0909');
 
                         </View>
                         {selectedProjectData?.IsTimesheetBased && (
-                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
-                            <View style={styles.col}>
-                                <TouchableOpacity
-                                    activeOpacity={0.7}
-                                    onPress={() => { if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; } openDatePickerFor('start'); }}
-                                    style={{ marginTop: hp(0.8), opacity: headerEditable ? 1 : 0.6 }}
-                                    disabled={!headerEditable}
-                                >
-                                    <Text style={inputStyles.label}>From Date</Text>
-
-                                    <View
-                                        style={[
-                                            inputStyles.box,
-                                            styles.innerFieldBox,
-                                            styles.datePickerBox,
-                                            { alignItems: 'center' },
-                                        ]}
+                            <View style={[styles.row, { marginTop: hp(1.5) }]}>
+                                <View style={styles.col}>
+                                    <TouchableOpacity
+                                        activeOpacity={0.7}
+                                        onPress={() => { if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; } openDatePickerFor('start'); }}
+                                        style={{ marginTop: hp(0.8), opacity: headerEditable ? 1 : 0.6 }}
+                                        disabled={!headerEditable}
                                     >
-                                        <Text
-                                            style={[
-                                                inputStyles.input,
-                                                styles.datePickerText,
-                                                !startDate && {
-                                                    color: COLORS.textLight,
-                                                    fontFamily: TYPOGRAPHY.fontFamilyRegular,
-                                                },
-                                                startDate && {
-                                                    color: COLORS.text,
-                                                    fontFamily: TYPOGRAPHY.fontFamilyMedium,
-                                                },
-                                            ]}
-                                        >
-                                            {startDate || 'From Date'}
-                                        </Text>
+                                        <Text style={inputStyles.label}>From Date</Text>
+
                                         <View
                                             style={[
-                                                styles.calendarIconContainer,
-                                                startDate && styles.calendarIconContainerSelected,
+                                                inputStyles.box,
+                                                styles.innerFieldBox,
+                                                styles.datePickerBox,
+                                                { alignItems: 'center' },
                                             ]}
                                         >
-                                            <Icon
-                                                name="calendar-today"
-                                                size={rf(3.2)}
-                                                color={startDate ? COLORS.primary : COLORS.textLight}
-                                            />
+                                            <Text
+                                                style={[
+                                                    inputStyles.input,
+                                                    styles.datePickerText,
+                                                    !startDate && {
+                                                        color: COLORS.textLight,
+                                                        fontFamily: TYPOGRAPHY.fontFamilyRegular,
+                                                    },
+                                                    startDate && {
+                                                        color: COLORS.text,
+                                                        fontFamily: TYPOGRAPHY.fontFamilyMedium,
+                                                    },
+                                                ]}
+                                            >
+                                                {startDate || 'From Date'}
+                                            </Text>
+                                            <View
+                                                style={[
+                                                    styles.calendarIconContainer,
+                                                    startDate && styles.calendarIconContainerSelected,
+                                                ]}
+                                            >
+                                                <Icon
+                                                    name="calendar-today"
+                                                    size={rf(3.2)}
+                                                    color={startDate ? COLORS.primary : COLORS.textLight}
+                                                />
+                                            </View>
                                         </View>
-                                    </View>
-                                </TouchableOpacity>
-                            </View>
-                            <View style={styles.col}>
-                                <TouchableOpacity
-                                    activeOpacity={0.7}
-                                    onPress={() => { if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; } openDatePickerFor('end'); }}
-                                    style={{ marginTop: hp(0.8), opacity: headerEditable ? 1 : 0.6 }}
-                                    disabled={!headerEditable}
-                                >
-                                    <Text style={inputStyles.label}>To Date</Text>
-
-                                    <View
-                                        style={[
-                                            inputStyles.box,
-                                            styles.innerFieldBox,
-                                            styles.datePickerBox,
-                                            { alignItems: 'center' },
-                                        ]}
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={styles.col}>
+                                    <TouchableOpacity
+                                        activeOpacity={0.7}
+                                        onPress={() => { if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; } openDatePickerFor('end'); }}
+                                        style={{ marginTop: hp(0.8), opacity: headerEditable ? 1 : 0.6 }}
+                                        disabled={!headerEditable}
                                     >
-                                        <Text
-                                            style={[
-                                                inputStyles.input,
-                                                styles.datePickerText,
-                                                !endDate && {
-                                                    color: COLORS.textLight,
-                                                    fontFamily: TYPOGRAPHY.fontFamilyRegular,
-                                                },
-                                                endDate && {
-                                                    color: COLORS.text,
-                                                    fontFamily: TYPOGRAPHY.fontFamilyMedium,
-                                                },
-                                            ]}
-                                        >
-                                            {endDate || 'To Date'}
-                                        </Text>
+                                        <Text style={inputStyles.label}>To Date</Text>
+
                                         <View
                                             style={[
-                                                styles.calendarIconContainer,
-                                                endDate && styles.calendarIconContainerSelected,
+                                                inputStyles.box,
+                                                styles.innerFieldBox,
+                                                styles.datePickerBox,
+                                                { alignItems: 'center' },
                                             ]}
                                         >
-                                            <Icon
-                                                name="calendar-today"
-                                                size={rf(3.2)}
-                                                color={endDate ? COLORS.primary : COLORS.textLight}
-                                            />
+                                            <Text
+                                                style={[
+                                                    inputStyles.input,
+                                                    styles.datePickerText,
+                                                    !endDate && {
+                                                        color: COLORS.textLight,
+                                                        fontFamily: TYPOGRAPHY.fontFamilyRegular,
+                                                    },
+                                                    endDate && {
+                                                        color: COLORS.text,
+                                                        fontFamily: TYPOGRAPHY.fontFamilyMedium,
+                                                    },
+                                                ]}
+                                            >
+                                                {endDate || 'To Date'}
+                                            </Text>
+                                            <View
+                                                style={[
+                                                    styles.calendarIconContainer,
+                                                    endDate && styles.calendarIconContainerSelected,
+                                                ]}
+                                            >
+                                                <Icon
+                                                    name="calendar-today"
+                                                    size={rf(3.2)}
+                                                    color={endDate ? COLORS.primary : COLORS.textLight}
+                                                />
+                                            </View>
                                         </View>
-                                    </View>
-                                </TouchableOpacity>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
-                        </View>
                         )}
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
 
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>payment Tearm* </Text>
+                                <Text style={inputStyles.label}>payment Term* </Text>
 
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
-                                        placeholder="Payment Term*"
+                                        placeholder="-Select Payment Term-"
                                         value={paymentTerm}
                                         options={paymentTermsOptions}
                                         getLabel={p => p?.Name || p?.Title || String(p)}
@@ -1802,16 +1841,16 @@ console.log(payload,'0909');
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        textStyle={inputStyles.input}
+                                    // textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>payment Method* </Text>
+                                <Text style={inputStyles.label}>Payment Method* </Text>
 
                                 <View style={{ zIndex: 9998, elevation: 20 }}>
                                     <Dropdown
-                                        placeholder="Payment Method"
+                                        placeholder="-Select Payment Mode-"
                                         value={paymentMethod}
                                         options={paymentMethodsOptions}
                                         getLabel={p => p?.Name || p?.Title || String(p)}
@@ -1828,7 +1867,7 @@ console.log(payload,'0909');
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        textStyle={inputStyles.input}
+                                    // textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -2054,7 +2093,7 @@ console.log(payload,'0909');
                                                 }}
                                                 renderInModal={true}
                                                 inputBoxStyle={[inputStyles.box, { width: '100%' }]}
-                                                textStyle={inputStyles.input}
+                                            // textStyle={inputStyles.input}
                                             />
                                         </View>
                                     </View>
@@ -2063,27 +2102,27 @@ console.log(payload,'0909');
                                 {/* Item dropdown full width */}
                                 {!selectedProjectData?.IsTimesheetBased && (
                                     <View style={{ width: '100%', marginBottom: hp(1) }}>
-                                    <Text style={inputStyles.label}>Item*</Text>
-                                    <View style={{ zIndex: 9999, elevation: 20 }}>
-                                        <Dropdown
-                                            placeholder="Select Item"
-                                            value={currentItem.itemName}
-                                            options={masterItems}
-                                            getLabel={it => (it?.name || String(it))}
-                                            getKey={it => (it?.uuid || it?.sku || it)}
-                                            onSelect={v => {
-                                                if (v && typeof v === 'object') {
-                                                    setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.uuid || v?.UUID || v?.sku || null, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '', hsn: v?.hsn || ci?.hsn || '' }));
-                                                } else {
-                                                    setCurrentItem(ci => ({ ...ci, itemName: v, itemNameUuid: null }));
-                                                }
-                                            }}
-                                            renderInModal={true}
-                                            inputBoxStyle={[inputStyles.box, { width: '100%' }]}
-                                            textStyle={inputStyles.input}
-                                        />
+                                        <Text style={inputStyles.label}>Item*</Text>
+                                        <View style={{ zIndex: 9999, elevation: 20 }}>
+                                            <Dropdown
+                                                placeholder="Select Item"
+                                                value={currentItem.itemName}
+                                                options={masterItems}
+                                                getLabel={it => (it?.name || String(it))}
+                                                getKey={it => (it?.uuid || it?.sku || it)}
+                                                onSelect={v => {
+                                                    if (v && typeof v === 'object') {
+                                                        setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.uuid || v?.UUID || v?.sku || null, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '', hsn: v?.hsn || ci?.hsn || '' }));
+                                                    } else {
+                                                        setCurrentItem(ci => ({ ...ci, itemName: v, itemNameUuid: null }));
+                                                    }
+                                                }}
+                                                renderInModal={true}
+                                                inputBoxStyle={[inputStyles.box, { width: '100%' }]}
+                                            // textStyle={inputStyles.input}
+                                            />
+                                        </View>
                                     </View>
-                                </View>
                                 )}
 
                                 {/* Description full width */}
@@ -2247,14 +2286,14 @@ console.log(payload,'0909');
                                                 <View style={styles.table}>
                                                     <View style={styles.thead}>
                                                         <View style={styles.tr}>
-                                                            <Text style={[styles.th, { width: wp(10) }]}>Sr.No</Text>
-                                                            <Text style={[styles.th, { width: wp(30) }]}>{selectedProjectData?.IsTimesheetBased ? 'Employee' : 'Item Details'}</Text>
-                                                            <Text style={[styles.th, { width: wp(30) }]}>Description</Text>
-                                                            {!selectedProjectData?.IsTimesheetBased && (<Text style={[styles.th, { width: wp(25) }]}>HSN/SAC</Text>)}
-                                                            <Text style={[styles.th, { width: wp(20) }]}>{selectedProjectData?.IsTimesheetBased ? 'Total Hours Worked' : 'Quantity'}</Text>
-                                                            <Text style={[styles.th, { width: wp(20) }]}>Rate</Text>
-                                                            <Text style={[styles.th, { width: wp(20) }]}>Amount</Text>
-                                                            <Text style={[styles.th, { width: wp(40) }]}>Action</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(10) }]}>Sr.No</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(30) }]}>{selectedProjectData?.IsTimesheetBased ? 'Employee' : 'Item Details'}</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(30) }]}>Description</Text>
+                                                            {!selectedProjectData?.IsTimesheetBased && (<Text style={[styles.th, { color: screenTheme.text, width: wp(25) }]}>HSN/SAC</Text>)}
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(20) }]}>{selectedProjectData?.IsTimesheetBased ? 'Total Hours Worked' : 'Quantity'}</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(20) }]}>Rate</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(20) }]}>Amount</Text>
+                                                            <Text style={[styles.th, { color: screenTheme.text, width: wp(40) }]}>Action</Text>
                                                         </View>
                                                     </View>
 
@@ -2264,20 +2303,20 @@ console.log(payload,'0909');
                                                                 <View style={[styles.td, { width: wp(10) }]}>
                                                                     <Text style={styles.tdText}>{start + idx + 1}</Text>
                                                                 </View>
-                                                                    <View style={[styles.td, { width: wp(30), paddingLeft: wp(2) }]}>
-                                                                        <Text style={styles.tdText}>{selectedProjectData?.IsTimesheetBased ? (item.employeeName || item.name) : item.name}</Text>
+                                                                <View style={[styles.td, { width: wp(30), paddingLeft: wp(2) }]}>
+                                                                    <Text style={styles.tdText}>{selectedProjectData?.IsTimesheetBased ? (item.employeeName || item.name) : item.name}</Text>
+                                                                </View>
+                                                                <View style={[styles.td, { width: wp(30) }]}>
+                                                                    <Text style={styles.tdText}>{item.desc}</Text>
+                                                                </View>
+                                                                {!selectedProjectData?.IsTimesheetBased && (
+                                                                    <View style={[styles.td, { width: wp(25) }]}>
+                                                                        <Text style={styles.tdText}>{item.hsn || '-'}</Text>
                                                                     </View>
-                                                                    <View style={[styles.td, { width: wp(30) }]}>
-                                                                        <Text style={styles.tdText}>{item.desc}</Text>
-                                                                    </View>
-                                                                    {!selectedProjectData?.IsTimesheetBased && (
-                                                                        <View style={[styles.td, { width: wp(25) }]}>
-                                                                            <Text style={styles.tdText}>{item.hsn || '-'}</Text>
-                                                                        </View>
-                                                                    )}
-                                                                    <View style={[styles.td, { width: wp(20) }]}>
-                                                                        <Text style={styles.tdText}>{item.qty}</Text>
-                                                                    </View>
+                                                                )}
+                                                                <View style={[styles.td, { width: wp(20) }]}>
+                                                                    <Text style={styles.tdText}>{item.qty}</Text>
+                                                                </View>
                                                                 <View style={[styles.td, { width: wp(20) }]}>
                                                                     <Text style={styles.tdText}>₹{item.rate}</Text>
                                                                 </View>
@@ -2411,7 +2450,7 @@ console.log(payload,'0909');
                                             }}
                                             style={styles.helpIconContainer}
                                         >
-                                            <Text style={styles.helpIcon}>?</Text>
+                                            <Text style={[styles.helpIcon, { color: screenTheme.text } ]}>?</Text>
                                         </TouchableOpacity>
 
                                         {/* Tooltip */}
@@ -3318,6 +3357,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginRight: 8,
         backgroundColor: '#fff',
+        color: '#000',
     },
 
     labelInput: {

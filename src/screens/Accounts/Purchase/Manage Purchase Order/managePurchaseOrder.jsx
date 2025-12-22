@@ -22,7 +22,7 @@ import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
-import { addPurchaseOrder, updatePurchaseOrder, addPurchaseOrderLine, updatePurchaseOrderLine, getVendors, getCountries, getStates, getCities, getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getPurchaseOrderHeaderById, getPurchaseOrderHeaders, getItems, getPurchaseOrderLines, deletePurchaseOrderLine } from '../../../../api/authServices';
+import { addPurchaseOrder, updatePurchaseOrder, addPurchaseOrderLine, updatePurchaseOrderLine, getVendors, getCountries, getStates, getCities, getPaymentTerms, getPaymentMethods, fetchProjects, getAllPurchaseInquiryNumbers, getPurchaseOrderHeaderById, getPurchaseOrderHeaders, getItems, getPurchaseOrderLines, deletePurchaseOrderLine } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 
@@ -886,7 +886,7 @@ const ManageSalesOrder = () => {
           getPaymentMethods(),
           getCountries(),
           fetchProjects(),
-          getAllInquiryNumbers(),
+          getAllPurchaseInquiryNumbers(),
         ]);
 
         const custList = extractArray(custResp);
@@ -1894,7 +1894,7 @@ const ManageSalesOrder = () => {
                       setHeaderForm(s => ({ ...s, SalesInquiryUUID: candidateUuid }));
                     }}
                     inputBoxStyle={inputStyles.box}
-                    textStyle={inputStyles.input}
+                    // textStyle={inputStyles.input}
                   />
                 )}
               </View>
@@ -1921,7 +1921,7 @@ const ManageSalesOrder = () => {
                       CustomerUUID: v?.UUID || v?.Id || (typeof v === 'string' ? v : ''),
                     }))}
                     inputBoxStyle={inputStyles.box}
-                    textStyle={inputStyles.input}
+                    // textStyle={inputStyles.input}
                   />
                 )}
               </View>
@@ -1949,7 +1949,7 @@ const ManageSalesOrder = () => {
                       onSelect={v => { setProject(v?.ProjectTitle || v), setProjectUUID(v?.Uuid || v); }}
                       renderInModal={true}
                       inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                      textStyle={inputStyles.input}
+                      // textStyle={inputStyles.input}
                     />
                   )}
                 </View>
@@ -1973,7 +1973,7 @@ const ManageSalesOrder = () => {
                       onSelect={v => { setPaymentTerm(v?.Name || v), setPaymentTermUuid(v?.UUID || v) }}
                       renderInModal={true}
                       inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                      textStyle={inputStyles.input}
+                      // textStyle={inputStyles.input}
                     />
                   )}
                 </View>
@@ -2000,7 +2000,7 @@ const ManageSalesOrder = () => {
                       onSelect={v => { setPaymentMethod(v?.Name || v), setPaymentMethodUUID(v?.UUID || v) }}
                       renderInModal={true}
                       inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                      textStyle={inputStyles.input}
+                      // textStyle={inputStyles.input}
                     />
                   )}
                 </View>
@@ -2348,7 +2348,7 @@ const ManageSalesOrder = () => {
                       getKey={c => (c?.UUID || c?.Id || c)}
                       onSelect={handleShippingCountrySelect}
                       inputBoxStyle={inputStyles.box}
-                      textStyle={inputStyles.input}
+                      // textStyle={inputStyles.input}
                       style={{ marginBottom: hp(1.6) }}
                       renderInModal={true}
                     />
@@ -2365,7 +2365,7 @@ const ManageSalesOrder = () => {
                       getKey={c => (c?.UUID || c?.Id || c)}
                       onSelect={handleShippingStateSelect}
                       inputBoxStyle={inputStyles.box}
-                      textStyle={inputStyles.input}
+                      // textStyle={inputStyles.input}
                       style={{ marginBottom: hp(1.6) }}
                       renderInModal={true}
                     />
@@ -2388,7 +2388,7 @@ const ManageSalesOrder = () => {
                         setShippingForm(s => ({ ...s, city: c?.UUID || c }));
                       }}
                       inputBoxStyle={inputStyles.box}
-                      textStyle={inputStyles.input}
+                      // textStyle={inputStyles.input}
                       style={{ marginBottom: hp(1.6) }}
                       renderInModal={true}
                     />
@@ -2460,7 +2460,7 @@ const ManageSalesOrder = () => {
                         }}
                         renderInModal={true}
                         inputBoxStyle={[inputStyles.box, { width: '100%' }]}
-                        textStyle={inputStyles.input}
+                        // textStyle={inputStyles.input}
                       />
                     </View>
                   </View>
@@ -2571,7 +2571,7 @@ const ManageSalesOrder = () => {
                 <View>
                   <View style={styles.tableControlsRow}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={{ marginRight: wp(2) }}>Show</Text>
+                      <Text style={{ marginRight: wp(2), color: screenTheme.text  }}>Show</Text>
                       <Dropdown
                         placeholder={String(pageSize)}
                         value={String(pageSize)}
@@ -2580,9 +2580,9 @@ const ManageSalesOrder = () => {
                         getKey={p => String(p)}
                         onSelect={v => { setPageSize(Number(v)); setPage(1); }}
                         inputBoxStyle={{ width: wp(18) }}
-                        textStyle={inputStyles.input}
+                        // textStyle={inputStyles.input}
                       />
-                      <Text style={{ marginLeft: wp(2) }}>entries</Text>
+                      <Text style={{ marginLeft: wp(2), color: screenTheme.text  }}>entries</Text>
                     </View>
 
                     <View style={{ flex: 1, alignItems: 'flex-end' }}>

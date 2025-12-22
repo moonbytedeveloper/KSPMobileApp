@@ -1,10 +1,10 @@
 
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal, RefreshControl } from 'react-native';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 import AppHeader from '../../../../components/common/AppHeader';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
 import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -47,6 +47,7 @@ const ManageSalesInvoice = () => {
             setCurrentPage(totalPages - 1);
         }
     }, [totalPages, currentPage]);
+    const serverPagingModeRef = useRef(null); // 'offset' | 'pageIndex' | null
 
     const fetchSalesInvoices = async (page = 0, pageSize = itemsPerPage, q = searchQuery) => {
         try {
@@ -54,7 +55,9 @@ const ManageSalesInvoice = () => {
             setError(null);
             const cmp = await getCMPUUID();
             const env = await getENVUUID();
-            const start = page * pageSize;
+            const usePageIndex = serverPagingModeRef.current === 'pageIndex';
+            const start = usePageIndex ? page : page * pageSize;
+            console.log('fetchSalesInvoices ->', { page, pageSize, start, usePageIndex, serverPagingMode: serverPagingModeRef.current });
             const resp = await getSalesInvoiceHeaders({ cmpUuid: cmp, envUuid: env, start, length: pageSize, searchValue: q });
             const data = resp?.Data || resp || {};
             const records = Array.isArray(data?.Records) ? data.Records : (Array.isArray(data) ? data : []);
@@ -71,9 +74,54 @@ const ManageSalesInvoice = () => {
                 status: r?.Status || r?.State || 'Draft',
                 raw: r,
             }));
+            // Prefer Data.TotalCount, then common total keys
+            const total = Number(data?.TotalCount ?? data?.TotalRecords ?? data?.Total ?? resp?.TotalRecords ?? resp?.Total ?? records.length) || records.length;
+            console.log('fetchSalesInvoices resp ->', { recordsReturned: Array.isArray(records) ? records.length : 0, totalReported: total });
+
+            // If server reports total > 0 but returned zero records for this page, probe alternate paging mode
+            if (total > 0 && Array.isArray(records) && records.length === 0 && page > 0) {
+                if (!serverPagingModeRef.current) {
+                    try {
+                        const altStart = page; // treat start as page index
+                        const altResp = await getSalesInvoiceHeaders({ cmpUuid: cmp, envUuid: env, start: altStart, length: pageSize, searchValue: q });
+                        const altData = altResp?.Data || altResp || {};
+                        const altRecords = Array.isArray(altData?.Records) ? altData.Records : (Array.isArray(altData) ? altData : []);
+                        const altTotal = Number(altData?.TotalCount ?? altData?.TotalRecords ?? altData?.Total ?? altResp?.TotalRecords ?? altResp?.Total ?? altRecords.length) || altRecords.length;
+                        console.log('fetchSalesInvoices altProbe ->', { altStart, altRecordsReturned: Array.isArray(altRecords) ? altRecords.length : 0, altTotalReported: altTotal });
+                        if (Array.isArray(altRecords) && altRecords.length > 0) {
+                            serverPagingModeRef.current = 'pageIndex';
+                            const altNormalized = altRecords.map((r, idx) => ({
+                                id: r?.UUID || r?.Id || `si-${altStart + idx + 1}`,
+                                salesInvoiceNumber: r?.SalesInvoiceNo || r?.InvoiceNo || r?.SalesInvNo || r?.SalesPerInvNo || r?.SalesInvoiceNumber || '',
+                                salesOrderNumber: r?.SalesOrderNo || r?.OrderNo || r?.SalesOrder || '',
+                                amount: r?.Amount || r?.TotalAmount || r?.NetAmount || r?.AmountPayable || null,
+                                customerName: r?.CustomerName || r?.Customer || r?.CustomerDisplayName || '',
+                                deliveryDate: r?.DeliveryDate || r?.InvoiceDate || r?.OrderDate || '',
+                                dueDate: r?.DueDate || r?.PaymentDueDate || '',
+                                contactPerson: r?.ContactPerson || r?.Contact || '',
+                                status: r?.Status || r?.State || 'Draft',
+                                raw: r,
+                            }));
+                            setInvoices(altNormalized);
+                            setTotalRecords(altTotal);
+                            return;
+                        }
+                    } catch (e) {
+                        console.warn('alternate paging probe failed', e);
+                    }
+                }
+
+                // fallback to last page to avoid blank screens
+                const lastPage = Math.max(0, Math.floor((total - 1) / pageSize));
+                console.log('fetchSalesInvoices fallback to lastPage', { lastPage });
+                if (page !== lastPage) {
+                    setCurrentPage(lastPage);
+                    return;
+                }
+            }
+
 
             setInvoices(normalized);
-            const total = Number(data?.TotalRecords ?? data?.Total ?? resp?.TotalRecords ?? resp?.Total ?? records.length) || records.length;
             setTotalRecords(total);
         } catch (err) {
             console.warn('getSalesInvoiceHeaders error', err?.message || err);
@@ -107,6 +155,16 @@ const ManageSalesInvoice = () => {
         fetchSalesInvoices(currentPage, itemsPerPage, searchQuery);
     }, [currentPage, itemsPerPage, searchQuery]);
 
+    // Refetch when screen comes into focus to reflect changes made on other screens
+    useFocusEffect(
+        useCallback(() => {
+            try {
+                fetchSalesInvoices(currentPage, itemsPerPage, (searchQuery || '').trim());
+            } catch (e) {
+                console.warn('useFocusEffect fetchSalesInvoices error', e);
+            }
+        }, [currentPage, itemsPerPage, searchQuery])
+    );
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
         try {
@@ -1171,7 +1229,7 @@ const styles = StyleSheet.create({
     colLeft: { width: '48%' },
     colRight: { width: '48%' },
     inputLabel: { color: COLORS.textMuted, marginBottom: hp(0.6) },
-    modalInput: { borderWidth: 1, borderColor: COLORS.border, borderRadius: wp(1.2), padding: wp(2), backgroundColor: '#fff' },
+    modalInput: { color: '#000', borderWidth: 1, borderColor: COLORS.border, borderRadius: wp(1.2), padding: wp(2), backgroundColor: '#fff' },
     fileButton: { backgroundColor: '#f3f4f6', paddingVertical: hp(0.8), paddingHorizontal: wp(3), borderRadius: wp(1) },
     modalFooterRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: hp(1.5), gap: wp(2) },
     modalBtn: { paddingVertical: hp(1), paddingHorizontal: wp(4), borderRadius: wp(1) },

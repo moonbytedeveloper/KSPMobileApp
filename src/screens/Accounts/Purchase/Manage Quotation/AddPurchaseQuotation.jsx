@@ -22,7 +22,7 @@ import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
-import { getPurchasequotationVendor, getItems, postAddPurchaseQuotationHeader, addPurchaseOrder, updatePurchaseOrder, updatePurchaseQuotationHeader, addPurchaseQuotationLine, updatePurchaseQuotationLine,  deletePurchaseQuotationLine, getPurchaseOrderLines, fetchProjects, getPurchaseQuotationHeaderById, uploadFiles } from '../../../../api/authServices';
+import { getPurchasequotationVendor, getItems, postAddPurchaseQuotationHeader, addPurchaseOrder, updatePurchaseOrder, updatePurchaseQuotationHeader, addPurchaseQuotationLine, updatePurchaseQuotationLine, deletePurchaseQuotationLine, getPurchaseOrderLines, fetchProjects, getPurchaseQuotationHeaderById, uploadFiles } from '../../../../api/authServices';
 import { publish } from '../../../../utils/eventBus';
 import { getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { pick, types, isCancel } from '@react-native-documents/picker';
@@ -72,14 +72,18 @@ const AddPurchaseQuotation = () => {
   const [headerSubmitted, setHeaderSubmitted] = useState(false);
   const [headerEditable, setHeaderEditable] = useState(true);
   const [headerSubmitting, setHeaderSubmitting] = useState(false);
-
+  const screenTheme = {
+    text: COLORS.text,
+    textLight: COLORS.textLight,
+    bg: '#fff',
+  };
   const toggleSection = id => {
     // Prevent opening header unless editable (user clicked Edit)
     if (id === 1 && !headerEditable) return;
 
     // If header has been submitted and is not editable, prevent opening other sections
     if (typeof headerSubmitted !== 'undefined' && headerSubmitted && id !== 1) {
-        navigation.goBack();
+      navigation.goBack();
       return;
     }
 
@@ -94,14 +98,14 @@ const AddPurchaseQuotation = () => {
   };
 
   // Demo options for dropdowns
-  const paymentTerms = [ 'Net 7', 'Net 15', 'Net 30'];
+  const paymentTerms = ['Net 7', 'Net 15', 'Net 30'];
   const taxOptions = ['IGST', 'CGST', 'SGST', 'No Tax'];
   const countries = ['India', 'United States', 'United Kingdom'];
   // Purchase quotation numbers (fetched from API)
   const [purchaseQuotationNumbers, setPurchaseQuotationNumbers] = useState([]);
   const customers = ['Acme Corp', 'Beta Ltd'];
-  const state = [ 'Gujarat', 'Delhi', 'Mumbai'];
-  const city = ['vadodara', 'surat', ];
+  const state = ['Gujarat', 'Delhi', 'Mumbai'];
+  const city = ['vadodara', 'surat',];
 
 
 
@@ -118,7 +122,7 @@ const AddPurchaseQuotation = () => {
   // payment terms fetched from API
   const [paymentTermOptions, setPaymentTermOptions] = useState([]);
 
-  
+
 
 
   // Master items (loaded from API)
@@ -198,6 +202,9 @@ const AddPurchaseQuotation = () => {
   const [file, setFile] = useState(null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [uploadedFilePaths, setUploadedFilePaths] = useState([]);
+  const [file2, setFile2] = useState(null);
+  const [uploadedAnotherFiles, setUploadedAnotherFiles] = useState([]);
+  const [uploadedAnotherFilePaths, setUploadedAnotherFilePaths] = useState([]);
   const [showShippingTip, setShowShippingTip] = useState(false);
   const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
 
@@ -647,7 +654,7 @@ const AddPurchaseQuotation = () => {
             };
             return inner(obj);
           };
-              const detectedId = serverItem ? findServerId(serverItem) : null;
+          const detectedId = serverItem ? findServerId(serverItem) : null;
           const itemToPush = {
             ...newItem,
             id: editItemId ? editItemId : nextId,
@@ -712,39 +719,15 @@ const AddPurchaseQuotation = () => {
 
       const payload = {
         UUID: headerResponse?.UUID || '',
-        PurchaseOrderNo: headerForm.purchaseOrderNumber || '',
-        Inquiry_No: headerForm.companyName || '',
         InquiryNo: headerForm.companyName || '',
-        Vendor_UUID: vendor || headerForm.clientName || '',
         VendorUUID: vendor || headerForm.clientName || '',
         ProjectUUID: projectUUID || '',
-        PaymentTermUUID: paymentTerm || '',
         PaymentTerm: paymentTerm || '',
-        PaymentMethodUUID: paymentMethod || '',
         PaymentMode: paymentMethod || '',
-        OrderDate: uiDateToApiDate(invoiceDate),
-        DueDate: uiDateToApiDate(dueDate),
-        Notes: notes || '',
         Note: notes || '',
-        QuotationNo: headerForm.purchaseOrderNumber || '',
         QuotationTitle: headerForm.quotationTitle || '',
+        QuotationNo: headerForm.purchaseOrderNumber || '',
         TermsConditions: terms || '',
-        BillingBuildingNo: billingForm.buildingNo || '',
-        BillingStreet1: billingForm.street1 || '',
-        BillingStreet2: billingForm.street2 || '',
-        BillingPostalCode: billingForm.postalCode || '',
-        BillingCountryUUID: billingForm.country || '',
-        BillingStateUUID: billingForm.state || '',
-        BillingCityUUID: resolveCityUuid(billingForm.city),
-        IsShipAddrSame: !!isShippingSame,
-        ShippingBuildingNo: shippingForm.buildingNo || '',
-        ShippingStreet1: shippingForm.street1 || '',
-        ShippingStreet2: shippingForm.street2 || '',
-        ShippingPostalCode: shippingForm.postalCode || '',
-        ShippingCountryUUID: shippingForm.country || '',
-        ShippingStateUUID: shippingForm.state || '',
-        ShippingCityUUID: resolveCityUuid(shippingForm.city),
-        SubTotal: subtotalNum,
         TotalTax: totalTaxNum,
         TotalAmount: totalAmountNum,
         ShippingCharges: parseFloat(shippingCharges) || 0,
@@ -752,26 +735,21 @@ const AddPurchaseQuotation = () => {
         AdjustmentField: adjustmentLabel || '',
         AdjustmentPrice: parseFloat(adjustments) || 0,
       };
-      // Attach uploaded file path(s) when updating header as well
+      // Attach uploaded file path(s) when updating header as QuotationDocument
       if (Array.isArray(uploadedFilePaths) && uploadedFilePaths.length > 0) {
-        payload.FilePath = uploadedFilePaths.length === 1 ? uploadedFilePaths[0] : uploadedFilePaths;
-        try { console.log('Attaching FilePath to updateHeader payload ->', JSON.stringify(payload.FilePath, null, 2)); } catch (_) { console.log('Attaching FilePath to updateHeader payload ->', payload.FilePath); }
+        payload.QuotationDocument = uploadedFilePaths.length === 1 ? uploadedFilePaths[0] : uploadedFilePaths;
+        try { console.log('Attaching QuotationDocument to updateHeader payload ->', JSON.stringify(payload.QuotationDocument, null, 2)); } catch (_) { console.log('Attaching QuotationDocument to updateHeader payload ->', payload.QuotationDocument); }
       }
 
-      // If a file was uploaded via the picker, attach returned server path(s) to the header payload
-      if (Array.isArray(uploadedFilePaths) && uploadedFilePaths.length > 0) {
-        payload.FilePath = uploadedFilePaths.length === 1 ? uploadedFilePaths[0] : uploadedFilePaths;
-        try { console.log('Attaching FilePath to submitHeader payload ->', JSON.stringify(payload.FilePath, null, 2)); } catch (_) { console.log('Attaching FilePath to submitHeader payload ->', payload.FilePath); }
+      // Attach second uploaded file path(s) as AnotherDocument when present
+      if (Array.isArray(uploadedAnotherFilePaths) && uploadedAnotherFilePaths.length > 0) {
+        payload.AnotherDocument = uploadedAnotherFilePaths.length === 1 ? uploadedAnotherFilePaths[0] : uploadedAnotherFilePaths;
+        try { console.log('Attaching AnotherDocument to updateHeader payload ->', JSON.stringify(payload.AnotherDocument, null, 2)); } catch (_) { console.log('Attaching AnotherDocument to updateHeader payload ->', payload.AnotherDocument); }
       }
 
       console.log('AddPurchaseQuotation: submit payload ->', payload);
-      let resp;
-      if (headerResponse?.UUID) {
-        resp = await updatePurchaseQuotationHeader(payload);
-      } else {
-        // Create a purchase quotation header (use quotation API)
-        resp = await postAddPurchaseQuotationHeader(payload);
-      }
+      // Always call update API on final submit from footer
+      let resp = await updatePurchaseQuotationHeader(payload);
 
       const data = resp?.Data || resp || {};
       setHeaderResponse(data);
@@ -793,9 +771,9 @@ const AddPurchaseQuotation = () => {
             _raw: data,
           };
           publish('purchaseQuotation.added', mapped);
-        } catch (_) {}
+        } catch (_) { }
         // navigate back to list so user can see newly added record
-        try { navigation.goBack(); } catch (_) {}
+        try { navigation.goBack(); } catch (_) { }
       } catch (e) { /* ignore */ }
     } catch (err) {
       console.error('handleCreateOrder error ->', err);
@@ -825,44 +803,18 @@ const AddPurchaseQuotation = () => {
       const payload = {
         UUID: headerResponse?.UUID || '',
         PurchaseOrderNo: headerForm.purchaseOrderNumber || '',
-        Inquiry_No: headerForm.companyName || '',
         InquiryNo: headerForm.companyName || '',
-        Vendor_UUID: vendor || headerForm.clientName || '',
         VendorUUID: vendor || headerForm.clientName || '',
         ProjectUUID: projectUUID || '',
-        PaymentTermUUID: paymentTerm || '',
-        PaymentMethodUUID: paymentMethod || '',
         PaymentTerm: paymentTerm || '',
         PaymentMode: paymentMethod || '',
-        OrderDate: uiDateToApiDate(invoiceDate),
-        DueDate: uiDateToApiDate(dueDate),
-        Notes: notes || '',
         Note: notes || '',
         QuotationNo: headerForm.purchaseOrderNumber || '',
         QuotationTitle: headerForm.quotationTitle || '',
         TermsConditions: terms || '',
-        BillingBuildingNo: billingForm.buildingNo || '',
-        BillingStreet1: billingForm.street1 || '',
-        BillingStreet2: billingForm.street2 || '',
-        BillingPostalCode: billingForm.postalCode || '',
-        BillingCountryUUID: billingForm.country || '',
-        BillingStateUUID: billingForm.state || '',
-        BillingCityUUID: billingForm.city || '',
-        IsShipAddrSame: !!isShippingSame,
-        ShippingBuildingNo: shippingForm.buildingNo || '',
-        ShippingStreet1: shippingForm.street1 || '',
-        ShippingStreet2: shippingForm.street2 || '',
-        ShippingPostalCode: shippingForm.postalCode || '',
-        ShippingCountryUUID: shippingForm.country || '',
-        ShippingStateUUID: shippingForm.state || '',
-        ShippingCityUUID: shippingForm.city || '',
-        SubTotal: subtotalNum,
-        TotalTax: totalTaxNum,
-        TotalAmount: totalAmountNum,
-        ShippingCharges: parseFloat(shippingCharges) || 0,
         Discount: parseFloat(discount) || 0,
-        AdjustmentField: adjustmentLabel || '',
-        AdjustmentPrice: parseFloat(adjustments) || 0,
+        QuotationDocument: Array.isArray(uploadedFilePaths) && uploadedFilePaths.length > 0 ? (uploadedFilePaths.length === 1 ? uploadedFilePaths[0] : uploadedFilePaths) : undefined,
+        AnotherDocument: Array.isArray(uploadedAnotherFilePaths) && uploadedAnotherFilePaths.length > 0 ? (uploadedAnotherFilePaths.length === 1 ? uploadedAnotherFilePaths[0] : uploadedAnotherFilePaths) : undefined,
       };
 
       let resp;
@@ -874,8 +826,8 @@ const AddPurchaseQuotation = () => {
       }
 
       const data = resp?.Data || resp || {};
-      console.log(payload,811);
-      
+      console.log(payload, 811);
+
       setHeaderResponse(data);
       setHeaderSaved(true);
 
@@ -962,6 +914,8 @@ const AddPurchaseQuotation = () => {
         Discount: parseFloat(discount) || 0,
         AdjustmentField: adjustmentLabel || '',
         AdjustmentPrice: parseFloat(adjustments) || 0,
+        QuotationDocument: Array.isArray(uploadedFilePaths) && uploadedFilePaths.length > 0 ? (uploadedFilePaths.length === 1 ? uploadedFilePaths[0] : uploadedFilePaths) : undefined,
+        AnotherDocument: Array.isArray(uploadedAnotherFilePaths) && uploadedAnotherFilePaths.length > 0 ? (uploadedAnotherFilePaths.length === 1 ? uploadedAnotherFilePaths[0] : uploadedAnotherFilePaths) : undefined,
       };
       const resp = await updatePurchaseQuotationHeader(payload);
       const data = resp?.Data || resp || {};
@@ -971,12 +925,12 @@ const AddPurchaseQuotation = () => {
       Alert.alert('Success', 'Header updated successfully', [
         {
           text: 'OK',
-              onPress: async () => {
+          onPress: async () => {
             try {
               setHeaderEditable(false);
               setHeaderSubmitted(true);
               setExpandedId(4);
-                await loadPurchaseOrderLines(data?.UUID || data?.Id || data?.HeaderUUID || headerUuid);
+              await loadPurchaseOrderLines(data?.UUID || data?.Id || data?.HeaderUUID || headerUuid);
               // Publish update so any list screen can refresh in-place without navigation
               try {
                 const mapped = {
@@ -987,7 +941,7 @@ const AddPurchaseQuotation = () => {
                   _raw: data,
                 };
                 publish('purchaseQuotation.updated', mapped);
-              } catch (_) {}
+              } catch (_) { }
             } catch (e) { /* ignore */ }
           },
         },
@@ -1082,10 +1036,82 @@ const AddPurchaseQuotation = () => {
     }
   };
 
+  // Second file picker (AnotherDocument)
+  const pickAnotherFile = async () => {
+    try {
+      const hasPerm = await requestStoragePermissionAndroid();
+      if (!hasPerm) {
+        Alert.alert(
+          'Permission required',
+          'Storage permission is needed to pick a file.',
+        );
+        return;
+      }
+
+      const [selectedFile] = await pick({
+        type: [types.pdf, types.images],
+        allowMultiSelection: false,
+      });
+
+      if (selectedFile) {
+        const allowedTypes = [
+          'application/pdf',
+          'image/png',
+          'image/jpeg',
+          'image/jpg',
+        ];
+        if (!allowedTypes.includes(selectedFile.type)) {
+          Alert.alert('Invalid File Type', 'Please select a PDF, PNG, or JPG file.');
+          return;
+        }
+        const maxSize = 10 * 1024 * 1024;
+        if (selectedFile.size && selectedFile.size > maxSize) {
+          Alert.alert('File Too Large', 'File size must be less than 10MB.');
+          return;
+        }
+
+        const fileObj = {
+          name: selectedFile.name || selectedFile.fileName || 'attachment',
+          uri: selectedFile.uri || selectedFile.fileUri || selectedFile.uriString,
+          type: selectedFile.type || selectedFile.mime || 'application/octet-stream',
+          size: selectedFile.size,
+        };
+
+        setFile2(fileObj);
+
+        // Immediately upload with fixed Filepath 'AnotherDocument'
+        try {
+          const uploadResp = await uploadFiles(fileObj, { filepath: 'AnotherDocument' });
+          const upData = uploadResp?.Data || uploadResp || {};
+          const uploaded = upData?.Files || upData?.files || upData?.UploadedFiles || upData?.FilePaths || upData || [];
+          const finalRefs = Array.isArray(uploaded) ? uploaded : (uploaded ? [uploaded] : []);
+          setUploadedAnotherFiles(finalRefs);
+          const paths = finalRefs.map(r => { try { return r?.RemoteResponse?.path || r?.path || (typeof r === 'string' ? r : null); } catch (_) { return null; } }).filter(Boolean);
+          setUploadedAnotherFilePaths(paths);
+        } catch (uErr) {
+          console.warn('uploadFiles (AnotherDocument) failed', uErr);
+          Alert.alert('Upload Error', 'Unable to upload the selected file. Please try again.');
+          setFile2(null);
+          setUploadedAnotherFiles([]);
+          setUploadedAnotherFilePaths([]);
+        }
+      }
+    } catch (err) {
+      if (isCancel && isCancel(err)) return;
+      console.warn('Document pick error (another):', err);
+    }
+  };
+
   const removeFile = () => {
     setFile(null);
     setUploadedFiles([]);
     setUploadedFilePaths([]);
+  };
+
+  const removeFile2 = () => {
+    setFile2(null);
+    setUploadedAnotherFiles([]);
+    setUploadedAnotherFilePaths([]);
   };
 
   // Fetch vendors for Purchase Quotation dropdown (preserve UUIDs when available)
@@ -1266,7 +1292,6 @@ const AddPurchaseQuotation = () => {
           if (value === null || typeof value === 'undefined' || value === '' || value === labelStr) {
             value = 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
           }
-          console.log('Normalized project:', { label: labelStr, value, original: it });
           return { label: labelStr || String(value), value };
         }).filter(Boolean);
         if (!mounted) return;
@@ -1318,13 +1343,13 @@ const AddPurchaseQuotation = () => {
         }));
 
         setVendor(hdr.VendorName || hdr.Vendor || hdr.CustomerName || hdr.Vendor_UUID || hdr.VendorUUID || '');
-        
+
         // Set project name for display and UUID for API
         const projectDisplayName = hdr.ProjectName || hdr.Project || hdr.ProjectTitle || '';
         const projectId = hdr.ProjectUUID || hdr.Project_Id || hdr.ProjectId || '';
         setProjectName(projectDisplayName); // Use name for display
         setProjectUUID(projectId); // Use UUID for API
-        
+
         setPaymentTerm(hdr.PaymentTermUUID || hdr.PaymentTerm || hdr.PaymentTermUUID || '');
         setPaymentMethod(hdr.PaymentMethodUUID || hdr.PaymentMethod || hdr.PaymentMethodUUID || '');
 
@@ -1408,7 +1433,7 @@ const AddPurchaseQuotation = () => {
 
   return (
     <>
-      <View style={{ flex: 1, backgroundColor: '#fff'}}>
+      <View style={{ flex: 1, backgroundColor: '#fff' }}>
         <AppHeader
           title="Add Quotation Order"
           onLeftPress={() => {
@@ -1430,7 +1455,7 @@ const AddPurchaseQuotation = () => {
               headerSubmitted && !headerEditable ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
                   <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
-                    <TouchableOpacity onPress={() => { setHeaderEditable(true); setIsEditingHeader(true); setExpandedId(1); setShowPurchaseQuotationNoField(true); }}>
+                  <TouchableOpacity onPress={() => { setHeaderEditable(true); setIsEditingHeader(true); setExpandedId(1); setShowPurchaseQuotationNoField(true); }}>
                     <Icon name="edit" size={rf(4.4)} color={COLORS.primary} />
                   </TouchableOpacity>
                 </View>
@@ -1469,7 +1494,7 @@ const AddPurchaseQuotation = () => {
                     setHeaderForm(s => ({ ...s, companyName: v }));
                   }}
                   inputBoxStyle={inputStyles.box}
-                  textStyle={inputStyles.input}
+                // textStyle={inputStyles.input}
                 />
               </View>
               <View style={styles.col}>
@@ -1492,13 +1517,13 @@ const AddPurchaseQuotation = () => {
                     }}
                     renderInModal={true}
                     inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                    textStyle={inputStyles.input}
+                  // textStyle={inputStyles.input}
                   />
                 </View>
               </View>
             </View>
 
-            <View style={[styles.row, { marginTop: hp(1.5) }]}> 
+            <View style={[styles.row, { marginTop: hp(1.5) }]}>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Quotation Title*</Text>
                 <View
@@ -1540,10 +1565,10 @@ const AddPurchaseQuotation = () => {
                         console.log('Selected project option:', opt);
                         const selectedUUID = opt?.value || '';
                         const selectedName = opt?.label || '';
-                        
+
                         console.log('Final UUID being set:', selectedUUID);
                         console.log('Selected name:', selectedName);
-                        
+
                         setProjectUUID(selectedUUID); // Store UUID for API
                         setProjectName(selectedName); // Store name for display
                       } catch (e) {
@@ -1554,16 +1579,16 @@ const AddPurchaseQuotation = () => {
                     }}
                     renderInModal={true}
                     inputBoxStyle={[inputStyles.box]}
-                    textStyle={inputStyles.input}
+                  // textStyle={inputStyles.input}
                   />
                 </View>
               </View>
             </View>
 
             <View style={[styles.row, { marginTop: hp(1.5) }]}>
-            
-           <View style={styles.col}>
-                                         <Text style={inputStyles.label}>Payment Term* </Text>
+
+              <View style={styles.col}>
+                <Text style={inputStyles.label}>Payment Term* </Text>
 
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
@@ -1578,12 +1603,12 @@ const AddPurchaseQuotation = () => {
                     }}
                     renderInModal={true}
                     inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                    textStyle={inputStyles.input}
+                  // textStyle={inputStyles.input}
                   />
                 </View>
               </View>
               <View style={styles.col}>
-                                         <Text style={inputStyles.label}>payment Method* </Text>
+                <Text style={inputStyles.label}>payment Method* </Text>
 
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
@@ -1598,58 +1623,58 @@ const AddPurchaseQuotation = () => {
                     }}
                     renderInModal={true}
                     inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                    textStyle={inputStyles.input}
+                  // textStyle={inputStyles.input}
                   />
                 </View>
               </View>
             </View>
             <View style={[styles.row, { marginTop: hp(1.5) }]}>
-           <View style={styles.attachCol}>
-                  <Text style={inputStyles.label}>Upload PQ Document*</Text>
-                  <View
-                    style={[
-                      inputStyles.box,
-                      { justifyContent: 'space-between' },
-                      styles.fileInputBox,
-                    ]}
-                  >
-                    <TextInput
-                      style={[inputStyles.input, { fontSize: rf(4.2) }]}
-                      placeholder="Attach file"
-                      placeholderTextColor="#9ca3af"
-                      value={file?.name || ''}
-                      editable={false}
-                    />
-                    {file ? (
-                      <TouchableOpacity
-                        activeOpacity={0.85}
-                        onPress={removeFile}
-                      >
-                        <Icon
-                          name="close"
-                          size={rf(3.6)}
-                          color="#ef4444"
-                          style={{ marginRight: SPACING.sm }}
-                        />
-                      </TouchableOpacity>
-                    ) : (
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        style={[styles.uploadButton]}
-                        onPress={() => {
-                          if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
-                          pickFile();
-                        }}
-                      >
-                        <Icon name="cloud-upload" size={rf(4)} color="#fff" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                  <Text style={styles.uploadHint}>
-                    Allowed: PDF, PNG, JPG • Max size 10 MB
-                  </Text>
+              <View style={styles.attachCol}>
+                <Text style={inputStyles.label}>Upload PQ Document*</Text>
+                <View
+                  style={[
+                    inputStyles.box,
+                    { justifyContent: 'space-between' },
+                    styles.fileInputBox,
+                  ]}
+                >
+                  <TextInput
+                    style={[inputStyles.input, { fontSize: rf(4.2) }]}
+                    placeholder="Attach file"
+                    placeholderTextColor="#9ca3af"
+                    value={file?.name || ''}
+                    editable={false}
+                  />
+                  {file ? (
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={removeFile}
+                    >
+                      <Icon
+                        name="close"
+                        size={rf(3.6)}
+                        color="#ef4444"
+                        style={{ marginRight: SPACING.sm }}
+                      />
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      style={[styles.uploadButton]}
+                      onPress={() => {
+                        if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
+                        pickFile();
+                      }}
+                    >
+                      <Icon name="cloud-upload" size={rf(4)} color="#fff" />
+                    </TouchableOpacity>
+                  )}
                 </View>
-                </View>
+                <Text style={styles.uploadHint}>
+                  Allowed: PDF, PNG, JPG • Max size 10 MB
+                </Text>
+              </View>
+            </View>
 
             <View style={{ marginTop: hp(1.5), flexDirection: 'row', justifyContent: 'flex-end' }}>
               <TouchableOpacity
@@ -2001,7 +2026,7 @@ const AddPurchaseQuotation = () => {
                       }}
                       renderInModal={true}
                       inputBoxStyle={[inputStyles.box, { width: '100%' }]}
-                      textStyle={inputStyles.input}
+                    // textStyle={inputStyles.input}
                     />
                   </View>
                 </View>
@@ -2022,7 +2047,7 @@ const AddPurchaseQuotation = () => {
                 <View style={{ width: '100%', marginBottom: hp(1) }}>
                   <Text style={inputStyles.label}>HSN/SAC</Text>
                   <TextInput
-                    style={[inputStyles.box, { width: '100%' }]}
+                    style={[inputStyles.box, { color: screenTheme.text, width: '100%' }]}
                     value={currentItem.hsn || ''}
                     onChangeText={t => setCurrentItem(ci => ({ ...ci, hsn: t }))}
                     placeholder="Enter HSN/SAC code"
@@ -2030,7 +2055,7 @@ const AddPurchaseQuotation = () => {
                   />
                 </View>
 
-                <View style={[styles.row, { justifyContent: 'space-between' }]}> 
+                <View style={[styles.row, { justifyContent: 'space-between' }]}>
                   <View style={{ width: '48%' }}>
                     <Text style={inputStyles.label}>Quantity*</Text>
                     <View style={[inputStyles.box, { marginTop: hp(0.5), width: '100%' }]}>
@@ -2060,7 +2085,7 @@ const AddPurchaseQuotation = () => {
                   </View>
                 </View>
 
-                <View style={[styles.row, { justifyContent: 'space-between', alignItems: 'center', marginTop: hp(1) }]}> 
+                <View style={[styles.row, { justifyContent: 'space-between', alignItems: 'center', marginTop: hp(1) }]}>
                   <View style={{ width: '40%' }}>
                     <Text style={inputStyles.label}>Amount</Text>
                     <View style={[inputStyles.box, { marginTop: hp(0.5), width: '60%' }]}>
@@ -2111,7 +2136,7 @@ const AddPurchaseQuotation = () => {
                         getKey={p => String(p)}
                         onSelect={v => { setPageSize(Number(v)); setPage(1); }}
                         inputBoxStyle={{ width: wp(18) }}
-                        textStyle={inputStyles.input}
+                      // textStyle={inputStyles.input}
                       />
                       <Text style={{ marginLeft: wp(2) }}>entries</Text>
                     </View>
@@ -2172,13 +2197,13 @@ const AddPurchaseQuotation = () => {
                               <>
                                 {visible.map((item, idx) => (
                                   <View key={item.id} style={styles.tr}>
-                                    <View style={[styles.td, { width: wp(10)  }]}>
+                                    <View style={[styles.td, { width: wp(10) }]}>
                                       <Text style={styles.tdText}>{start + idx + 1}</Text>
                                     </View>
-                                    <View style={[styles.td, { width: wp(30),   paddingLeft: wp(2) }]}>
+                                    <View style={[styles.td, { width: wp(30), paddingLeft: wp(2) }]}>
                                       <Text style={styles.tdText}>{item.name}</Text>
                                     </View>
-                                     <View style={[styles.td, { width: wp(25) }]}>
+                                    <View style={[styles.td, { width: wp(25) }]}>
                                       <Text style={styles.tdText}>{item.desc}</Text>
                                     </View>
                                     <View style={[styles.td, { width: wp(20), paddingVertical: hp(0.5), minHeight: hp(4) }]}>
@@ -2193,7 +2218,7 @@ const AddPurchaseQuotation = () => {
                                     <View style={[styles.td, { width: wp(20) }]}>
                                       <Text style={[styles.tdText, { fontWeight: '600' }]}>₹{item.amount}</Text>
                                     </View>
-                                    <View style={[styles.tdAction, { width: wp(40) } ,{flexDirection: 'row',paddingLeft: wp(2)}]}>
+                                    <View style={[styles.tdAction, { width: wp(40) }, { flexDirection: 'row', paddingLeft: wp(2) }]}>
                                       <TouchableOpacity style={styles.actionButton} onPress={() => handleEditItem(item.id)}>
                                         <Icon name="edit" size={rf(3.6)} color="#fff" />
                                       </TouchableOpacity>
@@ -2274,7 +2299,7 @@ const AddPurchaseQuotation = () => {
                     </View>
 
                     {/* Question Icon with Tooltip */}
-                    
+
                   </View>
 
                   <Text style={styles.value}>
@@ -2282,7 +2307,7 @@ const AddPurchaseQuotation = () => {
                   </Text>
                 </View>
 
-                
+
 
                 {/* Total Tax */}
                 <View style={styles.row}>
@@ -2336,7 +2361,7 @@ const AddPurchaseQuotation = () => {
                 </View>
 
 
-                 <View style={styles.notesCol}>
+                <View style={styles.notesCol}>
                   <Text style={inputStyles.label}>Terms & Conditions</Text>
                   <View
                     onStartShouldSetResponder={() => true}
@@ -2372,13 +2397,13 @@ const AddPurchaseQuotation = () => {
                       style={[inputStyles.input, { fontSize: rf(4.2) }]}
                       placeholder="Attach file"
                       placeholderTextColor="#9ca3af"
-                      value={file?.name || ''}
+                      value={file2?.name || ''}
                       editable={false}
                     />
-                    {file ? (
+                    {file2 ? (
                       <TouchableOpacity
                         activeOpacity={0.85}
-                        onPress={removeFile}
+                        onPress={removeFile2}
                       >
                         <Icon
                           name="close"
@@ -2392,8 +2417,9 @@ const AddPurchaseQuotation = () => {
                         activeOpacity={0.8}
                         style={[styles.uploadButton]}
                         onPress={() => {
-                          if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
-                          pickFile();
+                          // Allow uploading an additional attachment from this field
+                          // even when header is read-only — it's a separate document.
+                          pickAnotherFile();
                         }}
                       >
                         <Icon name="cloud-upload" size={rf(4)} color="#fff" />
@@ -2958,7 +2984,7 @@ const styles = StyleSheet.create({
   table: { minWidth: wp(170) },
 
   /* ── COMMON ── */
-    thead: { backgroundColor: '#f1f1f1' },
+  thead: { backgroundColor: '#f1f1f1' },
   tr: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#E0E0E0' },
 
   tableControlsRow: {

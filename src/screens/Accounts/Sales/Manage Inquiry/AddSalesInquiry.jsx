@@ -134,7 +134,6 @@ const AddSalesInquiry = () => {
     const [requestedDate, setRequestedDate] = useState('');
     const [expectedPurchaseDate, setExpectedPurchaseDate] = useState('');
     const [projectName, setProjectName] = useState('');
-    console.log(projectName,'999');
     
     const [inquiryNo, setInquiryNo] = useState('');
     const [showInquiryNoField, setShowInquiryNoField] = useState(false);
@@ -847,7 +846,7 @@ const AddSalesInquiry = () => {
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        textStyle={inputStyles.input}
+                                        // textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -875,7 +874,7 @@ const AddSalesInquiry = () => {
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        textStyle={inputStyles.input}
+                                        // textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -883,7 +882,7 @@ const AddSalesInquiry = () => {
 
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Requested Date*</Text>
+                                <Text style={inputStyles.label}>Ordered Date*</Text>
                                 <TouchableOpacity
                                     activeOpacity={0.7}
                                     onPress={() => openDatePickerFor('requested')}
@@ -912,7 +911,7 @@ const AddSalesInquiry = () => {
                                 </TouchableOpacity>
                             </View>
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>Expected Purchase Date*</Text>
+                                <Text style={inputStyles.label}>Requested Delivery Date*</Text>
                                 <TouchableOpacity
                                     activeOpacity={0.7}
                                     onPress={() => openDatePickerFor('expected')}
@@ -980,7 +979,7 @@ const AddSalesInquiry = () => {
                                             }}
                                             renderInModal={true}
                                             inputBoxStyle={[inputStyles.box, { minHeight: hp(4.6), paddingVertical: 0, marginTop: hp(0.5) }]}
-                                            textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
+                                            // textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
                                         />
                                     </View>
                                 </View>
@@ -1002,7 +1001,7 @@ const AddSalesInquiry = () => {
                                             }}
                                             renderInModal={true}
                                             inputBoxStyle={[inputStyles.box, { minHeight: hp(4.6), paddingVertical: 0, marginTop: hp(0.5) }]}
-                                            textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
+                                            // textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
                                         />
                                     </View>
                                 </View>
@@ -1016,7 +1015,7 @@ const AddSalesInquiry = () => {
                                             style={[inputStyles.input, { flex: 1, fontSize: rf(3.4), color: COLORS.text }]}
                                             value={currentItem.quantity}
                                             onChangeText={(v) => setCurrentItem({ ...currentItem, quantity: v })}
-                                            placeholder="eg. Auto fill"
+                                            placeholder="eg."
                                             placeholderTextColor={COLORS.textLight}
                                             keyboardType="numeric"
                                         />
@@ -1040,7 +1039,7 @@ const AddSalesInquiry = () => {
                                             }}
                                             renderInModal={true}
                                             inputBoxStyle={[inputStyles.box, { marginTop: hp(0.5) }]}
-                                            textStyle={inputStyles.input}
+                                            // textStyle={inputStyles.input}
                                         />
                                     </View>
                                 </View>
