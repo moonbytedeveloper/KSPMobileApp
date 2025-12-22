@@ -1060,7 +1060,7 @@ const AddSalesInquiry = () => {
                                 <View style={{ zIndex: 9998, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="Select Vendor"
-                                        value={vendorName}
+                                        value={vendorUuid || vendorName}
                                         options={vendors}
                                         getLabel={(v) => (typeof v === 'string' ? v : v?.Name || v?.DisplayName || '')}
                                         getKey={(v) => (typeof v === 'string' ? v : v?.UUID || v?.Id || v?.id || v?.Name)}
@@ -1086,7 +1086,7 @@ const AddSalesInquiry = () => {
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        textStyle={inputStyles.input}
+                                        // textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -1095,7 +1095,7 @@ const AddSalesInquiry = () => {
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="Select Currency"
-                                        value={currencyType}
+                                        value={currencyUuid || currencyType}
                                         options={currencyOptions.length ? currencyOptions : currencyTypes}
                                         getLabel={(c) => (typeof c === 'string' ? c : c?.Name || c?.CurrencyName || c?.Code || c?.DisplayName || c?.name || '')}
                                         getKey={(c) => (typeof c === 'string' ? c : c?.UUID || c?.Id || c?.id || c?.Code || c?.Name)}
@@ -1110,7 +1110,7 @@ const AddSalesInquiry = () => {
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        textStyle={inputStyles.input}
+                                        // textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -1166,7 +1166,7 @@ const AddSalesInquiry = () => {
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="Select Project"
-                                        value={projectName}
+                                        value={selectedProjectUuid || projectName}
                                         options={projects.length ? projects : projectsStatic}
                                         getLabel={(p) => {
                                             if (typeof p === 'string') return p;
@@ -1222,7 +1222,7 @@ const AddSalesInquiry = () => {
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        textStyle={inputStyles.input}
+                                        // textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -1278,7 +1278,7 @@ const AddSalesInquiry = () => {
                                     <View style={{ zIndex: 9998, elevation: 20 }}>
                                         <Dropdown
                                             placeholder="- Select Item -"
-                                            value={currentItem.itemType}
+                                            value={currentItem.itemTypeUuid || currentItem.itemType}
                                             options={serverItemTypes.length ? serverItemTypes : demoItemTypes}
                                             getLabel={(it) => it?.Name || it?.DisplayName || it?.name || it}
                                             getKey={(it) => it?.UUID || it?.Id || it}
@@ -1295,7 +1295,7 @@ const AddSalesInquiry = () => {
                                             }}
                                             renderInModal={true}
                                             inputBoxStyle={[inputStyles.box, { minHeight: hp(4.6), paddingVertical: 0, marginTop: hp(0.5) }]}
-                                            textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
+                                            // textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
                                         />
                                     </View>
                                 </View>
@@ -1304,7 +1304,7 @@ const AddSalesInquiry = () => {
                                     <View style={{ zIndex: 9997, elevation: 20 }}>
                                         <Dropdown
                                             placeholder="- Select Item -"
-                                            value={currentItem.itemName}
+                                            value={currentItem.itemNameUuid || currentItem.itemName}
                                             options={serverItemMasters.length ? serverItemMasters : itemNames}
                                             getLabel={(it) => it?.Name || it?.DisplayName || it?.name || it}
                                             getKey={(it) => it?.UUID || it?.Id || it}
@@ -1317,7 +1317,7 @@ const AddSalesInquiry = () => {
                                             }}
                                             renderInModal={true}
                                             inputBoxStyle={[inputStyles.box, { minHeight: hp(4.6), paddingVertical: 0, marginTop: hp(0.5) }]}
-                                            textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
+                                            // textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
                                         />
                                     </View>
                                 </View>
@@ -1342,7 +1342,7 @@ const AddSalesInquiry = () => {
                                     <View style={{ zIndex: 9996, elevation: 20 }}>
                                         <Dropdown
                                             placeholder="- Select Unit -"
-                                            value={currentItem.unit}
+                                            value={currentItem.unitUuid || currentItem.unit}
                                             options={serverUnits.length ? serverUnits : units}
                                             getLabel={(u) => u?.Name || u?.DisplayName || u?.name || u}
                                             getKey={(u) => u?.UUID || u?.Id || u}
@@ -1355,7 +1355,7 @@ const AddSalesInquiry = () => {
                                             }}
                                             renderInModal={true}
                                             inputBoxStyle={[inputStyles.box, { marginTop: hp(0.5) }]}
-                                            textStyle={inputStyles.input}
+                                            // textStyle={inputStyles.input}
                                         />
                                     </View>
                                 </View>
