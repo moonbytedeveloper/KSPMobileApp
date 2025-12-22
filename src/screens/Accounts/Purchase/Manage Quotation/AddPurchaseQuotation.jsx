@@ -22,7 +22,7 @@ import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
-import { getPurchasequotationVendor, getItems, postAddPurchaseQuotationHeader, addPurchaseOrder, updatePurchaseOrder, updatePurchaseQuotationHeader, addPurchaseQuotationLine, updatePurchaseQuotationLine,  deletePurchaseQuotationLine, getPurchaseOrderLines, fetchProjects } from '../../../../api/authServices';
+import { getPurchasequotationVendor, getItems, postAddPurchaseQuotationHeader, addPurchaseOrder, updatePurchaseOrder, updatePurchaseQuotationHeader, addPurchaseQuotationLine, updatePurchaseQuotationLine,  deletePurchaseQuotationLine, getPurchaseOrderLines, fetchProjects, getPurchaseQuotationHeaderById, uploadFiles } from '../../../../api/authServices';
 import { publish } from '../../../../utils/eventBus';
 import { getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { pick, types, isCancel } from '@react-native-documents/picker';
@@ -196,6 +196,8 @@ const AddPurchaseQuotation = () => {
   const [adjustments, setAdjustments] = useState('0');
   const [adjustmentLabel, setAdjustmentLabel] = useState('Adjustments');
   const [file, setFile] = useState(null);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [uploadedFilePaths, setUploadedFilePaths] = useState([]);
   const [showShippingTip, setShowShippingTip] = useState(false);
   const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
 
@@ -750,6 +752,17 @@ const AddPurchaseQuotation = () => {
         AdjustmentField: adjustmentLabel || '',
         AdjustmentPrice: parseFloat(adjustments) || 0,
       };
+      // Attach uploaded file path(s) when updating header as well
+      if (Array.isArray(uploadedFilePaths) && uploadedFilePaths.length > 0) {
+        payload.FilePath = uploadedFilePaths.length === 1 ? uploadedFilePaths[0] : uploadedFilePaths;
+        try { console.log('Attaching FilePath to updateHeader payload ->', JSON.stringify(payload.FilePath, null, 2)); } catch (_) { console.log('Attaching FilePath to updateHeader payload ->', payload.FilePath); }
+      }
+
+      // If a file was uploaded via the picker, attach returned server path(s) to the header payload
+      if (Array.isArray(uploadedFilePaths) && uploadedFilePaths.length > 0) {
+        payload.FilePath = uploadedFilePaths.length === 1 ? uploadedFilePaths[0] : uploadedFilePaths;
+        try { console.log('Attaching FilePath to submitHeader payload ->', JSON.stringify(payload.FilePath, null, 2)); } catch (_) { console.log('Attaching FilePath to submitHeader payload ->', payload.FilePath); }
+      }
 
       console.log('AddPurchaseQuotation: submit payload ->', payload);
       let resp;
@@ -791,10 +804,18 @@ const AddPurchaseQuotation = () => {
       setIsSavingHeader(false);
     }
   };
-  const onCancel = () => {};
+  const onCancel = () => {
+    navigation.goBack();
+  };
 
   // Submit header only (creates header UUID and locks header fields)
   const submitHeader = async () => {
+    // Validate required header fields before submitting
+    const isValid = validateHeaderFields();
+    if (!isValid) {
+      Alert.alert('Validation', 'Please fill all required header fields before submitting.');
+      return;
+    }
     setHeaderSubmitting(true);
     try {
       const subtotalNum = parseFloat(computeSubtotal()) || 0;
@@ -887,6 +908,12 @@ const AddPurchaseQuotation = () => {
     const headerUuid = headerResponse?.UUID || headerResponse?.Uuid || headerResponse?.Id || headerResponse?.HeaderUUID || headerResponse?.HeaderId || route?.params?.headerUuid || null;
     if (!headerUuid) {
       Alert.alert('Error', 'No header UUID to update');
+      return;
+    }
+    // Validate required header fields before updating
+    const isValid = validateHeaderFields();
+    if (!isValid) {
+      Alert.alert('Validation', 'Please fill all required header fields before updating.');
       return;
     }
     setHeaderSubmitting(true);
@@ -1014,13 +1041,38 @@ const AddPurchaseQuotation = () => {
           return;
         }
 
-        // Set the selected file
-        setFile({
-          name: selectedFile.name,
-          uri: selectedFile.uri,
-          type: selectedFile.type,
+        // Prepare the selected file object
+        const fileObj = {
+          name: selectedFile.name || selectedFile.fileName || 'attachment',
+          uri: selectedFile.uri || selectedFile.fileUri || selectedFile.uriString,
+          type: selectedFile.type || selectedFile.mime || 'application/octet-stream',
           size: selectedFile.size,
-        });
+        };
+
+        // Optimistically set the selected file for UI
+        setFile(fileObj);
+
+        // Immediately upload the picked file with fixed Filepath 'QuotationDocument'
+        try {
+          const uploadResp = await uploadFiles(fileObj, { filepath: 'QuotationDocument' });
+          const upData = uploadResp?.Data || uploadResp || {};
+          const uploaded = upData?.Files || upData?.files || upData?.UploadedFiles || upData?.FilePaths || upData || [];
+          const finalRefs = Array.isArray(uploaded) ? uploaded : (uploaded ? [uploaded] : []);
+          setUploadedFiles(finalRefs);
+
+          const paths = finalRefs.map(r => {
+            try { return r?.RemoteResponse?.path || r?.path || (typeof r === 'string' ? r : null); } catch (_) { return null; }
+          }).filter(Boolean);
+          setUploadedFilePaths(paths);
+
+        } catch (uErr) {
+          console.warn('uploadFiles (QuotationDocument) failed', uErr);
+          Alert.alert('Upload Error', 'Unable to upload the selected file. Please try again.');
+          // clear selection on failure
+          setFile(null);
+          setUploadedFiles([]);
+          setUploadedFilePaths([]);
+        }
       }
     } catch (err) {
       if (isCancel && isCancel(err)) {
@@ -1032,6 +1084,8 @@ const AddPurchaseQuotation = () => {
 
   const removeFile = () => {
     setFile(null);
+    setUploadedFiles([]);
+    setUploadedFilePaths([]);
   };
 
   // Fetch vendors for Purchase Quotation dropdown (preserve UUIDs when available)
@@ -1292,6 +1346,53 @@ const AddPurchaseQuotation = () => {
       console.warn('prefill from route params failed', e);
     }
   }, [route?.params]);
+
+  // If navigated here with just headerUuid (edit button), call API to fetch header and prefill
+  useEffect(() => {
+    const headerUuid = route?.params?.headerUuid || null;
+    if (!headerUuid) return;
+    let mounted = true;
+    (async () => {
+      try {
+        setIsPrefilling(true);
+        const resp = await getPurchaseQuotationHeaderById({ headerUuid });
+        const data = resp?.Data || resp || null;
+        if (!mounted || !data) return;
+        // reuse existing prefill logic used for route.headerData
+        setHeaderResponse(data);
+        setHeaderSaved(true);
+        setHeaderEditable(true);
+        setIsEditingHeader(true);
+        setExpandedId(1);
+
+        setHeaderForm(s => ({
+          ...s,
+          companyName: data.Inquiry_No || data.InquiryNo || data.PurchaseRequestNumber || data.PurchaseRequestNo || data.companyName || data.InquiryNumber || '',
+          quotationTitle: data.QuotationTitle || data.Title || data.quotationTitle || data.SalesOrderTitle || '',
+          purchaseOrderNumber: data.PurchaseOrderNo || data.PurchaseOrderNumber || s.purchaseOrderNumber || '',
+          purchaseQuotationNumber: data.QuotationNo || data.QuotationNumber || data.Quotation || data.QuotationNo || s.purchaseQuotationNumber || '',
+        }));
+
+        setVendor(data.VendorName || data.Vendor || data.CustomerName || data.Vendor_UUID || data.VendorUUID || '');
+        const projectDisplayName = data.ProjectName || data.Project || data.ProjectTitle || '';
+        const projectId = data.ProjectUUID || data.Project_Id || data.ProjectId || '';
+        setProjectName(projectDisplayName);
+        setProjectUUID(projectId);
+        setPaymentTerm(data.PaymentTermUUID || data.PaymentTerm || data.PaymentTermUUID || '');
+        setPaymentMethod(data.PaymentMethodUUID || data.PaymentMethod || data.PaymentMethodUUID || '');
+
+        const uuidToLoad = headerUuid || (data && (data.UUID || data.Id || data.HeaderUUID));
+        if (uuidToLoad) {
+          try { await loadPurchaseOrderLines(uuidToLoad); } catch (e) { /* ignore */ }
+        }
+      } catch (err) {
+        console.warn('Failed to load purchase quotation header by id', err?.message || err);
+      } finally {
+        if (mounted) setIsPrefilling(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [route?.params?.headerUuid]);
 
   // When navigated with header data or headerUuid, show the Purchase Quotation Number field
   useEffect(() => {

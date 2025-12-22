@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { Alert } from 'react-native';
-import { getRefreshToken, setTokens, clearTokens, getUUID, getCMPUUID, getENVUUID, setMenuRights, setUUID, setENVUUID, setCMPUUID, setProfile, setDesignation, setRoles, setDisplayName, setSelectedEnvironmentUUID, setSelectedCompanyUUID, getSelectedCompanyUUID, getSelectedEnvironmentUUID, setReportingDesignation, getReportingDesignation, setRoleUUID, getRoleUUID, setAllowedCompanyUUIDs } from './tokenStorage';
+import { getRefreshToken, setTokens, clearTokens, getUUID, getCMPUUID, getENVUUID, setMenuRights, setUUID, setENVUUID, setCMPUUID, setProfile, setDesignation, setRoles, setDisplayName, setSelectedEnvironmentUUID, setSelectedCompanyUUID, getSelectedCompanyUUID, getSelectedEnvironmentUUID, setReportingDesignation, getReportingDesignation, setRoleUUID, getRoleUUID, setAllowedCompanyUUIDs, getAccessToken } from './tokenStorage';
 import api from './axios';
 import Config from 'react-native-config';
 import uuid from 'react-native-uuid';
@@ -153,6 +153,7 @@ const PATHS = {
     UpdatePurchaseQuotationHeader: Config.API_POST_UPDATE_PURCHASE_QUOTATION_HEADER_PATH || '/api/Account/UpdatePurchaseQuotationHeader',
     postpurchaseQuotationHeader: Config.API_POST_PURCHASE_QUOTATION_HEADER_PATH || '/api/Account/AddPurchaseQuotationHeader',
     getpurchaseQuotationHeaders: Config.API_GET_PURCHASE_QUOTATION_HEADERS_PATH || '/api/Account/GetPurchaseQuotationHeaders',
+    getPurchaseQuotationHeaderById: Config.API_GET_PURCHASE_QUOTATION_HEADER_BY_ID_PATH || '/api/Account/GetPurchaseQuotationHeaderById',
     deletePurchaseQuotationHeader: Config.API_DELETE_PURCHASE_QUOTATION_HEADER_PATH || '/api/Account/DeletePurchaseQuotationHeader',
 
     deletePurchaseInquiryLine: Config.API_DELETE_PURCHASE_INQUIRY_LINE_PATH || '/api/Account/DeletePurchaseInquiryLine',
@@ -662,6 +663,29 @@ export async function getpurchaseQuotationHeaders({ cmpUuid, envUuid, userUuid, 
         return resp.data;
     } catch (err) {
         console.error('[authServices] getpurchaseQuotationHeaders error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Get a single Purchase Quotation header by UUID
+export async function getPurchaseQuotationHeaderById({ headerUuid, cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        let { userUuid: u, cmpUuid: c, envUuid: e } = { userUuid, cmpUuid, envUuid } || {};
+        if (!u || !c || !e) {
+            const [uu, cc, ee] = await Promise.all([
+                userUuid || getUUID(),
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+            ]);
+            u = uu; c = cc; e = ee;
+        }
+        const params = { headerUuid, cmpUuid: c, envUuid: e };
+        console.log('[authServices] getPurchaseQuotationHeaderById params ->', params);
+        const resp = await api.get(PATHS.getPurchaseQuotationHeaderById, { params });
+        console.log('[authServices] getPurchaseQuotationHeaderById response ->', resp && resp.status);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] getPurchaseQuotationHeaderById error ->', err && (err.message || err));
         throw err;
     }
 }
@@ -1430,6 +1454,22 @@ export async function getSalesOrderRelatedDocuments({ salesOrderUuid, cmpUuid, e
         return resp.data;
     } catch (err) {
         console.error('[authServices] getSalesOrderRelatedDocuments error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Get related documents for a purchase order
+export async function getPurchaseOrderRelatedDocuments({ purchaseOrderUuid, cmpUuid, envUuid, userUuid } = {}) {
+    if (!purchaseOrderUuid) throw new Error('purchaseOrderUuid is required');
+    try {
+        const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+        const params = { purchaseOrderUuid, cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] getPurchaseOrderRelatedDocuments params ->', params);
+        const resp = await api.get('/api/Account/GetPurchaseOrderRelatedDocuments', { params });
+        console.log('[authServices] getPurchaseOrderRelatedDocuments resp ->', resp);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] getPurchaseOrderRelatedDocuments error ->', err && (err.message || err));
         throw err;
     }
 }
@@ -4164,6 +4204,38 @@ export async function getPurchasePerformaInvoiceSlip({ headerUuid, cmpUuid, envU
     }
 }
 
+// Get related documents for a purchase performa
+export async function getPurchasePerformaRelatedDocuments({ purchasePerformaUuid, cmpUuid, envUuid, userUuid } = {}) {
+    if (!purchasePerformaUuid) throw new Error('purchasePerformaUuid is required');
+    try {
+        const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+        const params = { purchasePerformaUuid, cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] getPurchasePerformaRelatedDocuments params ->', params);
+        const resp = await api.get('/api/Account/GetPurchasePerformaRelatedDocuments', { params });
+        console.log('[authServices] getPurchasePerformaRelatedDocuments resp ->', resp);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] getPurchasePerformaRelatedDocuments error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
+// Get related documents for a purchase invoice
+export async function getPurchaseInvoiceRelatedDocuments({ purchaseInvoiceUuid, cmpUuid, envUuid, userUuid } = {}) {
+    if (!purchaseInvoiceUuid) throw new Error('purchaseInvoiceUuid is required');
+    try {
+        const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+        const params = { purchaseInvoiceUuid, cmpUuid: c, envUuid: e, userUuid: u };
+        console.log('[authServices] getPurchaseInvoiceRelatedDocuments params ->', params);
+        const resp = await api.get('/api/Account/GetPurchaseInvoiceRelatedDocuments', { params });
+        console.log('[authServices] getPurchaseInvoiceRelatedDocuments resp ->', resp);
+        return resp.data;
+    } catch (err) {
+        console.error('[authServices] getPurchaseInvoiceRelatedDocuments error ->', err && (err.message || err));
+        throw err;
+    }
+}
+
 // Purchase Invoice: Get Purchase Invoice Slip PDF (base64 string)
 export async function getPurchaseInvoiceSlip({ headerUuid, cmpUuid, envUuid, userUuid } = {}) {
     try {
@@ -4497,14 +4569,24 @@ export async function updateProfileImage(payload, overrides = {}) {
 
     try {
         let { userUuid, cmpUuid, envUuid } = overrides || {};
+
+        // Allow caller to include UUIDs inside payload under common keys
+        userUuid = userUuid || payload?.UserUuid || payload?.userUuid || null;
+        cmpUuid = cmpUuid || payload?.CmpUuid || payload?.cmpUuid || null;
+        envUuid = envUuid || payload?.EnvUuid || payload?.envUuid || null;
+
+        // Fallback to stored values when not provided
         if (!userUuid || !cmpUuid || !envUuid) {
             const [u, c, e] = await Promise.all([
                 userUuid || getUUID(),
                 cmpUuid || getCMPUUID(),
                 envUuid || getENVUUID(),
             ]);
-            userUuid = u; cmpUuid = c; envUuid = e;
+            userUuid = userUuid || u;
+            cmpUuid = cmpUuid || c;
+            envUuid = envUuid || e;
         }
+
         if (!userUuid) throw new Error('Missing user UUID');
         if (!cmpUuid) throw new Error('Missing company UUID');
         if (!envUuid) throw new Error('Missing environment UUID');
@@ -4514,13 +4596,19 @@ export async function updateProfileImage(payload, overrides = {}) {
 
         // Build multipart form body
         const form = new FormData();
+        const appendedFields = [];
         const appendIfDefined = (key, value) => {
             if (value === undefined || value === null) return;
-            form.append(key, String(value));
+            try { form.append(key, String(value)); } catch (_) { try { form.append(key, value); } catch (_) {} }
+            appendedFields.push(key);
         };
+        // append both lowercase and capitalized variants for compatibility
         appendIfDefined('userUuid', userUuid);
+        appendIfDefined('UserUuid', userUuid);
         appendIfDefined('cmpUuid', cmpUuid);
+        appendIfDefined('CmpUuid', cmpUuid);
         appendIfDefined('envUuid', envUuid);
+        appendIfDefined('EnvUuid', envUuid);
 
         // File support: prefer { uri, name, type } else fallback to string
         const fileObj = payload?.profileImageFile;
@@ -4530,15 +4618,34 @@ export async function updateProfileImage(payload, overrides = {}) {
                 name: fileObj.name,
                 type: fileObj.type || 'image/jpeg',
             });
-        } else if (payload?.profileImage) {
-            appendIfDefined('profileImage', payload?.profileImage);
+        } else if (payload?.ProfilePath || payload?.profilePath || payload?.profileImage) {
+            // Support three styles callers may send: ProfilePath, profilePath, or profileImage
+            const p = payload?.ProfilePath || payload?.profilePath || payload?.profileImage;
+            // Append multiple possible server-expected keys
+            appendIfDefined('ProfilePath', p);
+            appendIfDefined('profilePath', p);
+            appendIfDefined('ProfileImage', p);
+            appendIfDefined('profileImage', p);
+            appendIfDefined('profileImagePath', p);
+            appendIfDefined('ProfileImagePath', p);
         }
 
-        const resp = await api.post(PATHS.updateProfileImage, form, {
-            params,
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        console.log('Update profile image response:', resp);
+        try { console.log('[authServices] updateProfileImage - form entries appended'); } catch(_) {}
+
+        try {
+            try { console.log('[authServices] updateProfileImage - sending to', PATHS.updateProfileImage, 'params', params); } catch (_) {}
+            try { console.log('[authServices] updateProfileImage - appended fields ->', appendedFields); } catch (_) {}
+            const resp = await api.post(PATHS.updateProfileImage, form, {
+                params,
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            console.log('Update profile image response:', resp && resp.data ? resp.data : resp);
+            return resp.data;
+        } catch (error) {
+            console.log('[authServices] updateProfileImage error response data:', error?.response?.data);
+            console.log('[authServices] updateProfileImage error status:', error?.response?.status);
+            throw error;
+        }
         return resp.data;
     } catch (error) {
         console.log('Update profile image error:', error);
@@ -5306,6 +5413,173 @@ export async function getSalesInvoiceSlip({ headerUuid, cmpUuid, envUuid, userUu
         console.log('❌ [getSalesInvoiceSlip] Error response:', error?.response?.data);
         console.log('❌ [getSalesInvoiceSlip] Error status:', error?.response?.status);
         throw error;
+    }
+}
+
+export async function updateSalesInvoicePayment(payload, { cmpUuid, envUuid, userUuid } = {}) {
+    try {
+        if (!payload) throw new Error('payload is required');
+        try { console.log('[authServices] updateSalesInvoicePayment - incoming payload ->', JSON.stringify(payload, null, 2)); } catch (_) { console.log('[authServices] updateSalesInvoicePayment - incoming payload (raw) ->', payload); }
+        if (!cmpUuid || !envUuid || !userUuid) {
+            const [c, e, u] = await Promise.all([
+                cmpUuid || getCMPUUID(),
+                envUuid || getENVUUID(),
+                userUuid || getUUID(),
+            ]);
+            cmpUuid = c; envUuid = e; userUuid = u;
+        }
+
+        const params = { cmpUuid, envUuid, userUuid };
+        const PATH = '/api/Account/UpdateSalesInvoicePayment';
+        try { console.log('[authServices] updateSalesInvoicePayment PATH:', PATH, 'params:', params); } catch (_) { }
+
+        // If payload contains files, decide whether to send multipart (actual file objects)
+        if (payload && payload.files) {
+            const filesArr = Array.isArray(payload.files) ? payload.files : [payload.files];
+            const hasFileObjects = filesArr.some(f => f && typeof f === 'object' && (f.uri || f.fileUri || f.uriString));
+
+            if (!hasFileObjects) {
+                // Files are references/strings returned by uploadFiles -> send JSON payload
+                try { console.log('[authServices] updateSalesInvoicePayment - sending JSON (files are references)'); } catch (_) { }
+                const resp = await api.post(PATH, payload, { params });
+                try { console.log('[authServices] updateSalesInvoicePayment resp ->', resp && resp.status); } catch (_) { }
+                return resp.data ?? resp;
+            }
+
+            try { console.log('[authServices] updateSalesInvoicePayment sending multipart/form-data with files'); } catch (_) { }
+            const form = new FormData();
+            const appendedFields = [];
+            // Append all non-file fields
+            Object.keys(payload).forEach((k) => {
+                if (k === 'files') return;
+                const v = payload[k];
+                try {
+                    if (v === null || v === undefined) return;
+                    if (typeof v === 'object') {
+                        const sval = JSON.stringify(v);
+                        form.append(k, sval);
+                        appendedFields.push({ key: k, value: sval });
+                    } else {
+                        const sval = String(v);
+                        form.append(k, sval);
+                        appendedFields.push({ key: k, value: sval });
+                    }
+                } catch (e) {
+                    try { console.warn('[authServices] updateSalesInvoicePayment append field failed', k, e); } catch (_) { }
+                }
+            });
+            try { console.log('[authServices] updateSalesInvoicePayment - appended fields ->', JSON.stringify(appendedFields, null, 2)); } catch (_) { console.log('[authServices] updateSalesInvoicePayment - appended fields (raw) ->', appendedFields); }
+
+            // Append files: support array of file objects or array of refs
+            const files = Array.isArray(payload.files) ? payload.files : [payload.files];
+            try { console.log('[authServices] updateSalesInvoicePayment - files to append ->', JSON.stringify(files, null, 2)); } catch (_) { console.log('[authServices] updateSalesInvoicePayment - files to append (raw) ->', files); }
+            for (const f of files) {
+                if (!f) continue;
+                // If looks like a file object with uri, append as file
+                if (typeof f === 'object' && (f.uri || f.fileUri || f.uriString)) {
+                    const entry = { uri: f.uri || f.uriString || f.fileUri, name: f.name || f.fileName || 'file', type: f.type || f.mime || 'application/octet-stream' };
+                    form.append('files', entry);
+                    try { console.log('[authServices] updateSalesInvoicePayment appended file object ->', JSON.stringify(entry)); } catch (_) { console.log('[authServices] updateSalesInvoicePayment appended file object (raw) ->', entry); }
+                } else {
+                    // treat as a reference string or JSON object
+                    const sval = (typeof f === 'string') ? f : JSON.stringify(f);
+                    form.append('files', sval);
+                    try { console.log('[authServices] updateSalesInvoicePayment appended file ref ->', sval); } catch (_) { console.log('[authServices] updateSalesInvoicePayment appended file ref (raw) ->', sval); }
+                }
+            }
+
+            const resp = await api.post(PATH, form, { params });
+            try { console.log('[authServices] updateSalesInvoicePayment multipart resp ->', resp && resp.status); } catch (_) { }
+            return resp.data ?? resp;
+        }
+
+        // Send JSON payload (application/json) as default
+        const resp = await api.post(PATH, payload, { params });
+        try { console.log('[authServices] updateSalesInvoicePayment resp ->', resp && resp.status); } catch (_) { }
+        return resp.data ?? resp;
+    } catch (err) {
+        try {
+            console.error('[authServices] updateSalesInvoicePayment error ->', err && (err.message || err));
+            if (err?.response) {
+                try { console.error('[authServices] updateSalesInvoicePayment response data ->', JSON.stringify(err.response.data, null, 2)); } catch (_) { }
+            }
+        } catch (_) { }
+        throw err;
+    }
+}
+
+export async function uploadFiles(fileObj, { filepath = 'SalesInv' } = {}) {
+    try {
+        if (!fileObj) throw new Error('fileObj is required');
+        // Backend expects multipart/form-data payload only. Do NOT send query params.
+        // We'll include `Filepath` inside the form data if the server needs it.
+        const PATH = '/api/CompanySetup/upload-file';
+        try { console.log('[authServices] uploadFiles PATH:', PATH); } catch (_) { }
+
+        const form = new FormData();
+        // include Filepath as a form field (not a query param)
+        try { form.append('Filepath', filepath); } catch (_) { }
+        // Log incoming file object(s) for debugging
+        try { console.log('[authServices] uploadFiles - incoming fileObj ->', JSON.stringify(fileObj, null, 2)); } catch (_) { try { console.log('[authServices] uploadFiles - incoming (non-serializable) ->', fileObj); } catch (_) { } }
+        // Support single fileObj or array; build a small descriptor array for logging
+        const appendedFiles = [];
+        // Server UI indicates a single file field named `File`. Support both single and array input,
+        // but only send as one or multiple `File` entries (server may accept repeated keys).
+        if (Array.isArray(fileObj)) {
+            fileObj.forEach((f) => {
+                const entry = { uri: f.uri || f.uriString || f.fileUri, name: f.name || f.fileName || 'file', type: f.type || f.mime || 'application/octet-stream' };
+                appendedFiles.push(entry);
+                form.append('File', entry);
+            });
+        } else {
+            const f = fileObj;
+            const entry = { uri: f.uri || f.uriString || f.fileUri, name: f.name || f.fileName || 'file', type: f.type || f.mime || 'application/octet-stream' };
+            appendedFiles.push(entry);
+            form.append('File', entry);
+        }
+        try { console.log('[authServices] uploadFiles - appended files ->', JSON.stringify(appendedFiles, null, 2)); } catch (_) { console.log('[authServices] uploadFiles - appended files (raw) ->', appendedFiles); }
+
+        // Send form-data payload only (no query params). Let axios set the Content-Type boundary.
+        // Use global axios directly to bypass the `api` instance interceptors which would add `cmpUuid`.
+        const token = await getAccessToken().catch(() => null);
+        const headers = {};
+        if (token) headers.Authorization = `Bearer ${token}`;
+
+        try {
+            const resp = await axios.post(`${BASE_URL}${PATH}`, form, { headers });
+            try { console.log('[authServices] uploadFiles resp ->', resp && resp.status); } catch (_) { }
+            return resp.data ?? resp;
+        } catch (err) {
+            // Common issue on Android: content:// URIs can cause axios/XHR to fail with "Network Error".
+            // Fall back to the native fetch API which handles FormData + content:// URIs better.
+            try {
+                console.warn('[authServices] uploadFiles axios failed, falling back to fetch:', err?.message || err);
+                const uploadUrl = `${BASE_URL}${PATH}`;
+                const fetchHeaders = {};
+                if (token) fetchHeaders.Authorization = `Bearer ${token}`;
+                // Do not set Content-Type header; let fetch / RN set the multipart boundary
+                const fetchResp = await fetch(uploadUrl, { method: 'POST', headers: fetchHeaders, body: form });
+                const text = await fetchResp.text();
+                let data;
+                try { data = JSON.parse(text); } catch (_) { data = text; }
+                try { console.log('[authServices] uploadFiles fetch resp ->', fetchResp && fetchResp.status); } catch (_) { }
+                return data;
+            } catch (fetchErr) {
+                console.error('[authServices] uploadFiles fetch fallback failed ->', fetchErr && (fetchErr.message || fetchErr));
+                if (fetchErr?.response) {
+                    try { console.error('[authServices] uploadFiles fetch response data ->', JSON.stringify(fetchErr.response.data, null, 2)); } catch (_) { }
+                }
+                throw err;
+            }
+        }
+    } catch (err) {
+        try {
+            console.error('[authServices] uploadFiles error ->', err && (err.message || err));
+            if (err?.response) {
+                try { console.error('[authServices] uploadFiles response data ->', JSON.stringify(err.response.data, null, 2)); } catch (_) { }
+            }
+        } catch (_) { }
+        throw err;
     }
 }
 

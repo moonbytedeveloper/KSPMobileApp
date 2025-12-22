@@ -87,6 +87,11 @@ const ManageSalesOrder = () => {
     if (has) return (Array.isArray(prev) ? prev.filter(x => x !== id) : []);
     return Array.isArray(prev) ? [...prev, id] : [id];
   });
+   const screenTheme = { 
+    text: COLORS.text,
+    textLight: COLORS.textLight,
+    bg: '#fff',
+  };
 
   // Load master items (items catalog) on mount
   React.useEffect(() => {
@@ -256,7 +261,7 @@ const ManageSalesOrder = () => {
       setSelectedShippingCountry(null);
       setSelectedShippingState(null);
       setSelectedShippingCity(null);
-      setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null, desc: '', rate: '' });
+      setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', rate: '' });
       setEditItemId(null);
       setTableSearch('');
       setPage(1);
@@ -533,7 +538,7 @@ const ManageSalesOrder = () => {
     itemTypeUuid: null,
     itemName: '',
     itemNameUuid: null,
-    quantity: '',
+    quantity: 1,
     unit: '',
     unitUuid: null,
     desc: '',
@@ -968,7 +973,7 @@ const ManageSalesOrder = () => {
         const sku = r?.SKU || r?.Sku || r?.ItemCode || '';
         const rate = String(r?.Rate ?? r?.Price ?? r?.UnitPrice ?? 0);
         const desc = r?.Description || r?.Desc || '';
-        const hsn = r?.HSNCode || r?.HSN || r?.hsn ||r?.HSNSACNO|| '-';
+        const hsn = r?.HSNCode || r?.HSN || r?.hsn || r?.HSNSACNO || '-';
         const qty = String(r?.Quantity ?? r?.Qty ?? r?.QuantityOrdered ?? 1);
         const amtNum = Number(r?.Amount ?? r?.TotalAmount ?? r?.NetAmount ?? r?.LineAmount ?? 0) || 0;
         const amount = amtNum.toFixed(2);
@@ -1514,7 +1519,7 @@ const ManageSalesOrder = () => {
       sku: master ? master.sku : '',
       rate: rate,
       desc: currentItem.desc && currentItem.desc.length ? currentItem.desc : (master ? master.desc || '' : ''),
-      hsn:  currentItem.hsn && currentItem.hsn.length ? currentItem.hsn : (master ? master.hsn || '' : ''),
+      hsn: currentItem.hsn && currentItem.hsn.length ? currentItem.hsn : (master ? master.hsn || '' : ''),
       qty: qty,
       tax: 'IGST',
       amount: amount,
@@ -1628,7 +1633,7 @@ const ManageSalesOrder = () => {
     }
 
     // reset form
-    setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: 1, unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
+    setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
   };
 
   const handleEditItem = id => {
@@ -1768,7 +1773,9 @@ const ManageSalesOrder = () => {
       setIsSavingHeader(false);
     }
   };
-  const onCancel = () => { };
+  const onCancel = () => { 
+    navigation.goBack();
+  };
 
   // File attachment functions
   const pickFile = async () => {
@@ -1840,13 +1847,7 @@ const ManageSalesOrder = () => {
         )}
         <AppHeader
           title="Manage Purchase Order"
-          onLeftPress={() => {
-            try {
-              navigation.navigate('ViewPurchaseOrder');
-            } catch (e) {
-              navigation.goBack();
-            }
-          }}
+          onLeftPress={() => navigation.goBack()}
         />
         <View style={styles.headerSeparator} />
         <ScrollView
@@ -1927,34 +1928,8 @@ const ManageSalesOrder = () => {
             </View>
 
             <View style={[styles.row, { marginTop: hp(1.5) }]}>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Purchase Order Number* </Text>
+              {/* Purchase Order Number - Only shown in edit mode, auto-generated from server response */}
 
-                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Sales Order Number*</Text> */}
-                {headerSaved && !isEditingHeader ? (
-                  <View style={[inputStyles.box]} pointerEvents="none">
-                    <Text style={[inputStyles.input, { flex: 1 }]}>{renderLabel(headerForm.SalesOrderNo)}</Text>
-                  </View>
-                ) : (
-                  // If we have server-supplied purchase order options, show a dropdown.
-                  // Otherwise fall back to a plain TextInput so existing flows aren't broken.
-                  <View style={{ zIndex: 9999, elevation: 20 }}>
-                    <Dropdown
-                      placeholder="Select Purchase Order"
-                      value={headerForm.SalesOrderNo}
-                      options={purchaseOrderOptions}
-                      getLabel={c => (c?.PurchaseOrderNo || c?.PurchaseOrderNumber || c?.PurchaseOrder || String(c))}
-                      getKey={c => (c?.UUID || c?.Id || c)}
-                      onSelect={v => {
-                        setHeaderForm(s => ({ ...s, SalesOrderNo: v?.PurchaseOrderNo || String(v), SalesOrderUUID: v?.UUID || v }));
-                      }}
-                      inputBoxStyle={inputStyles.box}
-                      textStyle={inputStyles.input}
-                    />
-                  </View>
-
-                )}
-              </View>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Project Name </Text>
 
@@ -1979,10 +1954,6 @@ const ManageSalesOrder = () => {
                   )}
                 </View>
               </View>
-            </View>
-
-            <View style={[styles.row, { marginTop: hp(1.5) }]}>
-
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Payment Term </Text>
 
@@ -2007,6 +1978,10 @@ const ManageSalesOrder = () => {
                   )}
                 </View>
               </View>
+            </View>
+
+            <View style={[styles.row, { marginTop: hp(1.5) }]}>
+
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Payment Method* </Text>
 
@@ -2030,8 +2005,6 @@ const ManageSalesOrder = () => {
                   )}
                 </View>
               </View>
-            </View>
-            <View style={[styles.row, { marginTop: hp(1.5) }]}>
               <View style={styles.col}>
                 <TouchableOpacity
                   activeOpacity={0.7}
@@ -2079,7 +2052,16 @@ const ManageSalesOrder = () => {
                   </View>
                 </TouchableOpacity>
               </View>
-
+            </View>
+            <View style={[styles.row, { marginTop: hp(1.5) }]}>
+              {(headerSaved || isEditingHeader) && headerForm.SalesOrderNo ? (
+                <View style={styles.col}>
+                  <Text style={inputStyles.label}>Purchase Order Number</Text>
+                  <View style={[inputStyles.box]} pointerEvents="none">
+                    <Text style={[inputStyles.input, { flex: 1, color: COLORS.textLight }]}>{renderLabel(headerForm.SalesOrderNo)}</Text>
+                  </View>
+                </View>
+              ) : null}
               {/* <View style={styles.col}>
                 <TouchableOpacity
                   activeOpacity={0.7}
@@ -2568,7 +2550,7 @@ const ManageSalesOrder = () => {
                         <TouchableOpacity
                           activeOpacity={0.8}
                           style={[styles.addButton, { backgroundColor: '#6c757d', marginLeft: wp(3) }]}
-                          onPress={() => { setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null, desc: '', rate: '' }); setEditItemId(null); }}
+                          onPress={() => { setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', rate: '' }); setEditItemId(null); }}
                         >
                           <Text style={styles.addButtonText}>Cancel</Text>
                         </TouchableOpacity>
@@ -2625,14 +2607,14 @@ const ManageSalesOrder = () => {
                       <View style={styles.table}>
                         <View style={styles.thead}>
                           <View style={styles.tr}>
-                            <Text style={[styles.th, { width: wp(10) }]}>Sr.No</Text>
-                            <Text style={[styles.th, { width: wp(30) }]}>Item Details</Text>
-                            <Text style={[styles.th, { width: wp(30) }]}>Description</Text>
-                            <Text style={[styles.th, { width: wp(20) }]}>HSN/SAC</Text>
-                            <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
-                            <Text style={[styles.th, { width: wp(20) }]}>Rate</Text>
-                            <Text style={[styles.th, { width: wp(20) }]}>Amount</Text>
-                            <Text style={[styles.th, { width: wp(40) }]}>Action</Text>
+                            <Text style={[styles.th, {color: screenTheme.text, width: wp(10) }]}>Sr.No</Text>
+                            <Text style={[styles.th, {color: screenTheme.text, width: wp(30) }]}>Item Details</Text>
+                            <Text style={[styles.th, {color: screenTheme.text, width: wp(30) }]}>Description</Text>
+                            <Text style={[styles.th, {color: screenTheme.text, width: wp(20) }]}>HSN/SAC</Text>
+                            <Text style={[styles.th, {color: screenTheme.text, width: wp(20) }]}>Quantity</Text>
+                            <Text style={[styles.th, {color: screenTheme.text, width: wp(20) }]}>Rate</Text>
+                            <Text style={[styles.th, {color: screenTheme.text, width: wp(20) }]}>Amount</Text>
+                            <Text style={[styles.th, {color: screenTheme.text, width: wp(40) }]}>Action</Text>
                           </View>
                         </View>
 

@@ -140,6 +140,11 @@ export const text = StyleSheet.create({
     fontWeight: '400',
   },
 });
+ const screenTheme = { 
+    text: COLORS.text,
+    textLight: COLORS.textLight,
+    bg: '#fff',
+  };
 
 // Reusable input styles (label + container + input + helper/error)
 export const inputStyles = StyleSheet.create({
@@ -169,7 +174,8 @@ export const inputStyles = StyleSheet.create({
     paddingVertical: hp(2.2),
     minHeight: 'auto',
   },
-  input: {
+  input: { 
+    color: screenTheme.text,
     paddingVertical: 0, 
     fontFamily: 'Nunito-Regular',
     flex: 1,
@@ -178,6 +184,7 @@ export const inputStyles = StyleSheet.create({
   inputMultiline: {
     minHeight: hp(10),
     textAlignVertical: 'top',
+    color: screenTheme.text,
   },
   rightIconRow: {
     flexDirection: 'row',

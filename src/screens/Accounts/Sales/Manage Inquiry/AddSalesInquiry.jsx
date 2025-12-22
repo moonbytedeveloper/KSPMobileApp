@@ -134,6 +134,8 @@ const AddSalesInquiry = () => {
     const [requestedDate, setRequestedDate] = useState('');
     const [expectedPurchaseDate, setExpectedPurchaseDate] = useState('');
     const [projectName, setProjectName] = useState('');
+    console.log(projectName,'999');
+    
     const [inquiryNo, setInquiryNo] = useState('');
     const [showInquiryNoField, setShowInquiryNoField] = useState(false);
     const [country, setCountry] = useState('');
@@ -535,32 +537,32 @@ const AddSalesInquiry = () => {
             try {
                 // Use route-provided headerRaw (if present) to prefill locally. No network calls.
                 const headerRaw = route?.params?.headerRaw || route?.params?.headerData || null;
-                if (headerData) {
+                if (headerRaw) {
                     if (!headerEditing) {
-                        if (!userEditedRef.current.project) setProjectName(headerData.ProjectName || '');
+                        if (!userEditedRef.current.project) setProjectName(headerRaw.ProjectName || '');
                         // also bind project UUID when available so API posts use UUID
-                        if (headerData.ProjectUUID || headerData.ProjectId || headerData.Project) {
-                            setProjectUuid(headerData.ProjectUUID || headerData.ProjectId || headerData.Project || null);
+                        if (headerRaw.ProjectUUID || headerRaw.ProjectId || headerRaw.Project) {
+                            setProjectUuid(headerRaw.ProjectUUID || headerRaw.ProjectId || headerRaw.Project || null);
                         }
-                        setInquiryNo(headerData.InquiryNo || '');
-                        if (headerData.OrderDate && !userEditedRef.current.requestedDate) setRequestedDate(headerData.OrderDate);
-                        if (headerData.RequestedDeliveryDate && !userEditedRef.current.expectedDate) setExpectedPurchaseDate(headerData.RequestedDeliveryDate);
+                        setInquiryNo(headerRaw.InquiryNo || '');
+                        if (headerRaw.OrderDate && !userEditedRef.current.requestedDate) setRequestedDate(headerRaw.OrderDate);
+                        if (headerRaw.RequestedDeliveryDate && !userEditedRef.current.expectedDate) setExpectedPurchaseDate(headerRaw.RequestedDeliveryDate);
                     } else {
-                        if (!inquiryNo) setInquiryNo(headerData.InquiryNo || '');
+                        if (!inquiryNo) setInquiryNo(headerRaw.InquiryNo || '');
                     }
 
-                    if (headerData.CustomerUUID || headerData.CustomerId || headerData.CustomerID) {
-                        const custUuid = headerData.CustomerUUID || headerData.CustomerId || headerData.CustomerID;
+                    if (headerRaw.CustomerUUID || headerRaw.CustomerId || headerRaw.CustomerID) {
+                        const custUuid = headerRaw.CustomerUUID || headerRaw.CustomerId || headerRaw.CustomerID;
                         if (!userEditedRef.current.customer) {
                             setCustomerUuid(custUuid);
                             const found = (customersList || customers || []).find(c => (c.UUID || c.Id || c.id) === custUuid) || null;
                             if (found) setCustomerName(found?.Name || found?.DisplayName || found?.name || '');
-                            else if (headerData.CustomerName || headerData.Customer) setCustomerName(headerData.CustomerName || headerData.Customer);
+                            else if (headerRaw.CustomerName || headerRaw.Customer) setCustomerName(headerRaw.CustomerName || headerRaw.Customer);
                         }
                     }
 
                     // store local header response and mark saved
-                    setHeaderResponse({ Data: headerData });
+                    setHeaderResponse({ Data: headerRaw });
                     setHeaderSaved(true);
 
                     // Map any provided lines from headerRaw (if available)
@@ -807,7 +809,7 @@ const AddSalesInquiry = () => {
                     >
                         {showInquiryNoField && (
                             <View style={[styles.row, { marginBottom: hp(1.2) }]}> 
-                                <View >
+                                <View style={styles.col}>
                                     <Text style={inputStyles.label}>Inquiry No</Text>
                                     <View style={[inputStyles.box, { marginTop: hp(0.5) }]}>
                                         <TextInput

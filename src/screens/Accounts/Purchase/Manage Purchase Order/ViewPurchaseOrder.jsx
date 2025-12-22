@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
 import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
-import { getPurchaseOrderHeaders, deletePurchaseOrderHeader, convertPurchaseOrderToInvoice, getPurchaseOrderSlip } from '../../../../api/authServices';
+import { getPurchaseOrderHeaders, deletePurchaseOrderHeader, convertPurchaseOrderToInvoice, getPurchaseOrderSlip, getPurchaseOrderRelatedDocuments, getPurchaseInvoiceSlip, getPurchasePerformaInvoiceSlip } from '../../../../api/authServices';
 
 // Will be loaded from server
 
@@ -24,6 +24,9 @@ const ViewPurchaseOrder = () => {
     const [totalRecords, setTotalRecords] = useState(0);
     const [loading, setLoading] = useState(false);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+    const [orderRelatedModalVisible, setOrderRelatedModalVisible] = useState(false);
+    const [orderRelatedLoading, setOrderRelatedLoading] = useState(false);
+    const [orderRelatedData, setOrderRelatedData] = useState({ PurchaseInvoices: [], ProformaInvoices: [] });
 
     // Server-backed paging: fetch whenever page, pageSize or search changes
     const totalPages = useMemo(() => {
@@ -45,48 +48,49 @@ const ViewPurchaseOrder = () => {
     const rangeStart = totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1;
     const rangeEnd = totalRecords === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, totalRecords);
 
-    useEffect(() => {
-        let mounted = true;
-        const load = async () => {
-            try {
-                setLoading(true);
-                const start = currentPage * itemsPerPage;
-                const resp = await getPurchaseOrderHeaders({ start, length: itemsPerPage, searchValue: searchQuery });
-                console.log(resp,'response');
-                
-                const data = resp?.Data || resp || {};
-                const rawList = data?.Records || data?.List || data?.Items || data || [];
-                const list = Array.isArray(rawList) ? rawList : [];
-                console.log(list,'list11');
-                
-                const normalized = list.map(it => ({
-                    id: it?.UUID || it?.Id || it?.PurchaseOrderUUID || it?.PurchaseOrderId || it?.PurchaseOrderNo || String(Math.random()),
-                    purchaseOrderNumber: it?.PurchaseOrderNo || it?.PurchaseOrderNumber || it?.PurchaseOrder || it?.PurchaseOrderId || '',
-                    vendorName: it?.VendorName || it?.Vendor || it?.CustomerName || it?.Customer || '',
-                    projectName: it?.ProjectTitle || it?.ProjectName || it?.Project || '',
-                    deliveryDate: it?.DeliveryDate || it?.DeliveryDateUTC || it?.OrderDate || '',
-                    // amount may be returned under different keys depending on API
-                    amount: it?.Amount || it?.TotalAmount || it?.NetAmount || it?.OrderAmount || '',
-                    item: { itemType: '', name: '' },
-                    quantity: it?.LineCount || it?.TotalLines || 0,
-                    raw: it,
-                }));
-                if (!mounted) return;
-                setOrders(normalized);
-                const total = data?.TotalRecords ?? data?.total ?? data?.Total ?? list.length;
-                setTotalRecords(Number(total) || normalized.length);
-            } catch (err) {
-                console.warn('getPurchaseOrderHeaders failed', err?.message || err);
-                if (!mounted) return;
-                setOrders([]);
-                setTotalRecords(0);
-            } finally {
-                if (mounted) setLoading(false);
-            }
-        };
-        load();
-        return () => { mounted = false; };
-    }, [currentPage, itemsPerPage, searchQuery]);
+    // Load purchase orders from server
+    const loadPurchaseOrders = async () => {
+        try {
+            setLoading(true);
+            const start = currentPage * itemsPerPage;
+            const resp = await getPurchaseOrderHeaders({ start, length: itemsPerPage, searchValue: searchQuery });
+            console.log(resp,'response');
+            
+            const data = resp?.Data || resp || {};
+            const rawList = data?.Records || data?.List || data?.Items || data || [];
+            const list = Array.isArray(rawList) ? rawList : [];
+            console.log(list,'list11');
+            
+            const normalized = list.map(it => ({
+                id: it?.UUID || it?.Id || it?.PurchaseOrderUUID || it?.PurchaseOrderId || it?.PurchaseOrderNo || String(Math.random()),
+                purchaseOrderNumber: it?.PurchaseOrderNo || it?.PurchaseOrderNumber || it?.PurchaseOrder || it?.PurchaseOrderId || '',
+                vendorName: it?.VendorName || it?.Vendor || it?.CustomerName || it?.Customer || '',
+                projectName: it?.ProjectTitle || it?.ProjectName || it?.Project || '',
+                deliveryDate: it?.DeliveryDate || it?.DeliveryDateUTC || it?.OrderDate || '',
+                // amount may be returned under different keys depending on API
+                amount: it?.Amount || it?.TotalAmount || it?.NetAmount || it?.OrderAmount || '',
+                item: { itemType: '', name: '' },
+                quantity: it?.LineCount || it?.TotalLines || 0,
+                raw: it,
+            }));
+            setOrders(normalized);
+            const total = data?.TotalRecords ?? data?.total ?? data?.Total ?? list.length;
+            setTotalRecords(Number(total) || normalized.length);
+        } catch (err) {
+            console.warn('getPurchaseOrderHeaders failed', err?.message || err);
+            setOrders([]);
+            setTotalRecords(0);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Reload data when screen comes into focus (after adding/editing)
+    useFocusEffect(
+        React.useCallback(() => {
+            loadPurchaseOrders();
+        }, [currentPage, itemsPerPage, searchQuery])
+    );
 
     const handleDownloadPDF = async (order) => {
         try {
@@ -119,14 +123,22 @@ const ViewPurchaseOrder = () => {
         }
     };
 
-    const handleQuickAction = (order, actionLabel) => {
+    const handleQuickAction = async (order, actionLabel) => {
         switch (actionLabel) {
             case 'Edit':
                 // Navigate to ManagePurchaseOrder and pass the header UUID for prefill
                 navigation.navigate('ManagePurchaseOrder', { headerUuid: order.id, HeaderUUID: order.id, UUID: order.id, origin: 'ViewPurchaseOrder' });
                 return;
             case 'View':
-                navigation.navigate('ManagePurchaseOrder', { headerUuid: order.id, HeaderUUID: order.id, UUID: order.id, viewOnly: true, origin: 'ViewPurchaseOrder' });
+                // Open related documents bottom-sheet (purchase invoices / performa)
+                setOrderRelatedModalVisible(true);
+                try {
+                    await fetchPurchaseOrderRelatedDocuments(order);
+                } catch (err) {
+                    console.warn('fetchPurchaseOrderRelatedDocuments error ->', err?.message || err);
+                    setOrderRelatedModalVisible(false);
+                    Alert.alert('Error', 'Unable to fetch related documents');
+                }
                 return;
             case 'Delete':
                 Alert.alert(
@@ -207,6 +219,67 @@ const ViewPurchaseOrder = () => {
                 return;
             default:
                 Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.purchaseOrderNumber}`);
+        }
+    };
+
+    const fetchPurchaseOrderRelatedDocuments = async (order) => {
+        try {
+            setOrderRelatedLoading(true);
+            const purchaseOrderUuid = order?.raw?.UUID || order?.raw?.PurchaseOrderUUID || order?.id;
+            if (!purchaseOrderUuid) throw new Error('Purchase Order UUID not found');
+            const resp = await getPurchaseOrderRelatedDocuments({ purchaseOrderUuid });
+            const data = resp?.Data || resp || {};
+            // purchase invoices may be under multiple keys depending on backend
+            const purchaseInvoices = data?.PurchaseInvoices || data?.PurchaseInvoice || data?.Invoices || data?.PurchaseInvoiceList || [];
+            // some APIs use "PerformaInvoices" (typo) while others use "ProformaInvoices"
+            const proformas = data?.ProformaInvoices || data?.PerformaInvoices || data?.PurchaseProformas || data?.SalesProformas || [];
+            setOrderRelatedData({ PurchaseInvoices: purchaseInvoices, ProformaInvoices: proformas });
+        } catch (err) {
+            console.log('getPurchaseOrderRelatedDocuments error ->', err?.message || err);
+            setOrderRelatedData({ PurchaseInvoices: [], ProformaInvoices: [] });
+            throw err;
+        } finally {
+            setOrderRelatedLoading(false);
+        }
+    };
+
+    const handleOpenPurchaseInvoiceSlip = async (invoice) => {
+        try {
+            const uuid = invoice?.UUID || invoice?.InvoiceUUID || invoice?.id;
+            if (!uuid) {
+                Alert.alert('Error', 'Invoice identifier not found');
+                return;
+            }
+            const pdfBase64 = await getPurchaseInvoiceSlip({ headerUuid: uuid });
+            if (!pdfBase64) {
+                Alert.alert('Error', 'Invoice PDF not available');
+                return;
+            }
+            setOrderRelatedModalVisible(false);
+            navigation.navigate('FileViewerScreen', { pdfBase64, fileName: invoice?.DocumentNumber || `Invoice_${uuid}`, opportunityTitle: invoice?.DocumentNumber || 'Invoice', companyName: '' });
+        } catch (err) {
+            console.log('handleOpenPurchaseInvoiceSlip error ->', err?.message || err);
+            Alert.alert('Error', err?.message || 'Unable to open invoice PDF');
+        }
+    };
+
+    const handleOpenPurchasePerformaSlip = async (pf) => {
+        try {
+            const uuid = pf?.UUID || pf?.ProformaUUID || pf?.id;
+            if (!uuid) {
+                Alert.alert('Error', 'Performa identifier not found');
+                return;
+            }
+            const pdfBase64 = await getPurchasePerformaInvoiceSlip({ headerUuid: uuid });
+            if (!pdfBase64) {
+                Alert.alert('Error', 'Performa PDF not available');
+                return;
+            }
+            setOrderRelatedModalVisible(false);
+            navigation.navigate('FileViewerScreen', { pdfBase64, fileName: pf?.DocumentNumber || `Performa_${uuid}`, opportunityTitle: pf?.DocumentNumber || 'Performa Invoice', companyName: '' });
+        } catch (err) {
+            console.log('handleOpenPurchasePerformaSlip error ->', err?.message || err);
+            Alert.alert('Error', err?.message || 'Unable to open performa PDF');
         }
     };
 
@@ -325,10 +398,10 @@ const ViewPurchaseOrder = () => {
                         onToggle={() => setActiveOrderId(prev => prev === order.id ? null : order.id)}
 
                         customRows={[
-                            { label: "Vendor Name", value: order.vendorName || order.raw?.VendorName || '' },
-                            { label: "Project Name", value: order.projectName || order.raw?.ProjectTitle || '' },
-                            { label: "Delivery Date", value: order.deliveryDate || '' },
-                            { label: "Total Amount", value: order.amount || '' }
+                            { label: "Vendor Name", value: order.vendorName || order.raw?.VendorName || '-' },
+                            { label: "Project Name", value: order.projectName || order.raw?.ProjectTitle || '-' },
+                            { label: "Delivery Date", value: order.deliveryDate || '-' },
+                            { label: "Total Amount", value: order.amount || '-' }
                         ]}
 
                         headerLeftLabel="Purchase Order No"
@@ -348,6 +421,63 @@ const ViewPurchaseOrder = () => {
                     </View>
                 )}
             </ScrollView>
+
+            {/* Related Documents bottom-sheet modal for Purchase Order */}
+            <Modal transparent visible={orderRelatedModalVisible} animationType="slide">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalBox}>
+                        <View style={styles.modalHeaderRow}>
+                            <Text style={styles.modalTitle}>Related Documents</Text>
+                            <TouchableOpacity onPress={() => setOrderRelatedModalVisible(false)}>
+                                <Icon name="close" size={rf(3.6)} color={COLORS.textLight} />
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.modalBody}>
+                            {orderRelatedLoading ? (
+                                <View style={{ paddingVertical: hp(4), alignItems: 'center' }}>
+                                    <ActivityIndicator size="small" color={COLORS.primary} />
+                                </View>
+                            ) : (
+                                <View>
+                                    <View style={{ marginBottom: hp(1.5) }}>
+                                        <Text style={{ fontFamily: TYPOGRAPHY.fontFamilyBold, color: COLORS.text, marginBottom: hp(0.6) }}>Purchase Invoices</Text>
+                                        {Array.isArray(orderRelatedData?.PurchaseInvoices) && orderRelatedData.PurchaseInvoices.length > 0 ? (
+                                            orderRelatedData.PurchaseInvoices.map((inv) => (
+                                                <TouchableOpacity key={inv?.UUID || inv?.id} style={{ paddingVertical: hp(1), borderBottomWidth: 1, borderBottomColor: COLORS.border }} onPress={() => handleOpenPurchaseInvoiceSlip(inv)}>
+                                                    <Text style={{ color: COLORS.primary, fontWeight: '400' }}>{inv?.DocumentNumber || inv?.ProformaNo || inv?.InvoiceNo || inv?.DocumentNo}</Text>
+                                                    {(inv?.DocumentDate || inv?.InvoiceDate) ? <Text style={{ color: COLORS.textLight, fontSize: rf(2.8) }}>{inv.DocumentDate || inv.InvoiceDate}</Text> : null}
+                                                </TouchableOpacity>
+                                            ))
+                                        ) : (
+                                            <Text style={{ fontSize: rf(3), color: COLORS.textLight }}>No purchase invoice records found.</Text>
+                                        )}
+                                    </View>
+
+                                    <View>
+                                        <Text style={{ fontFamily: TYPOGRAPHY.fontFamilyBold, color: COLORS.text, marginBottom: hp(0.6) }}>Proforma Invoices</Text>
+                                        {Array.isArray(orderRelatedData?.ProformaInvoices) && orderRelatedData.ProformaInvoices.length > 0 ? (
+                                            orderRelatedData.ProformaInvoices.map((pf) => (
+                                                <TouchableOpacity key={pf?.UUID || pf?.id} style={{ paddingVertical: hp(1), borderBottomWidth: 1, borderBottomColor: COLORS.border }} onPress={() => handleOpenPurchasePerformaSlip(pf)}>
+                                                    <Text style={{ color: COLORS.primary, fontWeight: '400' }}>{pf?.DocumentNumber || pf?.ProformaNo || pf?.InvoiceNo || pf?.DocumentNo}</Text>
+                                                    {(pf?.DocumentDate || pf?.InvoiceDate) ? <Text style={{ color: COLORS.textLight, fontSize: rf(2.8) }}>{pf.DocumentDate || pf.InvoiceDate}</Text> : null}
+                                                </TouchableOpacity>
+                                            ))
+                                        ) : (
+                                            <Text style={{fontSize: rf(3), color: COLORS.textLight }}>No proforma invoice records found.</Text>
+                                        )}
+                                    </View>
+
+                                    {(!orderRelatedData?.PurchaseInvoices?.length && !orderRelatedData?.ProformaInvoices?.length) && (
+                                        <View style={{ paddingVertical: hp(4), alignItems: 'center' }}>
+                                            <Text style={{ color: COLORS.textLight }}>No related documents found.</Text>
+                                        </View>
+                                    )}
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                </View>
+            </Modal>
 
             {totalRecords > 0 && (
                 <View style={styles.paginationContainer}>
@@ -579,6 +709,26 @@ const styles = StyleSheet.create({
         paddingHorizontal: wp(5),
         fontFamily: TYPOGRAPHY.fontFamilyRegular,
     },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalBox: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: wp(3),
+        borderTopRightRadius: wp(3),
+        padding: wp(5),
+        maxHeight: hp(85),
+        width: '100%'
+    },
+    modalHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    modalTitle: { fontSize: rf(3.6), fontWeight: '700', color: COLORS.text },
+    modalBody: { marginTop: hp(1) },
 });
 
 export default ViewPurchaseOrder;

@@ -9,7 +9,7 @@ import AppHeader from '../../components/common/AppHeader';
 import Loader from '../../components/common/Loader';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 import { COLORS, TYPOGRAPHY } from '../styles/styles';
-import { getProfile, updateProfileImage, getProfileImage, deleteProfileImage } from '../../api/authServices';
+import { getProfile, updateProfileImage, getProfileImage, deleteProfileImage, uploadFiles } from '../../api/authServices';
 import { getProfile as getStoredProfile, getUUID, getRoles, getDesignation, getCMPUUID, getENVUUID } from '../../api/tokenStorage';
 const TABS = {
   BASIC: 'Basic Information',
@@ -229,27 +229,79 @@ const ProfileScreen = () => {
         return;
       }
       
-      // Prepare file object for multipart upload
+      // Step 1: Upload file to server first using /api/CompanySetup/upload-file
+      console.log('Step 1: Uploading file to server...');
       const fileObj = {
         uri: file.uri,
         name: file.name || `profile_${Date.now()}.jpg`,
         type: file.type || 'image/jpeg'
       };
       
-      const payload = {
-        profileImageFile: fileObj
-      };
+      // Call upload-file API with fixed Filepath value
+      const uploadResponse = await uploadFiles(fileObj, { filepath: 'EmployeeProfilePic' });
+      console.log('Upload file response:', uploadResponse);
       
-      const overrides = {
-        userUuid,
-        cmpUuid,
-        envUuid
-      };
       
-      console.log('Uploading profile image...');
-      const response = await updateProfileImage(payload, overrides);
-      console.log('Profile image upload response:', response);
       
+      // Step 2: If file upload successful, call updateProfileImage API with server file path
+      console.log('Step 2: Updating profile image with uploaded file path...');
+
+      // Try to extract a server-side file path from upload response (support multiple possible shapes)
+      let uploadedPaths = [];
+      try {
+        // Handle multiple possible response shapes. The backend may return the path under
+        // RemoteResponse.path (as in the reported example), Data.FilePath, FilePath, or arrays.
+        const data = uploadResponse?.Data ?? uploadResponse;
+
+        // Direct RemoteResponse.path (example provided by user)
+        const rrPath = uploadResponse?.RemoteResponse?.path || uploadResponse?.Data?.RemoteResponse?.path || data?.RemoteResponse?.path;
+        if (rrPath) uploadedPaths.push(rrPath);
+
+        if (data) {
+          if (Array.isArray(data.FilePaths)) uploadedPaths = uploadedPaths.concat(data.FilePaths);
+          if (data.FilePath) uploadedPaths.push(data.FilePath);
+
+          if (Array.isArray(data.UploadedFiles)) uploadedPaths = uploadedPaths.concat(data.UploadedFiles.map(f => f?.Path || f?.FilePath || f?.path || f?.filePath).filter(Boolean));
+          if (Array.isArray(data.Files)) uploadedPaths = uploadedPaths.concat(data.Files.map(f => f?.Path || f?.FilePath || f?.path || f?.filePath).filter(Boolean));
+
+          // some servers return { path: '...' } directly inside Data
+          if (data.path && typeof data.path === 'string') uploadedPaths.push(data.path);
+        }
+
+        // top-level fallbacks
+        if (Array.isArray(uploadResponse?.FilePaths)) uploadedPaths = uploadedPaths.concat(uploadResponse.FilePaths);
+        if (uploadResponse?.FilePath) uploadedPaths.push(uploadResponse.FilePath);
+        if (uploadResponse?.path) uploadedPaths.push(uploadResponse.path);
+
+        // If the response itself is a plain string, use it
+        if (typeof uploadResponse === 'string') uploadedPaths.push(uploadResponse);
+
+        // Normalize and remove duplicates / falsy
+        uploadedPaths = Array.from(new Set((uploadedPaths || []).filter(Boolean)));
+      } catch (e) {
+        console.warn('Failed to extract uploaded file path', e);
+      }
+
+      const firstPath = uploadedPaths && uploadedPaths.length ? uploadedPaths[0] : null;
+
+      // Build payload with the four required fields: UserUuid, CmpUuid, EnvUuid, ProfilePath
+      const payload = firstPath
+        ? { UserUuid: userUuid, CmpUuid: cmpUuid, EnvUuid: envUuid, ProfilePath: firstPath }
+        : { UserUuid: userUuid, CmpUuid: cmpUuid, EnvUuid: envUuid, profileImageFile: fileObj };
+
+      console.log('Calling updateProfileImage with payload:', payload);
+      let updateResponse;
+      try {
+        updateResponse = await updateProfileImage(payload);
+        console.log('Profile image update response:', updateResponse);
+      } catch (err) {
+        console.error('updateProfileImage threw error:', err?.message || err);
+        console.error('updateProfileImage error.response.data:', err?.response?.data);
+        console.error('updateProfileImage error.response.status:', err?.response?.status);
+        throw err;
+      }
+      
+      // Show success message
       setMessageTitle('Success');
       setMessageText('Profile image updated successfully!');
       messageSheetRef.current?.present();

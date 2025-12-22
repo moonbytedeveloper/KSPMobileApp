@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal, RefreshControl } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
 import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
-import { getPurchasePerformaInvoiceHeaders, deletePurchasePerformaInvoiceHeader, getPurchasePerformaInvoiceSlip, convertPurchasePerformaToInvoice } from '../../../../api/authServices';
+import { getPurchasePerformaInvoiceHeaders, deletePurchasePerformaInvoiceHeader, getPurchasePerformaInvoiceSlip, convertPurchasePerformaToInvoice, getPurchasePerformaRelatedDocuments, getPurchaseOrderSlip } from '../../../../api/authServices';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 
 const SALES_ORDERS = [
@@ -84,7 +84,11 @@ const ViewPerfomaPurchaseInvoice = () => {
     const [orders, setOrders] = useState([]);
     const [totalCount, setTotalCount] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+    const [orderRelatedModalVisible, setOrderRelatedModalVisible] = useState(false);
+    const [orderRelatedLoading, setOrderRelatedLoading] = useState(false);
+    const [orderRelatedData, setOrderRelatedData] = useState({ PurchaseOrders: [], PurchaseInvoices: [] });
 
     // Orders are fetched from API; filtering/search handled server-side via `searchQuery` param
     const filteredOrders = orders || [];
@@ -135,6 +139,17 @@ const ViewPerfomaPurchaseInvoice = () => {
         // initial load and when pagination/search changes
         loadOrders();
     }, [itemsPerPage, currentPage, searchQuery]);
+
+    const onRefresh = async () => {
+        try {
+            setRefreshing(true);
+            await loadOrders();
+        } catch (err) {
+            console.warn('Refresh failed', err);
+        } finally {
+            setRefreshing(false);
+        }
+    };
 
     // Reload when screen gains focus (for example after returning from Add screen)
     useEffect(() => {
@@ -245,6 +260,31 @@ const ViewPerfomaPurchaseInvoice = () => {
                                 return;
                             }
 
+                            if (btn.action === 'View') {
+                                // open related-docs bottom sheet for this performa
+                                (async () => {
+                                    try {
+                                        setOrderRelatedModalVisible(true);
+                                        setOrderRelatedLoading(true);
+                                        const performaUuid = order.UUID || order.HeaderUUID || order.PerformaInvoiceHeaderUUID || order.id;
+                                        if (!performaUuid) throw new Error('Performa UUID not found');
+                                        const resp = await getPurchasePerformaRelatedDocuments({ purchasePerformaUuid: performaUuid });
+                                        const data = resp?.Data || resp || {};
+                                        const purchaseOrders = data?.PurchaseOrders || data?.SalesOrders || data?.Orders || data?.PurchaseOrderList || [];
+                                        const purchaseInvoices = data?.PurchaseInvoices || data?.SalesInvoices || data?.PerformaInvoices || data?.PurchaseInvoiceList || [];
+                                        setOrderRelatedData({ PurchaseOrders: purchaseOrders, PurchaseInvoices: purchaseInvoices });
+                                    } catch (err) {
+                                        console.warn('fetchPurchasePerformaRelatedDocuments error ->', err?.message || err);
+                                        setOrderRelatedData({ PurchaseOrders: [], PurchaseInvoices: [] });
+                                        setOrderRelatedModalVisible(false);
+                                        Alert.alert('Error', 'Unable to fetch related documents');
+                                    } finally {
+                                        setOrderRelatedLoading(false);
+                                    }
+                                })();
+                                return;
+                            }
+
                             if (btn.action === 'Forward') {
                                 // Convert performa to invoice when Forward is clicked
                                 const headerUuid = order.UUID || order.HeaderUUID || order.PerformaInvoiceHeaderUUID || order.id;
@@ -297,6 +337,42 @@ const ViewPerfomaPurchaseInvoice = () => {
         );
     };
 
+    const openPurchaseOrderPDF = async (uuid) => {
+        try {
+            if (!uuid) throw new Error('Purchase Order UUID not found');
+            const pdfBase64 = await getPurchaseOrderSlip({ headerUuid: uuid });
+            if (pdfBase64) {
+                setOrderRelatedModalVisible(false);
+                navigation.navigate('FileViewerScreen', {
+                    pdfBase64,
+                    fileName: `Purchase_Order_${uuid}.pdf`,
+                    opportunityTitle: `Purchase Order`,
+                });
+            }
+        } catch (err) {
+            console.error('openPurchaseOrderPDF error ->', err);
+            Alert.alert('Error', err?.message || 'Failed to open purchase order PDF');
+        }
+    };
+
+    const openPurchasePerformaPDF = async (uuid) => {
+        try {
+            if (!uuid) throw new Error('Performa/Invoice UUID not found');
+            const pdfBase64 = await getPurchasePerformaInvoiceSlip({ headerUuid: uuid });
+            if (pdfBase64) {
+                setOrderRelatedModalVisible(false);
+                navigation.navigate('FileViewerScreen', {
+                    pdfBase64,
+                    fileName: `Purchase_Performa_Invoice_${uuid}.pdf`,
+                    opportunityTitle: `Purchase Performa Invoice`,
+                });
+            }
+        } catch (err) {
+            console.error('openPurchasePerformaPDF error ->', err);
+            Alert.alert('Error', err?.message || 'Failed to open performa invoice PDF');
+        }
+    };
+
     const pageItems = useMemo(() => {
         if (totalPages === 0) return [];
         const items = ['prev'];
@@ -320,6 +396,7 @@ const ViewPerfomaPurchaseInvoice = () => {
     };
 
     return (
+        <>
         <View style={styles.screen}>
                 <AppHeader
                     title="View Perfoma Purchase Invoice"
@@ -367,7 +444,7 @@ const ViewPerfomaPurchaseInvoice = () => {
                 </View>
             </View>
 
-            <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}>
                 {paginatedOrders.map((order) => {
                     const id = order.HeaderUUID || order.UUID || order.id || order.headerUuid || order.HeaderId || order.Id || (order.PerformaInvoiceHeaderUUID || null);
                     const salesOrderNumber = order.SalesOrderNumber || order.PurchaseOrderNumber || order.HeaderNumber || order.DocumentNo || order.Code || order.salesOrderNumber || '';
@@ -473,6 +550,55 @@ const ViewPerfomaPurchaseInvoice = () => {
                 </View>
             )}
         </View>
+
+        {/* Related documents bottom sheet modal */}
+        <Modal visible={orderRelatedModalVisible} transparent animationType="fade" onRequestClose={() => setOrderRelatedModalVisible(false)}>
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalBox}>
+                    <View style={styles.modalHeaderRow}>
+                        <Text style={styles.modalTitle}>Related Documents</Text>
+                        <TouchableOpacity onPress={() => setOrderRelatedModalVisible(false)}>
+                            <Text style={styles.modalClose}>Close</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <ScrollView style={styles.modalBody}>
+                        <Text style={styles.modalSectionTitle}>Purchase Orders</Text>
+                        {orderRelatedLoading ? (
+                            <ActivityIndicator />
+                        ) : (orderRelatedData?.PurchaseOrders?.length ? (
+                                orderRelatedData.PurchaseOrders.map((po) => (
+                                <View key={po.UUID || po.id || po.PurchaseOrderUUID || po.OrderUUID} style={styles.modalItemRow}>
+                                    <TouchableOpacity onPress={() => openPurchaseOrderPDF(po.UUID || po.id || po.PurchaseOrderUUID || po.OrderUUID)}>
+                                        <Text style={[styles.modalItemTitle, styles.modalLink]}>{po.DocumentNumber || po.OrderNo || po.PurchaseOrderNo || po.OrderNumber}</Text>
+                                    </TouchableOpacity>
+                                    <Text style={styles.modalItemSub}>{po.DocumentDate || po.OrderDate || po.PurchaseOrderDate}</Text>
+                                </View>
+                            ))
+                        ) : (
+                            <Text style={styles.modalEmpty}>No purchase order records found.</Text>
+                        ))}
+
+                        <Text style={styles.modalSectionTitle}>Purchase Invoices / Performa</Text>
+                        {orderRelatedLoading ? (
+                            <ActivityIndicator />
+                        ) : (orderRelatedData?.PurchaseInvoices?.length ? (
+                            orderRelatedData.PurchaseInvoices.map((inv) => (
+                                <View key={inv.UUID || inv.id || inv.InvoiceUUID || inv.PerformaUUID} style={styles.modalItemRow}>
+                                    <TouchableOpacity onPress={() => openPurchasePerformaPDF(inv.UUID || inv.id || inv.InvoiceUUID || inv.PerformaUUID || inv.HeaderUUID)}>
+                                        <Text style={[styles.modalItemTitle, styles.modalLink]}>{inv.InvoiceNo || inv.DocumentNumber || inv.PerformaNumber || inv.InvoiceNumber}</Text>
+                                    </TouchableOpacity>
+                                    <Text style={styles.modalItemSub}>{inv.InvoiceDate || inv.DocumentDate || inv.PerformaDate || inv.Date}</Text>
+                                </View>
+                            ))
+                        ) : (
+                            <Text style={styles.modalEmpty}>No purchase invoice records found.</Text>
+                        ))}
+                    </ScrollView>
+                </View>
+            </View>
+        </Modal>
+        </>
+
     );
 };
 
@@ -644,6 +770,69 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         paddingHorizontal: wp(5),
         fontFamily: TYPOGRAPHY.fontFamilyRegular,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalBox: {
+        maxHeight: '70%',
+        backgroundColor: '#fff',
+        borderTopLeftRadius: RADIUS.lg,
+        borderTopRightRadius: RADIUS.lg,
+        padding: wp(4),
+    },
+    modalHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: hp(1),
+    },
+    modalTitle: {
+        fontSize: rf(4),
+        fontFamily: TYPOGRAPHY.fontFamilyBold,
+        color: COLORS.text,
+    },
+    modalClose: {
+        fontSize: rf(3.2),
+        color: COLORS.primary,
+        fontFamily: TYPOGRAPHY.fontFamilyMedium,
+    },
+    modalBody: {
+        paddingBottom: hp(2),
+    },
+    modalSectionTitle: {
+        fontSize: rf(3.4),
+        fontFamily: TYPOGRAPHY.fontFamilyBold,
+        color: COLORS.text,
+        marginTop: hp(1),
+        marginBottom: hp(0.6),
+    },
+    modalItemRow: {
+        paddingVertical: hp(0.8),
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    modalItemTitle: {
+        fontSize: rf(3.4),
+        color: COLORS.text,
+        fontFamily: TYPOGRAPHY.fontFamilyMedium,
+    },
+    modalItemSub: {
+        fontSize: rf(3),
+        color: COLORS.textLight,
+        fontFamily: TYPOGRAPHY.fontFamilyRegular,
+    },
+    modalLink: {
+        color: COLORS.primary,
+        fontFamily: TYPOGRAPHY.fontFamilyBold,
+    },
+    modalEmpty: {
+        fontSize: rf(3.2),
+        color: COLORS.textLight,
+        textAlign: 'center',
+        paddingVertical: hp(2),
     },
 });
 

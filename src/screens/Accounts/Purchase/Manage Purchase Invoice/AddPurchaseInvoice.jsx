@@ -159,6 +159,18 @@ const AddPurchaseInvoice = () => {
     const [salesInquiryNosOptions, setSalesInquiryNosOptions] = useState([]);
     const [salesOrderOptions, setSalesOrderOptions] = useState([]);
     const [salesOrderUuid, setSalesOrderUuid] = useState(null);
+
+    // Derived UUID for PurchaseOrder field (prefer explicit UUIDs when available)
+    let purchaseorderNoUuid = salesOrderUuid || headerForm?.PurchaseOrderUUID || headerForm?.SalesOrderUUID || null;
+    // Fallback: if we only have a textual OrderNo (e.g. "1-004"), try to find its UUID from loaded options
+    if (!purchaseorderNoUuid && headerForm?.clientName && Array.isArray(salesOrderOptions) && salesOrderOptions.length > 0) {
+        const needle = String(headerForm.clientName).trim();
+        const match = salesOrderOptions.find(s => {
+            const on = String(s?.OrderNo || s?.OrderNumber || s?.DocumentNumber || '').trim();
+            return on && (on === needle || on.toLowerCase() === needle.toLowerCase());
+        });
+        if (match) purchaseorderNoUuid = match?.UUID || match?.Uuid || match?.uuid || null;
+    }
     const [headerSubmitting, setHeaderSubmitting] = useState(false);
     const [headerUUID, setHeaderUUID] = useState(null);
     const [headerSubmitted, setHeaderSubmitted] = useState(false);
@@ -1380,12 +1392,31 @@ const AddPurchaseInvoice = () => {
     const submitHeader = async () => {
         setHeaderSubmitting(true);
         try {
+            // Derive PurchaseOrderNo UUID at runtime (use latest state)
+            let purchaseOrderNoUuidRuntime = salesOrderUuid || headerForm?.PurchaseOrderUUID || headerForm?.SalesOrderUUID || null;
+            // Fallback: if we only have a textual OrderNo, try to find its UUID from loaded options
+            if (!purchaseOrderNoUuidRuntime && headerForm?.clientName && Array.isArray(salesOrderOptions) && salesOrderOptions.length > 0) {
+                const needle = String(headerForm.clientName).trim();
+                const match = salesOrderOptions.find(s => {
+                    const on = String(s?.OrderNo || s?.OrderNumber || s?.DocumentNumber || '').trim();
+                    return on && (on === needle || on.toLowerCase() === needle.toLowerCase());
+                });
+                if (match) purchaseOrderNoUuidRuntime = match?.UUID || match?.Uuid || match?.uuid || null;
+            }
+            console.log('🔍 [submitHeader] PurchaseOrderNo resolution:', {
+                salesOrderUuid,
+                'headerForm.clientName': headerForm.clientName,
+                'headerForm.PurchaseOrderUUID': headerForm?.PurchaseOrderUUID,
+                purchaseOrderNoUuidRuntime,
+                'salesOrderOptions count': salesOrderOptions.length,
+            });
+
             // Build payload matching required purchase invoice header schema
-            const payload = {
+                const payload = {
                 UUID: headerForm.UUID || headerUUID || '',
                 InvoiceNo: headerForm.salesInquiryText || '',
                 PurchaseInqNoUUID: salesInquiryUuid || headerForm.salesInquiryUUID || '',
-                PurchaseOrderNo: salesOrderUuid || headerForm.clientName || '',
+                PurchaseOrderNo: purchaseOrderNoUuidRuntime || headerForm.clientName || '',
                 VendorUUID: headerForm.CustomerUUID || '',
                 ProjectUUID: projectUUID || project || '',
                 PaymentTerm: paymentTerm || (paymentTermUuid || ''),
@@ -1431,12 +1462,31 @@ const AddPurchaseInvoice = () => {
         setHeaderSubmitting(true);
         try {
             console.log('updateHeader: Building payload...');
+            // Derive PurchaseOrderNo UUID at runtime (use latest state)
+            let purchaseOrderNoUuidRuntime = salesOrderUuid || headerForm?.PurchaseOrderUUID || headerForm?.SalesOrderUUID || null;
+            // Fallback: if we only have a textual OrderNo, try to find its UUID from loaded options
+            if (!purchaseOrderNoUuidRuntime && headerForm?.clientName && Array.isArray(salesOrderOptions) && salesOrderOptions.length > 0) {
+                const needle = String(headerForm.clientName).trim();
+                const match = salesOrderOptions.find(s => {
+                    const on = String(s?.OrderNo || s?.OrderNumber || s?.DocumentNumber || '').trim();
+                    return on && (on === needle || on.toLowerCase() === needle.toLowerCase());
+                });
+                if (match) purchaseOrderNoUuidRuntime = match?.UUID || match?.Uuid || match?.uuid || null;
+            }
+            console.log('🔍 [updateHeader] PurchaseOrderNo resolution:', {
+                salesOrderUuid,
+                'headerForm.clientName': headerForm.clientName,
+                'headerForm.PurchaseOrderUUID': headerForm?.PurchaseOrderUUID,
+                purchaseOrderNoUuidRuntime,
+                'salesOrderOptions count': salesOrderOptions.length,
+            });
+
             // Build update payload following requested schema
             const payload = {
                 UUID: headerUUID,
                 InvoiceNo: headerForm.salesInquiryText || '',
                 PurchaseInqNoUUID: salesInquiryUuid || headerForm.salesInquiryUUID || '',
-                PurchaseOrderNo: salesOrderUuid || headerForm.clientName || '',
+                PurchaseOrderNo: purchaseOrderNoUuidRuntime || headerForm.clientName || '',
                 VendorUUID: headerForm.CustomerUUID || '',
                 ProjectUUID: projectUUID || project || '',
                 PaymentTerm: paymentTerm || (paymentTermUuid || ''),

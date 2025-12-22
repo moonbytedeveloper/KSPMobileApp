@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, RefreshControl } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
@@ -21,6 +21,7 @@ const ViewPurchaseInquiry = () => {
     const [totalRecords, setTotalRecords] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [refreshing, setRefreshing] = useState(false);
 
     const totalPages = useMemo(() => {
         if (totalRecords === 0) return 0;
@@ -109,6 +110,17 @@ const ViewPurchaseInquiry = () => {
     useEffect(() => {
         if (isFocused) fetchInquiries();
     }, [isFocused, currentPage, itemsPerPage, searchQuery]);
+
+    const onRefresh = async () => {
+        try {
+            setRefreshing(true);
+            await fetchInquiries();
+        } catch (err) {
+            console.warn('Refresh failed', err);
+        } finally {
+            setRefreshing(false);
+        }
+    };
 
     const rangeStart = totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1;
     const rangeEnd = totalRecords === 0 ? 0 : Math.min((currentPage + 1) * itemsPerPage, totalRecords);
@@ -274,7 +286,7 @@ const ViewPurchaseInquiry = () => {
                 <Text style={styles.errorText}>{error}</Text>
             )}
 
-            <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}>
                 {inquiries.map((order) => (
                     <AccordionItem
                         key={order.id}

@@ -1759,6 +1759,7 @@ const AddSalesInvoice = () => {
                                         options={projectsOptions}
                                         getLabel={p => (p?.Name || p?.ProjectTitle || String(p))}
                                         getKey={p => (p?.Uuid || p?.Id || p)}
+                                        disabled={!headerEditable}
                                         onSelect={v => {
                                             if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
                                             setProject(v?.ProjectTitle || v);
@@ -1879,7 +1880,7 @@ const AddSalesInvoice = () => {
                         )}
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>payment Tearm* </Text>
+                                <Text style={inputStyles.label}>Payment Term* </Text>
 
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
@@ -1906,7 +1907,7 @@ const AddSalesInvoice = () => {
                             </View>
 
                             <View style={styles.col}>
-                                <Text style={inputStyles.label}>payment Method* </Text>
+                                <Text style={inputStyles.label}>Payment Method* </Text>
 
                                 <View style={{ zIndex: 9998, elevation: 20 }}>
                                     <Dropdown

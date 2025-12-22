@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal, RefreshControl } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
@@ -22,6 +22,7 @@ const SalesPerfomaInvoice = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
 
     const totalPages = useMemo(() => {
         if (totalRecords === 0) return 0;
@@ -58,6 +59,7 @@ const SalesPerfomaInvoice = () => {
                 // Amount may be present under different keys depending on backend. Try common fallbacks.
                 amount: r?.Amount || r?.TotalAmount || r?.NetAmount || r?.Total || r?.AmountPayable || null,
                 requestDate: r?.DeliveryDate || r?.OrderDate || r?.RequestDate || r?.PerformaDate || '',
+                DueDate: r?.DueDate || '',
                 TaxInvoice: r?.TaxInvoice || r?.TaxInvoiceNo || r?.TaxNo || '',
                 customerName: r?.CustomerName || r?.Customer || r?.CustomerDisplayName || r?.CustomerNameDisplay || '',
                 status: r?.Status || r?.State || 'Draft',
@@ -77,6 +79,17 @@ const SalesPerfomaInvoice = () => {
             setLoading(false);
         }
     }, [itemsPerPage, searchQuery]);
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        try {
+            await fetchPurchaseInquiries(currentPage, itemsPerPage, searchQuery);
+        } catch (e) {
+            console.warn('refresh error', e);
+        } finally {
+            setRefreshing(false);
+        }
+    }, [fetchPurchaseInquiries, currentPage, itemsPerPage, searchQuery]);
 
     useEffect(() => {
         fetchPurchaseInquiries(currentPage, itemsPerPage, searchQuery);
@@ -425,7 +438,7 @@ const SalesPerfomaInvoice = () => {
             </View>
             {error && <Text style={styles.errorText}>{error}</Text>}
 
-            <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
                 {inquiries.map((item) => (
                     <AccordionItem
                         key={item.id}
@@ -444,9 +457,9 @@ const SalesPerfomaInvoice = () => {
                         onToggle={() => setActiveOrderId(prev => prev === item.id ? null : item.id)}
 
                         customRows={[
-                            { label: "Sales Inquiry No", value: item.inquiryNo },
                             { label: "Customer Name", value: item.customerName },
                             { label: "Order Date", value: item.requestDate },
+                            { label: "DueDate", value: item.DueDate },
                             { label: "Status", value: item.status, isStatus: true }
                         ]}
                         headerLeftLabel="Performa Invoice No"

@@ -1,6 +1,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, RefreshControl } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
@@ -93,7 +93,37 @@ const ViewPurchaseQuotation = () => {
     }
     const [loadingOrders, setLoadingOrders] = useState(false);
     const [ordersError, setOrdersError] = useState(null);
+    const [refreshing, setRefreshing] = useState(false);
     const route = useRoute();
+
+    const onRefresh = async () => {
+        try {
+            setRefreshing(true);
+            setOrdersError(null);
+            const resp = await getpurchaseQuotationHeaders();
+            const payload = resp?.Data ?? resp?.data ?? resp ?? [];
+            const list = Array.isArray(payload) ? payload : (payload?.Records || payload?.List || []);
+            const mapped = (list || []).map((it) => ({
+                id: it?.UUID || it?.Uuid || it?.Id || it?.PurchaseQuotationHeaderId || it?.PurchaseQuotationHeader_UUID || String(Math.random()),
+                quotationNumber: it?.QuotationNo || it?.QuotationNumber || it?.Quotation_No || it?.QuotationNo || it?.Quotation || it?.Number || '',
+                quotationTitle: it?.QuotationTitle || it?.Title || it?.Quotation_Title || it?.SalesOrderTitle || '',
+                customerName: (it?.VendorName || it?.Vendor || it?.CompanyName || it?.CustomerName || it?.Customer || it?.Name) || '',
+                purchaseRequestNumber: it?.PurchaseRequestNumber || it?.PurchaseRequestNo || it?.PurchaseRequest || it?.PRNumber || it?.InquiryNo || it?.InquiryNumber || it?.ReferenceNumber || it?.SalesInvoiceNumber || it?.salesInvoiceNumber || '',
+                salesOrderNumber: it?.QuotationNo || it?.QuotationNumber || it?.Quotation_No || it?.QuotationNo || it?.Number || '',
+                status: it?.Status || it?.ApprovalStatus || it?.Approval || '',
+                deliveryDate: it?.DeliveryDate || it?.RequiredDate || '',
+                dueDate: it?.DueDate || it?.ExpectedDate || '',
+                _raw: it,
+            }));
+            setOrders(mapped);
+            setCurrentPage(0);
+        } catch (err) {
+            console.error('getpurchaseQuotationHeaders (refresh) error ->', err);
+            setOrdersError(err);
+        } finally {
+            setRefreshing(false);
+        }
+    };
 
     const filteredOrders = useMemo(() => {
         const source = (orders && orders.length) ? orders : SALES_ORDERS;
@@ -493,7 +523,7 @@ const ViewPurchaseQuotation = () => {
                 </View>
             </View>
 
-            <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}>
                 {loadingOrders ? (
                     <View style={[styles.emptyState, { paddingVertical: hp(6) }]}>
                         <ActivityIndicator size="large" color={COLORS.primary} />

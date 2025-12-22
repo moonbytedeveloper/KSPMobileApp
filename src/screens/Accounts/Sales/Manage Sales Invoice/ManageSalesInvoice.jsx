@@ -1,6 +1,6 @@
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal } from 'react-native';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal, RefreshControl } from 'react-native';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 import AppHeader from '../../../../components/common/AppHeader';
@@ -12,7 +12,7 @@ import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
 import api from '../../../../api/axios';
-import { getSalesInvoiceHeaders, getSalesInvoiceSlip, getSalesInvoicePaymentHistory, getSalesInvoiceRelatedDocuments, getSalesOrderSlip, getSalesPerformaInvoiceSlip } from '../../../../api/authServices';
+import { getSalesInvoiceHeaders, getSalesInvoiceSlip, getSalesInvoicePaymentHistory, getSalesInvoiceRelatedDocuments, getSalesOrderSlip, getSalesPerformaInvoiceSlip, updateSalesInvoicePayment, uploadFiles } from '../../../../api/authServices';
 import { Linking } from 'react-native';
 
 // server-backed list state will be used instead of static sample data
@@ -31,6 +31,7 @@ const ManageSalesInvoice = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
 
     const totalPages = useMemo(() => {
         if (totalRecords === 0) return 0;
@@ -104,6 +105,17 @@ const ManageSalesInvoice = () => {
 
     useEffect(() => {
         fetchSalesInvoices(currentPage, itemsPerPage, searchQuery);
+    }, [currentPage, itemsPerPage, searchQuery]);
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        try {
+            await fetchSalesInvoices(currentPage, itemsPerPage, searchQuery);
+        } catch (e) {
+            console.warn('refresh error', e);
+        } finally {
+            setRefreshing(false);
+        }
     }, [currentPage, itemsPerPage, searchQuery]);
 
     const rangeStart = totalRecords === 0 ? 0 : currentPage * itemsPerPage + 1;
@@ -250,6 +262,7 @@ const ManageSalesInvoice = () => {
                     transactionDetails: '',
                     fileName: '',
                 });
+                setForwardFile(null);
                 setForwardTarget(order || null);
                 setForwardModalVisible(true);
                 // fetch payment summary for this invoice
@@ -345,7 +358,11 @@ const ManageSalesInvoice = () => {
     // Forward (chat) bottom sheet state
     const [forwardModalVisible, setForwardModalVisible] = useState(false);
     const [forwardTarget, setForwardTarget] = useState(null);
-    const [forwardForm, setForwardForm] = useState({ customerName: '', paymentDate: '', tdsAmount: '', amountAfterTds: '', remark: '', transactionDetails: '', fileName: '', fileObj: null });
+    const [forwardForm, setForwardForm] = useState({ customerName: '', paymentDate: '', tdsAmount: '', amountAfterTds: '', remark: '', transactionDetails: '', fileName: '' });
+    const [forwardFile, setForwardFile] = useState(null);
+    const [forwardUploadedFiles, setForwardUploadedFiles] = useState([]);
+    // store only server-returned path strings (RemoteResponse.path)
+    const [forwardUploadedFilePaths, setForwardUploadedFilePaths] = useState([]);
     const [forwardPaymentSummary, setForwardPaymentSummary] = useState({ totalAmount: '0', amountPaid: '0', remaining: '0' });
     const [forwardOpenDatePicker, setForwardOpenDatePicker] = useState(false);
     const [forwardDatePickerSelectedDate, setForwardDatePickerSelectedDate] = useState(new Date());
@@ -437,50 +454,81 @@ const ManageSalesInvoice = () => {
         setForwardSubmitting(true);
         try {
             const invoiceUuid = extractServerUuid(forwardTarget?.raw) || forwardTarget?.id || forwardTarget?.UUID || '';
+
+            // Build payload and POST via authServices wrapper using provided UUIDs
+            const payload = {
+                InvoiceUUID: invoiceUuid,
+                PaymentDate: uiDateToIsoDatetime(forwardForm.paymentDate),
+                TDSAmount: Number(forwardForm.tdsAmount) || 0,
+                TransactionDetails: forwardForm.transactionDetails || '',
+                Remark: forwardForm.remark || '',
+                AmountPaid: Number(forwardForm.amountAfterTds) || 0,
+            };
+            console.log('UpdateSalesInvoicePayment payload ->', payload);
+
             const cmp = await getCMPUUID();
             const env = await getENVUUID();
             const user = await getUUID();
+            console.log('updateSalesInvoicePayment params ->', { cmp, env, user });
 
-            // If file attached, send multipart/form-data
-            if (forwardForm.fileObj) {
-                const fd = new FormData();
-                fd.append('InvoiceUUID', invoiceUuid);
-                fd.append('PaymentDate', uiDateToIsoDatetime(forwardForm.paymentDate));
-                fd.append('TDSAmount', String(Number(forwardForm.tdsAmount) || 0));
-                fd.append('TransactionDetails', forwardForm.transactionDetails || '');
-                fd.append('Remark', forwardForm.remark || '');
-                fd.append('AmountPaid', String(Number(forwardForm.amountAfterTds) || 0));
-                // fileObj from picker may include uri, name, type
-                const file = forwardForm.fileObj;
-                fd.append('uploadedFile', { uri: file.uri || file.uri, name: file.name || file.fileName || 'file.pdf', type: file.type || 'application/pdf' });
-
-                console.log('UpdateSalesInvoicePayment multipart payload ->', fd);
-                const resp = await api.post('/api/Account/UpdateSalesInvoicePayment', fd, { params: { cmpUuid: cmp, envUuid: env, userUuid: user }, headers: { 'Content-Type': 'multipart/form-data' } });
-                console.log('UpdateSalesInvoicePayment resp ->', resp?.data || resp);
-            } else {
-                const payload = {
-                    InvoiceUUID: invoiceUuid,
-                    PaymentDate: uiDateToIsoDatetime(forwardForm.paymentDate),
-                    TDSAmount: Number(forwardForm.tdsAmount) || 0,
-                    TransactionDetails: forwardForm.transactionDetails || '',
-                    Remark: forwardForm.remark || '',
-                    AmountPaid: Number(forwardForm.amountAfterTds) || 0,
-                    uploadedFile: '',
-                };
-                console.log('UpdateSalesInvoicePayment payload ->', payload);
-                const resp = await api.post('/api/Account/UpdateSalesInvoicePayment', payload, { params: { cmpUuid: cmp, envUuid: env, userUuid: user } });
-                console.log('UpdateSalesInvoicePayment resp ->', resp?.data || resp);
+            // If user previously uploaded file(s) on pick, attach those path(s) here as `FilePath`
+            if (Array.isArray(forwardUploadedFilePaths) && forwardUploadedFilePaths.length > 0) {
+                payload.FilePath = forwardUploadedFilePaths.length === 1 ? forwardUploadedFilePaths[0] : forwardUploadedFilePaths;
+                try { console.log('Attaching FilePath to payload ->', JSON.stringify(payload.FilePath, null, 2)); } catch (_) { console.log('Attaching FilePath to payload ->', payload.FilePath); }
             }
 
+            const resp = await updateSalesInvoicePayment(payload, { cmpUuid: cmp, envUuid: env, userUuid: user });
+            console.log('updateSalesInvoicePayment resp ->', resp);
             Alert.alert('Success', 'Payment updated successfully');
             // refresh summary
             fetchSalesInvoicePayment(forwardTarget);
             closeForwardModal();
         } catch (e) {
-            console.warn('UpdateSalesInvoicePayment error', e);
-            Alert.alert('Error', e?.message || 'Unable to update payment');
+            console.warn('handleForwardSubmit error', e);
+            Alert.alert('Error', e?.message || 'Unable to prepare payload');
         } finally {
             setForwardSubmitting(false);
+        }
+    };
+
+    const openFilePicker = async () => {
+        try {
+            const res = await pick({ allowMultiSelection: false, types: [types.pdf, types.images, types.zip, types.plainText] });
+            // pick may return array or single
+            const file = Array.isArray(res) ? res[0] : res;
+            if (!file) return;
+            const fileObj = { uri: file.uri || file.fileUri || file.uriString, name: file.name || file.fileName || 'attachment', type: file.type || file.mime || 'application/octet-stream' };
+            setForwardFile(fileObj);
+            setForwardForm(f => ({ ...f, fileName: fileObj.name }));
+            // Immediately upload the picked file and store returned references
+            try {
+                console.log('Uploading picked file ->', fileObj);
+                const uploadResp = await uploadFiles(fileObj, { filepath: 'InvoicePaymentUpdateDoc' });
+                const upData = uploadResp?.Data || uploadResp || {};
+                const uploadedFiles = upData?.Files || upData?.files || upData?.UploadedFiles || upData?.FilePaths || upData;
+                const finalRefs = Array.isArray(uploadedFiles) ? uploadedFiles : (uploadedFiles ? [uploadedFiles] : []);
+                setForwardUploadedFiles(finalRefs);
+                // extract RemoteResponse.path (or path) into a simple array of strings
+                const paths = finalRefs.map(r => {
+                    try { return r?.RemoteResponse?.path || r?.path || (typeof r === 'string' ? r : null); } catch (_) { return null; }
+                }).filter(Boolean);
+                setForwardUploadedFilePaths(paths);
+                try { console.log('uploadFiles returned (on pick) ->', JSON.stringify(finalRefs, null, 2)); } catch (_) { console.log('uploadFiles returned (on pick) ->', finalRefs); }
+            } catch (uErr) {
+                console.warn('Immediate upload failed', uErr);
+                Alert.alert('Upload Error', 'Unable to upload the selected file. Please try again.');
+                // clear selection on failure
+                setForwardFile(null);
+                setForwardForm(f => ({ ...f, fileName: '' }));
+                setForwardUploadedFiles([]);
+            }
+        } catch (err) {
+            if (isCancel(err)) {
+                // user cancelled
+                return;
+            }
+            console.warn('openFilePicker error', err);
+            Alert.alert('Error', 'Unable to pick file');
         }
     };
 
@@ -668,7 +716,7 @@ const ManageSalesInvoice = () => {
                 </View>
             </View>
 
-            <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
                 {invoices.map((order) => (
                     <AccordionItem
                         key={order.id}
@@ -809,29 +857,18 @@ const ManageSalesInvoice = () => {
                             </View>
 
                             <View style={{ marginTop: hp(1) }}>
-                                <Text style={[styles.inputLabel, { fontWeight: '600' }]}>Upload Document</Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2), marginTop: hp(0.5), borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.sm, padding: wp(1) }}>
-                                    <TouchableOpacity style={styles.fileButton} onPress={async () => {
-                                        try {
-                                            const [selected] = await pick({ type: [types.pdf], allowMultiSelection: false });
-                                            if (!selected) return;
-                                            // Basic validation
-                                            const allowedTypes = ['application/pdf'];
-                                            if (selected.type && !allowedTypes.includes(selected.type)) {
-                                                Alert.alert('Invalid file', 'Please select a PDF file');
-                                                return;
-                                            }
-                                            setForwardForm(f => ({ ...f, fileName: selected.name || selected.fileName || 'file.pdf', fileObj: selected }));
-                                        } catch (err) {
-                                            if (isCancel && isCancel(err)) return;
-                                            console.warn('pick file error', err);
-                                            Alert.alert('Error', 'Unable to pick file');
-                                        }
-                                    }}>
-                                        <Text style={{ color: '#000' }}>Choose File</Text>
+                                <Text style={[styles.inputLabel, { fontWeight: '600' }]}>Attachment</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
+                                    <TouchableOpacity style={styles.fileButton} onPress={openFilePicker}>
+                                        <Text style={{ color: COLORS.text }}>{forwardForm.fileName || (forwardFile && forwardFile.name) || 'Upload file'}</Text>
                                     </TouchableOpacity>
-                                    <Text style={{ color: COLORS.textLight }}>{forwardForm.fileName || 'No file chosen'}</Text>
+                                    {forwardFile ? (
+                                        <TouchableOpacity onPress={() => { setForwardFile(null); setForwardForm(f => ({ ...f, fileName: '' })); setForwardUploadedFiles([]); setForwardUploadedFilePaths([]); }}>
+                                            <Text style={{ color: '#ef4444' }}>Remove</Text>
+                                        </TouchableOpacity>
+                                    ) : null}
                                 </View>
+                                <Text style={{ color: COLORS.textLight, marginTop: hp(0.6), fontSize: rf(2.8) }}>Allowed: PDF, images, zip (max size depends on server)</Text>
                             </View>
 
                             <View style={{ marginTop: hp(1) }}>

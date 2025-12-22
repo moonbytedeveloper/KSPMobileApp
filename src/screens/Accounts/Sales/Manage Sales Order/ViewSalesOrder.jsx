@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, Modal, ActivityIndicator, RefreshControl } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
@@ -8,7 +8,6 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 import { getSalesOrderHeaders, getSalesHeader, deleteSalesOrderHeader, getSalesOrderSlip, convertSalesOrderToInvoice, getSalesOrderRelatedDocuments, getSalesInvoiceSlip, getSalesPerformaInvoiceSlip } from '../../../../api/authServices';
-import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
 
 // sales orders will be fetched from API
 
@@ -23,6 +22,7 @@ const ViewSalesOrder = () => {
     const [orders, setOrders] = useState([]);
     const [totalRecords, setTotalRecords] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [isFetchingHeader, setIsFetchingHeader] = useState(false);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
     const [orderRelatedModalVisible, setOrderRelatedModalVisible] = useState(false);
@@ -86,7 +86,9 @@ const ViewSalesOrder = () => {
                     'Sales Order converted to Invoice successfully',
                     [
                         { text: 'OK', onPress: () => { 
-                            navigation.navigate('AddSalesInvoice', { headerUuid: HeaderUUID }); 
+                            // Pass both headerUuid (lowercase) and HeaderUUID (uppercase)
+                            // and include the API response as prefillHeader so AddSalesInvoice can prefill immediately
+                            navigation.navigate('AddSalesInvoice', { headerUuid: HeaderUUID, HeaderUUID: HeaderUUID, prefillHeader: result, from: 'ViewSalesOrder' }); 
                             fetchOrders(); 
                         } }
                     ]
@@ -98,16 +100,13 @@ const ViewSalesOrder = () => {
             }
         } else if (actionLabel === 'View') {
             try {
-                setOrderRelatedData({ SalesInvoices: [], ProformaInvoices: [] });
-                setOrderRelatedLoading(true);
+                // open related documents bottom-sheet
                 setOrderRelatedModalVisible(true);
                 await fetchSalesOrderRelatedDocuments(order);
-            } catch (e) {
-                console.warn('openOrderRelated error', e);
+            } catch (err) {
+                console.log('fetchSalesOrderRelatedDocuments error ->', err?.message || err);
+                Alert.alert('Error', 'Unable to fetch related documents');
                 setOrderRelatedModalVisible(false);
-                Alert.alert('Error', 'Unable to load related documents');
-            } finally {
-                setOrderRelatedLoading(false);
             }
         } else {
             Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber}`);
@@ -116,72 +115,61 @@ const ViewSalesOrder = () => {
 
     const fetchSalesOrderRelatedDocuments = async (order) => {
         try {
-            const salesOrderUuid = order?.raw?.UUID || order?.id || order?.UUID || '';
-            if (!salesOrderUuid) {
-                console.warn('fetchSalesOrderRelatedDocuments: no sales order UUID');
-                setOrderRelatedData({ SalesInvoices: [], ProformaInvoices: [] });
-                return;
-            }
-            const cmp = await getCMPUUID();
-            const env = await getENVUUID();
-            const resp = await getSalesOrderRelatedDocuments({ salesOrderUuid, cmpUuid: cmp, envUuid: env });
+            setOrderRelatedLoading(true);
+            const salesOrderUuid = order?.raw?.UUID || order?.raw?.SalesOrderUUID || order?.id;
+            if (!salesOrderUuid) throw new Error('Sales Order UUID not found');
+            const resp = await getSalesOrderRelatedDocuments({ salesOrderUuid });
+            // Server returns { Success, Message, Data }
             const data = resp?.Data || resp || {};
-            setOrderRelatedData({ SalesInvoices: Array.isArray(data?.SalesInvoices) ? data.SalesInvoices : [], ProformaInvoices: Array.isArray(data?.ProformaInvoices) ? data.ProformaInvoices : [] });
-        } catch (e) {
-            console.warn('fetchSalesOrderRelatedDocuments error', e?.message || e);
+            const salesInvoices = data?.SalesInvoices || data?.SalesInvoice || [];
+            const proformas = data?.ProformaInvoices || data?.SalesProformas || [];
+            setOrderRelatedData({ SalesInvoices: salesInvoices, ProformaInvoices: proformas });
+        } catch (err) {
+            console.log('getSalesOrderRelatedDocuments error ->', err?.message || err);
             setOrderRelatedData({ SalesInvoices: [], ProformaInvoices: [] });
+            throw err;
+        } finally {
+            setOrderRelatedLoading(false);
         }
     };
 
-    const handleOpenSalesInvoiceSlip = async (si) => {
+    const handleOpenSalesInvoiceSlip = async (invoice) => {
         try {
-            setIsGeneratingPDF(true);
-            const headerUuid = si?.UUID || si?.Uuid || si?.HeaderUUID || si?.SalesInvoiceUUID || si?.Id || '';
-            if (!headerUuid) {
-                Alert.alert('Error', 'Unable to determine Sales Invoice identifier');
+            const uuid = invoice?.UUID || invoice?.InvoiceUUID || invoice?.id;
+            if (!uuid) {
+                Alert.alert('Error', 'Invoice identifier not found');
                 return;
             }
-            const cmp = await getCMPUUID();
-            const env = await getENVUUID();
-            const user = await getUUID();
-            const pdfBase64 = await getSalesInvoiceSlip({ headerUuid, cmpUuid: cmp, envUuid: env, userUuid: user });
+            const pdfBase64 = await getSalesInvoiceSlip({ headerUuid: uuid });
             if (!pdfBase64) {
-                Alert.alert('Error', 'No PDF returned for Sales Invoice');
+                Alert.alert('Error', 'Invoice PDF not available');
                 return;
             }
-            const fileName = `SalesInvoice_${si?.DocumentNumber || si?.SalesInvoiceNo || headerUuid}`;
-            navigation.navigate('FileViewerScreen', { pdfBase64, fileName });
-        } catch (e) {
-            console.warn('open sales invoice slip error', e);
-            Alert.alert('Error', e?.message || 'Unable to open sales invoice PDF');
-        } finally {
-            setIsGeneratingPDF(false);
+            setOrderRelatedModalVisible(false);
+            navigation.navigate('FileViewerScreen', { pdfBase64, fileName: invoice?.DocumentNumber || `Invoice_${uuid}`, opportunityTitle: invoice?.DocumentNumber || 'Invoice', companyName: '' });
+        } catch (err) {
+            console.log('handleOpenSalesInvoiceSlip error ->', err?.message || err);
+            Alert.alert('Error', err?.message || 'Unable to open invoice PDF');
         }
     };
 
-    const handleOpenProformaSlip = async (pf) => {
+    const handleOpenSalesPerformaSlip = async (pf) => {
         try {
-            setIsGeneratingPDF(true);
-            const headerUuid = pf?.UUID || pf?.Uuid || pf?.HeaderUUID || pf?.SalesPerInvUUID || pf?.Id || '';
-            if (!headerUuid) {
-                Alert.alert('Error', 'Unable to determine Proforma identifier');
+            const uuid = pf?.UUID || pf?.ProformaUUID || pf?.id;
+            if (!uuid) {
+                Alert.alert('Error', 'Performa identifier not found');
                 return;
             }
-            const cmp = await getCMPUUID();
-            const env = await getENVUUID();
-            const user = await getUUID();
-            const pdfBase64 = await getSalesPerformaInvoiceSlip({ headerUuid, cmpUuid: cmp, envUuid: env, userUuid: user });
+            const pdfBase64 = await getSalesPerformaInvoiceSlip({ headerUuid: uuid });
             if (!pdfBase64) {
-                Alert.alert('Error', 'No PDF returned for Proforma');
+                Alert.alert('Error', 'Performa PDF not available');
                 return;
             }
-            const fileName = `SalesProforma_${pf?.DocumentNumber || pf?.SalesPerInvNo || headerUuid}`;
-            navigation.navigate('FileViewerScreen', { pdfBase64, fileName });
-        } catch (e) {
-            console.warn('open proforma slip error', e);
-            Alert.alert('Error', e?.message || 'Unable to open proforma PDF');
-        } finally {
-            setIsGeneratingPDF(false);
+            setOrderRelatedModalVisible(false);
+            navigation.navigate('FileViewerScreen', { pdfBase64, fileName: pf?.DocumentNumber || `Performa_${uuid}`, opportunityTitle: pf?.DocumentNumber || 'Performa Invoice', companyName: '' });
+        } catch (err) {
+            console.log('handleOpenSalesPerformaSlip error ->', err?.message || err);
+            Alert.alert('Error', err?.message || 'Unable to open performa PDF');
         }
     };
 
@@ -217,6 +205,17 @@ const ViewSalesOrder = () => {
     useEffect(() => {
         fetchOrders({ start: currentPage * itemsPerPage, length: itemsPerPage, searchValue: searchQuery.trim() });
     }, [currentPage, itemsPerPage]);
+
+    const onRefresh = async () => {
+        try {
+            setRefreshing(true);
+            await fetchOrders({ start: currentPage * itemsPerPage, length: itemsPerPage, searchValue: searchQuery.trim() });
+        } catch (err) {
+            console.warn('Refresh failed', err);
+        } finally {
+            setRefreshing(false);
+        }
+    };
 
     const handleEditOrder = async (order) => {
         setIsFetchingHeader(true);
@@ -407,7 +406,7 @@ const ViewSalesOrder = () => {
                 </View>
             </View>
 
-            <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}>
                 {loading && (
                     <View style={{ paddingVertical: hp(4), alignItems: 'center' }}>
                         <Text style={{ color: COLORS.textLight }}>Loading sales orders...</Text>
@@ -445,6 +444,61 @@ const ViewSalesOrder = () => {
                     </View>
                 )}
             </ScrollView>
+
+            {/* Related Documents bottom-sheet modal for Sales Order */}
+            <Modal transparent visible={orderRelatedModalVisible} animationType="slide">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalBox}>
+                        <View style={styles.modalHeaderRow}>
+                            <Text style={styles.modalTitle}>Related Documents</Text>
+                            <TouchableOpacity onPress={() => setOrderRelatedModalVisible(false)}>
+                                <Icon name="close" size={rf(3.6)} color={COLORS.textLight} />
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.modalBody}>
+                            {orderRelatedLoading ? (
+                                <View style={{ paddingVertical: hp(4), alignItems: 'center' }}>
+                                    <ActivityIndicator size="small" color={COLORS.primary} />
+                                </View>
+                            ) : (
+                                <View>
+                                    {Array.isArray(orderRelatedData?.SalesInvoices) && orderRelatedData.SalesInvoices.length > 0 && (
+                                        <View style={{ marginBottom: hp(1.5) }}>
+                                            <Text style={{ fontFamily: TYPOGRAPHY.fontFamilyBold, color: COLORS.text, marginBottom: hp(0.6) }}>Sales Invoices</Text>
+                                            {orderRelatedData.SalesInvoices.map((inv) => (
+                                                <TouchableOpacity key={inv?.UUID || inv?.id} style={{ paddingVertical: hp(1), borderBottomWidth: 1, borderBottomColor: COLORS.border }} onPress={() => handleOpenSalesInvoiceSlip(inv)}>
+                                                    <Text style={{ color: COLORS.primary, fontWeight: '400' }}>{inv?.DocumentNumber || inv?.InvoiceNo || inv?.DocumentNo}</Text>
+                                                    {inv?.DocumentDate ? <Text style={{ color: COLORS.textLight, fontSize: rf(2.8) }}>{inv.DocumentDate}</Text> : null}
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    )}
+
+                                    <View>
+                                        <Text style={{ fontFamily: TYPOGRAPHY.fontFamilyBold, color: COLORS.text, marginBottom: hp(0.6) }}>Proforma Invoices</Text>
+                                        {Array.isArray(orderRelatedData?.ProformaInvoices) && orderRelatedData.ProformaInvoices.length > 0 ? (
+                                            orderRelatedData.ProformaInvoices.map((pf) => (
+                                                <TouchableOpacity key={pf?.UUID || pf?.id} style={{ paddingVertical: hp(1), borderBottomWidth: 1, borderBottomColor: COLORS.border }} onPress={() => handleOpenSalesPerformaSlip(pf)}>
+                                                    <Text style={{ color: COLORS.primary, fontWeight: '400' }}>{pf?.DocumentNumber || pf?.ProformaNo || pf?.DocumentNo}</Text>
+                                                    {pf?.DocumentDate ? <Text style={{ color: COLORS.textLight, fontSize: rf(2.8) }}>{pf.DocumentDate}</Text> : null}
+                                                </TouchableOpacity>
+                                            ))
+                                        ) : (
+                                            <Text style={{fontSize: rf(3), color: COLORS.textLight }}>No proforma invoice records found.</Text>
+                                        )}
+                                    </View>
+
+                                    {(!orderRelatedData?.SalesInvoices?.length && !orderRelatedData?.ProformaInvoices?.length) && (
+                                        <View style={{ paddingVertical: hp(4), alignItems: 'center' }}>
+                                            <Text style={{ color: COLORS.textLight }}>No related documents found.</Text>
+                                        </View>
+                                    )}
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                </View>
+            </Modal>
 
             {/* Loading modal while fetching header for edit */}
             <Modal transparent visible={isFetchingHeader} animationType="none">
@@ -695,8 +749,9 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderTopLeftRadius: wp(3),
         borderTopRightRadius: wp(3),
-        padding: wp(4),
+        padding: wp(5),
         maxHeight: hp(85),
+        width: '100%'
     },
     modalHeaderRow: {
         flexDirection: 'row',

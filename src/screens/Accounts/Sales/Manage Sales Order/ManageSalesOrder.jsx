@@ -22,7 +22,7 @@ import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
-import { addSalesOrder, updateSalesOrder, addSalesOrderLine, updateSalesOrderLine, getCustomers, getCountries, getStates, getCities, getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getSalesOrderHeaderById, getItems, getSalesLines, getSalesOrderLines, deleteSalesOrderLine, getSalesOrderSlip } from '../../../../api/authServices';
+import { addSalesOrder, updateSalesOrder, addSalesOrderLine, updateSalesOrderLine, getCustomers, getCountries, getStates, getCities, getPaymentTerms, getPaymentMethods, fetchProjects, getAllInquiryNumbers, getSalesOrderHeaderById, getItems, getSalesLines, getSalesOrderLines, deleteSalesOrderLine, getSalesOrderSlip, uploadFiles } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 
@@ -88,6 +88,14 @@ const ManageSalesOrder = () => {
     if (has) return (Array.isArray(prev) ? prev.filter(x => x !== id) : []);
     return Array.isArray(prev) ? [...prev, id] : [id];
   });
+
+  // Per-screen theme override: use dark text on forced-white backgrounds
+  const screenTheme = {
+    ...themeColors,
+    text: COLORS.text,
+    textLight: COLORS.textLight,
+    bg: '#fff',
+  };
 
   // Demo options for dropdowns
   <View style={styles.addButtonWrapperRow}>
@@ -219,6 +227,7 @@ const ManageSalesOrder = () => {
   const [serverTotalAmount, setServerTotalAmount] = useState('');
   const [linesLoading, setLinesLoading] = useState(false);
   const [file, setFile] = useState(null);
+  const [uploadedFilePath, setUploadedFilePath] = useState(null);
   const [showShippingTip, setShowShippingTip] = useState(false);
   const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
   const [headerSaved, setHeaderSaved] = useState(false);
@@ -268,7 +277,7 @@ const ManageSalesOrder = () => {
         CustomerName: data?.CustomerName || data?.Customer || data?.CustomerDisplayName || s.CustomerName || '',
         DueDays: data?.DueDays || data?.PaymentDueDays || data?.OrderDays || data?.Days || s.DueDays || '',
       }));
-      
+
       // Set SalesInquiry display value from InquiryNo
       if (data?.InquiryNo) {
         setSalesInquiry(data.InquiryNo);
@@ -300,7 +309,7 @@ const ManageSalesOrder = () => {
       if (data?.AdjustmentPrice !== undefined) setAdjustments(String(data.AdjustmentPrice || 0));
       if (data?.TotalTax !== undefined) setTotalTax(String(data.TotalTax || 0));
       if (data?.SubTotal !== undefined) setServerTotalAmount(String(data.SubTotal || ''));
-      
+
       // Set response data if this is a saved header
       if (data?.UUID) {
         setHeaderResponse(data);
@@ -344,7 +353,7 @@ const ManageSalesOrder = () => {
       // Prefill IsShipAddrSame checkbox
       const shipSame = data?.IsShipAddrSame === true || data?.IsShipAddrSame === 'true' || data?.IsShipAddrSame === 'True' || data?.IsShipAddrSame === 1 || data?.Is_ShipAddrSame === true || data?.IsShipAddrSame === 'Y' || data?.IsShipAddrSame === 'y';
       setIsShippingSame(shipSame);
-      
+
       // Copy billing to shipping if they're the same - this is handled above in the shipping form set
       // No need for additional setTimeout as shipping form is already set correctly
 
@@ -387,7 +396,7 @@ const ManageSalesOrder = () => {
       const sinqUuid = data?.InquiryNo || data?.SalesInquiryUUID || data?.SalesInquiryId || data?.SalesInquiry || data?.SalesInquiryUuid || data?.Header?.SalesInquiryUUID || data?.Header?.SalesInquiryId || null;
       // immediate attempt to set SalesInquiry display value from many possible keys
       const immediateInquiryNo = data?.SalesInquiryNo || data?.SalesInquiryNumber || data?.SalesInquiry || data?.InquiryNo || data?.InquiryNumber || data?.Inquiry || data?.Header?.SalesInquiryNo || data?.Header?.InquiryNo || data?.Header?.SalesInquiryNumber || null;
-      
+
       if (sinqUuid && sinqUuid.trim() !== '') {
         setHeaderForm(s => ({ ...s, SalesInquiryUUID: sinqUuid, SalesInquiryNo: immediateInquiryNo || sinqUuid }));
         // Only set the display name if we have it immediately, otherwise let useEffect handle UUID->name mapping
@@ -543,13 +552,13 @@ const ManageSalesOrder = () => {
       if (shippingCharges !== undefined) {
         setShippingCharges(String(shippingCharges || 0));
       }
-      
+
       // Set adjustments (handle null/zero values)
       const adjustmentPrice = data?.AdjustmentPrice;
       if (adjustmentPrice !== undefined) {
         setAdjustments(String(adjustmentPrice || 0));
       }
-      
+
       if (data?.AdjustmentField) {
         setAdjustmentLabel(String(data.AdjustmentField));
       }
@@ -810,6 +819,8 @@ const ManageSalesOrder = () => {
         AdjustmentField: adjustmentLabel || '',
         AdjustmentPrice: parseFloat(adjustments) || 0,
         Days: parseInt(dueDays, 10) || 0,
+        // Attach uploaded file path when available (returned by /api/CompanySetup/upload-file)
+        FilePath: uploadedFilePath || '',
       };
 
       console.log('saveHeader payload ->', payload, 'isEditing:', isEditingHeader);
@@ -1488,9 +1499,9 @@ const ManageSalesOrder = () => {
     // Sales Inquiry - Map UUID/InquiryNo to display name
     if (headerForm?.SalesInquiryUUID && Array.isArray(salesInquiryNosOptions) && salesInquiryNosOptions.length) {
       const found = salesInquiryNosOptions.find(s => (
-        s?.UUID === headerForm.SalesInquiryUUID || 
-        s?.Uuid === headerForm.SalesInquiryUUID || 
-        s?.Id === headerForm.SalesInquiryUUID || 
+        s?.UUID === headerForm.SalesInquiryUUID ||
+        s?.Uuid === headerForm.SalesInquiryUUID ||
+        s?.Id === headerForm.SalesInquiryUUID ||
         s?.InquiryNo === headerForm.SalesInquiryUUID ||
         String(s?.UUID) === String(headerForm.SalesInquiryUUID) ||
         String(s?.InquiryNo) === String(headerForm.SalesInquiryUUID)
@@ -1503,8 +1514,8 @@ const ManageSalesOrder = () => {
         }
         // Update both SalesInquiryNo and ensure UUID is properly set
         const properUUID = found?.UUID || found?.Uuid || found?.Id || found?.InquiryNo || headerForm?.SalesInquiryUUID;
-        setHeaderForm(s => ({ 
-          ...s, 
+        setHeaderForm(s => ({
+          ...s,
           SalesInquiryUUID: properUUID,
           SalesInquiryNo: inquiryDisplayName
         }));
@@ -1552,7 +1563,7 @@ const ManageSalesOrder = () => {
     // Auto-reload mechanism: if mapping is not ready after timeout and we haven't exceeded max attempts
     const timeout = setTimeout(() => {
       console.log(`[ManageSalesOrder] Mapping not ready after timeout, reload attempt: ${reloadAttempts + 1}/${MAX_RELOAD_ATTEMPTS}`);
-      
+
       if (reloadAttempts < MAX_RELOAD_ATTEMPTS) {
         // Check if we have prefill data that should be mapped
         const shouldReload = (
@@ -1587,7 +1598,7 @@ const ManageSalesOrder = () => {
         setIsPrefilling(false);
       }
     }, 3000); // Reduced timeout to 3 seconds for faster reloads
-    
+
     return () => clearTimeout(timeout);
   }, [isPrefilling, reloadAttempts, billingForm?.country, billingForm?.state, billingForm?.city, shippingForm?.country, shippingForm?.state, shippingForm?.city, selectedBillingCountry, selectedBillingState, selectedBillingCity, selectedShippingCountry, selectedShippingState, selectedShippingCity, headerForm?.CustomerUUID, headerForm?.CustomerName, projectUUID, project, paymentTermUuid, paymentTerm, paymentMethodUUID, paymentMethod, headerForm?.SalesInquiryUUID, SalesInquiryNo, headerHasDates, invoiceDate, dueDate]);
 
@@ -1908,6 +1919,7 @@ const ManageSalesOrder = () => {
         AdjustmentField: adjustmentLabel || '',
         AdjustmentPrice: parseFloat(adjustments) || 0,
         Days: parseInt(dueDays, 10) || 0,
+        FilePath: uploadedFilePath || '',
       };
 
       console.log('Final Submit payload ->', payload);
@@ -1926,7 +1938,7 @@ const ManageSalesOrder = () => {
       Alert.alert('Success', 'Order submitted successfully');
       // reload lines to ensure totals reflect server
       try { await loadSalesOrderLines(data?.UUID || data?.Id || data?.HeaderUUID || headerResponse?.UUID); } catch (e) { /* ignore */ }
-      
+
       // Don't clear form data in edit mode to preserve prefilled information
       // Only reset edit states
       setIsEditingHeader(false);
@@ -1951,7 +1963,7 @@ const ManageSalesOrder = () => {
 
       setIsGeneratingPDF(true);
       const pdfBase64 = await getSalesOrderSlip({ headerUuid: headerUuidCandidate });
-      
+
       if (!pdfBase64) {
         Alert.alert('Error', 'Sales Order PDF is not available right now.');
         return;
@@ -2102,12 +2114,33 @@ const ManageSalesOrder = () => {
         }
 
         // Set the selected file
-        setFile({
+        const fileObj = {
           name: selectedFile.name,
           uri: selectedFile.uri,
           type: selectedFile.type,
           size: selectedFile.size,
-        });
+        };
+        setFile(fileObj);
+
+        // Immediately upload the file to server with fixed Filepath 'SalesOrders'
+        try {
+          const uploadResp = await uploadFiles({ uri: fileObj.uri, name: fileObj.name, type: fileObj.type }, { filepath: 'SalesOrders' });
+          console.log('uploadFiles response (SalesOrders):', uploadResp);
+          // try common response shapes to extract path
+          let path = uploadResp?.RemoteResponse?.path || uploadResp?.Data?.FilePath || uploadResp?.Data?.path || uploadResp?.FilePath || uploadResp?.path || (uploadResp?.Data && uploadResp.Data);
+          if (typeof path === 'object') {
+            // if object, try to find string inside
+            path = path?.path || path?.FilePath || null;
+          }
+          if (path) {
+            setUploadedFilePath(path);
+          } else {
+            console.warn('Could not extract uploaded file path from response', uploadResp);
+          }
+        } catch (upErr) {
+          console.error('SalesOrders file upload failed', upErr);
+          Alert.alert('Upload Error', upErr?.message || 'Failed to upload file');
+        }
       }
     } catch (err) {
       if (isCancel && isCancel(err)) {
@@ -2123,9 +2156,9 @@ const ManageSalesOrder = () => {
 
   return (
     <>
-      <View style={{ flex: 1, backgroundColor: themeColors.bg }}>
+      <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
         {(isPrefilling || isInitialLoading) && (
-          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: themeColors.bg + '75', zIndex: 9999 }}>
+          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.bg + '75', zIndex: 9999 }}>
             <ActivityIndicator size="large" color={themeColors?.primary || '#000'} />
             {reloadAttempts > 0 && (
               <Text style={{ marginTop: 10, fontSize: 14, color: themeColors?.primary || '#000' }}>
@@ -2179,8 +2212,8 @@ const ManageSalesOrder = () => {
                     value={(() => {
                       // Find the selected inquiry object from options based on UUID or InquiryNo
                       if (headerForm?.SalesInquiryUUID && salesInquiryNosOptions?.length) {
-                        return salesInquiryNosOptions.find(opt => 
-                          opt?.UUID === headerForm.SalesInquiryUUID || 
+                        return salesInquiryNosOptions.find(opt =>
+                          opt?.UUID === headerForm.SalesInquiryUUID ||
                           opt?.Id === headerForm.SalesInquiryUUID ||
                           opt?.InquiryNo === headerForm.SalesInquiryUUID ||
                           String(opt?.UUID) === String(headerForm.SalesInquiryUUID) ||
@@ -2196,7 +2229,7 @@ const ManageSalesOrder = () => {
                       const inquiryNo = v?.InquiryNo || v?.SalesInqNo || v?.SalesInquiryNo || v;
                       // For UUID, prefer actual UUID field, fallback to InquiryNo if UUID not available
                       const inquiryUUID = v?.UUID || v?.Id || v?.InquiryNo || (typeof v === 'string' ? v : '');
-                      
+
                       setHeaderForm(s => ({
                         ...s,
                         SalesInquiryNo: inquiryNo,
@@ -2323,7 +2356,7 @@ const ManageSalesOrder = () => {
                 ) : (
                   <View style={[inputStyles.box]}>
                     <TextInput
-                      style={[inputStyles.input, { color: themeColors.text }]}
+                      style={[inputStyles.input, { color: screenTheme.text }]}
                       value={dueDays}
                       onChangeText={t => {
                         const cleanValue = String(t).replace(/[^0-9]/g, '');
@@ -2331,7 +2364,7 @@ const ManageSalesOrder = () => {
                         setHeaderForm(s => ({ ...s, DueDays: cleanValue }));
                       }}
                       placeholder="Days"
-                      placeholderTextColor={themeColors.textLight}
+                      placeholderTextColor={screenTheme.textLight}
                       keyboardType="number-pad"
                       returnKeyType="done"
                     />
@@ -2470,13 +2503,13 @@ const ManageSalesOrder = () => {
                   <Text style={inputStyles.label}>Building No.</Text>
                   <View style={[inputStyles.box]} pointerEvents="box-none">
                     <TextInput
-                      style={[inputStyles.input, { flex: 1, color: themeColors.text }]}
+                      style={[inputStyles.input, { flex: 1, color: screenTheme.text }]}
                       value={billingForm.buildingNo}
                       onChangeText={v =>
                         setBillingForm(s => ({ ...s, buildingNo: v }))
                       }
                       placeholder="eg."
-                      placeholderTextColor={themeColors.textLight}
+                      placeholderTextColor={screenTheme.textLight}
                     />
                   </View>
                 </View>
@@ -2484,7 +2517,7 @@ const ManageSalesOrder = () => {
                   <Text style={inputStyles.label}>Street 1</Text>
                   <View style={[inputStyles.box]} pointerEvents="box-none">
                     <TextInput
-                      style={[inputStyles.input, { flex: 1 }]}
+                      style={[inputStyles.input, { color: screenTheme.text, flex: 1 }]}
                       value={billingForm.street1}
                       onChangeText={v =>
                         setBillingForm(s => ({ ...s, street1: v }))
@@ -2814,11 +2847,11 @@ const ManageSalesOrder = () => {
                   <View style={{ width: '100%', marginBottom: hp(1) }}>
                     <Text style={inputStyles.label}>Description</Text>
                     <TextInput
-                      style={[styles.descInput, { minHeight: hp(10), width: '100%', color: themeColors.text }]}
+                      style={[styles.descInput, { minHeight: hp(10), width: '100%', color: screenTheme.text }]}
                       value={currentItem.desc || ''}
                       onChangeText={t => setCurrentItem(ci => ({ ...ci, desc: t }))}
                       placeholder="Enter description"
-                      placeholderTextColor={themeColors.textLight}
+                      placeholderTextColor={screenTheme.textLight}
                       multiline
                       numberOfLines={3}
                     />
@@ -2952,14 +2985,14 @@ const ManageSalesOrder = () => {
                       <View style={styles.table}>
                         <View style={styles.thead}>
                           <View style={styles.tr}>
-                            <Text style={[styles.th, { width: wp(10) }]}>Sr.No</Text>
-                            <Text style={[styles.th, { width: wp(30) }]}>Item Details</Text>
-                            <Text style={[styles.th, { width: wp(30) }]}>Description</Text>
-                            <Text style={[styles.th, { width: wp(25) }]}>HSN/SAC</Text>
-                            <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
-                            <Text style={[styles.th, { width: wp(20) }]}>Rate</Text>
-                            <Text style={[styles.th, { width: wp(20) }]}>Amount</Text>
-                            <Text style={[styles.th, { width: wp(40) }]}>Action</Text>
+                            <Text style={[styles.th, { color: screenTheme.text, width: wp(10) }]}>Sr.No</Text>
+                            <Text style={[styles.th, { color: screenTheme.text, width: wp(30) }]}>Item Details</Text>
+                            <Text style={[styles.th, { color: screenTheme.text, width: wp(30) }]}>Description</Text>
+                            <Text style={[styles.th, { color: screenTheme.text, width: wp(25) }]}>HSN/SAC</Text>
+                            <Text style={[styles.th, { color: screenTheme.text, width: wp(20) }]}>Quantity</Text>
+                            <Text style={[styles.th, { color: screenTheme.text, width: wp(20) }]}>Rate</Text>
+                            <Text style={[styles.th, { color: screenTheme.text, width: wp(20) }]}>Amount</Text>
+                            <Text style={[styles.th, { color: screenTheme.text, width: wp(40) }]}>Action</Text>
                           </View>
                         </View>
 
@@ -3065,7 +3098,7 @@ const ManageSalesOrder = () => {
                       value={String(shippingCharges)}
                       onChangeText={setShippingCharges}
                       keyboardType="numeric"
-                      style={[styles.inputBox, { color: themeColors.text }]}
+                      style={[styles.inputBox, { color: screenTheme.text }]}
                     />
 
                     {/* Question Icon with Tooltip */}
@@ -3125,7 +3158,7 @@ const ManageSalesOrder = () => {
                       value={String(adjustments)}
                       onChangeText={setAdjustments}
                       keyboardType="numeric"
-                      style={styles.inputBox}
+                      style={[styles.inputBox, { color: screenTheme.text }]}
                     />
                     {/* Question Icon with Tooltip */}
                     <View style={styles.helpIconWrapper}>
@@ -3201,7 +3234,7 @@ const ManageSalesOrder = () => {
                 <View style={styles.notesCol}>
                   <Text style={inputStyles.label}>Notes</Text>
                   <TextInput
-                    style={styles.noteBox}
+                    style={[styles.noteBox, { color: screenTheme.text }]}
                     multiline
                     numberOfLines={4}
                     value={notes}
@@ -3213,7 +3246,7 @@ const ManageSalesOrder = () => {
                 <View style={styles.notesCol}>
                   <Text style={inputStyles.label}>Terms & Conditions</Text>
                   <TextInput
-                    style={styles.noteBox}
+                    style={[styles.noteBox, { color: screenTheme.text }]}
                     multiline
                     numberOfLines={4}
                     value={terms}
@@ -3299,10 +3332,10 @@ const ManageSalesOrder = () => {
                   {/* {isSubmitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Submit')} */}
                 </Text>
               </TouchableOpacity>
-              
+
               {/* PDF Download Button - Show only if header is saved */}
             </View>
-            
+
             <TouchableOpacity
               activeOpacity={0.85}
               style={formStyles.cancelBtn}
@@ -3335,7 +3368,7 @@ const styles = StyleSheet.create({
   container: {
     padding: wp(3.5),
     // paddingBottom: hp(6),
-    backgroundColor: COLORS.bg,
+    backgroundColor: '#fff',
   },
   line: {
     borderBottomColor: COLORS.border,
@@ -3353,7 +3386,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: COLORS.border,
-    backgroundColor: COLORS.bg,
+    backgroundColor: '#fff',
     shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -3366,7 +3399,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.6),
-    backgroundColor: COLORS.bg,
+    backgroundColor: '#fff',
   },
   sectionTitle: {
     fontSize: rf(4),
@@ -3443,7 +3476,7 @@ const styles = StyleSheet.create({
     borderRadius: wp(1.2),
     borderWidth: 1,
     borderColor: COLORS.border,
-    backgroundColor: COLORS.bg,
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -3506,7 +3539,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: wp(2.5),
     padding: wp(3),
-    backgroundColor: COLORS.bg,
+    backgroundColor: '#fff',
   },
   previewText: {
     color: COLORS.text,
@@ -3530,7 +3563,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: wp(1.2),
     padding: wp(2),
-    backgroundColor: COLORS.bg,
+    backgroundColor: '#fff',
     minHeight: hp(8),
     textAlignVertical: 'top',
   },
@@ -3743,7 +3776,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chooseFileBtn: {
-    backgroundColor: COLORS.bg,
+    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: COLORS.border,
     paddingHorizontal: wp(3),
@@ -3778,7 +3811,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: wp(1),
-    backgroundColor: COLORS.bg,
+    backgroundColor: '#fff',
     flex: 1,
   },
   previewImage: {

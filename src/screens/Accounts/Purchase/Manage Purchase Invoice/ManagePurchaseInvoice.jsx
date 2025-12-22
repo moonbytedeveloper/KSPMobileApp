@@ -1,11 +1,11 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal, RefreshControl } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
 import Dropdown from '../../../../components/common/Dropdown';
-import { getPurchaseInvoiceHeaders, deletePurchaseInvoiceHeader, getPurchaseInvoiceSlip } from '../../../../api/authServices';
+import { getPurchaseInvoiceHeaders, deletePurchaseInvoiceHeader, getPurchaseInvoiceSlip, getPurchaseInvoiceRelatedDocuments, getPurchaseOrderSlip, getPurchasePerformaInvoiceSlip } from '../../../../api/authServices';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
@@ -24,7 +24,11 @@ const ManagePurchaseInvoice = () => {
     const [orders, setOrders] = useState([]);
     const [totalCount, setTotalCount] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+    const [orderRelatedModalVisible, setOrderRelatedModalVisible] = useState(false);
+    const [orderRelatedLoading, setOrderRelatedLoading] = useState(false);
+    const [orderRelatedData, setOrderRelatedData] = useState({ PurchaseOrders: [], PurchaseInvoices: [] });
 
     const totalPages = useMemo(() => {
         if (totalCount === 0) return 0;
@@ -69,6 +73,16 @@ const ManagePurchaseInvoice = () => {
         loadOrders();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentPage, itemsPerPage, searchQuery]);
+
+    const onRefresh = async () => {
+        if (refreshing || loading) return;
+        setRefreshing(true);
+        try {
+            await loadOrders();
+        } finally {
+            setRefreshing(false);
+        }
+    };
 
     const handleQuickAction = (order, actionLabel) => {
         // Derive header UUID from several possible server field names (case variations)
@@ -115,6 +129,29 @@ const ManagePurchaseInvoice = () => {
         }
         if (actionLabel === 'Download') {
             handleDownloadPDF(order);
+            return;
+        }
+        if (actionLabel === 'View') {
+            (async () => {
+                try {
+                    setOrderRelatedModalVisible(true);
+                    setOrderRelatedLoading(true);
+                    const purchaseInvoiceUuid = order.HeaderUuid || order.HeaderUUID || order.headerUuid || order.UUID || order.Uuid || order.Id || order.id || order.PurchaseInvoiceUUID || order.PurchaseInvoiceUuid || order.purchaseInvoiceUuid || null;
+                    if (!purchaseInvoiceUuid) throw new Error('Purchase Invoice UUID not found');
+                    const resp = await getPurchaseInvoiceRelatedDocuments({ purchaseInvoiceUuid });
+                    const data = resp?.Data || resp || {};
+                    const purchaseOrders = data?.PurchaseOrders || data?.PurchaseOrder || data?.Orders || data?.PurchaseOrderList || [];
+                    const purchaseInvoices = data?.PurchaseInvoices || data?.PerformaInvoices || data?.Invoices || data?.PurchaseInvoiceList || [];
+                    setOrderRelatedData({ PurchaseOrders: Array.isArray(purchaseOrders) ? purchaseOrders : [], PurchaseInvoices: Array.isArray(purchaseInvoices) ? purchaseInvoices : [] });
+                } catch (err) {
+                    console.warn('fetchPurchaseInvoiceRelatedDocuments error ->', err?.message || err);
+                    setOrderRelatedData({ PurchaseOrders: [], PurchaseInvoices: [] });
+                    setOrderRelatedModalVisible(false);
+                    Alert.alert('Error', 'Unable to fetch related documents');
+                } finally {
+                    setOrderRelatedLoading(false);
+                }
+            })();
             return;
         }
         Alert.alert('Action Triggered', `${actionLabel} clicked for ${order.salesOrderNumber || headerCandidate}`);
@@ -188,6 +225,91 @@ const ManagePurchaseInvoice = () => {
         );
     };
 
+    // Related documents bottom sheet modal
+    const RelatedDocsModal = () => (
+        <Modal visible={orderRelatedModalVisible} transparent animationType="fade" onRequestClose={() => setOrderRelatedModalVisible(false)}>
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalBox}>
+                    <View style={styles.modalHeaderRow}>
+                        <Text style={styles.modalTitle}>Related Documents</Text>
+                        <TouchableOpacity onPress={() => setOrderRelatedModalVisible(false)}>
+                            <Text style={styles.modalClose}>Close</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <ScrollView style={styles.modalBody}>
+                        <Text style={styles.modalSectionTitle}>Purchase Orders</Text>
+                        {orderRelatedLoading ? (
+                            <ActivityIndicator />
+                        ) : (orderRelatedData?.PurchaseOrders?.length ? (
+                            orderRelatedData.PurchaseOrders.map((po) => (
+                                <View key={po.UUID || po.id || po.PurchaseOrderUUID || po.OrderUUID} style={styles.modalItemRow}>
+                                    <TouchableOpacity onPress={() => openPurchaseOrderPDF(po.UUID || po.id || po.PurchaseOrderUUID || po.OrderUUID)}>
+                                        <Text style={[styles.modalItemTitle, styles.modalLink]}>{po.DocumentNumber || po.OrderNo || po.PurchaseOrderNo || po.OrderNumber}</Text>
+                                    </TouchableOpacity>
+                                    <Text style={styles.modalItemSub}>{po.DocumentDate || po.OrderDate || po.PurchaseOrderDate}</Text>
+                                </View>
+                            ))
+                        ) : (
+                            <Text style={styles.modalEmpty}>No purchase order records found.</Text>
+                        ))}
+
+                        <Text style={styles.modalSectionTitle}>Purchase Invoices / Performa</Text>
+                        {orderRelatedLoading ? (
+                            <ActivityIndicator />
+                        ) : (orderRelatedData?.PurchaseInvoices?.length ? (
+                            orderRelatedData.PurchaseInvoices.map((inv) => (
+                                <View key={inv.UUID || inv.id || inv.InvoiceUUID || inv.PerformaUUID} style={styles.modalItemRow}>
+                                    <TouchableOpacity onPress={() => openPurchasePerformaPDF(inv.UUID || inv.id || inv.InvoiceUUID || inv.PerformaUUID || inv.HeaderUUID)}>
+                                        <Text style={[styles.modalItemTitle, styles.modalLink]}>{inv.InvoiceNo || inv.DocumentNumber || inv.PerformaNumber || inv.InvoiceNumber}</Text>
+                                    </TouchableOpacity>
+                                    <Text style={styles.modalItemSub}>{inv.InvoiceDate || inv.DocumentDate || inv.PerformaDate || inv.Date}</Text>
+                                </View>
+                            ))
+                        ) : (
+                            <Text style={styles.modalEmpty}>No purchase invoice records found.</Text>
+                        ))}
+                    </ScrollView>
+                </View>
+            </View>
+        </Modal>
+    );
+
+    const openPurchaseOrderPDF = async (uuid) => {
+        try {
+            if (!uuid) throw new Error('Purchase Order UUID not found');
+            const pdfBase64 = await getPurchaseOrderSlip({ headerUuid: uuid });
+            if (pdfBase64) {
+                setOrderRelatedModalVisible(false);
+                navigation.navigate('FileViewerScreen', {
+                    pdfBase64,
+                    fileName: `Purchase_Order_${uuid}.pdf`,
+                    opportunityTitle: `Purchase Order`,
+                });
+            }
+        } catch (err) {
+            console.error('openPurchaseOrderPDF error ->', err);
+            Alert.alert('Error', err?.message || 'Failed to open purchase order PDF');
+        }
+    };
+
+    const openPurchasePerformaPDF = async (uuid) => {
+        try {
+            if (!uuid) throw new Error('Performa/Invoice UUID not found');
+            const pdfBase64 = await getPurchasePerformaInvoiceSlip({ headerUuid: uuid });
+            if (pdfBase64) {
+                setOrderRelatedModalVisible(false);
+                navigation.navigate('FileViewerScreen', {
+                    pdfBase64,
+                    fileName: `Purchase_Performa_Invoice_${uuid}.pdf`,
+                    opportunityTitle: `Purchase Performa Invoice`,
+                });
+            }
+        } catch (err) {
+            console.error('openPurchasePerformaPDF error ->', err);
+            Alert.alert('Error', err?.message || 'Failed to open performa invoice PDF');
+        }
+    };
+
     const pageItems = useMemo(() => {
         if (totalPages === 0) return [];
         const items = ['prev'];
@@ -211,6 +333,7 @@ const ManagePurchaseInvoice = () => {
     };
 
     return (
+        <>
         <View style={styles.screen}>
                 <AppHeader
                 title="Manage Purchase Invoice"
@@ -258,7 +381,18 @@ const ManagePurchaseInvoice = () => {
                 </View>
             </View>
 
-            <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+                contentContainerStyle={styles.listContent} 
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={[COLORS.primary]}
+                        tintColor={COLORS.primary}
+                    />
+                }
+            >
                 {loading && (
                     <View style={{ padding: hp(4), alignItems: 'center' }}>
                         <Text>Loading...</Text>
@@ -269,6 +403,7 @@ const ManagePurchaseInvoice = () => {
                     const invoiceNo = order.InvoiceNo || order.InvoiceNumber || order.PurchaseInvoiceNo || '';
                     const orderDate = order.OrderDate || order.InvoiceDate || order.Date || '';
                     const vendorName = order.VendorName || order.Vendor || order.customerName || '';
+                    const PurchaseOrderNo = order.PurchaseOrderNo || order.PurchaseOrderNumber || '';
                     const projectName = order.ProjectName || order.Project || order.ProjectTitle || '';
 
                     return (
@@ -283,9 +418,9 @@ const ManagePurchaseInvoice = () => {
                             onToggle={() => setActiveOrderId((prev) => (prev === key ? null : key))}
                             customRows={[
                                 { label: 'Vendor Name', value: vendorName },
-                                { label: 'Purchase Invoice Number', value: invoiceNo },
+                                { label: 'Purchase Order No', value: PurchaseOrderNo },
                                 { label: 'Order Date', value: orderDate },
-                                { label: 'Total Amount', value: order.TotalAmount || order.Total || order.Amount || '' },
+                                { label: 'Total Amount', value: order.TotalAmount || order.Total || order.Amount || '0' },
                             ]}
                             headerLeftLabel="Project Name"
                             headerRightLabel="Purchase Invoice Number"
@@ -362,6 +497,8 @@ const ManagePurchaseInvoice = () => {
                 </View>
             )}
         </View>
+        <RelatedDocsModal />
+        </>
     );
 };
 
@@ -480,6 +617,69 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         minWidth: wp(8),
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalBox: {
+        maxHeight: '70%',
+        backgroundColor: '#fff',
+        borderTopLeftRadius: RADIUS.lg,
+        borderTopRightRadius: RADIUS.lg,
+        padding: wp(4),
+    },
+    modalHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: hp(1),
+    },
+    modalTitle: {
+        fontSize: rf(4),
+        fontFamily: TYPOGRAPHY.fontFamilyBold,
+        color: COLORS.text,
+    },
+    modalClose: {
+        fontSize: rf(3.2),
+        color: COLORS.primary,
+        fontFamily: TYPOGRAPHY.fontFamilyMedium,
+    },
+    modalBody: {
+        paddingBottom: hp(2),
+    },
+    modalSectionTitle: {
+        fontSize: rf(3.4),
+        fontFamily: TYPOGRAPHY.fontFamilyBold,
+        color: COLORS.text,
+        marginTop: hp(1),
+        marginBottom: hp(0.6),
+    },
+    modalItemRow: {
+        paddingVertical: hp(0.8),
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    modalItemTitle: {
+        fontSize: rf(3.4),
+        color: COLORS.text,
+        fontFamily: TYPOGRAPHY.fontFamilyMedium,
+    },
+    modalItemSub: {
+        fontSize: rf(3),
+        color: COLORS.textLight,
+        fontFamily: TYPOGRAPHY.fontFamilyRegular,
+    },
+    modalEmpty: {
+        fontSize: rf(3.2),
+        color: COLORS.textLight,
+        textAlign: 'center',
+        paddingVertical: hp(2),
+    },
+    modalLink: {
+        color: COLORS.primary,
+        fontFamily: TYPOGRAPHY.fontFamilyBold,
     },
     listContent: {
         paddingHorizontal: wp(4),
