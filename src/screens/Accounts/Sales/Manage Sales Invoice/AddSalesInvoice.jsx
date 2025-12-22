@@ -1686,8 +1686,6 @@ const AddSalesInvoice = () => {
                                     </TouchableOpacity>
                                 </View>
 
-
-
                             ) : null
                         }
                     >
@@ -1699,7 +1697,7 @@ const AddSalesInvoice = () => {
                                 <View style={{ zIndex: 9997, elevation: 19 }}>
                                     <Dropdown
                                         placeholder="-Sales Inquiry No.-"
-                                        value={headerForm.salesInquiry}
+                                        value={salesInquiryUuid || headerForm.salesInquiry}
                                         options={salesInquiryNosOptions}
                                         getLabel={s => s?.InquiryNo || String(s)}
                                         getKey={s => s?.UUID || s}
@@ -1726,7 +1724,7 @@ const AddSalesInvoice = () => {
                                 <View style={{ zIndex: 9997, elevation: 19 }}>
                                     <Dropdown
                                         placeholder="Sales Order No.*"
-                                        value={headerForm.salesOrderNo}
+                                        value={salesOrderUuid || headerForm.salesOrderNo}
                                         options={salesOrderOptions}
                                         getLabel={so => (so?.OrderNo || so?.SalesOrderNo || so?.SalesOrderNumber || String(so))}
                                         getKey={so => (so?.UUID || so?.Id || so)}
@@ -1760,7 +1758,7 @@ const AddSalesInvoice = () => {
                                 <View style={{ zIndex: 9998, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="-select Customer-"
-                                        value={headerForm.CustomerName || headerForm.opportunityTitle}
+                                        value={headerForm.CustomerUUID || headerForm.CustomerName || headerForm.opportunityTitle}
                                         options={customersOptions}
                                         getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
                                         getKey={c => (c?.UUID || c?.Id || c)}
@@ -1785,7 +1783,7 @@ const AddSalesInvoice = () => {
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="-Select Project-*"
-                                        value={project}
+                                        value={projectUUID || project}
                                         options={projectsOptions}
                                         getLabel={p => (p?.Name || p?.ProjectTitle || String(p))}
                                         getKey={p => (p?.Uuid || p?.Id || p)}
@@ -1915,7 +1913,7 @@ const AddSalesInvoice = () => {
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="-Select Payment Term-"
-                                        value={paymentTerm}
+                                        value={paymentTermUuid || paymentTerm}
                                         options={paymentTermsOptions}
                                         getLabel={p => p?.Name || p?.Title || String(p)}
                                         getKey={p => p?.UUID || p?.Id || p}
@@ -1942,7 +1940,7 @@ const AddSalesInvoice = () => {
                                 <View style={{ zIndex: 9998, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="Payment Method"
-                                        value={paymentMethod}
+                                        value={paymentMethodUUID || paymentMethod}
                                         options={paymentMethodsOptions}
                                         getLabel={p => p?.Name || p?.Title || String(p)}
                                         getKey={p => p?.UUID || p?.Id || p}
@@ -2178,7 +2176,7 @@ const AddSalesInvoice = () => {
                                         <View style={{ zIndex: 9999, elevation: 20 }}>
                                             <Dropdown
                                                 placeholder="Select Item"
-                                                value={currentItem.itemName}
+                                                value={currentItem.itemNameUuid || currentItem.itemName}
                                                 options={masterItems}
                                                 getLabel={it => (it?.name || String(it))}
                                                 getKey={it => (it?.uuid || it?.sku || it)}
@@ -2203,7 +2201,7 @@ const AddSalesInvoice = () => {
                                         <View style={{ zIndex: 9999, elevation: 20 }}>
                                             <Dropdown
                                                 placeholder="Select Employee"
-                                                value={currentItem.employeeName}
+                                                value={currentItem.employeeUuid || currentItem.employeeName}
                                                 options={employeesOptions}
                                                 getLabel={emp => (emp?.FullName || emp?.Name || String(emp))}
                                                 getKey={emp => (emp?.UUID || emp?.Uuid || emp?.Id || emp)}

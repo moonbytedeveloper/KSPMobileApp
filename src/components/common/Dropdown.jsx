@@ -204,7 +204,6 @@ const Dropdown = ({
               } catch (e) {
                 safeKey = String(index);
               }
-
               // Determine active state by comparing normalized keys first, then labels
               let valueKeyStr = '';
               try {
@@ -212,7 +211,8 @@ const Dropdown = ({
                 valueKeyStr = rawValKey === null || rawValKey === undefined ? '' : String(rawValKey);
               } catch (e) { valueKeyStr = String(value ?? ''); }
 
-              const isActive = (safeKey === valueKeyStr) || (label === displayValue);
+              const isObjectValue = typeof value === 'object' && value !== null;
+              const isActive = (safeKey === valueKeyStr) || (isObjectValue && label === displayValue);
               return (
                 <TouchableOpacity
                   key={`dd-${safeKey}-${index}`}
@@ -295,7 +295,13 @@ const Dropdown = ({
                         else if (typeof key === 'object') safeKey = String(key?.UUID || key?.Uuid || key?.Id || key?.id || JSON.stringify(key));
                         else safeKey = String(index);
                       } catch (e) { safeKey = String(index); }
-                      const isActive = label === value;
+                      // In modal rendering, treat active when the option's key matches the primitive value,
+                      // or when `value` is an object compare by label.
+                      const rawVal = value;
+                      const isObjVal = typeof rawVal === 'object' && rawVal !== null;
+                      let valKey = '';
+                      try { valKey = isObjVal ? String(getKey(rawVal, 0) ?? '') : String(rawVal ?? ''); } catch (e) { valKey = String(rawVal ?? ''); }
+                      const isActive = (String(safeKey) === valKey) || (isObjVal && label === (typeof value === 'object' ? String(getLabel(value)) : ''));
                       return (
                         <TouchableOpacity
                           key={`dd-${safeKey}-${index}`}

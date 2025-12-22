@@ -1667,7 +1667,7 @@ const AddSalesPerfomaInvoice = () => {
                                 <View style={{ zIndex: 9998, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="-Select Customer-"
-                                        value={headerForm.CustomerName || headerForm.opportunityTitle}
+                                        value={headerForm.CustomerUUID || headerForm.CustomerName || headerForm.opportunityTitle}
                                         options={customersOptions}
                                         getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
                                         getKey={c => (c?.UUID || c?.Id || c)}

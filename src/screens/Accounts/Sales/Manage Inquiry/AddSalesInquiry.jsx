@@ -855,7 +855,7 @@ const AddSalesInquiry = () => {
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="- Select Customer -"
-                                        value={customerName}
+                                        value={customerUuid || customerName}
                                         options={customers}
                                         getLabel={(c) => c?.Name || c?.DisplayName || c?.name || ''}
                                         getKey={(c) => c?.UUID || c?.Id || c?.id || (c?.Name ?? c)}

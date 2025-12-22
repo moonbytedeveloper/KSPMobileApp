@@ -1883,7 +1883,7 @@ const ManageSalesOrder = () => {
                 ) : (
                   <Dropdown
                     placeholder="Purchase Inquiry No."
-                    value={SalesInquiryNo}
+                    value={headerForm.SalesInquiryUUID || SalesInquiryNo}
                     options={SalesInquiryNosOptions}
                     getLabel={c => (c?.InquiryNo || c?.Name || String(c))}
                     getKey={c => (c?.UUID || c?.Id || c)}
@@ -1911,7 +1911,7 @@ const ManageSalesOrder = () => {
                 ) : (
                   <Dropdown
                     placeholder="Vendor Name*"
-                    value={headerForm.CustomerName}
+                    value={headerForm.CustomerUUID || headerForm.CustomerName}
                     options={customersOptions}
                     getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
                     getKey={c => (c?.UUID || c?.Id || c)}
@@ -1942,7 +1942,7 @@ const ManageSalesOrder = () => {
                   ) : (
                     <Dropdown
                       placeholder="Select Project*"
-                      value={project}
+                      value={projectUUID || project}
                       options={projectsOptions}
                       getLabel={p => (p?.Name || p?.ProjectTitle || String(p))}
                       getKey={p => (p?.Uuid || p?.Id || p)}
@@ -1966,7 +1966,7 @@ const ManageSalesOrder = () => {
                   ) : (
                     <Dropdown
                       placeholder="Select Payment Term*"
-                      value={paymentTerm}
+                      value={paymentTermUuid || paymentTerm}
                       options={paymentTermsOptions}
                       getLabel={p => (p?.Name || p?.Term || String(p))}
                       getKey={p => (p?.UUID || p?.Id || p)}
@@ -1993,7 +1993,7 @@ const ManageSalesOrder = () => {
                   ) : (
                     <Dropdown
                       placeholder="Payment Method"
-                      value={paymentMethod}
+                      value={paymentMethodUUID || paymentMethod}
                       options={paymentMethodsOptions}
                       getLabel={p => (p?.Name || p?.Mode || String(p))}
                       getKey={p => (p?.UUID || p?.Id || p)}
@@ -2188,7 +2188,7 @@ const ManageSalesOrder = () => {
                   <View style={{ zIndex: 9999, elevation: 20 }}>
                     <Dropdown
                       placeholder="Select Country*"
-                      value={selectedBillingCountry}
+                      value={(selectedBillingCountry && (selectedBillingCountry?.UUID || selectedBillingCountry)) || billingForm.country}
                       options={countriesOptions}
                       getLabel={c => (c?.Name || c?.CountryName || c?.countryName || String(c))}
                       getKey={c => (c?.UUID || c?.Id || c)}
@@ -2204,7 +2204,7 @@ const ManageSalesOrder = () => {
                   <View style={{ zIndex: 9999, elevation: 20 }}>
                     <Dropdown
                       placeholder="Select State*"
-                      value={selectedBillingState}
+                      value={(selectedBillingState && (selectedBillingState?.UUID || selectedBillingState)) || billingForm.state}
                       options={statesOptions}
                       getLabel={c => (c?.Name || c?.StateName || String(c))}
                       getKey={c => (c?.UUID || c?.Id || c)}
@@ -2223,7 +2223,7 @@ const ManageSalesOrder = () => {
                   <View style={{ zIndex: 9998, elevation: 20 }}>
                     <Dropdown
                       placeholder="- Select City -"
-                      value={selectedBillingCity}
+                      value={(selectedBillingCity && (selectedBillingCity?.UUID || selectedBillingCity)) || billingForm.city}
                       options={citiesOptions}
                       getLabel={c => (c?.Name || c?.CityName || String(c))}
                       getKey={c => (c?.UUID || c?.Id || c)}
@@ -2342,7 +2342,7 @@ const ManageSalesOrder = () => {
                   <View style={{ zIndex: 9999, elevation: 20 }}>
                     <Dropdown
                       placeholder="- Select Country -"
-                      value={selectedShippingCountry}
+                      value={(selectedShippingCountry && (selectedShippingCountry?.UUID || selectedShippingCountry)) || shippingForm.country}
                       options={countriesOptions}
                       getLabel={c => (c?.Name || c?.CountryName || c?.countryName || String(c))}
                       getKey={c => (c?.UUID || c?.Id || c)}
@@ -2359,7 +2359,7 @@ const ManageSalesOrder = () => {
                   <View style={{ zIndex: 9999, elevation: 20 }}>
                     <Dropdown
                       placeholder="- Select State -"
-                      value={selectedShippingState}
+                      value={(selectedShippingState && (selectedShippingState?.UUID || selectedShippingState)) || shippingForm.state}
                       options={shippingStatesOptions}
                       getLabel={c => (c?.Name || c?.StateName || String(c))}
                       getKey={c => (c?.UUID || c?.Id || c)}
@@ -2379,7 +2379,7 @@ const ManageSalesOrder = () => {
                   <View style={{ zIndex: 9998, elevation: 20 }}>
                     <Dropdown
                       placeholder="- Select City -"
-                      value={selectedShippingCity}
+                      value={(selectedShippingCity && (selectedShippingCity?.UUID || selectedShippingCity)) || shippingForm.city}
                       options={shippingCitiesOptions}
                       getLabel={c => (c?.Name || c?.CityName || String(c))}
                       getKey={c => (c?.UUID || c?.Id || c)}
@@ -2447,13 +2447,13 @@ const ManageSalesOrder = () => {
                     <View style={{ zIndex: 9999, elevation: 20 }}>
                       <Dropdown
                         placeholder="Select Item"
-                        value={currentItem.itemName}
+                        value={currentItem.itemNameUuid || currentItem.itemName}
                         options={masterItems}
                         getLabel={it => (it?.name || String(it))}
-                        getKey={it => (it?.sku || it)}
+                        getKey={it => (it?.uuid || it?.sku || it)}
                         onSelect={v => {
                           if (v && typeof v === 'object') {
-                            setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.sku || v, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '', hsn: v?.hsn || ci?.hsn || '' }));
+                            setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.uuid || v?.sku || v, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '', hsn: v?.hsn || ci?.hsn || '' }));
                           } else {
                             setCurrentItem(ci => ({ ...ci, itemName: v, itemNameUuid: null }));
                           }

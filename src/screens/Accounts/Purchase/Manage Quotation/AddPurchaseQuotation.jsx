@@ -1554,7 +1554,7 @@ const AddPurchaseQuotation = () => {
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
                     placeholder="Select Project"
-                    value={projectName}
+                    value={projectUUID || projectName}
                     options={projects}
                     getLabel={p => p?.label || ''}
                     getKey={p => p?.value}
@@ -2013,13 +2013,13 @@ const AddPurchaseQuotation = () => {
                   <View style={{ zIndex: 9999, elevation: 20 }}>
                     <Dropdown
                       placeholder="Select Item"
-                      value={currentItem.itemName}
+                      value={currentItem.itemNameUuid || currentItem.itemName}
                       options={masterItems}
                       getLabel={it => (it?.name || String(it))}
-                      getKey={it => (it?.sku || it)}
+                      getKey={it => (it?.uuid || it?.sku || it)}
                       onSelect={v => {
                         if (v && typeof v === 'object') {
-                          setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.sku || v, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '', hsn: v?.hsn || ci?.hsn || '' }));
+                          setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.uuid || v?.sku || v, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '', hsn: v?.hsn || ci?.hsn || '' }));
                         } else {
                           setCurrentItem(ci => ({ ...ci, itemName: v, itemNameUuid: null }));
                         }
