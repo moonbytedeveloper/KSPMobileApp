@@ -113,18 +113,7 @@ const ManageSalesOrder = () => {
     >
       <Text style={styles.addButtonText}>Cancel</Text>
     </TouchableOpacity>
-  </View>
-  // const state = ['Gujarat', 'Delhi', 'Mumbai'];
-  // const city = ['vadodara', 'surat',];
-
-
-
-  const paymentMethods = [
-
-    'Bank Transfer',
-    'Mobile App Development',
-
-  ];
+  </View> 
 
   // Master items (loaded from server)
   const [masterItems, setMasterItems] = useState([]);
@@ -330,11 +319,7 @@ const ManageSalesOrder = () => {
         city: data?.BillingCityUUID || resolveUuid(data?.BillingCity || data?.City) || '',
       });
 
-      // Set billing UUID states for dropdowns - defer to useEffect for proper mapping
-      // Store UUIDs directly, let useEffect map them to proper objects when options load
-      // if (data?.BillingCountryUUID) setSelectedBillingCountry(data.BillingCountryUUID);
-      // if (data?.BillingStateUUID) setSelectedBillingState(data.BillingStateUUID);
-      // if (data?.BillingCityUUID) setSelectedBillingCity(data.BillingCityUUID);
+      // UUID-based matching: useEffect will find and set selected objects when options load
 
       // Prefill shipping (best-effort keys)
       setShippingForm({
@@ -347,11 +332,7 @@ const ManageSalesOrder = () => {
         city: data?.ShippingCityUUID || resolveUuid(data?.ShippingCity || data?.ShipCity) || '',
       });
 
-      // Set shipping UUID states for dropdowns - defer to useEffect for proper mapping
-      // Store UUIDs directly, let useEffect map them to proper objects when options load
-      // if (data?.ShippingCountryUUID) setSelectedShippingCountry(data.ShippingCountryUUID);
-      // if (data?.ShippingStateUUID) setSelectedShippingState(data.ShippingStateUUID);
-      // if (data?.ShippingCityUUID) setSelectedShippingCity(data.ShippingCityUUID);
+      // UUID-based matching: useEffect will find and set selected objects when options load
 
       // Prefill IsShipAddrSame checkbox
       const shipSame = data?.IsShipAddrSame === true || data?.IsShipAddrSame === 'true' || data?.IsShipAddrSame === 'True' || data?.IsShipAddrSame === 1 || data?.Is_ShipAddrSame === true || data?.IsShipAddrSame === 'Y' || data?.IsShipAddrSame === 'y';
@@ -688,15 +669,7 @@ const ManageSalesOrder = () => {
     );
     return granted === PermissionsAndroid.RESULTS.GRANTED;
   };
-
-  const copyBillingToShipping = () => {
-    setShippingForm({ ...billingForm });
-    setSelectedShippingCountry(selectedBillingCountry);
-    setSelectedShippingState(selectedBillingState);
-    setSelectedShippingCity(selectedBillingCity);
-    setIsShippingSame(true);
-  };
-
+ 
   // Toggle copy: if already copied, clear shipping form and uncheck
   const toggleCopyBillingToShipping = () => {
     if (!isShippingSame) {
@@ -1366,40 +1339,49 @@ const ManageSalesOrder = () => {
     }
   }, [billingForm?.country, countriesOptions]);
 
+  // Match pre-filled billing state with loaded states list by UUID
   React.useEffect(() => {
-    // Map state
-    if (billingForm?.state && !selectedBillingState && Array.isArray(statesOptions) && statesOptions.length) {
-      const found = statesOptions.find(s => (
+    if (statesOptions.length > 0 && billingForm?.state && !selectedBillingState) {
+      const foundState = statesOptions.find(s =>
         s?.UUID === billingForm.state ||
         s?.Uuid === billingForm.state ||
-        s?.Id === billingForm.state ||
         s?.StateUuid === billingForm.state ||
-        s?.StateId === billingForm.state ||
-        String(s?.UUID) === String(billingForm.state)
-      ));
-      if (found) {
-        handleBillingStateSelect(found);
-      }
-    }
-  }, [billingForm?.state, statesOptions]);
+        s?.Id === billingForm.state ||
+        String(s?.UUID) === String(billingForm.state) ||
+        String(s?.Uuid) === String(billingForm.state)
+      );
+      if (foundState) {
+        console.log('[ManageSalesOrder] Found billing state match:', foundState);
+        setSelectedBillingState(foundState);
 
-  React.useEffect(() => {
-    // Map city
-    if (billingForm?.city && !selectedBillingCity && Array.isArray(citiesOptions) && citiesOptions.length) {
-      const found = citiesOptions.find(ci => (
-        ci?.UUID === billingForm.city ||
-        ci?.Uuid === billingForm.city ||
-        ci?.Id === billingForm.city ||
-        ci?.CityUuid === billingForm.city ||
-        ci?.CityId === billingForm.city ||
-        String(ci?.UUID) === String(billingForm.city)
-      ));
-      if (found) {
-        setSelectedBillingCity(found);
-        setBillingForm(s => ({ ...s, city: found?.UUID || found }));
+        // If we have city UUID, load cities for this state
+        if (billingForm?.city) {
+          const stateUuid = foundState?.UUID || foundState?.Uuid || foundState?.StateUuid || foundState?.Id;
+          if (stateUuid) {
+            loadCitiesForState(stateUuid, 'billing');
+          }
+        }
       }
     }
-  }, [billingForm?.city, citiesOptions]);
+  }, [statesOptions, billingForm?.state, selectedBillingState]);
+
+  // Match pre-filled billing city with loaded cities list by UUID
+  React.useEffect(() => {
+    if (citiesOptions.length > 0 && billingForm?.city && !selectedBillingCity) {
+      const foundCity = citiesOptions.find(c =>
+        c?.UUID === billingForm.city ||
+        c?.Uuid === billingForm.city ||
+        c?.CityUuid === billingForm.city ||
+        c?.Id === billingForm.city ||
+        String(c?.UUID) === String(billingForm.city) ||
+        String(c?.Uuid) === String(billingForm.city)
+      );
+      if (foundCity) {
+        console.log('[ManageSalesOrder] Found billing city match:', foundCity);
+        setSelectedBillingCity(foundCity);
+      }
+    }
+  }, [citiesOptions, billingForm?.city, selectedBillingCity]);
 
   // Map shippingForm.country/state/city UUIDs to selected objects when options are available
   React.useEffect(() => {
@@ -1418,38 +1400,49 @@ const ManageSalesOrder = () => {
     }
   }, [shippingForm?.country, countriesOptions]);
 
+  // Match pre-filled shipping state with loaded states list by UUID
   React.useEffect(() => {
-    if (shippingForm?.state && !selectedShippingState && Array.isArray(shippingStatesOptions) && shippingStatesOptions.length) {
-      const found = shippingStatesOptions.find(s => (
+    if (shippingStatesOptions.length > 0 && shippingForm?.state && !selectedShippingState) {
+      const foundState = shippingStatesOptions.find(s =>
         s?.UUID === shippingForm.state ||
         s?.Uuid === shippingForm.state ||
-        s?.Id === shippingForm.state ||
         s?.StateUuid === shippingForm.state ||
-        s?.StateId === shippingForm.state ||
-        String(s?.UUID) === String(shippingForm.state)
-      ));
-      if (found) {
-        handleShippingStateSelect(found);
-      }
-    }
-  }, [shippingForm?.state, shippingStatesOptions]);
+        s?.Id === shippingForm.state ||
+        String(s?.UUID) === String(shippingForm.state) ||
+        String(s?.Uuid) === String(shippingForm.state)
+      );
+      if (foundState) {
+        console.log('[ManageSalesOrder] Found shipping state match:', foundState);
+        setSelectedShippingState(foundState);
 
-  React.useEffect(() => {
-    if (shippingForm?.city && !selectedShippingCity && Array.isArray(shippingCitiesOptions) && shippingCitiesOptions.length) {
-      const found = shippingCitiesOptions.find(ci => (
-        ci?.UUID === shippingForm.city ||
-        ci?.Uuid === shippingForm.city ||
-        ci?.Id === shippingForm.city ||
-        ci?.CityUuid === shippingForm.city ||
-        ci?.CityId === shippingForm.city ||
-        String(ci?.UUID) === String(shippingForm.city)
-      ));
-      if (found) {
-        setSelectedShippingCity(found);
-        setShippingForm(s => ({ ...s, city: found?.UUID || found }));
+        // If we have city UUID, load cities for this state
+        if (shippingForm?.city) {
+          const stateUuid = foundState?.UUID || foundState?.Uuid || foundState?.StateUuid || foundState?.Id;
+          if (stateUuid) {
+            loadCitiesForState(stateUuid, 'shipping');
+          }
+        }
       }
     }
-  }, [shippingForm?.city, shippingCitiesOptions]);
+  }, [shippingStatesOptions, shippingForm?.state, selectedShippingState]);
+
+  // Match pre-filled shipping city with loaded cities list by UUID
+  React.useEffect(() => {
+    if (shippingCitiesOptions.length > 0 && shippingForm?.city && !selectedShippingCity) {
+      const foundCity = shippingCitiesOptions.find(c =>
+        c?.UUID === shippingForm.city ||
+        c?.Uuid === shippingForm.city ||
+        c?.CityUuid === shippingForm.city ||
+        c?.Id === shippingForm.city ||
+        String(c?.UUID) === String(shippingForm.city) ||
+        String(c?.Uuid) === String(shippingForm.city)
+      );
+      if (foundCity) {
+        console.log('[ManageSalesOrder] Found shipping city match:', foundCity);
+        setSelectedShippingCity(foundCity);
+      }
+    }
+  }, [shippingCitiesOptions, shippingForm?.city, selectedShippingCity]);
 
   // Map project / payment term / payment method / sales inquiry / customer when lookup options load
   React.useEffect(() => {
@@ -1981,6 +1974,42 @@ const ManageSalesOrder = () => {
     } finally {
       setIsGeneratingPDF(false);
     }
+  };
+
+  const viewDocument = (opts = {}) => {
+    const fileUrlCandidate = (file && (file.uri || file.name))
+      || uploadedFilePath
+      || headerResponse?.FilePath
+      || headerResponse?.ProposalDocument
+      || headerResponse?.DocumentUrl
+      || headerResponse?.Document
+      || headerResponse?.File
+      || headerResponse?.FilePath;
+
+    if (!fileUrlCandidate) {
+      Alert.alert('No document', 'No document is available to view.');
+      return;
+    }
+
+    const url = String(Array.isArray(fileUrlCandidate) ? fileUrlCandidate[0] : fileUrlCandidate);
+    const lower = url.toLowerCase();
+
+    if (lower.includes('base64,') && lower.includes('pdf')) {
+      navigation.navigate('FileViewerScreen', { pdfBase64: url, fileName: opts.fileName || 'Document' });
+      return;
+    }
+
+    if (lower.endsWith('.pdf') || lower.includes('.pdf') || lower.includes('application/pdf')) {
+      navigation.navigate('FileViewerScreen', { pdfUrl: url, fileName: opts.fileName || 'Document' });
+      return;
+    }
+
+    if (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.includes('image/')) {
+      navigation.navigate('ImageViewerScreen', { imageUrl: url, opportunityTitle: opts.fileName || 'Document' });
+      return;
+    }
+
+    navigation.navigate('FileViewerScreen', { pdfUrl: url, fileName: opts.fileName || 'Document' });
   };
 
   const onCancel = () => {
@@ -3260,6 +3289,14 @@ const ManageSalesOrder = () => {
                     placeholderTextColor={COLORS.textLight}
                   />
                 </View>
+                {(isEditingHeader || headerResponse) && (
+                  <View style={{width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm }}>
+                    <Text style={inputStyles.label}>Document</Text>
+                    <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton]} onPress={() => viewDocument({ fileName: headerForm?.SalesOrderNo || 'Document' })}>
+                      <Text style={{ color: '#fff', fontWeight: '600', fontSize: rf(3.4)}}>View Document</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
                 <View style={styles.attachCol}>
                   <Text style={inputStyles.label}>Attach file</Text>
                   <View
@@ -3846,7 +3883,7 @@ const styles = StyleSheet.create({
   },
   uploadButton: {
     backgroundColor: COLORS.primary,
-    padding: wp(2.2),
+    padding: wp(1.8),
     borderRadius: wp(2),
   },
   fileInputBox: {

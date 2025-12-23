@@ -322,6 +322,35 @@ const ManageSalesOrder = () => {
         city: resolveUuid(data?.BillingCityUUID || data?.BillingCity || data?.City),
       });
 
+      console.log('[ManagePurchaseOrder] Prefill billing form:', {
+        country: resolveUuid(data?.BillingCountryUUID || data?.BillingCountry || data?.BillingCountryName || data?.Country),
+        state: resolveUuid(data?.BillingStateUUID || data?.BillingState || data?.State),
+        city: resolveUuid(data?.BillingCityUUID || data?.BillingCity || data?.City),
+      });
+
+      console.log('[ManagePurchaseOrder] Prefill API data (state/city names):', {
+        stateName: data?.BillingStateName || data?.StateName || data?.State,
+        cityName: data?.BillingCityName || data?.CityName || data?.City,
+      });
+
+      // If API provides state/city names, set initial selected objects for dropdown display
+      if (data?.BillingStateName || data?.StateName) {
+        setSelectedBillingState({
+          Name: data?.BillingStateName || data?.StateName || '',
+          StateName: data?.BillingStateName || data?.StateName || '',
+          UUID: resolveUuid(data?.BillingStateUUID || data?.BillingState || data?.State),
+        });
+      }
+      if (data?.BillingCityName || data?.CityName) {
+        setSelectedBillingCity({
+          Name: data?.BillingCityName || data?.CityName || '',
+          CityName: data?.BillingCityName || data?.CityName || '',
+          UUID: resolveUuid(data?.BillingCityUUID || data?.BillingCity || data?.City),
+        });
+      }
+
+      // UUID-based matching: useEffect will find and set selected objects when options load
+
       // Prefill shipping (best-effort keys)
       setShippingForm({
         buildingNo: data?.ShippingBuildingNo || data?.Shipping?.buildingNo || data?.ShipBuilding || '',
@@ -332,6 +361,24 @@ const ManageSalesOrder = () => {
         state: resolveUuid(data?.ShippingStateUUID || data?.ShippingState || data?.ShipState),
         city: resolveUuid(data?.ShippingCityUUID || data?.ShippingCity || data?.ShipCity),
       });
+
+      // If API provides state/city names for shipping, set initial selected objects for dropdown display
+      if (data?.ShippingStateName || data?.ShipStateName) {
+        setSelectedShippingState({
+          Name: data?.ShippingStateName || data?.ShipStateName || '',
+          StateName: data?.ShippingStateName || data?.ShipStateName || '',
+          UUID: resolveUuid(data?.ShippingStateUUID || data?.ShippingState || data?.ShipState),
+        });
+      }
+      if (data?.ShippingCityName || data?.ShipCityName) {
+        setSelectedShippingCity({
+          Name: data?.ShippingCityName || data?.ShipCityName || '',
+          CityName: data?.ShippingCityName || data?.ShipCityName || '',
+          UUID: resolveUuid(data?.ShippingCityUUID || data?.ShippingCity || data?.ShipCity),
+        });
+      }
+
+      // UUID-based matching: useEffect will find and set selected objects when options load
 
       // Prefill IsShipAddrSame checkbox
       const shipSame = data?.IsShipAddrSame === true || data?.IsShipAddrSame === 'true' || data?.IsShipAddrSame === 'True' || data?.IsShipAddrSame === 1 || data?.Is_ShipAddrSame === true || data?.IsShipAddrSame === 'Y' || data?.IsShipAddrSame === 'y';
@@ -1183,46 +1230,67 @@ const ManageSalesOrder = () => {
         String(c?.UUID) === String(billingForm.country)
       ));
       if (found) {
-        // use handler to ensure states are loaded
-        handleBillingCountrySelect(found);
+        console.log('[ManagePurchaseOrder] Found billing country match:', found);
+        // Don't use handler - just set country and load states without clearing state/city
+        setSelectedBillingCountry(found);
+        const countryUuid = found?.Uuid || found?.UUID || found?.CountryUuid || found?.Id;
+        if (countryUuid) {
+          loadStatesForCountry(countryUuid, 'billing');
+        }
       }
     }
   }, [billingForm?.country, countriesOptions]);
 
+  // Match pre-filled billing state with loaded states list by UUID
   React.useEffect(() => {
-    // Map state
-    if (billingForm?.state && !selectedBillingState && Array.isArray(statesOptions) && statesOptions.length) {
-      const found = statesOptions.find(s => (
+    console.log('[ManagePurchaseOrder] State matching check:', {
+      statesOptionsLength: statesOptions.length,
+      billingFormState: billingForm?.state,
+      selectedBillingState: selectedBillingState,
+    });
+    if (statesOptions.length > 0 && billingForm?.state && !selectedBillingState) {
+      const foundState = statesOptions.find(s =>
         s?.UUID === billingForm.state ||
         s?.Uuid === billingForm.state ||
-        s?.Id === billingForm.state ||
         s?.StateUuid === billingForm.state ||
-        s?.StateId === billingForm.state ||
-        String(s?.UUID) === String(billingForm.state)
-      ));
-      if (found) {
-        handleBillingStateSelect(found);
-      }
-    }
-  }, [billingForm?.state, statesOptions]);
+        s?.Id === billingForm.state ||
+        String(s?.UUID) === String(billingForm.state) ||
+        String(s?.Uuid) === String(billingForm.state)
+      );
+      if (foundState) {
+        console.log('[ManagePurchaseOrder] Found billing state match:', foundState);
+        setSelectedBillingState(foundState);
 
-  React.useEffect(() => {
-    // Map city
-    if (billingForm?.city && !selectedBillingCity && Array.isArray(citiesOptions) && citiesOptions.length) {
-      const found = citiesOptions.find(ci => (
-        ci?.UUID === billingForm.city ||
-        ci?.Uuid === billingForm.city ||
-        ci?.Id === billingForm.city ||
-        ci?.CityUuid === billingForm.city ||
-        ci?.CityId === billingForm.city ||
-        String(ci?.UUID) === String(billingForm.city)
-      ));
-      if (found) {
-        setSelectedBillingCity(found);
-        setBillingForm(s => ({ ...s, city: found?.UUID || found }));
+        // If we have city UUID, load cities for this state
+        if (billingForm?.city) {
+          const stateUuid = foundState?.UUID || foundState?.Uuid || foundState?.StateUuid || foundState?.Id;
+          if (stateUuid) {
+            loadCitiesForState(stateUuid, 'billing');
+          }
+        }
+      } else {
+        console.log('[ManagePurchaseOrder] No billing state match found in options');
       }
     }
-  }, [billingForm?.city, citiesOptions]);
+  }, [statesOptions, billingForm?.state, selectedBillingState]);
+
+  // Match pre-filled billing city with loaded cities list by UUID
+  React.useEffect(() => {
+    if (citiesOptions.length > 0 && billingForm?.city && !selectedBillingCity) {
+      const foundCity = citiesOptions.find(c =>
+        c?.UUID === billingForm.city ||
+        c?.Uuid === billingForm.city ||
+        c?.CityUuid === billingForm.city ||
+        c?.Id === billingForm.city ||
+        String(c?.UUID) === String(billingForm.city) ||
+        String(c?.Uuid) === String(billingForm.city)
+      );
+      if (foundCity) {
+        console.log('[ManagePurchaseOrder] Found billing city match:', foundCity);
+        setSelectedBillingCity(foundCity);
+      }
+    }
+  }, [citiesOptions, billingForm?.city, selectedBillingCity]);
 
   // Map shippingForm.country/state/city UUIDs to selected objects when options are available
   React.useEffect(() => {
@@ -1236,43 +1304,60 @@ const ManageSalesOrder = () => {
         String(c?.UUID) === String(shippingForm.country)
       ));
       if (found) {
-        handleShippingCountrySelect(found);
+        console.log('[ManagePurchaseOrder] Found shipping country match:', found);
+        // Don't use handler - just set country and load states without clearing state/city
+        setSelectedShippingCountry(found);
+        const countryUuid = found?.Uuid || found?.UUID || found?.CountryUuid || found?.Id;
+        if (countryUuid) {
+          loadStatesForCountry(countryUuid, 'shipping');
+        }
       }
     }
   }, [shippingForm?.country, countriesOptions]);
 
+  // Match pre-filled shipping state with loaded states list by UUID
   React.useEffect(() => {
-    if (shippingForm?.state && !selectedShippingState && Array.isArray(shippingStatesOptions) && shippingStatesOptions.length) {
-      const found = shippingStatesOptions.find(s => (
+    if (shippingStatesOptions.length > 0 && shippingForm?.state && !selectedShippingState) {
+      const foundState = shippingStatesOptions.find(s =>
         s?.UUID === shippingForm.state ||
         s?.Uuid === shippingForm.state ||
-        s?.Id === shippingForm.state ||
         s?.StateUuid === shippingForm.state ||
-        s?.StateId === shippingForm.state ||
-        String(s?.UUID) === String(shippingForm.state)
-      ));
-      if (found) {
-        handleShippingStateSelect(found);
-      }
-    }
-  }, [shippingForm?.state, shippingStatesOptions]);
+        s?.Id === shippingForm.state ||
+        String(s?.UUID) === String(shippingForm.state) ||
+        String(s?.Uuid) === String(shippingForm.state)
+      );
+      if (foundState) {
+        console.log('[ManagePurchaseOrder] Found shipping state match:', foundState);
+        setSelectedShippingState(foundState);
 
-  React.useEffect(() => {
-    if (shippingForm?.city && !selectedShippingCity && Array.isArray(shippingCitiesOptions) && shippingCitiesOptions.length) {
-      const found = shippingCitiesOptions.find(ci => (
-        ci?.UUID === shippingForm.city ||
-        ci?.Uuid === shippingForm.city ||
-        ci?.Id === shippingForm.city ||
-        ci?.CityUuid === shippingForm.city ||
-        ci?.CityId === shippingForm.city ||
-        String(ci?.UUID) === String(shippingForm.city)
-      ));
-      if (found) {
-        setSelectedShippingCity(found);
-        setShippingForm(s => ({ ...s, city: found?.UUID || found }));
+        // If we have city UUID, load cities for this state
+        if (shippingForm?.city) {
+          const stateUuid = foundState?.UUID || foundState?.Uuid || foundState?.StateUuid || foundState?.Id;
+          if (stateUuid) {
+            loadCitiesForState(stateUuid, 'shipping');
+          }
+        }
       }
     }
-  }, [shippingForm?.city, shippingCitiesOptions]);
+  }, [shippingStatesOptions, shippingForm?.state, selectedShippingState]);
+
+  // Match pre-filled shipping city with loaded cities list by UUID
+  React.useEffect(() => {
+    if (shippingCitiesOptions.length > 0 && shippingForm?.city && !selectedShippingCity) {
+      const foundCity = shippingCitiesOptions.find(c =>
+        c?.UUID === shippingForm.city ||
+        c?.Uuid === shippingForm.city ||
+        c?.CityUuid === shippingForm.city ||
+        c?.Id === shippingForm.city ||
+        String(c?.UUID) === String(shippingForm.city) ||
+        String(c?.Uuid) === String(shippingForm.city)
+      );
+      if (foundCity) {
+        console.log('[ManagePurchaseOrder] Found shipping city match:', foundCity);
+        setSelectedShippingCity(foundCity);
+      }
+    }
+  }, [shippingCitiesOptions, shippingForm?.city, selectedShippingCity]);
 
   // Map project / payment term / payment method / sales inquiry when lookup options load
   React.useEffect(() => {
