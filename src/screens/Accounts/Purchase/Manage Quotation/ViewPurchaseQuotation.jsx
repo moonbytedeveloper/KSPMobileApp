@@ -536,19 +536,19 @@ const ViewPurchaseQuotation = () => {
                                 item={{
                                     soleExpenseCode: order.id,
                                     expenseName: order.customerName,
-                                    amount: order.purchaseRequestNumber || order._raw?.PurchaseRequestNumber || order._raw?.PurchaseRequestNo || order._raw?.InquiryNo || order.quotationNumber || '',
+                                    amount:  order.quotationNumber || '',
                                     headerTitle: order.customerName || order.quotationTitle,
                                 }}
                             isActive={activeOrderId === order.id}
                             onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
                             customRows={[
                                 { label: 'Vendor Name', value: order.customerName },
-                                { label: 'Purchase Request Number', value: order.purchaseRequestNumber || order._raw?.PurchaseRequestNumber || order._raw?.PurchaseRequestNo || order._raw?.InquiryNo || order.quotationNumber || '—' },
+                                { label: 'Purchase Request Number', value: order.purchaseRequestNumber || order._raw?.PurchaseRequestNumber || order._raw?.PurchaseRequestNo ||  order.quotationNumber || '—' },
                                 { label: 'Quotation Title', value: order.quotationTitle || order.salesOrderNumber || 'Title' },
                                 // { label: 'Due Date', value: order.dueDate },
                             ]}
                             headerLeftLabel="Vendor Name"
-                            headerRightLabel="Purchase Request No."
+                            headerRightLabel="Quotation No."
                             footerComponent={renderFooterActions(order)}
                             headerRightContainerStyle={styles.headerRightContainer}
                         />

@@ -1549,7 +1549,7 @@ const AddSalesPerfomaInvoice = () => {
                                 {/* <Text style={[inputStyles.label, { fontWeight: '600' }]}>Sales Inquiry No.</Text> */}
                                 <Dropdown
                                     placeholder="Sales Inquiry No."
-                                    value={headerForm.salesInquiry}
+                                    value={salesInquiryUuid || headerForm.salesInquiry}
                                     options={salesInquiryNosOptions}
                                     getLabel={s => s?.InquiryNo || String(s)}
                                     getKey={s => s?.UUID || s}
@@ -1571,7 +1571,6 @@ const AddSalesPerfomaInvoice = () => {
                                         }
                                     }}
                                     inputBoxStyle={inputStyles.box}
-                                    textStyle={inputStyles.input}
                                 />
                             </View>
                             {headerEditable && (
@@ -1604,7 +1603,7 @@ const AddSalesPerfomaInvoice = () => {
                                     <View style={{ zIndex: 9999, elevation: 20 }}>
                                         <Dropdown
                                             placeholder="Select Purchase Order"
-                                            value={headerForm?.SalesOrderNo?.Number || headerForm?.PurchaseOrderNo}
+                                            value={purchaseOrderUuid || headerForm?.SalesOrderNo?.Number || headerForm?.PurchaseOrderNo}
                                             options={purchaseOrderOptions}
                                             getLabel={p => (p?.OrderNo || String(p))}
                                             getKey={p => (p?.UUID || p)}
@@ -1626,7 +1625,6 @@ const AddSalesPerfomaInvoice = () => {
                                                 }
                                             }}
                                             inputBoxStyle={[inputStyles.box, { marginTop: hp(1) }]}
-                                            textStyle={inputStyles.input}
                                             renderInModal={true}
                                         />
                                     </View>
@@ -1640,7 +1638,7 @@ const AddSalesPerfomaInvoice = () => {
                                 <View style={{ zIndex: 9998, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="Vendor Name*"
-                                        value={headerForm.CustomerName || headerForm.opportunityTitle}
+                                        value={headerForm.CustomerUUID || headerForm.CustomerName || headerForm.opportunityTitle}
                                         options={customersOptions}
                                         getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
                                         getKey={c => (c?.UUID || c?.Id || c)}
@@ -1657,7 +1655,6 @@ const AddSalesPerfomaInvoice = () => {
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={inputStyles.box}
-                                        textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -1674,7 +1671,7 @@ const AddSalesPerfomaInvoice = () => {
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="Select Project*"
-                                        value={project}
+                                        value={projectUUID || project}
                                         options={projectsOptions}
                                         getLabel={p => (p?.Name || p?.ProjectTitle || String(p))}
                                         getKey={p => (p?.Uuid || p?.Id || p)}
@@ -1684,7 +1681,6 @@ const AddSalesPerfomaInvoice = () => {
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -1695,7 +1691,7 @@ const AddSalesPerfomaInvoice = () => {
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="Payment Term*"
-                                        value={paymentTerm}
+                                        value={paymentTermUuid || paymentTerm}
                                         options={paymentTermsOptions}
                                         getLabel={p => p?.Name || p?.Title || String(p)}
                                         getKey={p => p?.UUID || p?.Id || p}
@@ -1711,7 +1707,6 @@ const AddSalesPerfomaInvoice = () => {
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -1724,7 +1719,7 @@ const AddSalesPerfomaInvoice = () => {
                                 <View style={{ zIndex: 9998, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="Payment Method"
-                                        value={paymentMethod}
+                                        value={paymentMethodUUID || paymentMethod}
                                         options={paymentMethodsOptions}
                                         getLabel={p => p?.Name || p?.Title || String(p)}
                                         getKey={p => p?.UUID || p?.Id || p}
@@ -1740,7 +1735,6 @@ const AddSalesPerfomaInvoice = () => {
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -1860,7 +1854,7 @@ const AddSalesPerfomaInvoice = () => {
                                     <View style={{ zIndex: 9999, elevation: 20 }}>
                                         <Dropdown
                                             placeholder="Select Item"
-                                            value={currentItem.itemName}
+                                            value={currentItem.itemNameUuid || currentItem.itemName}
                                             options={masterItems}
                                             getLabel={it => (it?.name || String(it))}
                                             getKey={it => (it?.uuid || it?.sku || it)}
@@ -1873,7 +1867,6 @@ const AddSalesPerfomaInvoice = () => {
                                             }}
                                             renderInModal={true}
                                             inputBoxStyle={[inputStyles.box, { width: '100%' }]}
-                                            textStyle={inputStyles.input}
                                         />
                                     </View>
                                 </View>

@@ -962,7 +962,7 @@ const AddSalesInquiry = () => {
             console.log('selectedProjectUuid value:', selectedProjectUuid);
             console.log('UpdatePurchaseInquiryHeader payload ->', payload);
             // Quick on-screen debug so you can confirm the payload and UUID before the API call
-            try { Alert.alert('Updating header', `UUID: ${headerUuid}\nProjectUUID: ${selectedProjectUuid || 'null'}\nRequestDate: ${payload.RequestDate || ''}`); } catch (_) { }
+            // try { Alert.alert('Updating header', `UUID: ${headerUuid}\nProjectUUID: ${selectedProjectUuid || 'null'}\nRequestDate: ${payload.RequestDate || ''}`); } catch (_) { }
 
             const resp = await updatePurchaseInquiryHeader(payload, { userUuid: await getUUID(), cmpUuid: await getCMPUUID(), envUuid: await getENVUUID() });
             console.log('UpdatePurchaseInquiryHeader resp ->', resp);
