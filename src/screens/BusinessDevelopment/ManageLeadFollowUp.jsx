@@ -46,7 +46,7 @@ const toUiDate = (value) => {
   // ISO like 2025-10-03T...
   const tIdx = s.indexOf('T');
   if (tIdx > 0 && /^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0, tIdx);
-  // Handle slash formats: dd/MM/yyyy or MM/dd/yyyy
+  // Handle slash formats: dd/MM/yyyy or dd/mm/yyyy
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
     const [a, b, yStr] = s.split('/');
     const dayFirst = Number(a) > 12; // if first part >12 => dd/MM/yyyy

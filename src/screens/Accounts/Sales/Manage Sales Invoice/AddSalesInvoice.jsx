@@ -1,5 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
 import { useRoute } from '@react-navigation/native';
 import {
     View,
@@ -80,6 +82,32 @@ const AccordionSection = ({
         </View>
     );
 };
+
+// Validation schema for Header form
+const HeaderValidationSchema = Yup.object().shape({
+    CustomerName: Yup.string().trim().required('Customer is required'),
+    CustomerUUID: Yup.string().trim().required('Customer is required'),
+    ProjectName: Yup.string().test('project-or-uuid', 'Project is required', function (val) {
+        const { ProjectUUID } = this.parent || {};
+        const hasVal = typeof val === 'string' && val.trim() !== '';
+        const hasUuid = typeof ProjectUUID === 'string' && ProjectUUID.trim() !== '';
+        return !!(hasVal || hasUuid);
+    }),
+    PaymentTerm: Yup.string().test('paymentterm-or-uuid', 'Payment term is required', function (val) {
+        const { PaymentTermUUID } = this.parent || {};
+        const hasVal = typeof val === 'string' && val.trim() !== '';
+        const hasUuid = typeof PaymentTermUUID === 'string' && PaymentTermUUID.trim() !== '';
+        return !!(hasVal || hasUuid);
+    }),
+    PaymentMethod: Yup.string().test('paymentmethod-or-uuid', 'Payment method is required', function (val) {
+        const { PaymentMethodUUID } = this.parent || {};
+        const hasVal = typeof val === 'string' && val.trim() !== '';
+        const hasUuid = typeof PaymentMethodUUID === 'string' && PaymentMethodUUID.trim() !== '';
+        return !!(hasVal || hasUuid);
+    }),
+    OrderDate: Yup.string().trim().required('Order date is required'),
+    DueDate: Yup.string().trim().required('Due date is required'),
+});
 
 const AddSalesInvoice = () => {
     // Keep header closed by default; only open when user clicks Edit
@@ -818,7 +846,7 @@ const AddSalesInvoice = () => {
                 const c = await getCMPUUID();
                 const e = await getENVUUID();
                 const [itemsResp, employeesResp] = await Promise.all([
-                    getItems({ cmpUuid: c, envUuid: e }).catch(err => { console.warn('getItems failed', err); return null; }),
+                    getItems({ cmpUuid: c, envUuid: e ,mode:"Sales" }).catch(err => { console.warn('getItems failed', err); return null; }),
                     (typeof getEmployees === 'function') ? getEmployees({ cmpUuid: c, envUuid: e }).catch(err => { console.warn('getEmployees failed', err); return null; }) : Promise.resolve(null),
                 ]);
 
@@ -919,6 +947,7 @@ const AddSalesInvoice = () => {
     const [serverTotalAmount, setServerTotalAmount] = useState('');
     const [file, setFile] = useState(null);
     const [uploadedFilePath, setUploadedFilePath] = useState(null);
+    const formikSetFieldValueRef = useRef(null);
     const [showShippingTip, setShowShippingTip] = useState(false);
     const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
     const [prefillLoading, setPrefillLoading] = useState(false);
@@ -1024,12 +1053,20 @@ const AddSalesInvoice = () => {
         const formatted = formatUiDate(date);
         if (datePickerField === 'invoice') {
             setInvoiceDate(formatted);
+            if (formikSetFieldValueRef.current) {
+                formikSetFieldValueRef.current('OrderDate', formatted);
+            }
             // Auto-calculate due date if days are set
             if (dueDays) {
                 calculateDueDate(date, dueDays);
             }
         }
-        if (datePickerField === 'due') setDueDate(formatted);
+        if (datePickerField === 'due') {
+            setDueDate(formatted);
+            if (formikSetFieldValueRef.current) {
+                formikSetFieldValueRef.current('DueDate', formatted);
+            }
+        }
         if (datePickerField === 'from') setFromDate(formatted);
         if (datePickerField === 'to') setToDate(formatted);
         setOpenDatePicker(false);
@@ -1076,6 +1113,9 @@ const AddSalesInvoice = () => {
             const newDueStr = formatUiDate(newDue);
             console.log('[AddSalesInvoice] calculateDueDate -> base=', baseDate, 'days=', days, 'due=', newDueStr);
             setDueDate(newDueStr);
+            if (formikSetFieldValueRef.current) {
+                formikSetFieldValueRef.current('DueDate', newDueStr);
+            }
         } catch (e) {
             console.warn('calculateDueDate error', e);
         }
@@ -1672,23 +1712,66 @@ const AddSalesInvoice = () => {
                     showsVerticalScrollIndicator={false}
                 >
                     {/* Section 1: Header / Basic Details */}
-                    <AccordionSection
-                        id={1}
-                        title="Header"
-                        expanded={expandedId === 1}
-                        onToggle={headerSubmitted && !headerEditable ? () => { } : toggleSection}
-                        rightActions={
-                            headerSubmitted && !headerEditable ? (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
-                                    <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
-                                    <TouchableOpacity onPress={() => { setHeaderEditable(true); setExpandedId(1); setShowSalesInvoiceNoField(true); }}>
-                                        <Icon name="edit" size={rf(5)} color={COLORS.primary} />
-                                    </TouchableOpacity>
-                                </View>
-
-                            ) : null
-                        }
+                    <Formik
+                        initialValues={{
+                            CustomerName: headerForm.CustomerName || '',
+                            CustomerUUID: headerForm.CustomerUUID || '',
+                            ProjectName: project || '',
+                            ProjectUUID: projectUUID || '',
+                            PaymentTerm: paymentTerm || '',
+                            PaymentTermUUID: paymentTermUuid || '',
+                            PaymentMethod: paymentMethod || '',
+                            PaymentMethodUUID: paymentMethodUUID || '',
+                            OrderDate: invoiceDate || '',
+                            DueDate: dueDate || '',
+                        }}
+                        enableReinitialize
+                        validationSchema={HeaderValidationSchema}
+                        onSubmit={async (values) => {
+                            // Keep local state in sync with Formik values
+                            setHeaderForm(s => ({ ...s, CustomerName: values.CustomerName || '', CustomerUUID: values.CustomerUUID || '' }));
+                            setProject(values.ProjectName || '');
+                            setProjectUUID(values.ProjectUUID || null);
+                            setPaymentTerm(values.PaymentTerm || '');
+                            setPaymentTermUuid(values.PaymentTermUUID || null);
+                            setPaymentMethod(values.PaymentMethod || '');
+                            setPaymentMethodUUID(values.PaymentMethodUUID || null);
+                            setInvoiceDate(values.OrderDate || '');
+                            setDueDate(values.DueDate || '');
+                            
+                            // Call the appropriate submit handler
+                            try {
+                                if (headerUUID && headerEditable) {
+                                    await updateHeader();
+                                } else {
+                                    await submitHeader();
+                                }
+                            } catch (e) {
+                                // Error already handled in handlers
+                            }
+                        }}
                     >
+                        {({ values, handleChange, handleBlur, setFieldValue, errors, touched, submitForm, submitCount }) => {
+                            // Store setFieldValue in ref so date handlers can use it
+                            formikSetFieldValueRef.current = setFieldValue;
+                            return (
+                                <AccordionSection
+                                    id={1}
+                                    title="Header"
+                                    expanded={expandedId === 1}
+                                    onToggle={headerSubmitted && !headerEditable ? () => { } : toggleSection}
+                                    rightActions={
+                                        headerSubmitted && !headerEditable ? (
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
+                                                <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
+                                                <TouchableOpacity onPress={() => { setHeaderEditable(true); setExpandedId(1); setShowSalesInvoiceNoField(true); }}>
+                                                    <Icon name="edit" size={rf(5)} color={COLORS.primary} />
+                                                </TouchableOpacity>
+                                            </View>
+
+                                        ) : null
+                                    }
+                                >
 
 
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
@@ -1758,15 +1841,21 @@ const AddSalesInvoice = () => {
                                 <View style={{ zIndex: 9998, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="-select Customer-"
-                                        value={headerForm.CustomerUUID || headerForm.CustomerName || headerForm.opportunityTitle}
+                                        value={values.CustomerUUID || values.CustomerName || ''}
                                         options={customersOptions}
                                         getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
                                         getKey={c => (c?.UUID || c?.Id || c)}
                                         onSelect={v => {
                                             if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
                                             if (v && typeof v === 'object') {
-                                                setHeaderForm(s => ({ ...s, CustomerName: v?.CustomerName || v?.Name || v, CustomerUUID: v?.UUID || v?.Id || null }));
+                                                const custName = v?.CustomerName || v?.Name || v || '';
+                                                const custUuid = v?.UUID || v?.Id || null;
+                                                setFieldValue('CustomerName', custName);
+                                                setFieldValue('CustomerUUID', custUuid || '');
+                                                setHeaderForm(s => ({ ...s, CustomerName: custName, CustomerUUID: custUuid }));
                                             } else {
+                                                setFieldValue('CustomerName', v || '');
+                                                setFieldValue('CustomerUUID', '');
                                                 setHeaderForm(s => ({ ...s, CustomerName: v, CustomerUUID: null }));
                                             }
                                         }}
@@ -1775,6 +1864,9 @@ const AddSalesInvoice = () => {
                                     // textStyle={inputStyles.input}
                                     />
                                 </View>
+                                {errors.CustomerName && (touched.CustomerName || submitCount > 0) ? (
+                                    <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.CustomerName}</Text>
+                                ) : null}
                             </View>
 
                             <View style={styles.col}>
@@ -1783,15 +1875,19 @@ const AddSalesInvoice = () => {
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="-Select Project-*"
-                                        value={projectUUID || project}
+                                        value={values.ProjectName || ''}
                                         options={projectsOptions}
                                         getLabel={p => (p?.Name || p?.ProjectTitle || String(p))}
                                         getKey={p => (p?.Uuid || p?.Id || p)}
                                         disabled={!headerEditable}
                                         onSelect={v => {
                                             if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
-                                            setProject(v?.ProjectTitle || v);
-                                            setProjectUUID(v?.Uuid || v);
+                                            const projName = v?.ProjectTitle || v?.Name || String(v) || '';
+                                            const projUuid = v?.Uuid || v?.UUID || v?.Id || null;
+                                            setFieldValue('ProjectName', projName);
+                                            setFieldValue('ProjectUUID', projUuid || '');
+                                            setProject(projName);
+                                            setProjectUUID(projUuid);
                                             // Check IsTimesheetBased property
                                             if (v && (v.IsTimesheetBased === true || v.IsTimesheetBased === 'true' || v.isTimesheetBased === true || v.isTimesheetBased === 'true')) {
                                                 setShowTimesheetDates(true);
@@ -1804,6 +1900,9 @@ const AddSalesInvoice = () => {
                                     // textStyle={inputStyles.input}
                                     />
                                 </View>
+                                {errors.ProjectName && (touched.ProjectName || submitCount > 0) ? (
+                                    <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.ProjectName}</Text>
+                                ) : null}
                             </View>
 
 
@@ -1913,16 +2012,22 @@ const AddSalesInvoice = () => {
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="-Select Payment Term-"
-                                        value={paymentTermUuid || paymentTerm}
+                                        value={values.PaymentTerm || ''}
                                         options={paymentTermsOptions}
                                         getLabel={p => p?.Name || p?.Title || String(p)}
                                         getKey={p => p?.UUID || p?.Id || p}
                                         onSelect={v => {
                                             if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
                                             if (v && typeof v === 'object') {
-                                                setPaymentTerm(v?.Name || v?.Title || String(v));
-                                                setPaymentTermUuid(v?.UUID || v?.Id || null);
+                                                const termName = v?.Name || v?.Title || String(v) || '';
+                                                const termUuid = v?.UUID || v?.Id || null;
+                                                setFieldValue('PaymentTerm', termName);
+                                                setFieldValue('PaymentTermUUID', termUuid || '');
+                                                setPaymentTerm(termName);
+                                                setPaymentTermUuid(termUuid);
                                             } else {
+                                                setFieldValue('PaymentTerm', v || '');
+                                                setFieldValue('PaymentTermUUID', '');
                                                 setPaymentTerm(v);
                                                 setPaymentTermUuid(null);
                                             }
@@ -1932,6 +2037,9 @@ const AddSalesInvoice = () => {
                                     // textStyle={inputStyles.input}
                                     />
                                 </View>
+                                {errors.PaymentTerm && (touched.PaymentTerm || submitCount > 0) ? (
+                                    <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.PaymentTerm}</Text>
+                                ) : null}
                             </View>
 
                             <View style={styles.col}>
@@ -1940,16 +2048,22 @@ const AddSalesInvoice = () => {
                                 <View style={{ zIndex: 9998, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="Payment Method"
-                                        value={paymentMethodUUID || paymentMethod}
+                                        value={values.PaymentMethod || ''}
                                         options={paymentMethodsOptions}
                                         getLabel={p => p?.Name || p?.Title || String(p)}
                                         getKey={p => p?.UUID || p?.Id || p}
                                         onSelect={v => {
                                             if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
                                             if (v && typeof v === 'object') {
-                                                setPaymentMethod(v?.Name || v?.Title || String(v));
-                                                setPaymentMethodUUID(v?.UUID || v?.Id || null);
+                                                const methodName = v?.Name || v?.Title || String(v) || '';
+                                                const methodUuid = v?.UUID || v?.Id || null;
+                                                setFieldValue('PaymentMethod', methodName);
+                                                setFieldValue('PaymentMethodUUID', methodUuid || '');
+                                                setPaymentMethod(methodName);
+                                                setPaymentMethodUUID(methodUuid);
                                             } else {
+                                                setFieldValue('PaymentMethod', v || '');
+                                                setFieldValue('PaymentMethodUUID', '');
                                                 setPaymentMethod(v);
                                                 setPaymentMethodUUID(null);
                                             }
@@ -1959,6 +2073,9 @@ const AddSalesInvoice = () => {
                                     // textStyle={inputStyles.input}
                                     />
                                 </View>
+                                {errors.PaymentMethod && (touched.PaymentMethod || submitCount > 0) ? (
+                                    <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.PaymentMethod}</Text>
+                                ) : null}
                             </View>
 
 
@@ -1986,32 +2103,35 @@ const AddSalesInvoice = () => {
                                             style={[
                                                 inputStyles.input,
                                                 styles.datePickerText,
-                                                !invoiceDate && {
+                                                !values.OrderDate && {
                                                     color: COLORS.textLight,
                                                     fontFamily: TYPOGRAPHY.fontFamilyRegular,
                                                 },
-                                                invoiceDate && {
+                                                values.OrderDate && {
                                                     color: COLORS.text,
                                                     fontFamily: TYPOGRAPHY.fontFamilyMedium,
                                                 },
                                             ]}
                                         >
-                                            {invoiceDate || 'Order Date*'}
+                                            {values.OrderDate || 'Order Date*'}
                                         </Text>
                                         <View
                                             style={[
                                                 styles.calendarIconContainer,
-                                                invoiceDate && styles.calendarIconContainerSelected,
+                                                values.OrderDate && styles.calendarIconContainerSelected,
                                             ]}
                                         >
                                             <Icon
                                                 name="calendar-today"
                                                 size={rf(3.2)}
-                                                color={invoiceDate ? COLORS.primary : COLORS.textLight}
+                                                color={values.OrderDate ? COLORS.primary : COLORS.textLight}
                                             />
                                         </View>
                                     </View>
                                 </TouchableOpacity>
+                                {errors.OrderDate && (touched.OrderDate || submitCount > 0) ? (
+                                    <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.OrderDate}</Text>
+                                ) : null}
                             </View>
                             <View style={styles.col}>
                                 <Text style={inputStyles.label}>Days</Text>
@@ -2056,32 +2176,35 @@ const AddSalesInvoice = () => {
                                             style={[
                                                 inputStyles.input,
                                                 styles.datePickerText,
-                                                !dueDate && {
+                                                !values.DueDate && {
                                                     color: COLORS.textLight,
                                                     fontFamily: TYPOGRAPHY.fontFamilyRegular,
                                                 },
-                                                dueDate && {
+                                                values.DueDate && {
                                                     color: COLORS.text,
                                                     fontFamily: TYPOGRAPHY.fontFamilyMedium,
                                                 },
                                             ]}
                                         >
-                                            {dueDate || 'Due Date*'}
+                                            {values.DueDate || 'Due Date*'}
                                         </Text>
                                         <View
                                             style={[
                                                 styles.calendarIconContainer,
-                                                dueDate && styles.calendarIconContainerSelected,
+                                                values.DueDate && styles.calendarIconContainerSelected,
                                             ]}
                                         >
                                             <Icon
                                                 name="calendar-today"
                                                 size={rf(3.2)}
-                                                color={dueDate ? COLORS.primary : COLORS.textLight}
+                                                color={values.DueDate ? COLORS.primary : COLORS.textLight}
                                             />
                                         </View>
                                     </View>
                                 </TouchableOpacity>
+                                {errors.DueDate && (touched.DueDate || submitCount > 0) ? (
+                                    <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.DueDate}</Text>
+                                ) : null}
                             </View>
 
                             {showSalesInvoiceNoField && (
@@ -2107,14 +2230,7 @@ const AddSalesInvoice = () => {
                             <TouchableOpacity
                                 activeOpacity={0.8}
                                 onPress={() => {
-                                    console.log('Button pressed - headerUUID:', headerUUID, 'headerEditable:', headerEditable);
-                                    if (headerUUID && headerEditable) {
-                                        console.log('Calling updateHeader');
-                                        updateHeader();
-                                    } else {
-                                        console.log('Calling submitHeader');
-                                        submitHeader();
-                                    }
+                                    submitForm();
                                 }}
                                 style={{
                                     backgroundColor: COLORS.primary,
@@ -2133,8 +2249,10 @@ const AddSalesInvoice = () => {
                                 )}
                             </TouchableOpacity>
                         </View>
-
-                    </AccordionSection>
+                                </AccordionSection>
+                            );
+                        }}
+                    </Formik>
 
                     {restrictToHeader && !headerSubmitted ? (
                         <View style={{ padding: hp(2), alignItems: 'center' }}>

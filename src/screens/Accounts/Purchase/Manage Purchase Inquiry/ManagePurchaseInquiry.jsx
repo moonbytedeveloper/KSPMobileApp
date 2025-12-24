@@ -1143,7 +1143,7 @@ const AddSalesInquiry = () => {
                                             !requestedDate && { color: COLORS.textLight, fontFamily: TYPOGRAPHY.fontFamilyRegular },
                                             requestedDate && { color: COLORS.text, fontFamily: TYPOGRAPHY.fontFamilyMedium }
                                         ]}>
-                                            {requestedDate || 'mm/dd/yyyy'}
+                                            {requestedDate || 'dd/mm/yyyy'}
                                         </Text>
                                         <View style={[
                                             styles.calendarIconContainer,
@@ -1240,7 +1240,7 @@ const AddSalesInquiry = () => {
                                             !expectedPurchaseDate && { color: COLORS.textLight, fontFamily: TYPOGRAPHY.fontFamilyRegular },
                                             expectedPurchaseDate && { color: COLORS.text, fontFamily: TYPOGRAPHY.fontFamilyMedium }
                                         ]}>
-                                            {expectedPurchaseDate || 'mm/dd/yyyy'}
+                                            {expectedPurchaseDate || 'dd/mm/yyyy'}
                                         </Text>
                                         <View style={[
                                             styles.calendarIconContainer,

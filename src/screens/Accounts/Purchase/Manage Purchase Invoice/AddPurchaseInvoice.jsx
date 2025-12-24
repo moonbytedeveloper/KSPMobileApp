@@ -869,7 +869,7 @@ const AddPurchaseInvoice = () => {
                 setMasterItemsLoading(true);
                 const c = await getCMPUUID();
                 const e = await getENVUUID();
-                const resp = await getItems({ cmpUuid: c, envUuid: e });
+                const resp = await getItems({ cmpUuid: c, envUuid: e,mode:"Purchase"  });
                 console.log('getItems raw response ->', JSON.stringify(resp, null, 2));
                 const rawList = resp?.Data?.Records || resp?.Data || resp || [];
                 console.log('getItems rawList ->', JSON.stringify(rawList && (Array.isArray(rawList) ? rawList.slice(0, 5) : rawList), null, 2));

@@ -400,7 +400,7 @@ const SalesPerfomaInvoice = () => {
                 title="Sales Perfoma Invoice"
                 onLeftPress={() => navigation.goBack()}
                 onRightPress={() => navigation.navigate('AddSalesPerfomaInvoice')}
-                rightButtonLabel="Add Perfoma Invoice"
+                rightButtonLabel="Add Perfoma In"
                 showRight
             />
             <View style={styles.headerSeparator} />

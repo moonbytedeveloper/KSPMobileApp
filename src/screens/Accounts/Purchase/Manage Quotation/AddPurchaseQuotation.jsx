@@ -1265,7 +1265,7 @@ const AddPurchaseQuotation = () => {
     const load = async () => {
       try {
         setMasterItemsLoading(true);
-        const resp = await getItems();
+        const resp = await getItems({mode:"Purchase"});
         const rawList = resp?.Data?.Records || resp?.Data || resp || [];
         const list = Array.isArray(rawList) ? rawList : [];
         const normalized = list.map(it => ({

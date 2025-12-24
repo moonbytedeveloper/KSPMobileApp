@@ -701,17 +701,30 @@ export async function getItemMasters({ itemTypeUuid, cmpUuid, envUuid, userUuid 
 }
 
 // Get items list (supports optional search / pagination)
-export async function getItems({ search, page, pageSize, cmpUuid, envUuid, userUuid } = {}) {
+export async function getItems({ search, page, pageSize, cmpUuid, envUuid, userUuid, mode } = {}) {
     const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
     const params = { cmpUuid: c, envUuid: e, userUuid: u };
     if (search) params.search = search;
     if (page) params.page = page;
     if (pageSize) params.pageSize = pageSize;
+    // allow callers to request items for a specific mode (e.g., 'Sales' or 'Purchase')
+    if (mode) params.mode = mode;
     try {
+        console.log('[authServices] getItems params ->', params);
         const resp = await api.get(PATHS.getItems, { params });
+        console.log('[authServices] getItems response status ->', resp?.status);
+        // Log small sample of response data for debugging
+        try {
+            const d = resp && resp.data;
+            if (Array.isArray(d)) {
+                console.log('[authServices] getItems data sample ->', JSON.stringify(d.slice(0, 5), null, 2));
+            } else {
+                console.log('[authServices] getItems data ->', JSON.stringify(d, null, 2));
+            }
+        } catch (e) { console.warn('[authServices] getItems logging error ->', e); }
         return resp.data;
     } catch (err) {
-        console.error('[authServices] getItems error ->', err && (err.message || err));
+        console.error('[authServices] getItems error ->', err && (err.message || err), err);
         throw err;
     }
 }

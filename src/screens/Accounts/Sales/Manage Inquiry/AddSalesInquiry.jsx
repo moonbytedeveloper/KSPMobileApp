@@ -1,4 +1,6 @@
 import React, { useState, useRef } from 'react';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import Dropdown from '../../../../components/common/Dropdown';
@@ -37,6 +39,20 @@ const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyl
         </View>
     );
 };
+
+// Validation schema for Header form
+const HeaderValidationSchema = Yup.object().shape({
+    ProjectName: Yup.string().test('project-or-uuid', 'Project is required', function (val) {
+        const { ProjectUUID } = this.parent || {};
+        const hasVal = typeof val === 'string' && val.trim() !== '';
+        const hasUuid = typeof ProjectUUID === 'string' && ProjectUUID.trim() !== '';
+        return !!(hasVal || hasUuid);
+    }),
+    CustomerUUID: Yup.string().trim().required('Customer is required'),
+    CustomerName: Yup.string().trim().required('Customer is required'),
+    OrderDate: Yup.string().trim().required('Ordered Date is required'),
+    RequestedDeliveryDate: Yup.string().trim().required('Requested Delivery Date is required'),
+});
 
 const AddSalesInquiry = () => {
     const [expandedId, setExpandedId] = useState(1);
@@ -152,6 +168,8 @@ const AddSalesInquiry = () => {
     const userEditedRef = useRef({ project: false, customer: false, requestedDate: false, expectedDate: false });
     // Prevent repeated prefill handling when route params change frequently
     const prefillHandledRef = useRef(false);
+    // Ref for Formik setFieldValue to update dates from handlers
+    const formikSetFieldValueRef = useRef(null);
 
     // Line items state
     const [lineItems, setLineItems] = useState([]);
@@ -213,10 +231,18 @@ const AddSalesInquiry = () => {
         if (datePickerField === 'requested') {
             setRequestedDate(formatted);
             userEditedRef.current.requestedDate = true;
+            // Update Formik if available
+            if (formikSetFieldValueRef.current) {
+                formikSetFieldValueRef.current('OrderDate', formatted);
+            }
         }
         if (datePickerField === 'expected') {
             setExpectedPurchaseDate(formatted);
             userEditedRef.current.expectedDate = true;
+            // Update Formik if available
+            if (formikSetFieldValueRef.current) {
+                formikSetFieldValueRef.current('RequestedDeliveryDate', formatted);
+            }
         }
         setOpenDatePicker(false);
         setDatePickerField(null);
@@ -913,22 +939,58 @@ const AddSalesInquiry = () => {
                 <View style={styles.headerSeparator} />
                 <ScrollView contentContainerStyle={[styles.container]} showsVerticalScrollIndicator={false}>
                     {/* Section 1: HEADER */}
-                    <AccordionSection
-                        id={1}
-                        title="HEADER"
-                        expanded={expandedId === 1}
-                        onToggle={handleHeaderToggle}
-                        rightActions={
-                            headerSaved ? (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
-                                    <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
-                                    <TouchableOpacity onPress={() => enterHeaderEditMode()}>
-                                        <Icon name="edit" size={rf(5)} color={COLORS.primary} />
-                                    </TouchableOpacity>
-                                </View>
-                            ) : null
-                        }
+                    <Formik
+                        initialValues={{
+                            ProjectName: projectName || '',
+                            ProjectUUID: projectUuid || '',
+                            CustomerName: customerName || '',
+                            CustomerUUID: customerUuid || '',
+                            OrderDate: requestedDate || '',
+                            RequestedDeliveryDate: expectedPurchaseDate || '',
+                        }}
+                        enableReinitialize
+                        validationSchema={HeaderValidationSchema}
+                        onSubmit={async (values) => {
+                            // Keep local state in sync with Formik values
+                            setProjectName(values.ProjectName || '');
+                            setProjectUuid(values.ProjectUUID || null);
+                            setCustomerName(values.CustomerName || '');
+                            setCustomerUuid(values.CustomerUUID || null);
+                            setRequestedDate(values.OrderDate || '');
+                            setExpectedPurchaseDate(values.RequestedDeliveryDate || '');
+                            
+                            // Call the appropriate submit handler
+                            try {
+                                if (headerEditing) {
+                                    await handleUpdateHeader();
+                                } else {
+                                    await handleSubmitHeader();
+                                }
+                            } catch (e) {
+                                // Error already handled in handlers
+                            }
+                        }}
                     >
+                        {({ values, handleChange, handleBlur, setFieldValue, errors, touched, submitForm, submitCount }) => {
+                            // Store setFieldValue in ref so date handlers can use it
+                            formikSetFieldValueRef.current = setFieldValue;
+                            return (
+                                <AccordionSection
+                                    id={1}
+                                    title="HEADER"
+                                    expanded={expandedId === 1}
+                                    onToggle={handleHeaderToggle}
+                                    rightActions={
+                                        headerSaved ? (
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
+                                                <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
+                                                <TouchableOpacity onPress={() => enterHeaderEditMode()}>
+                                                    <Icon name="edit" size={rf(5)} color={COLORS.primary} />
+                                                </TouchableOpacity>
+                                            </View>
+                                        ) : null
+                                    }
+                                >
                         {showInquiryNoField && (
                             <View style={[styles.row, { marginBottom: hp(1.2) }]}>
                                 <View style={styles.col}>
@@ -946,135 +1008,163 @@ const AddSalesInquiry = () => {
                             </View>
                         )}
 
-                        <View style={styles.row}>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Project Name*</Text>
-                                <View style={{ zIndex: 9998, elevation: 20 }}>
-                                    <Dropdown
-                                        placeholder="- Select Project -"
-                                        value={projectName}
-                                        options={projects}
-                                        getLabel={(p) => p?.ProjectTitle || p?.Name || p?.DisplayName || p?.name || ''}
-                                        getKey={(p) => p?.Uuid || p?.UUID || p?.Id || p?.id || (p?.ProjectTitle ?? p)}
-                                        onSelect={(v) => {
-                                            if (v && typeof v === 'object') {
-                                                setProjectName(v?.ProjectTitle || v?.Name || v?.DisplayName || v?.name || '');
-                                                setProjectUuid(v?.Uuid || v?.UUID || v?.Id || v?.id || null);
-                                                userEditedRef.current.project = true;
-                                            } else {
-                                                setProjectName(v);
-                                                setProjectUuid(null);
-                                                userEditedRef.current.project = true;
-                                            }
-                                        }}
-                                        renderInModal={true}
-                                        inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                    // textStyle={inputStyles.input}
-                                    />
-                                </View>
-                            </View>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Customer Name*</Text>
-                                <View style={{ zIndex: 9999, elevation: 20 }}>
-                                    <Dropdown
-                                        placeholder="- Select Customer -"
-                                        value={customerUuid || customerName}
-                                        options={customers}
-                                        getLabel={(c) => c?.Name || c?.DisplayName || c?.name || ''}
-                                        getKey={(c) => c?.UUID || c?.Id || c?.id || (c?.Name ?? c)}
-                                        onSelect={(v) => {
-                                            // Dropdown returns the selected item (object)
-                                            if (v && typeof v === 'object') {
-                                                setCustomerName(v?.Name || v?.DisplayName || v?.name || '');
-                                                setCustomerUuid(v?.UUID || v?.Id || v?.id || null);
-                                                userEditedRef.current.customer = true;
-                                            } else {
-                                                // fallback for string values
-                                                setCustomerName(v);
-                                                setCustomerUuid(null);
-                                                userEditedRef.current.customer = true;
-                                            }
-                                        }}
-                                        renderInModal={true}
-                                        inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                    // textStyle={inputStyles.input}
-                                    />
-                                </View>
-                            </View>
-                        </View>
-
-                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Ordered Date*</Text>
-                                <TouchableOpacity
-                                    activeOpacity={0.7}
-                                    onPress={() => openDatePickerFor('requested')}
-                                    style={{ marginTop: hp(0.8) }}
-                                >
-                                    <View style={[inputStyles.box, styles.innerFieldBox, styles.datePickerBox, { alignItems: 'center' }]}>
-                                        <Text style={[
-                                            inputStyles.input,
-                                            styles.datePickerText,
-                                            !requestedDate && { color: COLORS.textLight, fontFamily: TYPOGRAPHY.fontFamilyRegular },
-                                            requestedDate && { color: COLORS.text, fontFamily: TYPOGRAPHY.fontFamilyMedium }
-                                        ]}>
-                                            {requestedDate || 'mm/dd/yyyy'}
-                                        </Text>
-                                        <View style={[
-                                            styles.calendarIconContainer,
-                                            requestedDate && styles.calendarIconContainerSelected
-                                        ]}>
-                                            <Icon
-                                                name="calendar-today"
-                                                size={rf(3.2)}
-                                                color={requestedDate ? COLORS.primary : COLORS.textLight}
-                                            />
+                                    <View style={styles.row}>
+                                        <View style={styles.col}>
+                                            <Text style={inputStyles.label}>Project Name*</Text>
+                                            <View style={{ zIndex: 9998, elevation: 20 }}>
+                                                <Dropdown
+                                                    placeholder="- Select Project -"
+                                                    value={values.ProjectName || ''}
+                                                    options={projects}
+                                                    getLabel={(p) => p?.ProjectTitle || p?.Name || p?.DisplayName || p?.name || ''}
+                                                    getKey={(p) => p?.Uuid || p?.UUID || p?.Id || p?.id || (p?.ProjectTitle ?? p)}
+                                                    onSelect={(v) => {
+                                                        if (v && typeof v === 'object') {
+                                                            const projName = v?.ProjectTitle || v?.Name || v?.DisplayName || v?.name || '';
+                                                            const projUuid = v?.Uuid || v?.UUID || v?.Id || v?.id || null;
+                                                            setFieldValue('ProjectName', projName);
+                                                            setFieldValue('ProjectUUID', projUuid || '');
+                                                            setProjectName(projName);
+                                                            setProjectUuid(projUuid);
+                                                            userEditedRef.current.project = true;
+                                                        } else {
+                                                            setFieldValue('ProjectName', v || '');
+                                                            setFieldValue('ProjectUUID', '');
+                                                            setProjectName(v);
+                                                            setProjectUuid(null);
+                                                            userEditedRef.current.project = true;
+                                                        }
+                                                    }}
+                                                    renderInModal={true}
+                                                    inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                                                />
+                                            </View>
+                                            {errors.ProjectName && (touched.ProjectName || submitCount > 0) ? (
+                                                <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.ProjectName}</Text>
+                                            ) : null}
+                                        </View>
+                                        <View style={styles.col}>
+                                            <Text style={inputStyles.label}>Customer Name*</Text>
+                                            <View style={{ zIndex: 9999, elevation: 20 }}>
+                                                <Dropdown
+                                                    placeholder="- Select Customer -"
+                                                    value={values.CustomerUUID || values.CustomerName || ''}
+                                                    options={customers}
+                                                    getLabel={(c) => c?.Name || c?.DisplayName || c?.name || ''}
+                                                    getKey={(c) => c?.UUID || c?.Id || c?.id || (c?.Name ?? c)}
+                                                    onSelect={(v) => {
+                                                        // Dropdown returns the selected item (object)
+                                                        if (v && typeof v === 'object') {
+                                                            const custName = v?.Name || v?.DisplayName || v?.name || '';
+                                                            const custUuid = v?.UUID || v?.Id || v?.id || null;
+                                                            setFieldValue('CustomerName', custName);
+                                                            setFieldValue('CustomerUUID', custUuid || '');
+                                                            setCustomerName(custName);
+                                                            setCustomerUuid(custUuid);
+                                                            userEditedRef.current.customer = true;
+                                                        } else {
+                                                            // fallback for string values
+                                                            setFieldValue('CustomerName', v || '');
+                                                            setFieldValue('CustomerUUID', '');
+                                                            setCustomerName(v);
+                                                            setCustomerUuid(null);
+                                                            userEditedRef.current.customer = true;
+                                                        }
+                                                    }}
+                                                    renderInModal={true}
+                                                    inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                                                />
+                                            </View>
+                                            {errors.CustomerName && (touched.CustomerName || submitCount > 0) ? (
+                                                <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.CustomerName}</Text>
+                                            ) : null}
                                         </View>
                                     </View>
-                                </TouchableOpacity>
-                            </View>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Requested Delivery Date*</Text>
-                                <TouchableOpacity
-                                    activeOpacity={0.7}
-                                    onPress={() => openDatePickerFor('expected')}
-                                    style={{ marginTop: hp(0.8) }}
-                                >
-                                    <View style={[inputStyles.box, styles.innerFieldBox, styles.datePickerBox, { alignItems: 'center' }]}>
-                                        <Text style={[
-                                            inputStyles.input,
-                                            styles.datePickerText,
-                                            !expectedPurchaseDate && { color: COLORS.textLight, fontFamily: TYPOGRAPHY.fontFamilyRegular },
-                                            expectedPurchaseDate && { color: COLORS.text, fontFamily: TYPOGRAPHY.fontFamilyMedium }
-                                        ]}>
-                                            {expectedPurchaseDate || 'mm/dd/yyyy'}
-                                        </Text>
-                                        <View style={[
-                                            styles.calendarIconContainer,
-                                            expectedPurchaseDate && styles.calendarIconContainerSelected
-                                        ]}>
-                                            <Icon
-                                                name="calendar-today"
-                                                size={rf(3.2)}
-                                                color={expectedPurchaseDate ? COLORS.primary : COLORS.textLight}
-                                            />
+
+                                    <View style={[styles.row, { marginTop: hp(1.5) }]}>
+                                        <View style={styles.col}>
+                                            <Text style={inputStyles.label}>Ordered Date*</Text>
+                                            <TouchableOpacity
+                                                activeOpacity={0.7}
+                                                onPress={() => {
+                                                    openDatePickerFor('requested');
+                                                }}
+                                                style={{ marginTop: hp(0.8) }}
+                                            >
+                                                <View style={[inputStyles.box, styles.innerFieldBox, styles.datePickerBox, { alignItems: 'center' }]}>
+                                                    <Text style={[
+                                                        inputStyles.input,
+                                                        styles.datePickerText,
+                                                        !values.OrderDate && { color: COLORS.textLight, fontFamily: TYPOGRAPHY.fontFamilyRegular },
+                                                        values.OrderDate && { color: COLORS.text, fontFamily: TYPOGRAPHY.fontFamilyMedium }
+                                                    ]}>
+                                                        {values.OrderDate || 'dd/mm/yyyy'}
+                                                    </Text>
+                                                    <View style={[
+                                                        styles.calendarIconContainer,
+                                                        values.OrderDate && styles.calendarIconContainerSelected
+                                                    ]}>
+                                                        <Icon
+                                                            name="calendar-today"
+                                                            size={rf(3.2)}
+                                                            color={values.OrderDate ? COLORS.primary : COLORS.textLight}
+                                                        />
+                                                    </View>
+                                                </View>
+                                            </TouchableOpacity>
+                                            {errors.OrderDate && (touched.OrderDate || submitCount > 0) ? (
+                                                <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.OrderDate}</Text>
+                                            ) : null}
+                                        </View>
+                                        <View style={styles.col}>
+                                            <Text style={inputStyles.label}>Requested Delivery Date*</Text>
+                                            <TouchableOpacity
+                                                activeOpacity={0.7}
+                                                onPress={() => {
+                                                    openDatePickerFor('expected');
+                                                }}
+                                                style={{ marginTop: hp(0.8) }}
+                                            >
+                                                <View style={[inputStyles.box, styles.innerFieldBox, styles.datePickerBox, { alignItems: 'center' }]}>
+                                                    <Text style={[
+                                                        inputStyles.input,
+                                                        styles.datePickerText,
+                                                        !values.RequestedDeliveryDate && { color: COLORS.textLight, fontFamily: TYPOGRAPHY.fontFamilyRegular },
+                                                        values.RequestedDeliveryDate && { color: COLORS.text, fontFamily: TYPOGRAPHY.fontFamilyMedium }
+                                                    ]}>
+                                                        {values.RequestedDeliveryDate || 'dd/mm/yyyy'}
+                                                    </Text>
+                                                    <View style={[
+                                                        styles.calendarIconContainer,
+                                                        values.RequestedDeliveryDate && styles.calendarIconContainerSelected
+                                                    ]}>
+                                                        <Icon
+                                                            name="calendar-today"
+                                                            size={rf(3.2)}
+                                                            color={values.RequestedDeliveryDate ? COLORS.primary : COLORS.textLight}
+                                                        />
+                                                    </View>
+                                                </View>
+                                            </TouchableOpacity>
+                                            {errors.RequestedDeliveryDate && (touched.RequestedDeliveryDate || submitCount > 0) ? (
+                                                <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.RequestedDeliveryDate}</Text>
+                                            ) : null}
                                         </View>
                                     </View>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                        <View style={{ marginTop: hp(2), flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' }}>
-                            <TouchableOpacity
-                                activeOpacity={0.85}
-                                style={[styles.submitButton, headerSubmitting && styles.submitButtonDisabled]}
-                                onPress={headerEditing ? handleUpdateHeader : handleSubmitHeader}
-                                disabled={headerSubmitting}
-                            >
-                                <Text style={styles.submitButtonText}>{headerSubmitting ? (headerEditing ? 'Updating...' : 'Saving...') : (headerEditing ? 'Update Header' : 'Save Header')}</Text>
-                            </TouchableOpacity>
-
-                        </View>
-                    </AccordionSection>
+                                    <View style={{ marginTop: hp(2), flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                        <TouchableOpacity
+                                            activeOpacity={0.85}
+                                            style={[styles.submitButton, headerSubmitting && styles.submitButtonDisabled]}
+                                            onPress={submitForm}
+                                            disabled={headerSubmitting}
+                                        >
+                                            <Text style={styles.submitButtonText}>{headerSubmitting ? (headerEditing ? 'Updating...' : 'Saving...') : (headerEditing ? 'Update Header' : 'Save Header')}</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </AccordionSection>
+                            );
+                        }}
+                    </Formik>
 
                     {/* Section 2: LINE */}
                     {headerSaved && (

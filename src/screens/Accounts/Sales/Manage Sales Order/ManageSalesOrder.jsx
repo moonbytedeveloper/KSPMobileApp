@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Formik, ErrorMessage } from 'formik';
+import * as Yup from 'yup';
 import {
   View,
   Text,
@@ -79,10 +81,54 @@ const AccordionSection = ({
   );
 };
 
+// Validation schema for Header form (fields marked with '*')
+const HeaderValidationSchema = Yup.object().shape({
+  // Header fields
+  CustomerName: Yup.string().trim().required('Customer is required'),
+  Project: Yup.string().test('project-or-uuid', 'Project is required', function (val) {
+    const { ProjectUUID } = this.parent || {};
+    const hasVal = typeof val === 'string' && val.trim() !== '';
+    const hasUuid = typeof ProjectUUID === 'string' && ProjectUUID.trim() !== '';
+    return !!(hasVal || hasUuid);
+  }),
+  PaymentTerm: Yup.string().test('paymentterm-or-uuid', 'Payment term is required', function (val) {
+    const { PaymentTermUUID } = this.parent || {};
+    const hasVal = typeof val === 'string' && val.trim() !== '';
+    const hasUuid = typeof PaymentTermUUID === 'string' && PaymentTermUUID.trim() !== '';
+    return !!(hasVal || hasUuid);
+  }),
+  PaymentMethod: Yup.string().test('paymentmethod-or-uuid', 'Payment method is required', function (val) {
+    const { PaymentMethodUUID } = this.parent || {};
+    const hasVal = typeof val === 'string' && val.trim() !== '';
+    const hasUuid = typeof PaymentMethodUUID === 'string' && PaymentMethodUUID.trim() !== '';
+    return !!(hasVal || hasUuid);
+  }),
+  OrderDate: Yup.string().trim().required('Order date is required'),
+  DueDate: Yup.string().trim().required('Due date is required'),
+  DueDays: Yup.string().trim().required('Days is required'),
+  
+  // Billing Address fields
+  BillingBuildingNo: Yup.string().trim().required('Building No. is required'),
+  BillingStreet1: Yup.string().trim().required('Street 1 is required'),
+  BillingPostalCode: Yup.string().trim().required('Postal Code is required'),
+  BillingCountryUUID: Yup.string().trim().required('Country is required'),
+  BillingStateUUID: Yup.string().trim().required('State is required'),
+  BillingCityUUID: Yup.string().trim().required('City is required'),
+  
+  // Shipping Address fields
+  ShippingBuildingNo: Yup.string().trim().required('Building No. is required'),
+  ShippingStreet1: Yup.string().trim().required('Street 1 is required'),
+  ShippingPostalCode: Yup.string().trim().required('Postal Code is required'),
+  ShippingCountryUUID: Yup.string().trim().required('Country is required'),
+  ShippingStateUUID: Yup.string().trim().required('State is required'),
+  ShippingCityUUID: Yup.string().trim().required('City is required'),
+});
+
 const ManageSalesOrder = () => {
   const themeColors = useThemeColors();
   const [expandedIds, setExpandedIds] = useState([1]);
   const navigation = useNavigation();
+  const route = useRoute();
   const toggleSection = id => setExpandedIds(prev => {
     const has = Array.isArray(prev) ? prev.includes(id) : prev === id;
     if (has) return (Array.isArray(prev) ? prev.filter(x => x !== id) : []);
@@ -98,283 +144,11 @@ const ManageSalesOrder = () => {
   };
 
   // Demo options for dropdowns
-  <View style={styles.addButtonWrapperRow}>
-    <TouchableOpacity activeOpacity={0.8} style={styles.addButton} onPress={handleAddLineItem}>
-      <Text style={styles.addButtonText}>{editItemId ? 'Update' : 'Add'}</Text>
-    </TouchableOpacity>
-    <TouchableOpacity
-      activeOpacity={0.8}
-      style={[styles.addButton, { backgroundColor: '#6c757d', marginLeft: wp(3) }]}
-      onPress={() => {
-        // Cancel/clear current line editor
-        setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
-        setEditItemId(null);
-      }}
-    >
-      <Text style={styles.addButtonText}>Cancel</Text>
-    </TouchableOpacity>
-  </View> 
-
-  // Master items (loaded from server)
-  const [masterItems, setMasterItems] = useState([]);
-  const [masterItemsLoading, setMasterItemsLoading] = useState(false);
-
-  // Load master items from API on mount
-  React.useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      try {
-        setMasterItemsLoading(true);
-        const c = await getCMPUUID();
-        const e = await getENVUUID();
-        const resp = await getItems({ cmpUuid: c, envUuid: e });
-        const rawList = resp?.Data?.Records || resp?.Data || resp || [];
-        const list = Array.isArray(rawList) ? rawList : [];
-        const normalized = list.map(it => ({
-          name: it?.Name || it?.name || it?.ItemName || '',
-          sku: it?.SKU || it?.sku || it?.Sku || it?.ItemCode || '',
-          rate: (it?.Rate ?? it?.rate ?? it?.Price) || 0,
-          desc: it?.Description || it?.description || it?.Desc || '',
-          hsn: it?.HSNCode || it?.hsn || it?.HSN || '',
-          uuid: it?.UUID || it?.Uuid || it?.uuid || null,
-          raw: it,
-        }));
-        console.log(normalized, 'get itemsss');
-
-        if (mounted) setMasterItems(normalized);
-      } catch (err) {
-        console.warn('getItems failed', err);
-        if (mounted) setMasterItems([]);
-      } finally {
-        if (mounted) setMasterItemsLoading(false);
-      }
-    };
-    load();
-    return () => { mounted = false; };
-  }, []);
-  const [SalesInquiryNo, setSalesInquiry] = useState('');
-  // Form state
-  const [headerForm, setHeaderForm] = useState({
-    SalesInquiryUUID: '',
-    SalesInquiryNo: '',
-    CustomerUUID: '',
-    CustomerName: '',
-    SalesOrderNo: '',
-    DueDays: '',
-  });
-  const [dueDays, setDueDays] = useState();
-  const dueDaysRef = React.useRef('');
-  React.useEffect(() => {
-    // sync headerForm.DueDays into dueDays when headerForm is prefilled
-    try {
-      const hf = headerForm?.DueDays;
-      if (typeof hf !== 'undefined' && String(hf) !== String(dueDays)) {
-        setDueDays(hf ?? 0);
-      }
-    } catch (e) { /* ignore */ }
-  }, [headerForm?.DueDays]);
-  const [billingForm, setBillingForm] = useState({
-    buildingNo: '',
-    street1: '',
-    street2: '',
-    postalCode: '',
-    country: '',
-    state: '',
-    city: '',
-  });
-  const [shippingForm, setShippingForm] = useState({
-    buildingNo: '',
-    street1: '',
-    street2: '',
-    postalCode: '',
-    country: '',
-    state: '',
-    city: '',
-  });
-  const [isShippingSame, setIsShippingSame] = useState(false);
-  const [items, setItems] = useState([]);
-  const [invoiceDate, setInvoiceDate] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [headerHasDates, setHeaderHasDates] = useState(false);
-  const [openDatePicker, setOpenDatePicker] = useState(false);
-  const [datePickerField, setDatePickerField] = useState(null); // 'invoice' | 'due'
-  const [datePickerSelectedDate, setDatePickerSelectedDate] = useState(
-    new Date(),
-  );
-  const [paymentTerm, setPaymentTerm] = useState('');
-  const [paymentTermUuid, setPaymentTermUuid] = useState(null);
-  const [notes, setNotes] = useState('');
-  const [terms, setTerms] = useState('');
-  const [project, setProject] = useState('');
-  const [projectUUID, setProjectUUID] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('');
-  const [paymentMethodUUID, setPaymentMethodUUID] = useState('');
-  const [shippingCharges, setShippingCharges] = useState('0');
-  const [adjustments, setAdjustments] = useState('0');
-  const [adjustmentLabel, setAdjustmentLabel] = useState('Adjustments');
-  const [totalTax, setTotalTax] = useState('0');
-  const [serverTotalAmount, setServerTotalAmount] = useState('');
-  const [linesLoading, setLinesLoading] = useState(false);
-  const [file, setFile] = useState(null);
-  const [uploadedFilePath, setUploadedFilePath] = useState(null);
-  const [showShippingTip, setShowShippingTip] = useState(false);
-  const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
-  const [headerSaved, setHeaderSaved] = useState(false);
-  const [headerResponse, setHeaderResponse] = useState(null);
-  const [isPrefilling, setIsPrefilling] = useState(false);
-  const [isSavingHeader, setIsSavingHeader] = useState(false);
-  const [isEditingHeader, setIsEditingHeader] = useState(false);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [reloadAttempts, setReloadAttempts] = useState(0);
-  const MAX_RELOAD_ATTEMPTS = 5;
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-  const [customersOptions, setCustomersOptions] = useState([]);
-  const [paymentTermsOptions, setPaymentTermsOptions] = useState([]);
-  const [paymentMethodsOptions, setPaymentMethodsOptions] = useState([]);
-  const [projectsOptions, setProjectsOptions] = useState([]);
-  const [countriesOptions, setCountriesOptions] = useState([]);
-  const [salesInquiryNosOptions, setSalesInquiryNosOptions] = useState([]);
-  const [statesOptions, setStatesOptions] = useState([]);
-  const [citiesOptions, setCitiesOptions] = useState([]);
-  const [shippingStatesOptions, setShippingStatesOptions] = useState([]);
-  const [shippingCitiesOptions, setShippingCitiesOptions] = useState([]);
-  // Selected objects for billing/shipping dropdowns (LeadForm pattern)
-  const [selectedBillingCountry, setSelectedBillingCountry] = useState(null);
-  const [selectedBillingState, setSelectedBillingState] = useState(null);
-  const [selectedBillingCity, setSelectedBillingCity] = useState(null);
-  const [selectedShippingCountry, setSelectedShippingCountry] = useState(null);
-  const [selectedShippingState, setSelectedShippingState] = useState(null);
-  const [selectedShippingCity, setSelectedShippingCity] = useState(null);
-  const route = useRoute();
-
-  // Helper to prefill header/billing/shipping from a server/object payload
+  // Prefill helper: move this block into a function so its try/catch is scoped
   const prefillFromData = (data) => {
-    if (!data) return;
     try {
-      const resolveUuid = (val) => {
-        if (!val) return '';
-        if (typeof val === 'string') return val;
-        return val?.UUID || val?.Uuid || val?.Id || val?.Id || val?.CountryUuid || val?.CountryId || '';
-      };
-      // Prefill header fields (best-effort mapping)
-      setHeaderForm(s => ({
-        ...s,
-        SalesOrderNo: data?.SalesOrderNo || data?.SalesOrderNumber || data?.SalesOrder || s.SalesOrderNo || '',
-        SalesInquiryNo: data?.InquiryNo || data?.SalesInquiryNo || data?.SalesInquiryNumber || s.SalesInquiryNo || '',
-        SalesInquiryUUID: data?.SalesInquiryUUID || data?.SalesInquiryId || data?.SalesInquiry || data?.InquiryNo || s.SalesInquiryUUID || '',
-        CustomerUUID: data?.CustomerUUID || data?.CustomerId || data?.Customer || s.CustomerUUID || '',
-        CustomerName: data?.CustomerName || data?.Customer || data?.CustomerDisplayName || s.CustomerName || '',
-        DueDays: data?.DueDays || data?.PaymentDueDays || data?.OrderDays || data?.Days || s.DueDays || '',
-      }));
-
-      // Set SalesInquiry display value from InquiryNo
-      if (data?.InquiryNo) {
-        setSalesInquiry(data.InquiryNo);
-      }
-
-      // Also set dueDays state directly
-      const daysValue = data?.DueDays || data?.PaymentDueDays || data?.OrderDays || data?.Days || '';
-      if (daysValue) {
-        setDueDays(String(daysValue));
-      }
-
-      // Set UUID states for proper dropdown mapping (only if not empty)
-      if ((data?.PaymentTermUUID || data?.PaymentTermsUUID) && (data.PaymentTermUUID?.trim() !== '' || data.PaymentTermsUUID?.trim() !== '')) {
-        const termUuid = data.PaymentTermUUID || data.PaymentTermsUUID;
-        setPaymentTermUuid(termUuid);
-      }
-      if (data?.PaymentMethodUUID && data.PaymentMethodUUID.trim() !== '') {
-        setPaymentMethodUUID(data.PaymentMethodUUID);
-      }
-      if (data?.ProjectUUID && data.ProjectUUID.trim() !== '') {
-        setProjectUUID(data.ProjectUUID);
-      }
-
-      // Set additional form states
-      if (data?.Notes !== undefined) setNotes(data.Notes || '');
-      if (data?.TermsConditions !== undefined) setTerms(data.TermsConditions || '');
-      if (data?.ShippingCharges !== undefined) setShippingCharges(String(data.ShippingCharges || 0));
-      if (data?.AdjustmentField !== undefined) setAdjustmentLabel(data.AdjustmentField || 'Adjustments');
-      if (data?.AdjustmentPrice !== undefined) setAdjustments(String(data.AdjustmentPrice || 0));
-      if (data?.TotalTax !== undefined) setTotalTax(String(data.TotalTax || 0));
-      try {
-        const headerTotal = data?.TotalAmount ?? data?.NetAmount ?? data?.HeaderTotalAmount ?? data?.SubTotal ?? null;
-        if (headerTotal !== null && typeof headerTotal !== 'undefined') setServerTotalAmount(String(headerTotal));
-      } catch (e) { /* ignore */ }
-
-      // Set response data if this is a saved header
-      if (data?.UUID) {
-        setHeaderResponse(data);
-        setHeaderSaved(true);
-      }
-
-      // Prefill billing (best-effort keys)
-      const billingData = {
-        buildingNo: data?.BillingBuildingNo || data?.Billing?.buildingNo || data?.BillingBuilding || data?.BillBuilding || '',
-        street1: data?.BillingStreet1 || data?.Billing?.street1 || data?.billingStreet1 || data?.Street1 || '',
-        street2: data?.BillingStreet2 || data?.Billing?.street2 || data?.billingStreet2 || '',
-        postalCode: data?.BillingPostalCode || data?.Billing?.postalCode || data?.PostalCode || data?.billingPostal || '',
-        country: data?.BillingCountryUUID || resolveUuid(data?.BillingCountry || data?.BillingCountryName || data?.Country) || '',
-        state: data?.BillingStateUUID || resolveUuid(data?.BillingState || data?.State) || '',
-        city: data?.BillingCityUUID || resolveUuid(data?.BillingCity || data?.City) || '',
-      };
-      
-      console.log('[ManageSalesOrder] Prefilling billing form:', billingData);
-      console.log('[ManageSalesOrder] Raw API data:', {
-        BillingCountryUUID: data?.BillingCountryUUID,
-        BillingStateUUID: data?.BillingStateUUID,
-        BillingCityUUID: data?.BillingCityUUID,
-      });
-      
-      setBillingForm(billingData);
-
-      // UUID-based matching: useEffect will find and set selected objects when options load
-
-      // Prefill shipping (best-effort keys)
-      setShippingForm({
-        buildingNo: data?.ShippingBuildingNo || data?.Shipping?.buildingNo || data?.ShipBuilding || '',
-        street1: data?.ShippingStreet1 || data?.Shipping?.street1 || data?.ShipStreet1 || '',
-        street2: data?.ShippingStreet2 || data?.Shipping?.street2 || data?.ShipStreet2 || '',
-        postalCode: data?.ShippingPostalCode || data?.Shipping?.postalCode || data?.ShipPostal || '',
-        country: data?.ShippingCountryUUID || resolveUuid(data?.ShippingCountry || data?.ShipCountry) || '',
-        state: data?.ShippingStateUUID || resolveUuid(data?.ShippingState || data?.ShipState) || '',
-        city: data?.ShippingCityUUID || resolveUuid(data?.ShippingCity || data?.ShipCity) || '',
-      });
-
-      // UUID-based matching: useEffect will find and set selected objects when options load
-
-      // Prefill IsShipAddrSame checkbox
-      const shipSame = data?.IsShipAddrSame === true || data?.IsShipAddrSame === 'true' || data?.IsShipAddrSame === 'True' || data?.IsShipAddrSame === 1 || data?.Is_ShipAddrSame === true || data?.IsShipAddrSame === 'Y' || data?.IsShipAddrSame === 'y';
-      setIsShippingSame(shipSame);
-
-      // Copy billing to shipping if they're the same - this is handled above in the shipping form set
-      // No need for additional setTimeout as shipping form is already set correctly
-
-      // Prefill project / payment term / payment method / sales inquiry display + UUIDs
-      // Project
-      const projUuid = data?.ProjectUUID || data?.ProjectId || data?.Project || data?.ProjectUuid || data?.Project_Id || null;
-      if (projUuid && projUuid.trim() !== '') {
-        setProjectUUID(projUuid);
-        setProject(data?.ProjectTitle || data?.ProjectName || data?.Project || '');
-      } else {
-        // Clear project fields if UUID is empty
-        setProjectUUID('');
-        setProject('');
-      }
-
-      // Payment term
-      const pTermUuid = data?.PaymentTermUUID || data?.PaymentTermsUUID || data?.PaymentTermId || data?.PaymentTerm || data?.PaymentTermUuid || null;
-      if (pTermUuid && pTermUuid.trim() !== '') {
-        setPaymentTermUuid(pTermUuid);
-        setPaymentTerm(data?.PaymentTermName || data?.PaymentTerm || data?.Term || '');
-      } else {
-        // Clear payment term fields if UUID is empty
-        setPaymentTermUuid('');
-        setPaymentTerm('');
-      }
-
-      // Payment method
-      const pMethodUuid = data?.PaymentMethodUUID || data?.PaymentMethodId || data?.PaymentMethod || data?.PaymentMethodUuid || null;
+      // Ensure legacy/alternate payment method key is available
+      const pMethodUuid = data?.PaymentMethodUUID || data?.PaymentMethod || data?.Mode || '';
       if (pMethodUuid && pMethodUuid.trim() !== '') {
         setPaymentMethodUUID(pMethodUuid);
         setPaymentMethod(data?.PaymentMethodName || data?.PaymentMethod || data?.Mode || '');
@@ -556,6 +330,125 @@ const ManageSalesOrder = () => {
         setAdjustmentLabel(String(data.AdjustmentField));
       }
 
+      // Map common header fields from various possible API keys
+      const mapped = {
+        SalesOrderNo: data?.SalesOrderNo || data?.SalesOrderNumber || data?.OrderNo || data?.SalesOrder || data?.Order_No || '',
+        SalesInquiryUUID: sinqUuid || data?.SalesInquiryUUID || data?.SalesInquiryId || '',
+        CustomerUUID: data?.CustomerUUID || data?.CustomerId || data?.Customer || data?.CustomerUUID || '',
+        CustomerName: data?.CustomerName || data?.CustomerDisplayName || data?.Customer || '',
+        ProjectUUID: data?.ProjectUUID || data?.ProjectId || data?.Project || data?.ProjectUUID || projectUUID || '',
+        ProjectName: data?.ProjectTitle || data?.ProjectName || data?.Project || project || '',
+        PaymentTermUUID: data?.PaymentTermUUID || data?.PaymentTerm || paymentTermUuid || '',
+        PaymentTermName: data?.PaymentTermName || data?.PaymentTerm || '',
+        PaymentMethodUUID: data?.PaymentMethodUUID || data?.PaymentMethod || data?.Mode || paymentMethodUUID || '',
+        OrderDate: (data?.OrderDate || data?.Order_Date || data?.InvoiceDate) || invoiceDate || '',
+        DueDate: (data?.DueDate || data?.PaymentDueDate || data?.Due_Date) || dueDate || '',
+        Notes: data?.Notes || data?.CustomerNotes || data?.Note || notes || '',
+        TermsConditions: data?.TermsConditions || data?.Terms || data?.TermsAndConditions || terms || '',
+        DueDays: (typeof data?.DueDays !== 'undefined' && data?.DueDays !== null) ? String(data.DueDays) : (typeof data?.Days !== 'undefined' && data?.Days !== null ? String(data.Days) : (headerForm?.DueDays || '')),
+      };
+
+      // Prefill billing/shipping simple fields (UUIDs and address fields)
+      const billed = {
+        BillingBuildingNo: data?.BillingBuildingNo || data?.Billing_BuildingNo || data?.Billing?.BuildingNo || data?.BillingBuilding || '',
+        BillingStreet1: data?.BillingStreet1 || data?.Billing_Street1 || data?.Billing?.Street1 || data?.BillingStreet || '',
+        BillingStreet2: data?.BillingStreet2 || data?.Billing_Street2 || data?.Billing?.Street2 || '',
+        BillingPostalCode: data?.BillingPostalCode || data?.Billing_PostalCode || data?.Billing?.PostalCode || data?.BillingPostal || '',
+        BillingCountryUUID: data?.BillingCountryUUID || data?.BillingCountry || data?.Billing?.CountryUUID || data?.BillingCountryId || '',
+        BillingStateUUID: data?.BillingStateUUID || data?.BillingState || data?.Billing?.StateUUID || '',
+        BillingCityUUID: data?.BillingCityUUID || data?.BillingCity || data?.Billing?.CityUUID || '',
+      };
+
+      const ship = {
+        ShippingBuildingNo: data?.ShippingBuildingNo || data?.Shipping_BuildingNo || data?.Shipping?.BuildingNo || data?.ShippingBuilding || '',
+        ShippingStreet1: data?.ShippingStreet1 || data?.Shipping_Street1 || data?.Shipping?.Street1 || data?.ShippingStreet || '',
+        ShippingStreet2: data?.ShippingStreet2 || data?.Shipping_Street2 || data?.Shipping?.Street2 || '',
+        ShippingPostalCode: data?.ShippingPostalCode || data?.Shipping_PostalCode || data?.Shipping?.PostalCode || data?.ShippingPostal || '',
+        ShippingCountryUUID: data?.ShippingCountryUUID || data?.ShippingCountry || data?.Shipping?.CountryUUID || '',
+        ShippingStateUUID: data?.ShippingStateUUID || data?.ShippingState || data?.Shipping?.StateUUID || '',
+        ShippingCityUUID: data?.ShippingCityUUID || data?.ShippingCity || data?.Shipping?.CityUUID || '',
+        IsShipAddrSame: (typeof data?.IsShipAddrSame !== 'undefined') ? !!data.IsShipAddrSame : isShippingSame,
+      };
+
+      // Update local header/billing/shipping state so UI reflects values immediately
+      setHeaderForm(s => ({
+        ...s,
+        SalesOrderNo: mapped.SalesOrderNo || s.SalesOrderNo,
+        SalesInquiryUUID: mapped.SalesInquiryUUID || s.SalesInquiryUUID,
+        CustomerUUID: mapped.CustomerUUID || s.CustomerUUID,
+        CustomerName: mapped.CustomerName || s.CustomerName,
+        DueDays: mapped.DueDays || s.DueDays,
+        // Include payment/project/method in header state so Formik initialValues (enableReinitialize) pick them up
+        PaymentTerm: mapped.PaymentTermName || s.PaymentTerm || paymentTerm || '',
+        PaymentTermUUID: mapped.PaymentTermUUID || s.PaymentTermUUID || paymentTermUuid || '',
+        PaymentMethod: mapped.PaymentMethodName || mapped.PaymentMethod || s.PaymentMethod || paymentMethod || '',
+        PaymentMethodUUID: mapped.PaymentMethodUUID || s.PaymentMethodUUID || paymentMethodUUID || '',
+        Project: mapped.ProjectName || s.Project || project || '',
+        ProjectUUID: mapped.ProjectUUID || s.ProjectUUID || projectUUID || '',
+        OrderDate: mapped.OrderDate || s.OrderDate || invoiceDate || '',
+        DueDate: mapped.DueDate || s.DueDate || dueDate || '',
+        Notes: mapped.Notes || s.Notes || notes || '',
+        TermsConditions: mapped.TermsConditions || s.TermsConditions || terms || '',
+      }));
+      // Update display state for Project and PaymentTerm and DueDays so Dropdowns show values
+      try { setProject(mapped.ProjectName || project || ''); } catch (e) { }
+      try { setProjectUUID(mapped.ProjectUUID || projectUUID || ''); } catch (e) { }
+      try { setPaymentTerm(mapped.PaymentTermName || paymentTerm || ''); } catch (e) { }
+      try { setPaymentTermUuid(mapped.PaymentTermUUID || paymentTermUuid || null); } catch (e) { }
+      try { setDueDays(mapped.DueDays || ''); } catch (e) { }
+      setBillingForm(b => ({ ...b, buildingNo: billed.BillingBuildingNo || b.buildingNo, street1: billed.BillingStreet1 || b.street1, street2: billed.BillingStreet2 || b.street2, postalCode: billed.BillingPostalCode || b.postalCode, country: billed.BillingCountryUUID || b.country, state: billed.BillingStateUUID || b.state, city: billed.BillingCityUUID || b.city }));
+      setShippingForm(s => ({ ...s, buildingNo: ship.ShippingBuildingNo || s.buildingNo, street1: ship.ShippingStreet1 || s.street1, street2: ship.ShippingStreet2 || s.street2, postalCode: ship.ShippingPostalCode || s.postalCode, country: ship.ShippingCountryUUID || s.country, state: ship.ShippingStateUUID || s.state, city: ship.ShippingCityUUID || s.city }));
+      setIsShippingSame(!!ship.IsShipAddrSame);
+
+      // If Formik is mounted, set its values too so validation and submit use the prefilled data
+      try {
+        const setField = formikSetFieldValueRef && formikSetFieldValueRef.current;
+        if (setField) {
+          // ensure display keys also set in Formik
+          setField('Project', mapped.ProjectName || project || '');
+          setField('ProjectUUID', mapped.ProjectUUID || projectUUID || '');
+          setField('PaymentTerm', mapped.PaymentTermName || '');
+          setField('PaymentTermUUID', mapped.PaymentTermUUID || paymentTermUuid || '');
+
+          // Header-level fields
+          setField('SalesOrderNo', mapped.SalesOrderNo || '');
+          setField('SalesInquiryUUID', mapped.SalesInquiryUUID || '');
+          setField('CustomerUUID', mapped.CustomerUUID || '');
+          setField('CustomerName', mapped.CustomerName || '');
+          setField('ProjectUUID', mapped.ProjectUUID || projectUUID || '');
+          setField('PaymentTermUUID', mapped.PaymentTermUUID || paymentTermUuid || '');
+          // Ensure both PaymentMethod display value and UUID are set in Formik
+          try { setField('PaymentMethod', mapped.PaymentMethodName || mapped.PaymentMethod || paymentMethod || ''); } catch (e) { }
+          setField('PaymentMethodUUID', mapped.PaymentMethodUUID || paymentMethodUUID || '');
+          setField('OrderDate', mapped.OrderDate || invoiceDate || '');
+          setField('DueDate', mapped.DueDate || dueDate || '');
+          setField('Notes', mapped.Notes || '');
+          setField('TermsConditions', mapped.TermsConditions || '');
+          setField('DueDays', mapped.DueDays || '');
+
+          // Billing fields
+          setField('BillingBuildingNo', billed.BillingBuildingNo || '');
+          setField('BillingStreet1', billed.BillingStreet1 || '');
+          setField('BillingStreet2', billed.BillingStreet2 || '');
+          setField('BillingPostalCode', billed.BillingPostalCode || '');
+          setField('BillingCountryUUID', billed.BillingCountryUUID || '');
+          setField('BillingStateUUID', billed.BillingStateUUID || '');
+          setField('BillingCityUUID', billed.BillingCityUUID || '');
+
+          // Shipping fields
+          setField('IsShipAddrSame', !!ship.IsShipAddrSame);
+          setField('ShippingBuildingNo', ship.ShippingBuildingNo || '');
+          setField('ShippingStreet1', ship.ShippingStreet1 || '');
+          setField('ShippingStreet2', ship.ShippingStreet2 || '');
+          setField('ShippingPostalCode', ship.ShippingPostalCode || '');
+          setField('ShippingCountryUUID', ship.ShippingCountryUUID || '');
+          setField('ShippingStateUUID', ship.ShippingStateUUID || '');
+          setField('ShippingCityUUID', ship.ShippingCityUUID || '');
+        }
+      } catch (e) {
+        // ignore if Formik not yet mounted
+      }
+
       setIsEditingHeader(true);
       setHeaderSaved(false);
       setExpandedIds([1, 2, 3]);
@@ -621,6 +514,74 @@ const ManageSalesOrder = () => {
     rate: '',
   });
   const [editItemId, setEditItemId] = useState(null);
+  // Common form state (some declarations were accidentally removed earlier)
+  const [headerForm, setHeaderForm] = useState({ SalesInquiryUUID: '', SalesInquiryNo: '', CustomerUUID: '', CustomerName: '', SalesOrderNo: '', DueDays: '' });
+  const [billingForm, setBillingForm] = useState({ buildingNo: '', street1: '', street2: '', postalCode: '', country: '', state: '', city: '' });
+  const [shippingForm, setShippingForm] = useState({ buildingNo: '', street1: '', street2: '', postalCode: '', country: '', state: '', city: '' });
+  const [isShippingSame, setIsShippingSame] = useState(false);
+  const [items, setItems] = useState([]);
+  const [invoiceDate, setInvoiceDate] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [dueDays, setDueDays] = useState('');
+  const [headerHasDates, setHeaderHasDates] = useState(false);
+  const [paymentTerm, setPaymentTerm] = useState('');
+  const [paymentTermUuid, setPaymentTermUuid] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [paymentMethodUUID, setPaymentMethodUUID] = useState(null);
+  const [notes, setNotes] = useState('');
+  const [terms, setTerms] = useState('');
+  const [project, setProject] = useState('');
+  const [projectUUID, setProjectUUID] = useState('');
+  const [shippingCharges, setShippingCharges] = useState('0');
+  const [adjustments, setAdjustments] = useState('0');
+  const [adjustmentLabel, setAdjustmentLabel] = useState('Adjustments');
+  const [totalTax, setTotalTax] = useState('0');
+  const [serverTotalAmount, setServerTotalAmount] = useState('');
+  const [uploadedFilePath, setUploadedFilePath] = useState('');
+  const [headerSaved, setHeaderSaved] = useState(false);
+  const [headerResponse, setHeaderResponse] = useState(null);
+  const [isEditingHeader, setIsEditingHeader] = useState(false);
+  const [isPrefilling, setIsPrefilling] = useState(false);
+  const [isSavingHeader, setIsSavingHeader] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  // Tooltip/modal toggles
+  const [showShippingTip, setShowShippingTip] = useState(false);
+  const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
+  const [selectedBillingCountry, setSelectedBillingCountry] = useState(null);
+  const [selectedBillingState, setSelectedBillingState] = useState(null);
+  const [selectedBillingCity, setSelectedBillingCity] = useState(null);
+  const [selectedShippingCountry, setSelectedShippingCountry] = useState(null);
+  const [selectedShippingState, setSelectedShippingState] = useState(null);
+  const [selectedShippingCity, setSelectedShippingCity] = useState(null);
+  const [statesOptions, setStatesOptions] = useState([]);
+  const [citiesOptions, setCitiesOptions] = useState([]);
+  const [shippingStatesOptions, setShippingStatesOptions] = useState([]);
+  const [shippingCitiesOptions, setShippingCitiesOptions] = useState([]);
+  const [SalesInquiryNo, setSalesInquiry] = useState('');
+  const [customersOptions, setCustomersOptions] = useState([]);
+  const [projectsOptions, setProjectsOptions] = useState([]);
+  const [paymentTermsOptions, setPaymentTermsOptions] = useState([]);
+  const [paymentMethodsOptions, setPaymentMethodsOptions] = useState([]);
+  const [salesInquiryNosOptions, setSalesInquiryNosOptions] = useState([]);
+  const [masterItems, setMasterItems] = useState([]);
+  // Restored missing state variables and refs referenced elsewhere in the file
+  const [countriesOptions, setCountriesOptions] = useState([]);
+  const [isInitialLoading, setIsInitialLoading] = useState(false);
+  const [linesLoading, setLinesLoading] = useState(false);
+  const [file, setFile] = useState(null);
+  const [openDatePicker, setOpenDatePicker] = useState(false);
+  const [datePickerField, setDatePickerField] = useState(null);
+  const [datePickerSelectedDate, setDatePickerSelectedDate] = useState(null);
+  const [reloadAttempts, setReloadAttempts] = useState(0);
+  const MAX_RELOAD_ATTEMPTS = 5;
+  // Refs used by Formik integration and helpers
+  const formikSetFieldValueRef = React.useRef(null);
+  const formikSubmitRef = React.useRef(null);
+  const dueDaysRef = React.useRef(null);
+  // Globals to expose Formik state outside its render scope (used by Billing/Shipping sections)
+  let globalErrors = {};
+  let globalTouched = {};
+  let globalSubmitCount = 0;
   // Table controls: search + pagination
   const [tableSearch, setTableSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -678,15 +639,37 @@ const ManageSalesOrder = () => {
     );
     return granted === PermissionsAndroid.RESULTS.GRANTED;
   };
- 
+
   // Toggle copy: if already copied, clear shipping form and uncheck
-  const toggleCopyBillingToShipping = () => {
+  const toggleCopyBillingToShipping = (formikSetFieldValue = null) => {
     if (!isShippingSame) {
       setShippingForm({ ...billingForm });
       setSelectedShippingCountry(selectedBillingCountry);
       setSelectedShippingState(selectedBillingState);
       setSelectedShippingCity(selectedBillingCity);
       setIsShippingSame(true);
+      
+      // Update Formik values if available
+      if (formikSetFieldValue) {
+        formikSetFieldValue('ShippingBuildingNo', billingForm.buildingNo || '');
+        formikSetFieldValue('ShippingStreet1', billingForm.street1 || '');
+        formikSetFieldValue('ShippingStreet2', billingForm.street2 || '');
+        formikSetFieldValue('ShippingPostalCode', billingForm.postalCode || '');
+        formikSetFieldValue('ShippingCountryUUID', billingForm.country || '');
+        formikSetFieldValue('ShippingStateUUID', billingForm.state || '');
+        formikSetFieldValue('ShippingCityUUID', billingForm.city || '');
+        formikSetFieldValue('IsShipAddrSame', true);
+      } else if (formikSetFieldValueRef.current) {
+        const setField = formikSetFieldValueRef.current;
+        setField('ShippingBuildingNo', billingForm.buildingNo || '');
+        setField('ShippingStreet1', billingForm.street1 || '');
+        setField('ShippingStreet2', billingForm.street2 || '');
+        setField('ShippingPostalCode', billingForm.postalCode || '');
+        setField('ShippingCountryUUID', billingForm.country || '');
+        setField('ShippingStateUUID', billingForm.state || '');
+        setField('ShippingCityUUID', billingForm.city || '');
+        setField('IsShipAddrSame', true);
+      }
     } else {
       setShippingForm({
         buildingNo: '',
@@ -702,6 +685,28 @@ const ManageSalesOrder = () => {
       setSelectedShippingState(null);
       setSelectedShippingCity(null);
       setIsShippingSame(false);
+      
+      // Clear Formik values if available
+      if (formikSetFieldValue) {
+        formikSetFieldValue('ShippingBuildingNo', '');
+        formikSetFieldValue('ShippingStreet1', '');
+        formikSetFieldValue('ShippingStreet2', '');
+        formikSetFieldValue('ShippingPostalCode', '');
+        formikSetFieldValue('ShippingCountryUUID', '');
+        formikSetFieldValue('ShippingStateUUID', '');
+        formikSetFieldValue('ShippingCityUUID', '');
+        formikSetFieldValue('IsShipAddrSame', false);
+      } else if (formikSetFieldValueRef.current) {
+        const setField = formikSetFieldValueRef.current;
+        setField('ShippingBuildingNo', '');
+        setField('ShippingStreet1', '');
+        setField('ShippingStreet2', '');
+        setField('ShippingPostalCode', '');
+        setField('ShippingCountryUUID', '');
+        setField('ShippingStateUUID', '');
+        setField('ShippingCityUUID', '');
+        setField('IsShipAddrSame', false);
+      }
     }
   };
 
@@ -752,7 +757,7 @@ const ManageSalesOrder = () => {
     return headerFilled || billingFilled || shippingFilled;
   };
 
-  const saveHeader = async () => {
+  const saveHeader = async (values = null) => {
     setIsSavingHeader(true);
     try {
       const resolveCityUuid = (c) => {
@@ -766,40 +771,48 @@ const ManageSalesOrder = () => {
       // Always compute TotalAmount from subtotal + shipping + adjustments + tax
       const totalAmountNum = subtotalNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + totalTaxNum;
 
+      // If Formik provided values, prefer them; otherwise fall back to local state
+      const use = values || {
+        ...headerForm,
+        ProjectUUID: projectUUID,
+        PaymentTermUUID: paymentTermUuid,
+        PaymentMethodUUID: paymentMethodUUID,
+      };
+
       const payload = {
         UUID: headerResponse?.UUID || '',
-        SalesOrderNo: headerForm.SalesOrderNo || '',
-        SalesInquiryUUID: headerForm.SalesInquiryUUID || '',
-        CustomerUUID: headerForm.CustomerUUID || '',
-        ProjectUUID: projectUUID || '',
-        PaymentTermUUID: paymentTermUuid || '',
-        PaymentMethodUUID: paymentMethodUUID || '',
-        OrderDate: uiDateToApiDate(invoiceDate),
-        DueDate: uiDateToApiDate(dueDate),
-        Notes: notes || '',
-        TermsConditions: terms || '',
-        BillingBuildingNo: billingForm.buildingNo || '',
-        BillingStreet1: billingForm.street1 || '',
-        BillingStreet2: billingForm.street2 || '',
-        BillingPostalCode: billingForm.postalCode || '',
-        BillingCountryUUID: billingForm.country || '',
-        BillingStateUUID: billingForm.state || '',
-        BillingCityUUID: resolveCityUuid(billingForm.city),
-        IsShipAddrSame: !!isShippingSame,
-        ShippingBuildingNo: shippingForm.buildingNo || '',
-        ShippingStreet1: shippingForm.street1 || '',
-        ShippingStreet2: shippingForm.street2 || '',
-        ShippingPostalCode: shippingForm.postalCode || '',
-        ShippingCountryUUID: shippingForm.country || '',
-        ShippingStateUUID: shippingForm.state || '',
-        ShippingCityUUID: resolveCityUuid(shippingForm.city),
+        SalesOrderNo: use.SalesOrderNo || headerForm.SalesOrderNo || '',
+        SalesInquiryUUID: use.SalesInquiryUUID || headerForm.SalesInquiryUUID || '',
+        CustomerUUID: use.CustomerUUID || headerForm.CustomerUUID || '',
+        ProjectUUID: use.ProjectUUID || projectUUID || '',
+        PaymentTermUUID: use.PaymentTermUUID || paymentTermUuid || '',
+        PaymentMethodUUID: use.PaymentMethodUUID || paymentMethodUUID || '',
+        OrderDate: uiDateToApiDate(use.OrderDate || invoiceDate),
+        DueDate: uiDateToApiDate(use.DueDate || dueDate),
+        Notes: use.Notes || notes || '',
+        TermsConditions: use.TermsConditions || terms || '',
+        BillingBuildingNo: use.BillingBuildingNo || billingForm.buildingNo || '',
+        BillingStreet1: use.BillingStreet1 || billingForm.street1 || '',
+        BillingStreet2: use.BillingStreet2 || billingForm.street2 || '',
+        BillingPostalCode: use.BillingPostalCode || billingForm.postalCode || '',
+        BillingCountryUUID: use.BillingCountryUUID || billingForm.country || '',
+        BillingStateUUID: use.BillingStateUUID || billingForm.state || '',
+        BillingCityUUID: resolveCityUuid(use.BillingCityUUID || billingForm.city),
+        IsShipAddrSame: !!(use.IsShipAddrSame ?? isShippingSame),
+        ShippingBuildingNo: use.ShippingBuildingNo || shippingForm.buildingNo || '',
+        ShippingStreet1: use.ShippingStreet1 || shippingForm.street1 || '',
+        ShippingStreet2: use.ShippingStreet2 || shippingForm.street2 || '',
+        ShippingPostalCode: use.ShippingPostalCode || shippingForm.postalCode || '',
+        ShippingCountryUUID: use.ShippingCountryUUID || shippingForm.country || '',
+        ShippingStateUUID: use.ShippingStateUUID || shippingForm.state || '',
+        ShippingCityUUID: resolveCityUuid(use.ShippingCityUUID || shippingForm.city),
         SubTotal: subtotalNum,
         TotalTax: totalTaxNum,
         TotalAmount: totalAmountNum,
         ShippingCharges: parseFloat(shippingCharges) || 0,
         AdjustmentField: adjustmentLabel || '',
         AdjustmentPrice: parseFloat(adjustments) || 0,
-        Days: parseInt(dueDays, 10) || 0,
+        Days: parseInt(use.DueDays || dueDays, 10) || 0,
         // Attach uploaded file path when available (returned by /api/CompanySetup/upload-file)
         FilePath: uploadedFilePath || '',
       };
@@ -867,8 +880,14 @@ const ManageSalesOrder = () => {
 
   const handleDateSelect = date => {
     const formatted = formatUiDate(date);
-    if (datePickerField === 'invoice') setInvoiceDate(formatted);
-    if (datePickerField === 'due') setDueDate(formatted);
+    if (datePickerField === 'invoice') {
+      setInvoiceDate(formatted);
+      try { if (formikSetFieldValueRef.current) formikSetFieldValueRef.current('OrderDate', formatted); } catch (e) { }
+    }
+    if (datePickerField === 'due') {
+      setDueDate(formatted);
+      try { if (formikSetFieldValueRef.current) formikSetFieldValueRef.current('DueDate', formatted); } catch (e) { }
+    }
     // If user selected Order Date, immediately calculate Due Date using DueDays (if present)
     if (datePickerField === 'invoice') {
       try {
@@ -1139,18 +1158,20 @@ const ManageSalesOrder = () => {
     (async () => {
       try {
         setIsInitialLoading(true);
-        const [custResp, termsResp, methodsResp, countriesResp, projectsResp, inquiriesResp] = await Promise.all([
+        const [custResp, termsResp, methodsResp, countriesResp, projectsResp, inquiriesResp, itemsResp] = await Promise.all([
           getCustomers(),
           getPaymentTerms(),
           getPaymentMethods(),
           getCountries(),
           fetchProjects(),
           getAllSalesInquiryNumbers(),
+          // load master items for Item dropdown (pass mode so API can return Sales-specific items)
+          getItems({ mode: 'Sales' }),
         ]);
 
         const custList = extractArray(custResp);
-        console.log(custList,'001');
-        
+        console.log(custList, '001');
+
         const termsList = extractArray(termsResp);
         const methodsList = extractArray(methodsResp);
         const countriesList = extractArray(countriesResp);
@@ -1158,6 +1179,7 @@ const ManageSalesOrder = () => {
 
         const projectsList = extractArray(projectsResp);
         const inquiriesList = extractArray(inquiriesResp);
+        const itemsList = extractArray(itemsResp);
 
         // Normalize inquiry entries so dropdowns/prefill mapping find display values instead of raw UUIDs
         const normalizedInquiries = (Array.isArray(inquiriesList) ? inquiriesList : []).map((r, idx) => ({
@@ -1174,6 +1196,7 @@ const ManageSalesOrder = () => {
         setCountriesOptions(countriesList);
         setProjectsOptions(projectsList);
         setSalesInquiryNosOptions(normalizedInquiries);
+        setMasterItems(itemsList);
 
         console.log('[ManageSalesOrder] lookup counts ->', {
           customers: Array.isArray(custList) ? custList.length : 0,
@@ -1182,6 +1205,7 @@ const ManageSalesOrder = () => {
           countries: Array.isArray(countriesList) ? countriesList.length : 0,
           projects: Array.isArray(projectsList) ? projectsList.length : 0,
           inquiries: Array.isArray(inquiriesList) ? inquiriesList.length : 0,
+          items: Array.isArray(itemsList) ? itemsList.length : 0,
         });
       } catch (e) {
         console.warn('Lookup fetch error', e?.message || e);
@@ -1297,6 +1321,7 @@ const ManageSalesOrder = () => {
     setCitiesOptions([]);
     const countryUuid = selected?.Uuid || selected?.UUID || selected?.CountryUuid || selected?.Id || (typeof selected === 'string' ? selected : null);
     setBillingForm(s => ({ ...s, country: countryUuid || '', state: '', city: '' }));
+    try { if (formikSetFieldValueRef.current) { formikSetFieldValueRef.current('BillingCountryUUID', countryUuid || ''); formikSetFieldValueRef.current('BillingStateUUID', ''); formikSetFieldValueRef.current('BillingCityUUID', ''); } } catch (e) { }
     if (countryUuid) loadStatesForCountry(countryUuid, 'billing');
   };
 
@@ -1306,6 +1331,7 @@ const ManageSalesOrder = () => {
     setCitiesOptions([]);
     const stateUuid = selected?.Uuid || selected?.UUID || selected?.StateUuid || selected?.Id || (typeof selected === 'string' ? selected : null);
     setBillingForm(s => ({ ...s, state: stateUuid || '', city: '' }));
+    try { if (formikSetFieldValueRef.current) { formikSetFieldValueRef.current('BillingStateUUID', stateUuid || ''); formikSetFieldValueRef.current('BillingCityUUID', ''); } } catch (e) { }
     if (stateUuid) loadCitiesForState(stateUuid, 'billing');
   };
 
@@ -1317,6 +1343,7 @@ const ManageSalesOrder = () => {
     setShippingCitiesOptions([]);
     const countryUuid = selected?.Uuid || selected?.UUID || selected?.CountryUuid || selected?.Id || (typeof selected === 'string' ? selected : null);
     setShippingForm(s => ({ ...s, country: countryUuid || '', state: '', city: '' }));
+    try { if (formikSetFieldValueRef.current) { formikSetFieldValueRef.current('ShippingCountryUUID', countryUuid || ''); formikSetFieldValueRef.current('ShippingStateUUID', ''); formikSetFieldValueRef.current('ShippingCityUUID', ''); } } catch (e) { }
     if (countryUuid) loadStatesForCountry(countryUuid, 'shipping');
   };
 
@@ -1326,6 +1353,7 @@ const ManageSalesOrder = () => {
     setShippingCitiesOptions([]);
     const stateUuid = selected?.Uuid || selected?.UUID || selected?.StateUuid || selected?.Id || (typeof selected === 'string' ? selected : null);
     setShippingForm(s => ({ ...s, state: stateUuid || '', city: '' }));
+    try { if (formikSetFieldValueRef.current) { formikSetFieldValueRef.current('ShippingStateUUID', stateUuid || ''); formikSetFieldValueRef.current('ShippingCityUUID', ''); } } catch (e) { }
     if (stateUuid) loadCitiesForState(stateUuid, 'shipping');
   };
 
@@ -1848,9 +1876,10 @@ const ManageSalesOrder = () => {
       id: nextId,
       selectedItem: master || null,
       name: currentItem.itemName || (master ? master.name : ''),
+      itemUuid: (master ? master.uuid : (currentItem.itemNameUuid || null)),
       itemType: currentItem.itemType || '',
       itemTypeUuid: currentItem.itemTypeUuid || null,
-      itemNameUuid: currentItem.itemNameUuid || currentItem.itemNameUuid || null,
+      itemNameUuid: currentItem.itemNameUuid || (master ? master.uuid : null),
       sku: master ? master.sku : '',
       rate: rate,
       desc: currentItem.desc && currentItem.desc.length ? currentItem.desc : (master ? master.desc || '' : ''),
@@ -1861,13 +1890,24 @@ const ManageSalesOrder = () => {
       unit: currentItem.unit || '',
     };
 
+    const resolveItemUuidForPayload = (master, current) => {
+      // prefer canonical master UUID fields
+      const candidate = master?.uuid || master?.UUID || master?.Uuid || master?.ItemUUID || master?.ItemId || master?.Id || master?.itemUuid || master?.ItemCode || master?.SKU || master?.sku || null;
+      if (candidate && String(candidate).trim() !== '') return String(candidate);
+      // fall back to current item's itemNameUuid if it looks like an id
+      if (current?.itemNameUuid && String(current.itemNameUuid).trim() !== '') return String(current.itemNameUuid);
+      // as a last resort, if itemName is a UUID-like string, return it
+      if (current?.itemName && typeof current.itemName === 'string' && current.itemName.includes('-')) return current.itemName;
+      return null;
+    };
+
     // If header has been saved to server (we have Header UUID), attempt to POST the line
     if (headerSaved && headerResponse?.UUID) {
       try {
         setIsAddingLine(true);
         const payload = {
           HeaderUUID: headerResponse.UUID,
-          ItemUUID: (master && master.uuid) || currentItem.itemNameUuid || null,
+          ItemUUID: resolveItemUuidForPayload(master, currentItem),
           Quantity: Number(qty) || 0,
           Description: newItem.desc || '',
           HSNSACNO: newItem.hsn || '',
@@ -1883,7 +1923,7 @@ const ManageSalesOrder = () => {
             const upayload = {
               UUID: existing.serverUuid,
               HeaderUUID: headerResponse.UUID,
-              ItemUUID: (master && master.uuid) || currentItem.itemNameUuid || null,
+              ItemUUID: resolveItemUuidForPayload(master, currentItem),
               Quantity: Number(qty) || 0,
               Description: newItem.desc || '',
               HSNSACNO: newItem.hsn || '',
@@ -1972,7 +2012,7 @@ const ManageSalesOrder = () => {
       itemType: it.itemType || '',
       itemTypeUuid: it.itemTypeUuid || null,
       itemName: matchedMaster ? matchedMaster.name : (it.name || ''),
-      itemNameUuid: it.itemUuid || it.itemNameUuid || it.sku || (matchedMaster ? matchedMaster.uuid : null) || null,
+      itemNameUuid: it.itemUuid || (matchedMaster ? matchedMaster.uuid : null) || it.itemNameUuid || it.sku || null,
       quantity: it.qty || '',
       unit: it.unit || '',
       unitUuid: it.unitUuid || null,
@@ -2315,12 +2355,12 @@ const ManageSalesOrder = () => {
     <>
       <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
         {(isPrefilling || isInitialLoading) && (
-          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.bg + '75', zIndex: 9999 }}>
-            <ActivityIndicator size="large" color={themeColors?.primary || '#000'} />
+          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.85)', zIndex: 9999 }}>
+            <View style={{ backgroundColor: '#fff', padding: wp(4), borderRadius: wp(6), alignItems: 'center', justifyContent: 'center', shadowColor: COLORS.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 6 }}>
+              <ActivityIndicator size="large" color={themeColors?.primary || COLORS.text} />
+            </View>
             {reloadAttempts > 0 && (
-              <Text style={{ marginTop: 10, fontSize: 14, color: themeColors?.primary || '#000' }}>
-                Loading attempt {reloadAttempts}/{MAX_RELOAD_ATTEMPTS}
-              </Text>
+              <Text style={{ marginTop: hp(1.2), fontSize: rf(2.6), color: COLORS.text }}>{`Loading attempt ${reloadAttempts}/${MAX_RELOAD_ATTEMPTS}`}</Text>
             )}
           </View>
         )}
@@ -2339,616 +2379,772 @@ const ManageSalesOrder = () => {
           contentContainerStyle={[styles.container]}
           showsVerticalScrollIndicator={false}
         >
-          {/* Section 1: Header / Basic Details */}
-          <AccordionSection
-            id={1}
-            title="Header"
-            expanded={Array.isArray(expandedIds) ? expandedIds.includes(1) : expandedIds === 1}
-            onToggle={() => { if (headerSaved && !isEditingHeader) return; toggleSection(1); }}
-            rightActions={headerSaved ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: wp(2) }}>
-                <TouchableOpacity onPress={() => { /* no-op check */ }} style={{ marginRight: wp(3) }}>
-                  <Icon name="check-circle" size={rf(4)} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setIsEditingHeader(true); setHeaderSaved(false); setExpandedIds([1]); }}>
-                  <Icon name="edit" size={rf(4)} color={themeColors.success} />
-                </TouchableOpacity>
-              </View>
-            ) : null}
+          {/* Formik wraps all sections */}
+          <Formik
+            initialValues={{
+              ...headerForm,
+              // billing flattened
+              BillingBuildingNo: billingForm.buildingNo || '',
+              BillingStreet1: billingForm.street1 || '',
+              BillingStreet2: billingForm.street2 || '',
+              BillingPostalCode: billingForm.postalCode || '',
+              BillingCountryUUID: billingForm.country || '',
+              BillingStateUUID: billingForm.state || '',
+              BillingCityUUID: billingForm.city || '',
+              // shipping flattened
+              ShippingBuildingNo: shippingForm.buildingNo || '',
+              ShippingStreet1: shippingForm.street1 || '',
+              ShippingStreet2: shippingForm.street2 || '',
+              ShippingPostalCode: shippingForm.postalCode || '',
+              ShippingCountryUUID: shippingForm.country || '',
+              ShippingStateUUID: shippingForm.state || '',
+              ShippingCityUUID: shippingForm.city || '',
+              IsShipAddrSame: isShippingSame,
+            }}
+            enableReinitialize
+            validationSchema={HeaderValidationSchema}
+            onSubmit={async (values) => {
+              // keep headerForm state in sync with Formik values
+              setHeaderForm(s => ({ ...s, ...values }));
+              try { await saveHeader(values); } catch (e) { /* allow saveHeader to handle alerts */ }
+            }}
           >
-            <View style={styles.row}>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Sales Inquiry No </Text>
-                {headerSaved && !isEditingHeader ? (
-                  <View style={[inputStyles.box]}>
-                    <Text style={inputStyles.input}>{renderLabel(headerForm.SalesInquiryNo || headerForm.SalesInquiryUUID, ['InquiryNo', 'SalesInqNo', 'SalesInquiryNo'])}</Text>
-                  </View>
-                ) : (
-                  <Dropdown
-                    placeholder="-Sales Inquiry No-"
-                    value={(() => {
-                      // Find the selected inquiry object from options based on UUID or InquiryNo
-                      if (headerForm?.SalesInquiryUUID && salesInquiryNosOptions?.length) {
-                        return salesInquiryNosOptions.find(opt =>
-                          opt?.UUID === headerForm.SalesInquiryUUID ||
-                          opt?.Id === headerForm.SalesInquiryUUID ||
-                          opt?.InquiryNo === headerForm.SalesInquiryUUID ||
-                          String(opt?.UUID) === String(headerForm.SalesInquiryUUID) ||
-                          String(opt?.InquiryNo) === String(headerForm.SalesInquiryUUID)
-                        );
-                      }
-                      return null;
-                    })()}
-                    options={salesInquiryNosOptions}
-                    getLabel={c => (c?.InquiryNo || c?.SalesInqNo || c?.SalesInquiryNo || c?.Name || String(c))}
-                    getKey={c => (c?.UUID || c?.Id || c?.InquiryNo || c)}
-                    onSelect={v => {
-                      const inquiryNo = v?.InquiryNo || v?.SalesInqNo || v?.SalesInquiryNo || v;
-                      // For UUID, prefer actual UUID field, fallback to InquiryNo if UUID not available
-                      const inquiryUUID = v?.UUID || v?.Id || v?.InquiryNo || (typeof v === 'string' ? v : '');
+            {({ values, handleChange, handleBlur, setFieldValue, errors, touched, submitForm, submitCount }) => {
+              // expose Formik handlers and state to outer scope
+              try {
+                formikSubmitRef.current = submitForm;
+                formikSetFieldValueRef.current = setFieldValue;
+                // copy Formik state into globals so sections outside the Formik child can read validation state
+                globalErrors = errors || {};
+                globalTouched = touched || {};
+                globalSubmitCount = submitCount || 0;
+              } catch (e) { }
+              return (
+                <>
+                  {/* Section 1: Header / Basic Details */}
+                  <AccordionSection
+                    id={1}
+                    title="Header"
+                    expanded={Array.isArray(expandedIds) ? expandedIds.includes(1) : expandedIds === 1}
+                    onToggle={() => { if (headerSaved && !isEditingHeader) return; toggleSection(1); }}
+                    rightActions={headerSaved ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: wp(2) }}>
+                        <TouchableOpacity onPress={() => { /* no-op check */ }} style={{ marginRight: wp(3) }}>
+                          <Icon name="check-circle" size={rf(4)} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => { setIsEditingHeader(true); setHeaderSaved(false); setExpandedIds([1]); }}>
+                          <Icon name="edit" size={rf(4)} color={themeColors.success} />
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
+                  >
+                    <View style={styles.row}>
+                      <View style={styles.col}>
+                        <Text style={inputStyles.label}>Sales Inquiry No </Text>
+                        {headerSaved && !isEditingHeader ? (
+                          <View style={[inputStyles.box]}>
+                            <Text style={inputStyles.input}>{renderLabel(headerForm.SalesInquiryNo || headerForm.SalesInquiryUUID, ['InquiryNo', 'SalesInqNo', 'SalesInquiryNo'])}</Text>
+                          </View>
+                        ) : (
+                          <Dropdown
+                            placeholder="-Sales Inquiry No-"
+                            value={(() => {
+                              if (headerForm?.SalesInquiryUUID && salesInquiryNosOptions?.length) {
+                                return salesInquiryNosOptions.find(opt =>
+                                  opt?.UUID === headerForm.SalesInquiryUUID ||
+                                  opt?.Id === headerForm.SalesInquiryUUID ||
+                                  opt?.InquiryNo === headerForm.SalesInquiryUUID ||
+                                  String(opt?.UUID) === String(headerForm.SalesInquiryUUID) ||
+                                  String(opt?.InquiryNo) === String(headerForm.SalesInquiryUUID)
+                                );
+                              }
+                              return null;
+                            })()}
+                            options={salesInquiryNosOptions}
+                            getLabel={c => (c?.InquiryNo || c?.SalesInqNo || c?.SalesInquiryNo || c?.Name || String(c))}
+                            getKey={c => (c?.UUID || c?.Id || c?.InquiryNo || c)}
+                            onSelect={v => {
+                              const inquiryNo = v?.InquiryNo || v?.SalesInqNo || v?.SalesInquiryNo || v;
+                              const inquiryUUID = v?.UUID || v?.Id || v?.InquiryNo || (typeof v === 'string' ? v : '');
 
-                      setHeaderForm(s => ({
-                        ...s,
-                        SalesInquiryNo: inquiryNo,
-                        SalesInquiryUUID: inquiryUUID,
-                      }));
-                      setSalesInquiry(inquiryNo);
-                    }}
-                    inputBoxStyle={inputStyles.box}
-                    // textStyle={inputStyles.input}
-                  />
-                )}
-              </View>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Customer Name* </Text>
+                              setHeaderForm(s => ({
+                                ...s,
+                                SalesInquiryNo: inquiryNo,
+                                SalesInquiryUUID: inquiryUUID,
+                              }));
+                              setSalesInquiry(inquiryNo);
+                              try { setFieldValue && setFieldValue('SalesInquiryNo', inquiryNo); setFieldValue && setFieldValue('SalesInquiryUUID', inquiryUUID); } catch (e) { }
+                            }}
+                            inputBoxStyle={inputStyles.box}
+                          />
+                        )}
+                      </View>
+                      <View style={styles.col}>
+                        <Text style={inputStyles.label}>Customer Name* </Text>
 
-                {/* <Text style={inputStyles.label}>Customer Name*</Text> */}
-                {headerSaved && !isEditingHeader ? (
-                  <View style={[inputStyles.box]}>
-                    <Text style={inputStyles.input}>{renderLabel(headerForm.CustomerName, ['CustomerName', 'Name', 'DisplayName'])}</Text>
-                  </View>
-                ) : (
-                    <Dropdown
-                    placeholder="Customer Name*"
-                    value={headerForm.CustomerUUID || headerForm.CustomerName}
-                    options={customersOptions}
-                    getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
-                    getKey={c => (c?.UUID || c?.Id || c)}
-                    onSelect={v => setHeaderForm(s => ({
-                      ...s,
-                      CustomerName: v?.CustomerName || v,
-                      CustomerUUID: v?.UUID || v?.Id || (typeof v === 'string' ? v : ''),
-                    }))}
-                    inputBoxStyle={inputStyles.box}
-                    // textStyle={inputStyles.input}
-                  />
-                )}
-              </View>
-            </View>
-
-            <View style={[styles.row, { marginTop: hp(1.5) }]}>
-
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Project Name*</Text>
-
-                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
-                <View style={{ zIndex: 9998, elevation: 20 }}>
-                  {headerSaved && !isEditingHeader ? (
-                    <View style={[inputStyles.box]}>
-                      <Text style={inputStyles.input}>{renderLabel(project || projectUUID, ['ProjectTitle', 'Name'])}</Text>
+                        {/* <Text style={inputStyles.label}>Customer Name*</Text> */}
+                        {headerSaved && !isEditingHeader ? (
+                          <View style={[inputStyles.box]}>
+                            <Text style={inputStyles.input}>{renderLabel(headerForm.CustomerName, ['CustomerName', 'Name', 'DisplayName'])}</Text>
+                          </View>
+                        ) : (
+                          <>
+                            <Dropdown
+                              placeholder="Customer Name*"
+                              value={headerForm.CustomerUUID || headerForm.CustomerName}
+                              options={customersOptions}
+                              getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
+                              getKey={c => (c?.UUID || c?.Id || c)}
+                              onSelect={v => {
+                                const custName = v?.CustomerName || v;
+                                const custUuid = v?.UUID || v?.Id || (typeof v === 'string' ? v : '');
+                                setHeaderForm(s => ({
+                                  ...s,
+                                  CustomerName: custName,
+                                  CustomerUUID: custUuid,
+                                }));
+                                try { setFieldValue && setFieldValue('CustomerName', custName); setFieldValue && setFieldValue('CustomerUUID', custUuid); } catch (e) { }
+                              }}
+                              inputBoxStyle={inputStyles.box}
+                            />
+                            {errors.CustomerName && (touched.CustomerName || submitCount > 0) ? (
+                              <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.CustomerName}</Text>
+                            ) : null}
+                          </>
+                        )}
+                      </View>
                     </View>
-                  ) : (
-                    <Dropdown
-                      placeholder="-Select Project-"
-                      value={project}
-                      options={projectsOptions}
-                      getLabel={p => (p?.Name || p?.ProjectTitle || String(p))}
-                      getKey={p => (p?.Uuid || p?.Id || p)}
-                      onSelect={v => { setProject(v?.ProjectTitle || v), setProjectUUID(v?.Uuid || v); }}
-                      renderInModal={true}
-                      inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                      // textStyle={inputStyles.input}
-                    />
-                  )}
-                </View>
-              </View>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Payment Term*</Text>
 
-                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
-                <View style={{ zIndex: 9998, elevation: 20 }}>
-                  {headerSaved && !isEditingHeader ? (
-                    <View style={[inputStyles.box]}>
-                      <Text style={inputStyles.input}>{renderLabel(paymentTerm || paymentTermUuid, ['Name', 'Term'])}</Text>
+                    <View style={[styles.row, { marginTop: hp(1.5) }]}>
+
+                      <View style={styles.col}>
+                        <Text style={inputStyles.label}>Project Name*</Text>
+
+                        {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
+                        <View style={{ zIndex: 9998, elevation: 20 }}>
+                          {headerSaved && !isEditingHeader ? (
+                            <View style={[inputStyles.box]}>
+                              <Text style={inputStyles.input}>{renderLabel(project || projectUUID, ['ProjectTitle', 'Name'])}</Text>
+                            </View>
+                          ) : (
+                            <>
+                              <Dropdown
+                                placeholder="-Select Project-"
+                                value={project}
+                                options={projectsOptions}
+                                getLabel={p => (p?.Name || p?.ProjectTitle || String(p))}
+                                getKey={p => (p?.Uuid || p?.Id || p)}
+                                onSelect={v => { const pval = v?.ProjectTitle || v; const pu = v?.Uuid || v; setProject(pval); setProjectUUID(pu); try { if (setFieldValue) { setFieldValue('Project', pval); setFieldValue('ProjectUUID', pu); } } catch (e) { } }}
+                                renderInModal={true}
+                                inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                              // textStyle={inputStyles.input}
+                              />
+                              {errors.Project && (touched.Project || submitCount > 0) ? (
+                                <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.Project}</Text>
+                              ) : null}
+                            </>
+                          )}
+                        </View>
+                      </View>
+                      <View style={styles.col}>
+                        <Text style={inputStyles.label}>Payment Term*</Text>
+
+                        {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
+                        <View style={{ zIndex: 9998, elevation: 20 }}>
+                          {headerSaved && !isEditingHeader ? (
+                            <View style={[inputStyles.box]}>
+                              <Text style={inputStyles.input}>{renderLabel(paymentTerm || paymentTermUuid, ['Name', 'Term'])}</Text>
+                            </View>
+                          ) : (
+                            <>
+                              <Dropdown
+                                placeholder="-Select Payment Term-"
+                                value={paymentTerm}
+                                options={paymentTermsOptions}
+                                getLabel={p => (p?.Name || p?.Term || String(p))}
+                                getKey={p => (p?.UUID || p?.Id || p)}
+                                onSelect={v => { const pt = v?.Name || v; const ptu = v?.UUID || v; setPaymentTerm(pt); setPaymentTermUuid(ptu); try { if (setFieldValue) { setFieldValue('PaymentTerm', pt); setFieldValue('PaymentTermUUID', ptu); } } catch (e) { } }}
+                                renderInModal={true}
+                                inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                              // textStyle={inputStyles.input}
+                              />
+                              {errors.PaymentTerm && (touched.PaymentTerm || submitCount > 0) ? (
+                                <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.PaymentTerm}</Text>
+                              ) : null}
+                            </>
+                          )}
+                        </View>
+                      </View>
                     </View>
-                  ) : (
-                    <Dropdown
-                      placeholder="-Select Payment Term-"
-                      value={paymentTerm}
-                      options={paymentTermsOptions}
-                      getLabel={p => (p?.Name || p?.Term || String(p))}
-                      getKey={p => (p?.UUID || p?.Id || p)}
-                      onSelect={v => { setPaymentTerm(v?.Name || v), setPaymentTermUuid(v?.UUID || v) }}
-                      renderInModal={true}
-                      inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                      // textStyle={inputStyles.input}
-                    />
-                  )}
-                </View>
-              </View>
-            </View>
 
-            <View style={[styles.row, { marginTop: hp(1.5) }]}>
+                    <View style={[styles.row, { marginTop: hp(1.5) }]}>
 
 
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Payment Method*</Text>
+                      <View style={styles.col}>
+                        <Text style={inputStyles.label}>Payment Method*</Text>
 
-                <View style={{ zIndex: 9998, elevation: 20 }}>
-                  {headerSaved && !isEditingHeader ? (
-                    <View style={[inputStyles.box]}>
-                      <Text style={inputStyles.input}>{renderLabel(paymentMethod || paymentMethodUUID, ['Name', 'Mode'])}</Text>
+                        <View style={{ zIndex: 9998, elevation: 20 }}>
+                          {headerSaved && !isEditingHeader ? (
+                            <View style={[inputStyles.box]}>
+                              <Text style={inputStyles.input}>{renderLabel(paymentMethod || paymentMethodUUID, ['Name', 'Mode'])}</Text>
+                            </View>
+                          ) : (
+                            <>
+                              <Dropdown
+                                placeholder="-Select Payment Method-"
+                                value={paymentMethod}
+                                options={paymentMethodsOptions}
+                                getLabel={p => (p?.Name || p?.Mode || String(p))}
+                                getKey={p => (p?.UUID || p?.Id || p)}
+                                onSelect={v => { const pm = v?.Name || v; const pmu = v?.UUID || v; setPaymentMethod(pm); setPaymentMethodUUID(pmu); try { if (setFieldValue) { setFieldValue('PaymentMethod', pm); setFieldValue('PaymentMethodUUID', pmu); } } catch (e) { } }}
+                                renderInModal={true}
+                                inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                              // textStyle={inputStyles.input}
+                              />
+                              {errors.PaymentMethod && (touched.PaymentMethod || submitCount > 0) ? (
+                                <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.PaymentMethod}</Text>
+                              ) : null}
+                            </>
+                          )}
+                        </View>
+                      </View>
+                      <View style={styles.col}>
+                        <Text style={inputStyles.label}>Days*</Text>
+                        {headerSaved && !isEditingHeader ? (
+                          <View style={[inputStyles.box]} pointerEvents="none">
+                            <Text style={inputStyles.input}>{renderLabel(dueDays || headerForm.DueDays)}</Text>
+                          </View>
+                        ) : (
+                          <View style={[inputStyles.box]}>
+                            <TextInput
+                              style={[inputStyles.input, { color: screenTheme.text }]}
+                              value={dueDays}
+                              onChangeText={t => {
+                                const cleanValue = String(t).replace(/[^0-9]/g, '');
+                                setDueDays(cleanValue);
+                                setHeaderForm(s => ({ ...s, DueDays: cleanValue }));
+                                try { if (setFieldValue) setFieldValue('DueDays', cleanValue); } catch (e) { }
+                              }}
+                              placeholder="-Days-"
+                              placeholderTextColor={screenTheme.textLight}
+                              keyboardType="number-pad"
+                              returnKeyType="done"
+                            />
+                            {errors.DueDays && (touched.DueDays || submitCount > 0) ? (
+                              <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.DueDays}</Text>
+                            ) : null}
+                          </View>
+                        )}
+                      </View>
+
                     </View>
-                  ) : (
-                    <Dropdown
-                      placeholder="-Select Payment Method-"
-                      value={paymentMethod}
-                      options={paymentMethodsOptions}
-                      getLabel={p => (p?.Name || p?.Mode || String(p))}
-                      getKey={p => (p?.UUID || p?.Id || p)}
-                      onSelect={v => { setPaymentMethod(v?.Name || v), setPaymentMethodUUID(v?.UUID || v) }}
-                      renderInModal={true}
-                      inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                      // textStyle={inputStyles.input}
-                    />
-                  )}
-                </View>
-              </View>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Days*</Text>
-                {headerSaved && !isEditingHeader ? (
-                  <View style={[inputStyles.box]} pointerEvents="none">
-                    <Text style={inputStyles.input}>{renderLabel(dueDays || headerForm.DueDays)}</Text>
-                  </View>
-                ) : (
-                  <View style={[inputStyles.box]}>
-                    <TextInput
-                      style={[inputStyles.input, { color: screenTheme.text }]}
-                      value={dueDays}
-                      onChangeText={t => {
-                        const cleanValue = String(t).replace(/[^0-9]/g, '');
-                        setDueDays(cleanValue);
-                        setHeaderForm(s => ({ ...s, DueDays: cleanValue }));
-                      }}
-                      placeholder="-Days-"
-                      placeholderTextColor={screenTheme.textLight}
-                      keyboardType="number-pad"
-                      returnKeyType="done"
-                    />
-                  </View>
-                )}
-              </View>
-
-            </View>
-            {/* <View style={[styles.row, { marginTop: hp(1.5) }]}>
+                    {/* <View style={[styles.row, { marginTop: hp(1.5) }]}>
             
 
             </View> */}
-            <View style={[styles.row, { marginTop: hp(1.5) }]}>
-              <View style={styles.col}>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => openDatePickerFor('invoice')}
-                >
-                  <Text style={inputStyles.label}>Order Date* </Text>
+                    <View style={[styles.row, { marginTop: hp(1.5) }]}>
+                      <View style={styles.col}>
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => openDatePickerFor('invoice')}
+                        >
+                          <Text style={inputStyles.label}>Order Date* </Text>
 
-                  <View
-                    style={[
-                      inputStyles.box,
-                      styles.innerFieldBox,
-                      styles.datePickerBox,
-                      { alignItems: 'center' },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        inputStyles.input,
-                        styles.datePickerText,
-                        !invoiceDate && {
-                          color: COLORS.textLight,
-                          fontFamily: TYPOGRAPHY.fontFamilyRegular,
-                        },
-                        invoiceDate && {
-                          color: COLORS.text,
-                          fontFamily: TYPOGRAPHY.fontFamilyMedium,
-                        },
-                      ]}
-                    >
-                      {invoiceDate || 'Order Date'}
-                    </Text>
-                    <View
-                      style={[
-                        styles.calendarIconContainer,
-                        invoiceDate && styles.calendarIconContainerSelected,
-                      ]}
-                    >
-                      <Icon
-                        name="calendar-today"
-                        size={rf(3.2)}
-                        color={invoiceDate ? COLORS.primary : COLORS.textLight}
-                      />
+                          <View
+                            style={[
+                              inputStyles.box,
+                              styles.innerFieldBox,
+                              styles.datePickerBox,
+                              { alignItems: 'center' },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                inputStyles.input,
+                                styles.datePickerText,
+                                !invoiceDate && {
+                                  color: COLORS.textLight,
+                                  fontFamily: TYPOGRAPHY.fontFamilyRegular,
+                                },
+                                invoiceDate && {
+                                  color: COLORS.text,
+                                  fontFamily: TYPOGRAPHY.fontFamilyMedium,
+                                },
+                              ]}
+                            >
+                              {invoiceDate || 'Order Date'}
+                            </Text>
+                            <View
+                              style={[
+                                styles.calendarIconContainer,
+                                invoiceDate && styles.calendarIconContainerSelected,
+                              ]}
+                            >
+                              <Icon
+                                name="calendar-today"
+                                size={rf(3.2)}
+                                color={invoiceDate ? COLORS.primary : COLORS.textLight}
+                              />
+                            </View>
+                          </View>
+                          {errors.OrderDate && (touched.OrderDate || submitCount > 0) ? (
+                            <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.OrderDate}</Text>
+                          ) : null}
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={styles.col}>
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => openDatePickerFor('due')}
+                        >
+                          <Text style={inputStyles.label}>Due Date* </Text>
+
+                          <View
+                            style={[
+                              inputStyles.box,
+                              styles.innerFieldBox,
+                              styles.datePickerBox,
+                              { alignItems: 'center' },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                inputStyles.input,
+                                styles.datePickerText,
+                                !dueDate && {
+                                  color: COLORS.textLight,
+                                  fontFamily: TYPOGRAPHY.fontFamilyRegular,
+                                },
+                                dueDate && {
+                                  color: COLORS.text,
+                                  fontFamily: TYPOGRAPHY.fontFamilyMedium,
+                                },
+                              ]}
+                            >
+                              {dueDate || 'Due Date'}
+                            </Text>
+                            <View
+                              style={[
+                                styles.calendarIconContainer,
+                                dueDate && styles.calendarIconContainerSelected,
+                              ]}
+                            >
+                              <Icon
+                                name="calendar-today"
+                                size={rf(3.2)}
+                                color={dueDate ? COLORS.primary : COLORS.textLight}
+                              />
+                            </View>
+                          </View>
+                          {errors.DueDate && (touched.DueDate || submitCount > 0) ? (
+                            <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.DueDate}</Text>
+                          ) : null}
+                        </TouchableOpacity>
+                      </View>
+
                     </View>
-                  </View>
-                </TouchableOpacity>
-              </View>
+                    <View style={[styles.row, { marginTop: hp(1.5) }]}>
+                      {(headerForm?.SalesOrderNo && (headerSaved || isEditingHeader)) ? (
+                        <View style={styles.col}>
+                          <Text style={inputStyles.label}>Sales Order Number*</Text>
 
-              <View style={styles.col}>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => openDatePickerFor('due')}
-                >
-                  <Text style={inputStyles.label}>Due Date* </Text>
-
-                  <View
-                    style={[
-                      inputStyles.box,
-                      styles.innerFieldBox,
-                      styles.datePickerBox,
-                      { alignItems: 'center' },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        inputStyles.input,
-                        styles.datePickerText,
-                        !dueDate && {
-                          color: COLORS.textLight,
-                          fontFamily: TYPOGRAPHY.fontFamilyRegular,
-                        },
-                        dueDate && {
-                          color: COLORS.text,
-                          fontFamily: TYPOGRAPHY.fontFamilyMedium,
-                        },
-                      ]}
-                    >
-                      {dueDate || 'Due Date'}
-                    </Text>
-                    <View
-                      style={[
-                        styles.calendarIconContainer,
-                        dueDate && styles.calendarIconContainerSelected,
-                      ]}
-                    >
-                      <Icon
-                        name="calendar-today"
-                        size={rf(3.2)}
-                        color={dueDate ? COLORS.primary : COLORS.textLight}
-                      />
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              </View>
-
-            </View>
-            <View style={[styles.row, { marginTop: hp(1.5) }]}>
-              {(headerForm?.SalesOrderNo && (headerSaved || isEditingHeader)) ? (
-                <View style={styles.col}>
-                  <Text style={inputStyles.label}>Sales Order Number*</Text>
-
-                  {/* Show Sales Order Number only when editing an existing header or when viewing a saved header.
+                          {/* Show Sales Order Number only when editing an existing header or when viewing a saved header.
                    It must be read-only in both cases; hide it during Add-mode (creating new header). */}
 
-                  <View style={[inputStyles.box]} pointerEvents="none">
-                    <Text editable={false} style={[inputStyles.input, { flex: 1 }]}>{renderLabel(headerForm.SalesOrderNo)}</Text>
-                  </View>
-                </View>
-              ) : null}
-            </View>
-
-          </AccordionSection>
-
-          {/* Section 2: Billing Address */}
-          {!(headerSaved && !isEditingHeader) && (
-            <AccordionSection
-              id={2}
-              title="Billing Address"
-              expanded={Array.isArray(expandedIds) ? expandedIds.includes(2) : expandedIds === 2}
-              onToggle={toggleSection}
-            >
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <Text style={inputStyles.label}>Building No.*</Text>
-                  <View style={[inputStyles.box]} pointerEvents="box-none">
-                    <TextInput
-                      style={[inputStyles.input, { flex: 1, color: screenTheme.text }]}
-                      value={billingForm.buildingNo}
-                      onChangeText={v =>
-                        setBillingForm(s => ({ ...s, buildingNo: v }))
-                      }
-                      placeholder="eg."
-                      placeholderTextColor={screenTheme.textLight}
-                    />
-                  </View>
-                </View>
-                <View style={styles.col}>
-                  <Text style={inputStyles.label}>Street 1*</Text>
-                  <View style={[inputStyles.box]} pointerEvents="box-none">
-                    <TextInput
-                      style={[inputStyles.input, { color: screenTheme.text, flex: 1 }]}
-                      value={billingForm.street1}
-                      onChangeText={v =>
-                        setBillingForm(s => ({ ...s, street1: v }))
-                      }
-                      placeholder="eg."
-                      placeholderTextColor={COLORS.textLight}
-                    />
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <Text style={inputStyles.label}>Street 2</Text>
-                  <View style={[inputStyles.box]} pointerEvents="box-none">
-                    <TextInput
-                      style={[inputStyles.input, { flex: 1 }]}
-                      value={billingForm.street2}
-                      onChangeText={v =>
-                        setBillingForm(s => ({ ...s, street2: v }))
-                      }
-                      placeholder="eg."
-                      placeholderTextColor={COLORS.textLight}
-                    />
-                  </View>
-                </View>
-                <View style={styles.col}>
-                  <Text style={inputStyles.label}>Postal Code*</Text>
-                  <View style={[inputStyles.box]} pointerEvents="box-none">
-                    <TextInput
-                      style={[inputStyles.input, { flex: 1 }]}
-                      value={billingForm.postalCode}
-                      onChangeText={v =>
-                        setBillingForm(s => ({ ...s, postalCode: v }))
-                      }
-                      placeholder="eg."
-                      placeholderTextColor={COLORS.textLight}
-                    />
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <Text style={inputStyles.label}>Country Name*</Text>
-                  <View style={{ zIndex: 9999, elevation: 20 }}>
-                    <Dropdown
-                      placeholder="Select Country*"
-                      value={selectedBillingCountry}
-                      options={countriesOptions}
-                      getLabel={c => (c?.Name || c?.CountryName || c?.countryName || String(c))}
-                      getKey={c => (c?.UUID || c?.Id || c)}
-                      onSelect={(v) => { handleBillingCountrySelect(v); }}
-                      inputBoxStyle={inputStyles.box}
-                      style={{ marginBottom: hp(1.6) }}
-                      renderInModal={true}
-                    />
-                  </View>
-                </View>
-                <View style={styles.col}>
-                  <Text style={inputStyles.label}>State Name*</Text>
-                  <View style={{ zIndex: 9999, elevation: 20 }}>
-                    <Dropdown
-                      placeholder="Select State*"
-                      value={selectedBillingState}
-                      options={statesOptions}
-                      getLabel={c => (c?.Name || c?.StateName || String(c))}
-                      getKey={c => (c?.UUID || c?.Id || c)}
-                      onSelect={handleBillingStateSelect}
-                      inputBoxStyle={inputStyles.box}
-                      style={{ marginBottom: hp(1.6) }}
-                      renderInModal={true}
-                    />
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <Text style={inputStyles.label}>City Name*</Text>
-                  <View style={{ zIndex: 9998, elevation: 20 }}>
-                    <Dropdown
-                      placeholder="- Select City -"
-                      value={selectedBillingCity}
-                      options={citiesOptions}
-                      getLabel={c => (c?.Name || c?.CityName || String(c))}
-                      getKey={c => (c?.UUID || c?.Id || c)}
-                      onSelect={c => {
-                        setSelectedBillingCity(c);
-                        setBillingForm(s => ({ ...s, city: c?.UUID || c }));
-                      }}
-                      inputBoxStyle={inputStyles.box}
-                      style={{ marginBottom: hp(1.6) }}
-                      renderInModal={true}
-                    />
-                  </View>
-                </View>
-                <View style={[styles.col, styles.checkboxCol]}>
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    style={styles.checkboxRow}
-                    onPress={() => {
-                      toggleCopyBillingToShipping();
-                    }}
-                  >
-                    <View style={[styles.checkboxBox, isShippingSame && styles.checkboxBoxChecked]}>
-                      {isShippingSame ? (
-                        <Icon name="check" size={rf(3)} color="#fff" />
+                          <View style={[inputStyles.box]} pointerEvents="none">
+                            <Text editable={false} style={[inputStyles.input, { flex: 1 }]}>{renderLabel(headerForm.SalesOrderNo)}</Text>
+                          </View>
+                        </View>
                       ) : null}
                     </View>
-                    <View style={{ width: '80%' }}>
-                      <Text
-                        style={[
-                          inputStyles.label,
-                          { marginLeft: wp(2), marginTop: 0 },
-                        ]}
+                  </AccordionSection>
+
+                  {/* Section 2: Billing Address */}
+                  {!(headerSaved && !isEditingHeader) && (
+                    <AccordionSection
+                      id={2}
+                      title="Billing Address"
+                      expanded={Array.isArray(expandedIds) ? expandedIds.includes(2) : expandedIds === 2}
+                      onToggle={toggleSection}
+                    >
+                        <View style={styles.row}>
+                          <View style={styles.col}>
+                            <Text style={inputStyles.label}>Building No.*</Text>
+                            <View style={[inputStyles.box]} pointerEvents="box-none">
+                              <TextInput
+                                style={[inputStyles.input, { flex: 1, color: screenTheme.text }]}
+                                value={values.BillingBuildingNo || ''}
+                                onChangeText={(v) => {
+                                  handleChange('BillingBuildingNo')(v);
+                                  setBillingForm(s => ({ ...s, buildingNo: v }));
+                                }}
+                                onBlur={handleBlur('BillingBuildingNo')}
+                                placeholder="eg."
+                                placeholderTextColor={screenTheme.textLight}
+                              />
+                            </View>
+                            {errors.BillingBuildingNo && (touched.BillingBuildingNo || submitCount > 0) ? (
+                              <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.4) }}>{errors.BillingBuildingNo}</Text>
+                            ) : null}
+                          </View>
+                          <View style={styles.col}>
+                            <Text style={inputStyles.label}>Street 1*</Text>
+                            <View style={[inputStyles.box]} pointerEvents="box-none">
+                              <TextInput
+                                style={[inputStyles.input, { color: screenTheme.text, flex: 1 }]}
+                                value={values.BillingStreet1 || ''}
+                                onChangeText={(v) => {
+                                  handleChange('BillingStreet1')(v);
+                                  setBillingForm(s => ({ ...s, street1: v }));
+                                }}
+                                onBlur={handleBlur('BillingStreet1')}
+                                placeholder="eg."
+                                placeholderTextColor={COLORS.textLight}
+                              />
+                            </View>
+                            {errors.BillingStreet1 && (touched.BillingStreet1 || submitCount > 0) ? (
+                              <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.4) }}>{errors.BillingStreet1}</Text>
+                            ) : null}
+                          </View>
+                        </View>
+
+                        <View style={styles.row}>
+                          <View style={styles.col}>
+                            <Text style={inputStyles.label}>Street 2</Text>
+                            <View style={[inputStyles.box]} pointerEvents="box-none">
+                              <TextInput
+                                style={[inputStyles.input, { flex: 1 }]}
+                                value={values.BillingStreet2 || ''}
+                                onChangeText={(v) => {
+                                  handleChange('BillingStreet2')(v);
+                                  setBillingForm(s => ({ ...s, street2: v }));
+                                }}
+                                onBlur={handleBlur('BillingStreet2')}
+                                placeholder="eg."
+                                placeholderTextColor={COLORS.textLight}
+                              />
+                            </View>
+                          </View>
+                          <View style={styles.col}>
+                            <Text style={inputStyles.label}>Postal Code*</Text>
+                            <View style={[inputStyles.box]} pointerEvents="box-none">
+                              <TextInput
+                                style={[inputStyles.input, { flex: 1 }]}
+                                value={values.BillingPostalCode || ''}
+                                onChangeText={(v) => {
+                                  handleChange('BillingPostalCode')(v);
+                                  setBillingForm(s => ({ ...s, postalCode: v }));
+                                }}
+                                onBlur={handleBlur('BillingPostalCode')}
+                                placeholder="eg."
+                                placeholderTextColor={COLORS.textLight}
+                              />
+                            </View>
+                            {errors.BillingPostalCode && (touched.BillingPostalCode || submitCount > 0) ? (
+                              <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.4) }}>{errors.BillingPostalCode}</Text>
+                            ) : null}
+                          </View>
+                        </View>
+
+                        <View style={styles.row}>
+                          <View style={styles.col}>
+                            <Text style={inputStyles.label}>Country Name*</Text>
+                            <View style={{ zIndex: 9999, elevation: 20 }}>
+                              <Dropdown
+                                placeholder="Select Country*"
+                                value={selectedBillingCountry}
+                                options={countriesOptions}
+                                getLabel={c => (c?.Name || c?.CountryName || c?.countryName || String(c))}
+                                getKey={c => (c?.UUID || c?.Id || c)}
+                                onSelect={(v) => { 
+                                  handleBillingCountrySelect(v); 
+                                  const countryUuid = v?.Uuid || v?.UUID || v?.Id || (typeof v === 'string' ? v : null);
+                                  setFieldValue('BillingCountryUUID', countryUuid || ''); 
+                                  setFieldValue('BillingStateUUID', ''); 
+                                  setFieldValue('BillingCityUUID', ''); 
+                                  setBillingForm(s => ({ ...s, country: countryUuid || '', state: '', city: '' }));
+                                }}
+                                inputBoxStyle={inputStyles.box}
+                                style={{ marginBottom: hp(1.6) }}
+                                renderInModal={true}
+                              />
+                            </View>
+                            {errors.BillingCountryUUID && (touched.BillingCountryUUID || submitCount > 0) ? (
+                              <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.4) }}>{errors.BillingCountryUUID}</Text>
+                            ) : null}
+                          </View>
+                          <View style={styles.col}>
+                            <Text style={inputStyles.label}>State Name*</Text>
+                            <View style={{ zIndex: 9999, elevation: 20 }}>
+                              <Dropdown
+                                placeholder="Select State*"
+                                value={selectedBillingState}
+                                options={statesOptions}
+                                getLabel={c => (c?.Name || c?.StateName || String(c))}
+                                getKey={c => (c?.UUID || c?.Id || c)}
+                                onSelect={(v) => { 
+                                  handleBillingStateSelect(v); 
+                                  const stateUuid = v?.Uuid || v?.UUID || v?.Id || (typeof v === 'string' ? v : null);
+                                  setFieldValue('BillingStateUUID', stateUuid || ''); 
+                                  setFieldValue('BillingCityUUID', ''); 
+                                  setBillingForm(s => ({ ...s, state: stateUuid || '', city: '' }));
+                                }}
+                                inputBoxStyle={inputStyles.box}
+                                style={{ marginBottom: hp(1.6) }}
+                                renderInModal={true}
+                              />
+                            </View>
+                            {errors.BillingStateUUID && (touched.BillingStateUUID || submitCount > 0) ? (
+                              <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.4) }}>{errors.BillingStateUUID}</Text>
+                            ) : null}
+                          </View>
+                        </View>
+
+                        <View style={styles.row}>
+                          <View style={styles.col}>
+                            <Text style={inputStyles.label}>City Name*</Text>
+                            <View style={{ zIndex: 9998, elevation: 20 }}>
+                              <Dropdown
+                                placeholder="- Select City -"
+                                value={selectedBillingCity}
+                                options={citiesOptions}
+                                getLabel={c => (c?.Name || c?.CityName || String(c))}
+                                getKey={c => (c?.UUID || c?.Id || c)}
+                                onSelect={c => {
+                                  setSelectedBillingCity(c);
+                                  const cityUuid = c?.UUID || c?.Id || (typeof c === 'string' ? c : null);
+                                  setFieldValue('BillingCityUUID', cityUuid || ''); 
+                                  setBillingForm(s => ({ ...s, city: cityUuid || '' }));
+                                }}
+                                inputBoxStyle={inputStyles.box}
+                                style={{ marginBottom: hp(1.6) }}
+                                renderInModal={true}
+                              />
+                            </View>
+                            {errors.BillingCityUUID && (touched.BillingCityUUID || submitCount > 0) ? (
+                              <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.4) }}>{errors.BillingCityUUID}</Text>
+                            ) : null}
+                          </View>
+                          <View style={[styles.col, styles.checkboxCol]}>
+                            <TouchableOpacity
+                              activeOpacity={0.8}
+                              style={styles.checkboxRow}
+                              onPress={() => {
+                                toggleCopyBillingToShipping(setFieldValue);
+                              }}
+                            >
+                              <View style={[styles.checkboxBox, isShippingSame && styles.checkboxBoxChecked]}>
+                                {isShippingSame ? (
+                                  <Icon name="check" size={rf(3)} color="#fff" />
+                                ) : null}
+                              </View>
+                              <View style={{ width: '80%' }}>
+                                <Text
+                                  style={[
+                                    inputStyles.label,
+                                    { marginLeft: wp(2), marginTop: 0 },
+                                  ]}
+                                >
+                                  Is Shipping Address Same
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </AccordionSection>
+                    )}
+
+                    {/* Section 3: Shipping Address */}
+                    {!(headerSaved && !isEditingHeader) && (
+                      <AccordionSection
+                        id={3}
+                        title="Shipping Address"
+                        expanded={Array.isArray(expandedIds) ? expandedIds.includes(3) : expandedIds === 3}
+                        onToggle={toggleSection}
                       >
-                        Is Shipping Address Same
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </AccordionSection>
-          )}
+                        <View style={styles.row}>
+                          <View style={styles.col}>
+                            <Text style={inputStyles.label}>Building No.*</Text>
+                            <View style={[inputStyles.box]} pointerEvents="box-none">
+                              <TextInput
+                                style={[inputStyles.input, { flex: 1 }]}
+                                value={values.ShippingBuildingNo || ''}
+                                onChangeText={(v) => {
+                                  handleChange('ShippingBuildingNo')(v);
+                                  setShippingForm(s => ({ ...s, buildingNo: v }));
+                                }}
+                                onBlur={handleBlur('ShippingBuildingNo')}
+                                placeholder="eg."
+                                placeholderTextColor={COLORS.textLight}
+                              />
+                            </View>
+                            {errors.ShippingBuildingNo && (touched.ShippingBuildingNo || submitCount > 0) ? (
+                              <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.4) }}>{errors.ShippingBuildingNo}</Text>
+                            ) : null}
+                          </View>
+                          <View style={styles.col}>
+                            <Text style={inputStyles.label}>Street 1*</Text>
+                            <View style={[inputStyles.box]} pointerEvents="box-none">
+                              <TextInput
+                                style={[inputStyles.input, { flex: 1 }]}
+                                value={values.ShippingStreet1 || ''}
+                                onChangeText={(v) => {
+                                  handleChange('ShippingStreet1')(v);
+                                  setShippingForm(s => ({ ...s, street1: v }));
+                                }}
+                                onBlur={handleBlur('ShippingStreet1')}
+                                placeholder="eg."
+                                placeholderTextColor={COLORS.textLight}
+                              />
+                            </View>
+                            {errors.ShippingStreet1 && (touched.ShippingStreet1 || submitCount > 0) ? (
+                              <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.4) }}>{errors.ShippingStreet1}</Text>
+                            ) : null}
+                          </View>
+                        </View>
 
-          {/* Section 3: Shipping Address */}
-          {!(headerSaved && !isEditingHeader) && (
-            <AccordionSection
-              id={3}
-              title="Shipping Address"
-              expanded={Array.isArray(expandedIds) ? expandedIds.includes(3) : expandedIds === 3}
-              onToggle={toggleSection}
-            >
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <Text style={inputStyles.label}>Building No.*</Text>
-                  <View style={[inputStyles.box]} pointerEvents="box-none">
-                    <TextInput
-                      style={[inputStyles.input, { flex: 1 }]}
-                      value={shippingForm.buildingNo}
-                      onChangeText={v =>
-                        setShippingForm(s => ({ ...s, buildingNo: v }))
-                      }
-                      placeholder="eg."
-                      placeholderTextColor={COLORS.textLight}
-                    />
-                  </View>
-                </View>
-                <View style={styles.col}>
-                  <Text style={inputStyles.label}>Street 1*</Text>
-                  <View style={[inputStyles.box]} pointerEvents="box-none">
-                    <TextInput
-                      style={[inputStyles.input, { flex: 1 }]}
-                      value={shippingForm.street1}
-                      onChangeText={v =>
-                        setShippingForm(s => ({ ...s, street1: v }))
-                      }
-                      placeholder="eg."
-                      placeholderTextColor={COLORS.textLight}
-                    />
-                  </View>
-                </View>
-              </View>
+                        <View style={styles.row}>
+                          <View style={styles.col}>
+                            <Text style={inputStyles.label}>Street 2</Text>
+                            <View style={[inputStyles.box]} pointerEvents="box-none">
+                              <TextInput
+                                style={[inputStyles.input, { flex: 1 }]}
+                                value={values.ShippingStreet2 || ''}
+                                onChangeText={(v) => {
+                                  handleChange('ShippingStreet2')(v);
+                                  setShippingForm(s => ({ ...s, street2: v }));
+                                }}
+                                onBlur={handleBlur('ShippingStreet2')}
+                                placeholder="eg."
+                                placeholderTextColor={COLORS.textLight}
+                              />
+                            </View>
+                          </View>
+                          <View style={styles.col}>
+                            <Text style={inputStyles.label}>Postal Code*</Text>
+                            <View style={[inputStyles.box]} pointerEvents="box-none">
+                              <TextInput
+                                style={[inputStyles.input, { flex: 1 }]}
+                                value={values.ShippingPostalCode || ''}
+                                onChangeText={(v) => {
+                                  handleChange('ShippingPostalCode')(v);
+                                  setShippingForm(s => ({ ...s, postalCode: v }));
+                                }}
+                                onBlur={handleBlur('ShippingPostalCode')}
+                                placeholder="eg."
+                                placeholderTextColor={COLORS.textLight}
+                              />
+                            </View>
+                            {errors.ShippingPostalCode && (touched.ShippingPostalCode || submitCount > 0) ? (
+                              <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.4) }}>{errors.ShippingPostalCode}</Text>
+                            ) : null}
+                          </View>
+                        </View>
 
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <Text style={inputStyles.label}>Street 2</Text>
-                  <View style={[inputStyles.box]} pointerEvents="box-none">
-                    <TextInput
-                      style={[inputStyles.input, { flex: 1 }]}
-                      value={shippingForm.street2}
-                      onChangeText={v =>
-                        setShippingForm(s => ({ ...s, street2: v }))
-                      }
-                      placeholder="eg."
-                      placeholderTextColor={COLORS.textLight}
-                    />
-                  </View>
-                </View>
-                <View style={styles.col}>
-                  <Text style={inputStyles.label}>Postal Code*</Text>
-                  <View style={[inputStyles.box]} pointerEvents="box-none">
-                    <TextInput
-                      style={[inputStyles.input, { flex: 1 }]}
-                      value={shippingForm.postalCode}
-                      onChangeText={v =>
-                        setShippingForm(s => ({ ...s, postalCode: v }))
-                      }
-                      placeholder="eg."
-                      placeholderTextColor={COLORS.textLight}
-                    />
-                  </View>
-                </View>
-              </View>
+                        <View style={styles.row}>
+                          <View style={styles.col}>
+                            <Text style={inputStyles.label}>Country Name*</Text>
+                            <View style={{ zIndex: 9999, elevation: 20 }}>
+                              <Dropdown
+                                placeholder="- Select Country -"
+                                value={selectedShippingCountry}
+                                options={countriesOptions}
+                                getLabel={c => (c?.Name || c?.CountryName || c?.countryName || String(c))}
+                                getKey={c => (c?.UUID || c?.Id || c)}
+                                onSelect={(v) => { 
+                                  handleShippingCountrySelect(v); 
+                                  const countryUuid = v?.Uuid || v?.UUID || v?.Id || (typeof v === 'string' ? v : null);
+                                  setFieldValue('ShippingCountryUUID', countryUuid || ''); 
+                                  setFieldValue('ShippingStateUUID', ''); 
+                                  setFieldValue('ShippingCityUUID', ''); 
+                                  setShippingForm(s => ({ ...s, country: countryUuid || '', state: '', city: '' }));
+                                }}
+                                inputBoxStyle={inputStyles.box}
+                                style={{ marginBottom: hp(1.6) }}
+                                renderInModal={true}
+                              />
+                            </View>
+                            {errors.ShippingCountryUUID && (touched.ShippingCountryUUID || submitCount > 0) ? (
+                              <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.4) }}>{errors.ShippingCountryUUID}</Text>
+                            ) : null}
+                          </View>
+                          <View style={styles.col}>
+                            <Text style={inputStyles.label}>State Name*</Text>
+                            <View style={{ zIndex: 9999, elevation: 20 }}>
+                              <Dropdown
+                                placeholder="- Select State -"
+                                value={selectedShippingState}
+                                options={shippingStatesOptions}
+                                getLabel={c => (c?.Name || c?.StateName || String(c))}
+                                getKey={c => (c?.UUID || c?.Id || c)}
+                                onSelect={(v) => { 
+                                  handleShippingStateSelect(v); 
+                                  const stateUuid = v?.Uuid || v?.UUID || v?.Id || (typeof v === 'string' ? v : null);
+                                  setFieldValue('ShippingStateUUID', stateUuid || ''); 
+                                  setFieldValue('ShippingCityUUID', ''); 
+                                  setShippingForm(s => ({ ...s, state: stateUuid || '', city: '' }));
+                                }}
+                                inputBoxStyle={inputStyles.box}
+                                style={{ marginBottom: hp(1.6) }}
+                                renderInModal={true}
+                              />
+                            </View>
+                            {errors.ShippingStateUUID && (touched.ShippingStateUUID || submitCount > 0) ? (
+                              <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.4) }}>{errors.ShippingStateUUID}</Text>
+                            ) : null}
+                          </View>
+                        </View>
 
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <Text style={inputStyles.label}>Country Name*</Text>
-                  <View style={{ zIndex: 9999, elevation: 20 }}>
-                    <Dropdown
-                      placeholder="- Select Country -"
-                      value={selectedShippingCountry}
-                      options={countriesOptions}
-                      getLabel={c => (c?.Name || c?.CountryName || c?.countryName || String(c))}
-                      getKey={c => (c?.UUID || c?.Id || c)}
-                      onSelect={handleShippingCountrySelect}
-                      inputBoxStyle={inputStyles.box}
-                      // textStyle={inputStyles.input}
-                      style={{ marginBottom: hp(1.6) }}
-                      renderInModal={true}
-                    />
-                  </View>
-                </View>
-                <View style={styles.col}>
-                  <Text style={inputStyles.label}>State Name*</Text>
-                  <View style={{ zIndex: 9999, elevation: 20 }}>
-                    <Dropdown
-                      placeholder="- Select State -"
-                      value={selectedShippingState}
-                      options={shippingStatesOptions}
-                      getLabel={c => (c?.Name || c?.StateName || String(c))}
-                      getKey={c => (c?.UUID || c?.Id || c)}
-                      onSelect={handleShippingStateSelect}
-                      inputBoxStyle={inputStyles.box}
-                      // textStyle={inputStyles.input}
-                      style={{ marginBottom: hp(1.6) }}
-                      renderInModal={true}
-                    />
-                  </View>
-                </View>
-              </View>
+                        <View style={styles.row}>
+                          <View style={styles.col}>
+                            <Text style={inputStyles.label}>City Name*</Text>
+                            <View style={{ zIndex: 9998, elevation: 20 }}>
+                              <Dropdown
+                                placeholder="- Select City -"
+                                value={selectedShippingCity}
+                                options={shippingCitiesOptions}
+                                getLabel={c => (c?.Name || c?.CityName || String(c))}
+                                getKey={c => (c?.UUID || c?.Id || c)}
+                                onSelect={c => {
+                                  setSelectedShippingCity(c);
+                                  const cityUuid = c?.UUID || c?.Id || (typeof c === 'string' ? c : null);
+                                  setFieldValue('ShippingCityUUID', cityUuid || ''); 
+                                  setShippingForm(s => ({ ...s, city: cityUuid || '' }));
+                                }}
+                                inputBoxStyle={inputStyles.box}
+                                style={{ marginBottom: hp(1.6) }}
+                                renderInModal={true}
+                              />
+                            </View>
+                            {errors.ShippingCityUUID && (touched.ShippingCityUUID || submitCount > 0) ? (
+                              <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.4) }}>{errors.ShippingCityUUID}</Text>
+                            ) : null}
+                          </View>
+                          <View style={styles.col} />
+                        </View>
+                      {/* Submit button */}
+                      {!headerSaved && (
+                        <View style={{ marginTop: hp(2), alignItems: 'flex-end' }}>
+                          <TouchableOpacity
+                            activeOpacity={0.85}
+                            style={[formStyles.primaryBtn, { paddingVertical: hp(1), width: wp(36) }]}
+                            onPress={submitForm}
+                            disabled={isSavingHeader}
+                          >
+                            <Text style={formStyles.primaryBtnText}>
+                              {isSavingHeader ? (isEditingHeader ? 'Updating...' : 'Saving...') : (isEditingHeader ? 'Update' : 'Submit')}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </AccordionSection>
+                  )}
 
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <Text style={inputStyles.label}>City Name*</Text>
-                  <View style={{ zIndex: 9998, elevation: 20 }}>
-                    <Dropdown
-                      placeholder="- Select City -"
-                      value={selectedShippingCity}
-                      options={shippingCitiesOptions}
-                      getLabel={c => (c?.Name || c?.CityName || String(c))}
-                      getKey={c => (c?.UUID || c?.Id || c)}
-                      onSelect={c => {
-                        setSelectedShippingCity(c);
-                        setShippingForm(s => ({ ...s, city: c?.UUID || c }));
-                      }}
-                      inputBoxStyle={inputStyles.box}
-                      // textStyle={inputStyles.input}
-                      style={{ marginBottom: hp(1.6) }}
-                      renderInModal={true}
-                    />
-                  </View>
-                </View>
-                <View style={styles.col} />
-              </View>
-
-              {/* Submit button inside Shipping section when header fields filled */}
-              <View style={{ marginTop: hp(1.2), alignItems: 'flex-end' }}>
-                {hasHeaderData() && !headerSaved ? (
-                  <TouchableOpacity
-                    activeOpacity={0.85}
-                    style={[formStyles.primaryBtn, { paddingVertical: hp(1), width: wp(36) }]}
-                    onPress={saveHeader}
-                    disabled={isSavingHeader}
-                  >
-                    <Text style={formStyles.primaryBtnText}>
-                      {isSavingHeader ? (isEditingHeader ? 'Updating...' : 'Saving...') : (isEditingHeader ? 'Update' : 'Submit')}
-                    </Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            </AccordionSection>
-          )}
+                </>
+              )
+            }}
+          </Formik>
 
           {/* Section 4: Create Order */}
           {headerSaved && (
@@ -2984,18 +3180,71 @@ const ManageSalesOrder = () => {
                         placeholder="Select Item"
                         value={currentItem.itemName}
                         options={masterItems}
-                        getLabel={it => (it?.name || String(it))}
-                        getKey={it => (it?.sku || it)}
+                        getLabel={it => (
+                          it?.name || it?.Name || it?.itemName || it?.ItemName || it?.Item || it?.ItemDesc || it?.Description || it?.desc || String(it)
+                        )}
+                        getKey={it => (
+                          it?.sku || it?.SKU || it?.Sku || it?.uuid || it?.UUID || it?.Uuid || it?.id || it?.Id || it
+                        )}
                         onSelect={v => {
+                          const resolveRate = (obj, fallback) => {
+                            const r = obj?.rate ?? obj?.Rate ?? obj?.Price ?? obj?.price ?? obj?.UnitPrice ?? obj?.unitPrice ?? obj?.SellingPrice ?? obj?.sellingPrice ?? fallback;
+                            return (typeof r === 'number' || (typeof r === 'string' && r.trim() !== '')) ? String(r) : '';
+                          };
+
+                          const resolveDesc = (obj, fallback) => {
+                            return obj?.desc ?? obj?.Description ?? obj?.ItemDesc ?? obj?.itemDesc ?? fallback ?? '';
+                          };
+
+                          const resolveHsn = (obj, fallback) => {
+                            return obj?.hsn ?? obj?.HSNCode ?? obj?.HSN ?? obj?.HSNSACNO ?? fallback ?? '';
+                          };
+
+                          // If Dropdown returns an object, use it directly
                           if (v && typeof v === 'object') {
-                            setCurrentItem(ci => ({ ...ci, itemName: v?.name || v, itemNameUuid: v?.sku || v, rate: String(v?.rate || ci?.rate || ''), desc: v?.desc || ci?.desc || '', hsn: v?.hsn || ci?.hsn || '' }));
-                          } else {
-                            setCurrentItem(ci => ({ ...ci, itemName: v, itemNameUuid: null }));
+                            setCurrentItem(ci => ({
+                              ...ci,
+                              itemName: v?.name ?? v?.Name ?? v?.ItemName ?? String(v),
+                              itemNameUuid: v?.uuid ?? v?.UUID ?? v?.Uuid ?? v?.Id ?? v?.sku ?? v?.SKU ?? v,
+                              rate: resolveRate(v, ci?.rate ?? ''),
+                              desc: resolveDesc(v, ci?.desc ?? ''),
+                              hsn: resolveHsn(v, ci?.hsn ?? ''),
+                              quantity: (ci?.quantity && String(ci.quantity).trim() !== '') ? ci.quantity : '1',
+                            }));
+                            return;
                           }
+
+                          // If Dropdown returns a primitive key, try to resolve it from masterItems
+                          if (v !== null && typeof v !== 'undefined') {
+                            const key = String(v);
+                            const found = (Array.isArray(masterItems) ? masterItems : []).find(m => {
+                              try {
+                                const mKey = (m?.sku || m?.SKU || m?.Sku || m?.uuid || m?.UUID || m?.Uuid || m?.id || m?.Id || m?.ItemCode || m?.ItemId || m?.ItemUUID || m?.UUID);
+                                if (mKey && String(mKey) === key) return true;
+                                if (String(m?.name || m?.Name || m?.ItemName || m?.Item || '') === key) return true;
+                                return false;
+                              } catch (e) { return false; }
+                            });
+                            if (found) {
+                              setCurrentItem(ci => ({
+                                ...ci,
+                                itemName: found?.name ?? found?.Name ?? found?.ItemName ?? key,
+                                itemNameUuid: found?.uuid ?? found?.UUID ?? found?.Uuid ?? found?.Id ?? found?.sku ?? found?.SKU ?? key,
+                                rate: resolveRate(found, ci?.rate ?? ''),
+                                desc: resolveDesc(found, ci?.desc ?? ''),
+                                hsn: resolveHsn(found, ci?.hsn ?? ''),
+                                quantity: (ci?.quantity && String(ci.quantity).trim() !== '') ? ci.quantity : '1',
+                              }));
+                              return;
+                            }
+                          }
+
+                          // Fallback: set the primitive as the name and default qty
+                          setCurrentItem(ci => ({ ...ci, itemName: v, itemNameUuid: null, quantity: (ci?.quantity && String(ci.quantity).trim() !== '') ? ci.quantity : '1' }));
                         }}
                         renderInModal={true}
                         inputBoxStyle={[inputStyles.box, { width: '100%' }]}
-                        // textStyle={inputStyles.input}
+                      // textStyle={inputStyles.input}
                       />
                     </View>
                   </View>
@@ -3073,7 +3322,7 @@ const ManageSalesOrder = () => {
                         activeOpacity={0.8}
                         style={[styles.addButton, { backgroundColor: COLORS.primary }]}
                         onPress={handleAddLineItem}
-                        disabled={isAddingLine}
+                        disabled={isAddingLine || !currentItem.itemNameUuid}
                       >
                         {isAddingLine ? (
                           <ActivityIndicator size="small" color="#fff" />
@@ -3099,14 +3348,14 @@ const ManageSalesOrder = () => {
 
               {/* Table container (search + pagination + table) */}
               {linesLoading ? (
-                <View style={{ paddingVertical: hp(4), alignItems: 'center',  color: screenTheme.text }}>
+                <View style={{ paddingVertical: hp(4), alignItems: 'center', color: screenTheme.text }}>
                   <ActivityIndicator size="small" color={COLORS.primary} />
-                </View> 
+                </View>
               ) : items.length > 0 && (
                 <View>
                   <View style={styles.tableControlsRow}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={{ marginRight: wp(2), color: screenTheme.text  }}>Show</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={{ marginRight: wp(2), color: screenTheme.text }}>Show</Text>
                       <Dropdown
                         placeholder={String(pageSize)}
                         value={String(pageSize)}
@@ -3115,14 +3364,14 @@ const ManageSalesOrder = () => {
                         getKey={p => String(p)}
                         onSelect={v => { setPageSize(Number(v)); setPage(1); }}
                         inputBoxStyle={{ width: wp(18) }}
-                        // textStyle={inputStyles.input}
+                      // textStyle={inputStyles.input}
                       />
-                      <Text style={{ marginLeft: wp(2) , color: screenTheme.text }}>entries</Text>
+                      <Text style={{ marginLeft: wp(2), color: screenTheme.text }}>entries</Text>
                     </View>
 
                     <View style={{ flex: 1, alignItems: 'flex-end' }}>
                       <TextInput
-                        style={[inputStyles.box, { width: wp(40), height: hp(5), paddingHorizontal: wp(2) }]}
+                        style={[inputStyles.box, { color: screenTheme.text, width: wp(40), height: hp(5), paddingHorizontal: wp(2) }]}
                         placeholder="Search..."
                         value={tableSearch}
                         onChangeText={t => { setTableSearch(t); setPage(1); }}
@@ -3412,10 +3661,10 @@ const ManageSalesOrder = () => {
                   />
                 </View>
                 {(isEditingHeader || headerResponse) && (
-                  <View style={{width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm }}>
+                  <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm }}>
                     <Text style={inputStyles.label}>Document</Text>
                     <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton]} onPress={() => viewDocument({ fileName: headerForm?.SalesOrderNo || 'Document' })}>
-                      <Text style={{ color: '#fff', fontWeight: '600', fontSize: rf(3.4)}}>View Document</Text>
+                      <Text style={{ color: '#fff', fontWeight: '600', fontSize: rf(3.4) }}>View Document</Text>
                     </TouchableOpacity>
                   </View>
                 )}

@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
 import {
   View,
   Text,
@@ -79,6 +81,19 @@ const AccordionSection = ({
   );
 };
 
+// Validation schema for Header form
+const HeaderValidationSchema = Yup.object().shape({
+  VendorName: Yup.string().trim().required('Vendor is required'),
+  VendorUUID: Yup.string().trim().required('Vendor is required'),
+  PaymentMethod: Yup.string().test('paymentmethod-or-uuid', 'Payment method is required', function (val) {
+    const { PaymentMethodUUID } = this.parent || {};
+    const hasVal = typeof val === 'string' && val.trim() !== '';
+    const hasUuid = typeof PaymentMethodUUID === 'string' && PaymentMethodUUID.trim() !== '';
+    return !!(hasVal || hasUuid);
+  }),
+  DeliveryDate: Yup.string().trim().required('Delivery date is required'),
+});
+
 const ManageSalesOrder = () => {
   const [expandedIds, setExpandedIds] = useState([1]);
   const navigation = useNavigation();
@@ -101,7 +116,7 @@ const ManageSalesOrder = () => {
         setMasterItemsLoading(true);
         const c = await getCMPUUID();
         const e = await getENVUUID();
-        const resp = await getItems({ cmpUuid: c, envUuid: e });
+        const resp = await getItems({ cmpUuid: c, envUuid: e, mode:"Purchase" });
         const rawList = resp?.Data?.Records || resp?.Data || resp || [];
         const list = Array.isArray(rawList) ? rawList : [];
         const normalized = list.map(it => ({
@@ -178,6 +193,8 @@ const ManageSalesOrder = () => {
   const [serverTotalAmount, setServerTotalAmount] = useState('');
   const [linesLoading, setLinesLoading] = useState(false);
   const [file, setFile] = useState(null);
+  const formikSetFieldValueRef = useRef(null);
+  const formikSubmitRef = useRef(null);
   const [showShippingTip, setShowShippingTip] = useState(false);
   const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
   const [headerSaved, setHeaderSaved] = useState(false);
@@ -863,7 +880,12 @@ const ManageSalesOrder = () => {
 
   const handleDateSelect = date => {
     const formatted = formatUiDate(date);
-    if (datePickerField === 'invoice') setInvoiceDate(formatted);
+    if (datePickerField === 'invoice') {
+      setInvoiceDate(formatted);
+      if (formikSetFieldValueRef.current) {
+        formikSetFieldValueRef.current('DeliveryDate', formatted);
+      }
+    }
     if (datePickerField === 'due') setDueDate(formatted);
     setOpenDatePicker(false);
     setDatePickerField(null);
@@ -1903,22 +1925,52 @@ const ManageSalesOrder = () => {
           showsVerticalScrollIndicator={false}
         >
           {/* Section 1: Header / Basic Details */}
-          <AccordionSection
-            id={1}
-            title="Header"
-            expanded={Array.isArray(expandedIds) ? expandedIds.includes(1) : expandedIds === 1}
-            onToggle={() => { if (headerSaved && !isEditingHeader) return; toggleSection(1); }}
-            rightActions={headerSaved ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: wp(2) }}>
-                <TouchableOpacity onPress={() => { /* no-op check */ }} style={{ marginRight: wp(3) }}>
-                  <Icon name="check-circle" size={rf(4)} color={COLORS.primary} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setIsEditingHeader(true); setHeaderSaved(false); setExpandedIds([1]); }}>
-                  <Icon name="edit" size={rf(4)} color={COLORS.text} />
-                </TouchableOpacity>
-              </View>
-            ) : null}
+          <Formik
+            initialValues={{
+              VendorName: headerForm.CustomerName || '',
+              VendorUUID: headerForm.CustomerUUID || '',
+              PaymentMethod: paymentMethod || '',
+              PaymentMethodUUID: paymentMethodUUID || '',
+              DeliveryDate: invoiceDate || '',
+            }}
+            enableReinitialize
+            validationSchema={HeaderValidationSchema}
+            onSubmit={async (values) => {
+              // Keep local state in sync with Formik values
+              setHeaderForm(s => ({ ...s, CustomerName: values.VendorName || '', CustomerUUID: values.VendorUUID || '' }));
+              setPaymentMethod(values.PaymentMethod || '');
+              setPaymentMethodUUID(values.PaymentMethodUUID || null);
+              setInvoiceDate(values.DeliveryDate || '');
+              
+              // Call the submit handler
+              try {
+                await saveHeader();
+              } catch (e) {
+                // Error already handled in saveHeader
+              }
+            }}
           >
+            {({ values, handleChange, handleBlur, setFieldValue, errors, touched, submitForm, submitCount }) => {
+              // Store setFieldValue and submitForm in refs so date handlers and submit button can use them
+              formikSetFieldValueRef.current = setFieldValue;
+              formikSubmitRef.current = submitForm;
+              return (
+                <AccordionSection
+                  id={1}
+                  title="Header"
+                  expanded={Array.isArray(expandedIds) ? expandedIds.includes(1) : expandedIds === 1}
+                  onToggle={() => { if (headerSaved && !isEditingHeader) return; toggleSection(1); }}
+                  rightActions={headerSaved ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: wp(2) }}>
+                      <TouchableOpacity onPress={() => { /* no-op check */ }} style={{ marginRight: wp(3) }}>
+                        <Icon name="check-circle" size={rf(4)} color={COLORS.primary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => { setIsEditingHeader(true); setHeaderSaved(false); setExpandedIds([1]); }}>
+                        <Icon name="edit" size={rf(4)} color={COLORS.text} />
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+                >
             <View style={styles.row}>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Purchase Inquiry No.</Text>
@@ -1959,19 +2011,38 @@ const ManageSalesOrder = () => {
                 ) : (
                   <Dropdown
                     placeholder="Vendor Name*"
-                    value={headerForm.CustomerUUID || headerForm.CustomerName}
+                    value={values.VendorUUID || values.VendorName || ''}
                     options={customersOptions}
                     getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
                     getKey={c => (c?.UUID || c?.Id || c)}
-                    onSelect={v => setHeaderForm(s => ({
-                      ...s,
-                      CustomerName: v?.CustomerName || v,
-                      CustomerUUID: v?.UUID || v?.Id || (typeof v === 'string' ? v : ''),
-                    }))}
+                    onSelect={v => {
+                      if (v && typeof v === 'object') {
+                        const vendorName = v?.CustomerName || v?.Name || v || '';
+                        const vendorUuid = v?.UUID || v?.Id || null;
+                        setFieldValue('VendorName', vendorName);
+                        setFieldValue('VendorUUID', vendorUuid || '');
+                        setHeaderForm(s => ({
+                          ...s,
+                          CustomerName: vendorName,
+                          CustomerUUID: vendorUuid,
+                        }));
+                      } else {
+                        setFieldValue('VendorName', v || '');
+                        setFieldValue('VendorUUID', '');
+                        setHeaderForm(s => ({
+                          ...s,
+                          CustomerName: v,
+                          CustomerUUID: null,
+                        }));
+                      }
+                    }}
                     inputBoxStyle={inputStyles.box}
                     // textStyle={inputStyles.input}
                   />
                 )}
+                {errors.VendorName && (touched.VendorName || submitCount > 0) ? (
+                  <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.VendorName}</Text>
+                ) : null}
               </View>
             </View>
 
@@ -2003,7 +2074,7 @@ const ManageSalesOrder = () => {
                 </View>
               </View>
               <View style={styles.col}>
-                <Text style={inputStyles.label}>Payment Term </Text>
+                <Text style={inputStyles.label}>Payment Term* </Text>
 
                 {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
                 <View style={{ zIndex: 9998, elevation: 20 }}>
@@ -2041,17 +2112,34 @@ const ManageSalesOrder = () => {
                   ) : (
                     <Dropdown
                       placeholder="Payment Method"
-                      value={paymentMethodUUID || paymentMethod}
+                      value={values.PaymentMethod || ''}
                       options={paymentMethodsOptions}
                       getLabel={p => (p?.Name || p?.Mode || String(p))}
                       getKey={p => (p?.UUID || p?.Id || p)}
-                      onSelect={v => { setPaymentMethod(v?.Name || v), setPaymentMethodUUID(v?.UUID || v) }}
+                      onSelect={v => {
+                        if (v && typeof v === 'object') {
+                          const methodName = v?.Name || v?.Mode || String(v) || '';
+                          const methodUuid = v?.UUID || v?.Id || null;
+                          setFieldValue('PaymentMethod', methodName);
+                          setFieldValue('PaymentMethodUUID', methodUuid || '');
+                          setPaymentMethod(methodName);
+                          setPaymentMethodUUID(methodUuid);
+                        } else {
+                          setFieldValue('PaymentMethod', v || '');
+                          setFieldValue('PaymentMethodUUID', '');
+                          setPaymentMethod(v);
+                          setPaymentMethodUUID(null);
+                        }
+                      }}
                       renderInModal={true}
                       inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                       // textStyle={inputStyles.input}
                     />
                   )}
                 </View>
+                {errors.PaymentMethod && (touched.PaymentMethod || submitCount > 0) ? (
+                  <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.PaymentMethod}</Text>
+                ) : null}
               </View>
               <View style={styles.col}>
                 <TouchableOpacity
@@ -2073,32 +2161,35 @@ const ManageSalesOrder = () => {
                       style={[
                         inputStyles.input,
                         styles.datePickerText,
-                        !invoiceDate && {
+                        !values.DeliveryDate && {
                           color: COLORS.textLight,
                           fontFamily: TYPOGRAPHY.fontFamilyRegular,
                         },
-                        invoiceDate && {
+                        values.DeliveryDate && {
                           color: COLORS.text,
                           fontFamily: TYPOGRAPHY.fontFamilyMedium,
                         },
                       ]}
                     >
-                      {invoiceDate || 'Order Date*'}
+                      {values.DeliveryDate || 'Delivery Date*'}
                     </Text>
                     <View
                       style={[
                         styles.calendarIconContainer,
-                        invoiceDate && styles.calendarIconContainerSelected,
+                        values.DeliveryDate && styles.calendarIconContainerSelected,
                       ]}
                     >
                       <Icon
                         name="calendar-today"
                         size={rf(3.2)}
-                        color={invoiceDate ? COLORS.primary : COLORS.textLight}
+                        color={values.DeliveryDate ? COLORS.primary : COLORS.textLight}
                       />
                     </View>
                   </View>
                 </TouchableOpacity>
+                {errors.DeliveryDate && (touched.DeliveryDate || submitCount > 0) ? (
+                  <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.DeliveryDate}</Text>
+                ) : null}
               </View>
             </View>
             <View style={[styles.row, { marginTop: hp(1.5) }]}>
@@ -2158,7 +2249,10 @@ const ManageSalesOrder = () => {
                 </TouchableOpacity>
               </View> */}
             </View>
-          </AccordionSection>
+                </AccordionSection>
+              );
+            }}
+          </Formik>
 
           {/* Section 2: Billing Address */}
           {!(headerSaved && !isEditingHeader) && (
@@ -2170,7 +2264,7 @@ const ManageSalesOrder = () => {
             >
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>Building No.</Text>
+                  <Text style={inputStyles.label}>Building No.*</Text>
                   <View style={[inputStyles.box]} pointerEvents="box-none">
                     <TextInput
                       style={[inputStyles.input, { flex: 1 }]}
@@ -2184,7 +2278,7 @@ const ManageSalesOrder = () => {
                   </View>
                 </View>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>Street 1</Text>
+                  <Text style={inputStyles.label}>Street 1*</Text>
                   <View style={[inputStyles.box]} pointerEvents="box-none">
                     <TextInput
                       style={[inputStyles.input, { flex: 1 }]}
@@ -2215,7 +2309,7 @@ const ManageSalesOrder = () => {
                   </View>
                 </View>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>Postal Code</Text>
+                  <Text style={inputStyles.label}>Postal Code*</Text>
                   <View style={[inputStyles.box]} pointerEvents="box-none">
                     <TextInput
                       style={[inputStyles.input, { flex: 1 }]}
@@ -2232,7 +2326,7 @@ const ManageSalesOrder = () => {
 
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>Country Name</Text>
+                  <Text style={inputStyles.label}>Country Name*</Text>
                   <View style={{ zIndex: 9999, elevation: 20 }}>
                     <Dropdown
                       placeholder="Select Country*"
@@ -2248,7 +2342,7 @@ const ManageSalesOrder = () => {
                   </View>
                 </View>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>State Name</Text>
+                  <Text style={inputStyles.label}>State Name*</Text>
                   <View style={{ zIndex: 9999, elevation: 20 }}>
                     <Dropdown
                       placeholder="Select State*"
@@ -2267,7 +2361,7 @@ const ManageSalesOrder = () => {
 
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>City Name</Text>
+                  <Text style={inputStyles.label}>City Name*</Text>
                   <View style={{ zIndex: 9998, elevation: 20 }}>
                     <Dropdown
                       placeholder="- Select City -"
@@ -2324,7 +2418,7 @@ const ManageSalesOrder = () => {
             >
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>Building No.</Text>
+                  <Text style={inputStyles.label}>Building No.*</Text>
                   <View style={[inputStyles.box]} pointerEvents="box-none">
                     <TextInput
                       style={[inputStyles.input, { flex: 1 }]}
@@ -2338,7 +2432,7 @@ const ManageSalesOrder = () => {
                   </View>
                 </View>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>Street 1</Text>
+                  <Text style={inputStyles.label}>Street 1*</Text>
                   <View style={[inputStyles.box]} pointerEvents="box-none">
                     <TextInput
                       style={[inputStyles.input, { flex: 1 }]}
@@ -2369,7 +2463,7 @@ const ManageSalesOrder = () => {
                   </View>
                 </View>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>Postal Code</Text>
+                  <Text style={inputStyles.label}>Postal Code*</Text>
                   <View style={[inputStyles.box]} pointerEvents="box-none">
                     <TextInput
                       style={[inputStyles.input, { flex: 1 }]}
@@ -2386,7 +2480,7 @@ const ManageSalesOrder = () => {
 
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>Country Name</Text>
+                  <Text style={inputStyles.label}>Country Name*</Text>
                   <View style={{ zIndex: 9999, elevation: 20 }}>
                     <Dropdown
                       placeholder="- Select Country -"
@@ -2403,7 +2497,7 @@ const ManageSalesOrder = () => {
                   </View>
                 </View>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>State Name</Text>
+                  <Text style={inputStyles.label}>State Name*</Text>
                   <View style={{ zIndex: 9999, elevation: 20 }}>
                     <Dropdown
                       placeholder="- Select State -"
@@ -2423,7 +2517,7 @@ const ManageSalesOrder = () => {
 
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <Text style={inputStyles.label}>City Name</Text>
+                  <Text style={inputStyles.label}>City Name*</Text>
                   <View style={{ zIndex: 9998, elevation: 20 }}>
                     <Dropdown
                       placeholder="- Select City -"
@@ -2451,7 +2545,11 @@ const ManageSalesOrder = () => {
                   <TouchableOpacity
                     activeOpacity={0.85}
                     style={[formStyles.primaryBtn, { paddingVertical: hp(1), width: wp(36) }]}
-                    onPress={saveHeader}
+                    onPress={() => {
+                      if (formikSubmitRef.current) {
+                        formikSubmitRef.current();
+                      }
+                    }}
                     disabled={isSavingHeader}
                   >
                     <Text style={formStyles.primaryBtnText}>
