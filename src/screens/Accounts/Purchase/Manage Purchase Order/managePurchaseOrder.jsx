@@ -328,27 +328,6 @@ const ManageSalesOrder = () => {
         city: resolveUuid(data?.BillingCityUUID || data?.BillingCity || data?.City),
       });
 
-      console.log('[ManagePurchaseOrder] Prefill API data (state/city names):', {
-        stateName: data?.BillingStateName || data?.StateName || data?.State,
-        cityName: data?.BillingCityName || data?.CityName || data?.City,
-      });
-
-      // If API provides state/city names, set initial selected objects for dropdown display
-      if (data?.BillingStateName || data?.StateName) {
-        setSelectedBillingState({
-          Name: data?.BillingStateName || data?.StateName || '',
-          StateName: data?.BillingStateName || data?.StateName || '',
-          UUID: resolveUuid(data?.BillingStateUUID || data?.BillingState || data?.State),
-        });
-      }
-      if (data?.BillingCityName || data?.CityName) {
-        setSelectedBillingCity({
-          Name: data?.BillingCityName || data?.CityName || '',
-          CityName: data?.BillingCityName || data?.CityName || '',
-          UUID: resolveUuid(data?.BillingCityUUID || data?.BillingCity || data?.City),
-        });
-      }
-
       // UUID-based matching: useEffect will find and set selected objects when options load
 
       // Prefill shipping (best-effort keys)
@@ -361,22 +340,6 @@ const ManageSalesOrder = () => {
         state: resolveUuid(data?.ShippingStateUUID || data?.ShippingState || data?.ShipState),
         city: resolveUuid(data?.ShippingCityUUID || data?.ShippingCity || data?.ShipCity),
       });
-
-      // If API provides state/city names for shipping, set initial selected objects for dropdown display
-      if (data?.ShippingStateName || data?.ShipStateName) {
-        setSelectedShippingState({
-          Name: data?.ShippingStateName || data?.ShipStateName || '',
-          StateName: data?.ShippingStateName || data?.ShipStateName || '',
-          UUID: resolveUuid(data?.ShippingStateUUID || data?.ShippingState || data?.ShipState),
-        });
-      }
-      if (data?.ShippingCityName || data?.ShipCityName) {
-        setSelectedShippingCity({
-          Name: data?.ShippingCityName || data?.ShipCityName || '',
-          CityName: data?.ShippingCityName || data?.ShipCityName || '',
-          UUID: resolveUuid(data?.ShippingCityUUID || data?.ShippingCity || data?.ShipCity),
-        });
-      }
 
       // UUID-based matching: useEffect will find and set selected objects when options load
 

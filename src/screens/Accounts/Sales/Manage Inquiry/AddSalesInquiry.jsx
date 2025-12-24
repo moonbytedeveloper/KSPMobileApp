@@ -9,7 +9,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 // Network API calls removed from this screen — local-only behavior
 import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
-import { fetchProjects, getSalesHeader, getCustomers, addSalesInquiry, addSalesLine, updateSalesLine, deleteSalesLine, getItemTypes, getItemMasters, getUnits } from '../../../../api/authServices';
+import { fetchProjects, getSalesHeader, updateSalesHeader, getCustomers, addSalesInquiry, addSalesLine, updateSalesLine, deleteSalesLine, getItemTypes, getItemMasters, getUnits, getSalesLines } from '../../../../api/authServices';
 import { uiDateToApiDate } from '../../../../utils/dateUtils';
 import BottomSheetConfirm from '../../../../components/common/BottomSheetConfirm';
 
@@ -44,8 +44,20 @@ const AddSalesInquiry = () => {
     const toggleSection = (id) => setExpandedId((prev) => (prev === id ? null : id));
     // If header is saved, prevent opening it by tapping the header area (unless editing)
     const handleHeaderToggle = (id) => {
-        if (id === 1 && headerSaved && !headerEditing) {
-            Alert.alert('Header saved', 'To edit the header, please tap the edit icon.');
+        // If user tapped the HEADER title and header is saved (view-only), do not open it.
+        // The edit icon is the only way to enter edit mode and open the header for editing.
+        if (id === 1) {
+            if (headerSaved && !headerEditing) {
+                // do nothing — header is view-only and must be opened only via edit icon
+                return;
+            }
+            toggleSection(id);
+            return;
+        }
+
+        // For LINE and other sections: only allow opening LINE when header is saved
+        if (id === 2 && !headerSaved) {
+            // prevent opening LINE before header is added/updated
             return;
         }
         toggleSection(id);
@@ -63,45 +75,34 @@ const AddSalesInquiry = () => {
             userEditedRef.current = { project: false, customer: false, requestedDate: false, expectedDate: false };
 
             // If we already have headerResponse from a previous prefill, use it
-            const headerData = headerResponse?.Data || headerResponse || null;
-            if (headerData) {
-                setProjectName(headerData.ProjectName || '');
-                setInquiryNo(headerData.InquiryNo || '');
-                if (headerData.OrderDate) setRequestedDate(headerData.OrderDate);
-                if (headerData.RequestedDeliveryDate) setExpectedPurchaseDate(headerData.RequestedDeliveryDate);
+            // Prefer fresh server data when entering edit mode. Determine header UUID
+            const headerUuidParam = headerResponse?.Data?.UUID || headerResponse?.Data?.HeaderUUID || headerResponse?.Data?.Id ||
+                route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.headerUUID || route?.params?.uuid || route?.params?.headerRaw?.UUID || route?.params?.headerRaw?.Id;
 
-                const custUuid = headerData.CustomerUUID || headerData.CustomerId || headerData.CustomerID;
-                if (custUuid) {
-                    setCustomerUuid(custUuid);
-                    const found = (customers || []).find(c => (c.UUID || c.Id || c.id) === custUuid) || null;
-                    if (found) setCustomerName(found?.Name || found?.DisplayName || found?.name || '');
-                    else if (headerData.CustomerName || headerData.Customer) setCustomerName(headerData.CustomerName || headerData.Customer);
+            if (headerUuidParam) {
+                try {
+                    const resp = await getSalesHeader({ headerUuid: headerUuidParam });
+                    const hd = resp?.Data || resp || {};
+                    setProjectName(hd.ProjectName || '');
+                    setInquiryNo(hd.InquiryNo || '');
+                    if (hd.OrderDate) setRequestedDate(hd.OrderDate);
+                    if (hd.RequestedDeliveryDate) setExpectedPurchaseDate(hd.RequestedDeliveryDate);
+                    const custUuid = hd.CustomerUUID || hd.CustomerId || hd.CustomerID;
+                    if (custUuid) {
+                        setCustomerUuid(custUuid);
+                        const found = (customers || []).find(c => (c.UUID || c.Id || c.id) === custUuid) || null;
+                        if (found) setCustomerName(found?.Name || found?.DisplayName || found?.name || '');
+                        else if (hd.CustomerName || hd.Customer) setCustomerName(hd.CustomerName || hd.Customer);
+                    }
+                    // store response for later
+                    setHeaderResponse(resp);
+                    setHeaderSaved(true);
+                } catch (e) {
+                    console.log('enterHeaderEditMode fetch error ->', e?.message || e);
                 }
             } else {
-                // If headerResponse not present, attempt a fresh fetch using any route param
-                const headerUuidParam = route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.headerUUID || route?.params?.uuid || route?.params?.headerRaw?.UUID || route?.params?.headerRaw?.Id;
-                if (headerUuidParam) {
-                    try {
-                        const resp = await getSalesHeader({ headerUuid: headerUuidParam });
-                        const hd = resp?.Data || {};
-                        setProjectName(hd.ProjectName || '');
-                        setInquiryNo(hd.InquiryNo || '');
-                        if (hd.OrderDate) setRequestedDate(hd.OrderDate);
-                        if (hd.RequestedDeliveryDate) setExpectedPurchaseDate(hd.RequestedDeliveryDate);
-                        const custUuid = hd.CustomerUUID || hd.CustomerId || hd.CustomerID;
-                        if (custUuid) {
-                            setCustomerUuid(custUuid);
-                            const found = (customers || []).find(c => (c.UUID || c.Id || c.id) === custUuid) || null;
-                            if (found) setCustomerName(found?.Name || found?.DisplayName || found?.name || '');
-                            else if (hd.CustomerName || hd.Customer) setCustomerName(hd.CustomerName || hd.Customer);
-                        }
-                        // store response for later
-                        setHeaderResponse(resp);
-                        setHeaderSaved(true);
-                    } catch (e) {
-                        console.log('enterHeaderEditMode fetch error ->', e?.message || e);
-                    }
-                }
+                // no header identifier — nothing to prefill
+                console.warn('enterHeaderEditMode: no header UUID available to fetch');
             }
         } catch (e) {
             console.log('enterHeaderEditMode error ->', e?.message || e);
@@ -134,7 +135,7 @@ const AddSalesInquiry = () => {
     const [requestedDate, setRequestedDate] = useState('');
     const [expectedPurchaseDate, setExpectedPurchaseDate] = useState('');
     const [projectName, setProjectName] = useState('');
-    
+
     const [inquiryNo, setInquiryNo] = useState('');
     const [showInquiryNoField, setShowInquiryNoField] = useState(false);
     const [country, setCountry] = useState('');
@@ -149,6 +150,8 @@ const AddSalesInquiry = () => {
     // Track whether the user has manually edited header fields so background
     // prefill/mapping logic doesn't overwrite their changes.
     const userEditedRef = useRef({ project: false, customer: false, requestedDate: false, expectedDate: false });
+    // Prevent repeated prefill handling when route params change frequently
+    const prefillHandledRef = useRef(false);
 
     // Line items state
     const [lineItems, setLineItems] = useState([]);
@@ -163,6 +166,8 @@ const AddSalesInquiry = () => {
         unitUuid: null
     });
     const [editLineItemId, setEditLineItemId] = useState(null);
+
+    // Removed verbose lineItems logging (was flooding console).
 
     // Date picker state
     const [openDatePicker, setOpenDatePicker] = useState(false);
@@ -232,16 +237,18 @@ const AddSalesInquiry = () => {
             if (existingLineUuid) {
                 setLineAdding(true);
                 try {
+                   
                     const payload = {
+                        HeaderUUID: headerUuid,
                         UUID: existingLineUuid,
                         LineUUID: existingLineUuid,
                         SrNo: existing?.SrNo || editLineItemId,
-                        ItemTypeUUID: currentItem.itemTypeUuid || existing.itemTypeUuid || null,
+                        ItemType_UUID: currentItem.itemTypeUuid || existing.itemTypeUuid || null,
                         ItemTypeName: currentItem.itemType || existing.itemType || '',
-                        ItemUUID: currentItem.itemNameUuid || existing.itemNameUuid || null,
+                        ItemName_UUID: currentItem.itemNameUuid || existing.itemNameUuid || null,
                         ItemName: currentItem.itemName || existing.itemName || '',
                         Quantity: currentItem.quantity,
-                        UnitUUID: currentItem.unitUuid || existing.unitUuid || null,
+                        Unit_UUID: currentItem.unitUuid || existing.unitUuid || null,
                         Unit: currentItem.unit || existing.unit || ''
                     };
                     console.log('updateSalesLine payload ->', payload);
@@ -314,12 +321,12 @@ const AddSalesInquiry = () => {
                     headerUuid: headerUuid,
                     UUID: headerUuid,
                     SrNo: srNo,
-                    ItemTypeUUID: currentItem.itemTypeUuid || null,
+                    ItemType_UUID: currentItem.itemTypeUuid || null,
                     ItemTypeName: currentItem.itemType || '',
-                    ItemUUID: currentItem.itemNameUuid || null,
+                    ItemName_UUID: currentItem.itemNameUuid || null,
                     ItemName: currentItem.itemName || '',
                     Quantity: currentItem.quantity,
-                    UnitUUID: currentItem.unitUuid || null,
+                    Unit_UUID: currentItem.unitUuid || null,
                     Unit: currentItem.unit || ''
                 };
 
@@ -341,7 +348,14 @@ const AddSalesInquiry = () => {
                     lineUuid: createdUuid,
                 };
 
-                setLineItems(prev => [...prev, newItem]);
+                // Refresh lines from server to ensure canonical data
+                try {
+                    await loadSalesLines(headerUuid);
+                } catch (e) {
+                    // fallback to local append if refresh fails
+                    setLineItems(prev => [...prev, newItem]);
+                    console.log('[AddSalesInquiry] added server line (fallback) ->', newItem);
+                }
                 setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
             } catch (e) {
                 console.log('addSalesLine error ->', e?.message || e);
@@ -359,6 +373,7 @@ const AddSalesInquiry = () => {
                     lineUuid: null,
                 };
                 setLineItems(prev => [...prev, newItemBase]);
+                console.log('[AddSalesInquiry] fallback add (server fail) ->', newItemBase);
                 setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
             } finally {
                 setLineAdding(false);
@@ -380,7 +395,45 @@ const AddSalesInquiry = () => {
         };
 
         setLineItems(prev => [...prev, newItemBase]);
+        console.log('[AddSalesInquiry] local add ->', newItemBase);
         setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
+    };
+
+    // Load sales lines from server for a header UUID and set local lineItems
+    const loadSalesLines = async (headerUuidParam) => {
+        if (!headerUuidParam) return;
+        try {
+            const c = await getCMPUUID();
+            const e = await getENVUUID();
+            const resp = await getSalesLines({ headerUuid: headerUuidParam, cmpUuid: c, envUuid: e });
+            // Normalize response like other screens do
+            const raw = resp?.Data?.Records || resp?.Data || resp || [];
+            const list = Array.isArray(raw) ? raw : [];
+            // Map server lines to local UI shape (robust keys)
+            const mapped = list.map((r, idx) => {
+                const serverUuid = r?.UUID || r?.LineUUID || r?.Id || r?.Line_Id || null;
+                const itemUuid = r?.ItemUUID || r?.ItemUuid || r?.ItemId || r?.Item || null;
+                const name = r?.ItemName || r?.Name || r?.Item || r?.Description || '';
+                const qty = r?.Quantity ?? r?.Qty ?? r?.QuantityOrdered ?? 0;
+                return {
+                    id: r?.SrNo || idx + 1,
+                    itemType: r?.ItemTypeName || r?.ItemType || '',
+                    itemTypeUuid: r?.ItemType_UUID || r?.ItemTypeUuid || null,
+                    itemName: name,
+                    itemNameUuid: itemUuid || null,
+                    quantity: qty,
+                    unit: r?.Unit || '',
+                    unitUuid: r?.Unit_UUID || r?.UnitUuid || null,
+                    lineUuid: serverUuid,
+                };
+            });
+            setLineItems(mapped);
+            console.log('[AddSalesInquiry] loadSalesLines -> loaded', mapped.length);
+            return mapped;
+        } catch (e) {
+            console.log('[AddSalesInquiry] loadSalesLines error ->', e?.message || e);
+            throw e;
+        }
     };
 
     // Fetch customers for dropdown (prefer API, fall back to demo list)
@@ -493,16 +546,12 @@ const AddSalesInquiry = () => {
 
     const route = useRoute();
 
-    React.useEffect(() => {
-        // Log incoming route params for debugging navigation issues
-        try {
-            console.log('AddSalesInquiry route params ->', route?.params);
-        } catch (e) {
-            console.log('AddSalesInquiry route params log error ->', e);
-        }
-    }, [route?.params]);
+    // Removed noisy route params logger (was printing continuously).
 
     React.useEffect(() => {
+        if (prefillHandledRef.current) return;
+        // mark as run so this effect does not re-run repeatedly
+        prefillHandledRef.current = true;
         (async () => {
             const headerUuidParam = route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.headerUUID || route?.params?.uuid || route?.params?.headerRaw?.UUID || route?.params?.headerRaw?.Id;
             // Only warn if route params were explicitly provided but header uuid is missing
@@ -533,6 +582,16 @@ const AddSalesInquiry = () => {
                 console.log('Lookup fetch error ->', e?.message || e);
             }
 
+            // If a header UUID param was provided but no local headerRaw present,
+            // fetch server-side lines so the table shows them on open.
+            if (headerUuidParam && !route?.params?.headerRaw) {
+                try {
+                    await loadSalesLines(headerUuidParam);
+                } catch (e) {
+                    console.log('[AddSalesInquiry] initial loadSalesLines error ->', e?.message || e);
+                }
+            }
+
             try {
                 // Use route-provided headerRaw (if present) to prefill locally. No network calls.
                 const headerRaw = route?.params?.headerRaw || route?.params?.headerData || null;
@@ -559,6 +618,33 @@ const AddSalesInquiry = () => {
                             else if (headerRaw.CustomerName || headerRaw.Customer) setCustomerName(headerRaw.CustomerName || headerRaw.Customer);
                         }
                     }
+                        else if (headerUuidParam) {
+                            // No headerRaw provided — fetch header from server for edit
+                            try {
+                                const resp = await getSalesHeader({ headerUuid: headerUuidParam });
+                                const hd = resp?.Data || resp || {};
+                                // populate header fields into state and enter edit mode
+                                setProjectName(hd.ProjectName || '');
+                                setInquiryNo(hd.InquiryNo || '');
+                                if (hd.OrderDate) setRequestedDate(hd.OrderDate);
+                                if (hd.RequestedDeliveryDate) setExpectedPurchaseDate(hd.RequestedDeliveryDate);
+                                const custUuid = hd.CustomerUUID || hd.CustomerId || hd.CustomerID;
+                                if (custUuid) {
+                                    setCustomerUuid(custUuid);
+                                    const found = (customersList || customers || []).find(c => (c.UUID || c.Id || c.id) === custUuid) || null;
+                                    if (found) setCustomerName(found?.Name || found?.DisplayName || found?.name || '');
+                                    else if (hd.CustomerName || hd.Customer) setCustomerName(hd.CustomerName || hd.Customer);
+                                }
+                                setHeaderResponse(resp);
+                                setHeaderSaved(true);
+                                setHeaderEditing(true);
+                                setExpandedId(1);
+                                // load server lines
+                                try { await loadSalesLines(headerUuidParam); } catch (e) { console.log('[AddSalesInquiry] loadSalesLines error ->', e); }
+                            } catch (e) {
+                                console.log('[AddSalesInquiry] getSalesHeader fetch error ->', e?.message || e);
+                            }
+                        }
 
                     // store local header response and mark saved
                     setHeaderResponse({ Data: headerRaw });
@@ -577,14 +663,29 @@ const AddSalesInquiry = () => {
                         unitUuid: null,
                         lineUuid: ln?.UUID || null,
                     }));
-                    setLineItems(mapped);
+                    try {
+                        const currentJson = JSON.stringify(lineItems || []);
+                        const mappedJson = JSON.stringify(mapped || []);
+                        if (mappedJson !== currentJson) {
+                            setLineItems(mapped);
+                            console.log('[AddSalesInquiry] prefill applied, lines ->', mapped.length);
+                        } else {
+                            console.log('[AddSalesInquiry] prefill skipped (identical) mapped=', mapped.length);
+                        }
+                    } catch (e) {
+                        console.log('[AddSalesInquiry] prefill setLineItems error ->', e);
+                        setLineItems(mapped);
+                    }
                 }
             } catch (e) {
                 console.log('Prefill local error ->', e?.message || e);
             } finally {
-                // Clear route params after handling prefill so stale header UUIDs don't persist
+                // Clear route params after handling prefill so stale header UUIDs don't persist.
+                // Only clear when we actually received a header identifier (avoid triggering
+                // a navigation.setParams({}) on every render which causes a loop).
                 try {
-                    if (navigation && navigation.setParams) {
+                    const hadHeaderIdentifier = !!headerUuidParam || !!(route?.params?.headerRaw || route?.params?.headerData);
+                    if (hadHeaderIdentifier && navigation && navigation.setParams) {
                         navigation.setParams({});
                     }
                 } catch (e) {
@@ -671,12 +772,19 @@ const AddSalesInquiry = () => {
                 setLoading(false);
                 return;
             }
+             //  "UUID": "string",
+                    //   "CustomerUUID": "string",
+                    //   "OrderDate": "2025-12-23T12:28:23.849Z",
+                    //   "RequestedDeliveryDate": "2025-12-23T12:28:23.849Z",
+                    //   "ProjectName": "string",
+                    //   "InquiryNo": "string"
             const payload = {
-                projectName,
-                projectUUID: projectUuid || '',
-                customerUUID: customerUuid,
-                requestedDate,
-                expectedPurchaseDate,
+                ProjectName: projectName || '',
+                // projectUUID: projectUuid || '',
+                CustomerUUID: customerUuid,
+                OrderDate,
+                RequestedDeliveryDate,
+                InquiryNo: inquiryNo || '',
                 lineItems
             };
             console.log('Local submit payload ->', payload);
@@ -701,12 +809,13 @@ const AddSalesInquiry = () => {
                 return;
             }
             const payload = {
-                projectName,
-                customerUUID: customerUuid,
-                requestedDate: uiDateToApiDate(requestedDate) || null,
-                expectedPurchaseDate: uiDateToApiDate(expectedPurchaseDate) || null,
-                InquiryNo: inquiryNo || '',
-              
+                UUID:"",
+                ProjectName: projectUuid|| '',
+                CustomerUUID: customerUuid,
+                OrderDate: uiDateToApiDate(requestedDate) || null,
+                RequestedDeliveryDate: uiDateToApiDate(expectedPurchaseDate) || null,
+                InquiryNo: inquiryNo || '', 
+
             };
             console.log('addSalesInquiry payload ->', payload);
             // Call API to save the combined sales inquiry (header + lines)
@@ -723,6 +832,13 @@ const AddSalesInquiry = () => {
             setSuccessMessage(String(msg));
             setSuccessSheetVisible(true);
             setExpandedId(null);
+            // after header saved, load lines from server
+            try {
+                const headerUuid = headerResp?.Data?.UUID || headerResp?.Data?.HeaderUUID || headerResp?.Data?.Id || null;
+                if (headerUuid) await loadSalesLines(headerUuid);
+            } catch (e) {
+                console.log('[AddSalesInquiry] post-header save loadSalesLines error ->', e?.message || e);
+            }
         } catch (e) {
             console.log('AddSalesHeader error ->', e?.message || e);
             Alert.alert('Error', e?.message || 'Failed to save header');
@@ -739,15 +855,20 @@ const AddSalesInquiry = () => {
                 setHeaderSubmitting(false);
                 return;
             }
-            // Local-only update: simulate update by updating headerResponse
-            const headerUuid = headerResponse?.Data?.UUID || `local-header-${Date.now()}`;
+            // Call API to update header on server
+            const headerUuid = headerResponse?.Data?.UUID || headerResponse?.Data?.HeaderUUID || headerResponse?.Data?.Id || null;
+            if (!headerUuid) {
+                Alert.alert('Error', 'Header UUID missing. Cannot update.');
+                setHeaderSubmitting(false);
+                return;
+            }
             const payload = {
                 UUID: headerUuid,
                 CustomerUUID: customerUuid,
                 ProjectUUID: projectUuid || '',
                 OrderDate: uiDateToApiDate(requestedDate) || null,
                 RequestedDeliveryDate: uiDateToApiDate(expectedPurchaseDate) || null,
-                ProjectName: projectName || '',
+                ProjectName: projectUuid || '',
                 InquiryNo: inquiryNo || ''
             };
             console.log('Local update header payload ->', payload);
@@ -756,6 +877,8 @@ const AddSalesInquiry = () => {
             setHeaderEditing(false);
             userEditedRef.current = { project: false, customer: false, requestedDate: false, expectedDate: false };
             setExpandedId(null);
+            // refresh lines
+            try { if (headerResp?.Data?.UUID) await loadSalesLines(headerResp.Data.UUID); } catch (e) { console.log('[AddSalesInquiry] post-update loadSalesLines error ->', e); }
         } catch (e) {
             console.log('UpdateSalesHeader error ->', e?.message || e);
             Alert.alert('Error', e?.message || 'Failed to update header');
@@ -776,17 +899,17 @@ const AddSalesInquiry = () => {
         <>
             <View style={{ flex: 1, backgroundColor: '#fff' }}>
 
-                    <AppHeader
-          title="Add Sales Inquiry"
-          onLeftPress={() => {
-              if (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
-                  navigation.goBack();
-              } else {
-                  try { navigation.replace('Main'); } catch (e) { try { navigation.navigate('Main'); } catch (_) { /* ignore */ } }
-              }
-          }}
-        />
-              
+                <AppHeader
+                    title="Add Sales Inquiry"
+                    onLeftPress={() => {
+                        if (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
+                            navigation.goBack();
+                        } else {
+                            try { navigation.replace('Main'); } catch (e) { try { navigation.navigate('Main'); } catch (_) { /* ignore */ } }
+                        }
+                    }}
+                />
+
                 <View style={styles.headerSeparator} />
                 <ScrollView contentContainerStyle={[styles.container]} showsVerticalScrollIndicator={false}>
                     {/* Section 1: HEADER */}
@@ -807,7 +930,7 @@ const AddSalesInquiry = () => {
                         }
                     >
                         {showInquiryNoField && (
-                            <View style={[styles.row, { marginBottom: hp(1.2) }]}> 
+                            <View style={[styles.row, { marginBottom: hp(1.2) }]}>
                                 <View style={styles.col}>
                                     <Text style={inputStyles.label}>Inquiry No</Text>
                                     <View style={[inputStyles.box, { marginTop: hp(0.5) }]}>
@@ -846,7 +969,7 @@ const AddSalesInquiry = () => {
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        // textStyle={inputStyles.input}
+                                    // textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -874,7 +997,7 @@ const AddSalesInquiry = () => {
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        // textStyle={inputStyles.input}
+                                    // textStyle={inputStyles.input}
                                     />
                                 </View>
                             </View>
@@ -979,7 +1102,7 @@ const AddSalesInquiry = () => {
                                             }}
                                             renderInModal={true}
                                             inputBoxStyle={[inputStyles.box, { minHeight: hp(4.6), paddingVertical: 0, marginTop: hp(0.5) }]}
-                                            // textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
+                                        // textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
                                         />
                                     </View>
                                 </View>
@@ -1001,7 +1124,7 @@ const AddSalesInquiry = () => {
                                             }}
                                             renderInModal={true}
                                             inputBoxStyle={[inputStyles.box, { minHeight: hp(4.6), paddingVertical: 0, marginTop: hp(0.5) }]}
-                                            // textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
+                                        // textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
                                         />
                                     </View>
                                 </View>
@@ -1039,7 +1162,7 @@ const AddSalesInquiry = () => {
                                             }}
                                             renderInModal={true}
                                             inputBoxStyle={[inputStyles.box, { marginTop: hp(0.5) }]}
-                                            // textStyle={inputStyles.input}
+                                        // textStyle={inputStyles.input}
                                         />
                                     </View>
                                 </View>
@@ -1151,7 +1274,7 @@ const AddSalesInquiry = () => {
                     }}
                     onCancel={() => setSuccessSheetVisible(false)}
                 />
-               {/* No longer needed */}
+                {/* No longer needed */}
                 {/* <View style={styles.footerBar}>
                     <View style={styles.footerButtonsRow}>
                       

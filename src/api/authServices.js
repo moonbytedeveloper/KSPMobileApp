@@ -1247,7 +1247,7 @@ export async function getSalesLines({ headerUuid, cmpUuid, envUuid, userUuid } =
     const params = { headerUuid, UUID: headerUuid, HeaderUUID: headerUuid, cmpUuid: c, envUuid: e, userUuid: u };
     console.log('[authServices] getSalesLines params ->', params);
     const resp = await api.get(PATHS.getSalesLines, { params });
-    console.log('[authServices] getSalesLines resp ->', resp?.status);
+    console.log('[authServices] getSalesLines resp ->', resp);
     return resp.data;
 }
 

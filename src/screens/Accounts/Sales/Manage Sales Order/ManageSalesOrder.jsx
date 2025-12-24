@@ -309,7 +309,7 @@ const ManageSalesOrder = () => {
       }
 
       // Prefill billing (best-effort keys)
-      setBillingForm({
+      const billingData = {
         buildingNo: data?.BillingBuildingNo || data?.Billing?.buildingNo || data?.BillingBuilding || data?.BillBuilding || '',
         street1: data?.BillingStreet1 || data?.Billing?.street1 || data?.billingStreet1 || data?.Street1 || '',
         street2: data?.BillingStreet2 || data?.Billing?.street2 || data?.billingStreet2 || '',
@@ -317,7 +317,16 @@ const ManageSalesOrder = () => {
         country: data?.BillingCountryUUID || resolveUuid(data?.BillingCountry || data?.BillingCountryName || data?.Country) || '',
         state: data?.BillingStateUUID || resolveUuid(data?.BillingState || data?.State) || '',
         city: data?.BillingCityUUID || resolveUuid(data?.BillingCity || data?.City) || '',
+      };
+      
+      console.log('[ManageSalesOrder] Prefilling billing form:', billingData);
+      console.log('[ManageSalesOrder] Raw API data:', {
+        BillingCountryUUID: data?.BillingCountryUUID,
+        BillingStateUUID: data?.BillingStateUUID,
+        BillingCityUUID: data?.BillingCityUUID,
       });
+      
+      setBillingForm(billingData);
 
       // UUID-based matching: useEffect will find and set selected objects when options load
 
@@ -930,7 +939,7 @@ const ManageSalesOrder = () => {
 
   // Clear all form state when screen comes into focus without params (fresh navigation)
   React.useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
+    const unsubscribeFocus = navigation.addListener('focus', () => {
       // Only clear if no params (fresh navigation, not edit mode)
       const params = route?.params;
       if (!params?.prefillHeader && !params?.headerUuid && !params?.HeaderUUID && !params?.UUID) {
@@ -1017,7 +1026,95 @@ const ManageSalesOrder = () => {
       }
     });
 
-    return unsubscribe;
+    // Clear all fields when user navigates away (goes back)
+    const unsubscribeBlur = navigation.addListener('blur', () => {
+      console.log('[ManageSalesOrder] Screen blur - clearing all fields');
+      // Clear all state
+      setHeaderForm({
+        SalesInquiryUUID: '',
+        SalesInquiryNo: '',
+        CustomerUUID: '',
+        CustomerName: '',
+        SalesOrderNo: '',
+        DueDays: '',
+      });
+      setBillingForm({
+        buildingNo: '',
+        street1: '',
+        street2: '',
+        postalCode: '',
+        country: '',
+        state: '',
+        city: '',
+      });
+      setShippingForm({
+        buildingNo: '',
+        street1: '',
+        street2: '',
+        postalCode: '',
+        country: '',
+        state: '',
+        city: '',
+      });
+      setIsShippingSame(false);
+      setItems([]);
+      setInvoiceDate('');
+      setDueDate('');
+      setDueDays('');
+      setHeaderHasDates(false);
+      setPaymentTerm('');
+      setPaymentTermUuid(null);
+      setNotes('');
+      setTerms('');
+      setProject('');
+      setProjectUUID('');
+      setPaymentMethod('');
+      setPaymentMethodUUID('');
+      setShippingCharges('0');
+      setAdjustments('0');
+      setAdjustmentLabel('Adjustments');
+      setTotalTax('0');
+      setServerTotalAmount('');
+      setFile(null);
+      setHeaderSaved(false);
+      setHeaderResponse(null);
+      setIsEditingHeader(false);
+      setIsPrefilling(false);
+      setIsSavingHeader(false);
+      setIsGeneratingPDF(false);
+      setSelectedBillingCountry(null);
+      setSelectedBillingState(null);
+      setSelectedBillingCity(null);
+      setSelectedShippingCountry(null);
+      setSelectedShippingState(null);
+      setSelectedShippingCity(null);
+      setStatesOptions([]);
+      setCitiesOptions([]);
+      setShippingStatesOptions([]);
+      setShippingCitiesOptions([]);
+      setCurrentItem({
+        itemType: '',
+        itemTypeUuid: null,
+        itemName: '',
+        itemNameUuid: null,
+        quantity: '',
+        unit: '',
+        unitUuid: null,
+        desc: '',
+        hsn: '',
+        rate: '',
+      });
+      setEditItemId(null);
+      setTableSearch('');
+      setPage(1);
+      setSalesInquiry('');
+      setExpandedIds([1]);
+    });
+
+    return () => {
+      unsubscribeFocus();
+      unsubscribeBlur();
+    };
   }, [navigation, route?.params]);
 
   const computeAmount = (qty, rate) => {
@@ -1333,14 +1430,24 @@ const ManageSalesOrder = () => {
         String(c?.UUID) === String(billingForm.country)
       ));
       if (found) {
-        // use handler to ensure states are loaded
-        handleBillingCountrySelect(found);
+        console.log('[ManageSalesOrder] Found billing country match:', found);
+        // Don't use handler - just set country and load states without clearing state/city
+        setSelectedBillingCountry(found);
+        const countryUuid = found?.Uuid || found?.UUID || found?.CountryUuid || found?.Id;
+        if (countryUuid) {
+          loadStatesForCountry(countryUuid, 'billing');
+        }
       }
     }
   }, [billingForm?.country, countriesOptions]);
 
   // Match pre-filled billing state with loaded states list by UUID
   React.useEffect(() => {
+    console.log('[ManageSalesOrder] State matching check:', {
+      statesOptionsLength: statesOptions.length,
+      billingFormState: billingForm?.state,
+      selectedBillingState: selectedBillingState,
+    });
     if (statesOptions.length > 0 && billingForm?.state && !selectedBillingState) {
       const foundState = statesOptions.find(s =>
         s?.UUID === billingForm.state ||
@@ -1361,12 +1468,19 @@ const ManageSalesOrder = () => {
             loadCitiesForState(stateUuid, 'billing');
           }
         }
+      } else {
+        console.log('[ManageSalesOrder] No billing state match found in options');
       }
     }
   }, [statesOptions, billingForm?.state, selectedBillingState]);
 
   // Match pre-filled billing city with loaded cities list by UUID
   React.useEffect(() => {
+    console.log('[ManageSalesOrder] City matching check:', {
+      citiesOptionsLength: citiesOptions.length,
+      billingFormCity: billingForm?.city,
+      selectedBillingCity: selectedBillingCity,
+    });
     if (citiesOptions.length > 0 && billingForm?.city && !selectedBillingCity) {
       const foundCity = citiesOptions.find(c =>
         c?.UUID === billingForm.city ||
@@ -1379,6 +1493,8 @@ const ManageSalesOrder = () => {
       if (foundCity) {
         console.log('[ManageSalesOrder] Found billing city match:', foundCity);
         setSelectedBillingCity(foundCity);
+      } else {
+        console.log('[ManageSalesOrder] No billing city match found in options');
       }
     }
   }, [citiesOptions, billingForm?.city, selectedBillingCity]);
@@ -1395,7 +1511,13 @@ const ManageSalesOrder = () => {
         String(c?.UUID) === String(shippingForm.country)
       ));
       if (found) {
-        handleShippingCountrySelect(found);
+        console.log('[ManageSalesOrder] Found shipping country match:', found);
+        // Don't use handler - just set country and load states without clearing state/city
+        setSelectedShippingCountry(found);
+        const countryUuid = found?.Uuid || found?.UUID || found?.CountryUuid || found?.Id;
+        if (countryUuid) {
+          loadStatesForCountry(countryUuid, 'shipping');
+        }
       }
     }
   }, [shippingForm?.country, countriesOptions]);

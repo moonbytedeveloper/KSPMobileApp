@@ -306,13 +306,27 @@ const ViewSalesOrder = () => {
     };
 
     const renderFooterActions = (order) => {
-        const buttons = [
-            { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444', action: 'Delete' },
-            { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6', action: 'Download' },
-            { icon: 'logout', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280', action: 'Forward' },
-            { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E', action: 'View' },
-            { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316', action: 'Update Status' },
+        // If order is timesheet-based, hide the 'logout' / Forward button
+        const isTimesheet = !!(
+            order?.raw?.IsTimesheetBased === true ||
+            order?.raw?.IsTimesheetBased === 'true' ||
+            order?.raw?.IsTimesheetBased === '1' ||
+            order?.IsTimesheetBased === true ||
+            order?.IsTimesheetBased === 'true' ||
+            order?.IsTimesheetBased === '1'
+        );
+
+        let buttons = [
+            { icon: 'delete-outline', action: 'Delete', bg: '#FFE7E7', border: '#EF4444', color: '#EF4444' },
+            { icon: 'file-download', action: 'Download', bg: '#E5F0FF', border: '#3B82F6', color: '#3B82F6' },
+            { icon: 'logout', action: 'Forward', bg: '#E5E7EB', border: '#6B7280', color: '#6B7280' },
+            { icon: 'visibility', action: 'View', bg: '#E6F9EF', border: '#22C55E', color: '#22C55E' },
+            { icon: 'edit', action: 'Edit', bg: '#FFF4E5', border: '#F97316', color: '#F97316' },
         ];
+
+        if (isTimesheet) {
+            buttons = buttons.filter((b) => b.icon !== 'logout');
+        }
 
         return (
             <View style={styles.cardActionRow}>
