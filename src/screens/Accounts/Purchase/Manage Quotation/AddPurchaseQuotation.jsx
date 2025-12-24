@@ -827,7 +827,7 @@ const AddPurchaseQuotation = () => {
 
       const data = resp?.Data || resp || {};
       console.log(payload, 811);
-
+      console.log('submitHeader response header UUID ->', data?.UUID || data?.Uuid || data?.Id || data?.HeaderUUID || null);
       setHeaderResponse(data);
       setHeaderSaved(true);
 
@@ -920,6 +920,7 @@ const AddPurchaseQuotation = () => {
       const resp = await updatePurchaseQuotationHeader(payload);
       const data = resp?.Data || resp || {};
       // update local headerResponse with server-returned data
+      console.log('updateHeader response header UUID ->', data?.UUID || data?.Uuid || data?.Id || data?.HeaderUUID || null);
       setHeaderResponse(data);
 
       Alert.alert('Success', 'Header updated successfully', [
@@ -1147,6 +1148,18 @@ const AddPurchaseQuotation = () => {
     return () => { mounted = false; };
   }, []);
 
+  // After payment method options load, resolve payment method from headerResponse (if present)
+  useEffect(() => {
+    try {
+      if (!headerResponse) return;
+      const incoming = headerResponse.PaymentMethodUUID || headerResponse.PaymentMethod || headerResponse.PaymentMode || headerResponse.PaymentMethodName || null;
+      if (!incoming) return;
+      const resolved = resolveOptionValue(paymentMethodOptions, incoming);
+      if (resolved) setPaymentMethod(resolved);
+      else setPaymentMethod(incoming);
+    } catch (e) { /* ignore */ }
+  }, [paymentMethodOptions, headerResponse]);
+
   // Fetch purchase quotation numbers for dropdown
   useEffect(() => {
     let mounted = true;
@@ -1220,7 +1233,23 @@ const AddPurchaseQuotation = () => {
         }).filter(Boolean);
         const uniqueMap = new Map();
         mapped.forEach(m => { if (m && m.value) uniqueMap.set(String(m.value), m); });
-        setPaymentMethodOptions(Array.from(uniqueMap.values()));
+        const finalMethods = Array.from(uniqueMap.values());
+        setPaymentMethodOptions(finalMethods);
+
+        // If we have header data in route params, try to resolve its payment method to an option value
+        try {
+          const hdr = route?.params?.headerData || null;
+          if (hdr) {
+            const incoming = hdr.PaymentMethodUUID || hdr.PaymentMethod || hdr.PaymentMode || hdr.PaymentMethodName || hdr.PaymentMethodId || null;
+            if (incoming) {
+              // Try to find by value first, then by label (case-insensitive)
+              let found = finalMethods.find(m => String(m.value) === String(incoming));
+              if (!found) found = finalMethods.find(m => String(m.label).toLowerCase() === String(incoming).toLowerCase());
+              if (found) setPaymentMethod(found.value);
+              else setPaymentMethod(incoming);
+            }
+          }
+        } catch (e) { /* ignore */ }
       } catch (err) {
         console.error('Error loading payment methods ->', err && (err.message || err));
         setPaymentMethodOptions([]);
@@ -1301,13 +1330,22 @@ const AddPurchaseQuotation = () => {
         const hdr = route?.params?.headerData || null;
         if (hdr) {
           const uuid = hdr?.ProjectUUID || hdr?.ProjectId || hdr?.Project_Id || hdr?.Project || null;
+          const name = hdr?.ProjectTitle || hdr?.ProjectName || hdr?.Project || null;
           if (uuid) {
-            setProjectName(uuid);
-          } else {
-            const name = hdr?.ProjectTitle || hdr?.ProjectName || hdr?.Project || null;
-            if (name) {
-              const found = normalized.find(p => String(p.label).toLowerCase() === String(name).toLowerCase());
-              if (found) setProjectName(found.value);
+            // Store UUID for Dropdown `value` so option is selected correctly
+            setProjectUUID(uuid);
+            // Also try to set a friendly display name when available
+            if (name) setProjectName(name);
+          } else if (name) {
+            // Try to resolve the label to one of the loaded options and set the matching value
+            const found = normalized.find(p => String(p.label).toLowerCase() === String(name).toLowerCase());
+            if (found) {
+              setProjectUUID(found.value);
+              setProjectName(found.label);
+            } else {
+              // Fallback: keep display name, UUID blank
+              setProjectName(name);
+              setProjectUUID('');
             }
           }
         }
@@ -1319,6 +1357,36 @@ const AddPurchaseQuotation = () => {
     loadProjects();
     return () => { mounted = false; };
   }, [route?.params]);
+
+  // Helper to resolve an incoming header value (uuid or label) to an option.value from a loaded options array
+  const resolveOptionValue = (options, incoming) => {
+    if (!incoming || !Array.isArray(options) || options.length === 0) return null;
+    // match by value first (exact), then by label case-insensitive
+    const byValue = options.find(o => String(o.value) === String(incoming));
+    if (byValue) return byValue.value;
+    const byLabel = options.find(o => String(o.label).toLowerCase() === String(incoming).toLowerCase());
+    if (byLabel) return byLabel.value;
+    return null;
+  };
+
+  // When `projects` are loaded, if we already have headerResponse (from route or API), resolve its project into the Dropdown
+  useEffect(() => {
+    try {
+      if (!headerResponse) return;
+      const incoming = headerResponse.ProjectUUID || headerResponse.ProjectId || headerResponse.Project || headerResponse.ProjectName || headerResponse.ProjectTitle || null;
+      if (!incoming) return;
+      const resolved = resolveOptionValue(projects, incoming);
+      if (resolved) {
+        setProjectUUID(resolved);
+        const label = (projects.find(p => String(p.value) === String(resolved)) || {}).label || '';
+        if (label) setProjectName(label);
+      } else {
+        // fallback: keep what server provided
+        setProjectUUID(incoming);
+        if (headerResponse.ProjectName || headerResponse.ProjectTitle) setProjectName(headerResponse.ProjectName || headerResponse.ProjectTitle);
+      }
+    } catch (e) { /* ignore */ }
+  }, [projects, headerResponse]);
 
   // If navigated here for Edit, prefill header fields from route.params.headerData
   useEffect(() => {
@@ -1383,6 +1451,7 @@ const AddPurchaseQuotation = () => {
         const resp = await getPurchaseQuotationHeaderById({ headerUuid });
         const data = resp?.Data || resp || null;
         if (!mounted || !data) return;
+          console.log('getPurchaseQuotationHeaderById -> header UUID:', data?.UUID || data?.Uuid || data?.Id || data?.HeaderUUID || null);
         // reuse existing prefill logic used for route.headerData
         setHeaderResponse(data);
         setHeaderSaved(true);
