@@ -493,17 +493,21 @@ const ViewSalesOrder = () => {
                                 </View>
                             ) : (
                                 <View>
-                                    {Array.isArray(orderRelatedData?.SalesInvoices) && orderRelatedData.SalesInvoices.length > 0 && (
-                                        <View style={{ marginBottom: hp(1.5) }}>
-                                            <Text style={{ fontFamily: TYPOGRAPHY.fontFamilyBold, color: COLORS.text, marginBottom: hp(0.6) }}>Sales Invoices</Text>
-                                            {orderRelatedData.SalesInvoices.map((inv) => (
+                                    <View style={{ marginBottom: hp(1.5) }}>
+                                        <Text style={{ fontFamily: TYPOGRAPHY.fontFamilyBold, color: COLORS.text, marginBottom: hp(0.6) }}>Sales Invoices</Text>
+                                        {Array.isArray(orderRelatedData?.SalesInvoices) && orderRelatedData.SalesInvoices.length > 0 ? (
+                                            orderRelatedData.SalesInvoices.map((inv) => (
                                                 <TouchableOpacity key={inv?.UUID || inv?.id} style={{ paddingVertical: hp(1), borderBottomWidth: 1, borderBottomColor: COLORS.border }} onPress={() => handleOpenSalesInvoiceSlip(inv)}>
                                                     <Text style={{ color: COLORS.primary, fontWeight: '400' }}>{inv?.DocumentNumber || inv?.InvoiceNo || inv?.DocumentNo}</Text>
                                                     {inv?.DocumentDate ? <Text style={{ color: COLORS.textLight, fontSize: rf(2.8) }}>{inv.DocumentDate}</Text> : null}
                                                 </TouchableOpacity>
-                                            ))}
-                                        </View>
-                                    )}
+                                            ))
+                                        ) : (
+                                            <View style={{ paddingVertical: hp(1    ), }}>
+                                                <Text style={{ fontSize: rf(3), color: COLORS.textLight, }}>No sales invoice records found.</Text>
+                                            </View>
+                                        )}
+                                    </View>
 
                                     <View>
                                         <Text style={{ fontFamily: TYPOGRAPHY.fontFamilyBold, color: COLORS.text, marginBottom: hp(0.6) }}>Proforma Invoices</Text>

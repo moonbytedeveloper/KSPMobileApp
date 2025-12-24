@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import Dropdown from '../../../../components/common/Dropdown';
@@ -34,6 +36,33 @@ const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyl
     );
 };
 
+// Validation schema for Header form
+const HeaderValidationSchema = Yup.object().shape({
+    VendorName: Yup.string().trim().required('Vendor is required'),
+    VendorUUID: Yup.string().test('vendor-uuid-or-name', 'Vendor is required', function (val) {
+        const { VendorName } = this.parent || {};
+        const hasUuid = typeof val === 'string' && val.trim() !== '';
+        const hasName = typeof VendorName === 'string' && VendorName.trim() !== '';
+        return !!(hasUuid || hasName);
+    }),
+    CurrencyType: Yup.string().trim().required('Currency type is required'),
+    CurrencyUUID: Yup.string().test('currency-uuid-or-type', 'Currency type is required', function (val) {
+        const { CurrencyType } = this.parent || {};
+        const hasUuid = typeof val === 'string' && val.trim() !== '';
+        const hasType = typeof CurrencyType === 'string' && CurrencyType.trim() !== '';
+        return !!(hasUuid || hasType);
+    }),
+    RequestTitle: Yup.string().trim().required('Request Title is required'),
+    RequestedDate: Yup.string().trim().required('Requested Date is required'),
+    ProjectName: Yup.string().test('project-or-uuid', 'Project is required', function (val) {
+        const { ProjectUUID } = this.parent || {};
+        const hasVal = typeof val === 'string' && val.trim() !== '';
+        const hasUuid = typeof ProjectUUID === 'string' && ProjectUUID.trim() !== '';
+        return !!(hasVal || hasUuid);
+    }),
+    ExpectedPurchaseDate: Yup.string().trim().required('Expected Purchase Date is required'),
+});
+
 const AddSalesInquiry = () => {
     const [expandedId, setExpandedId] = useState(1);
     const navigation = useNavigation();
@@ -67,7 +96,7 @@ const AddSalesInquiry = () => {
     const [selectedProject, setSelectedProject] = useState(null);
     const [selectedProjectUuid, setSelectedProjectUuid] = useState(null);
     const [projects, setProjects] = useState([]);
-
+    const formikSetFieldValueRef = useRef(null);
     // Debug: log projects whenever they change to help troubleshooting dropdown
     React.useEffect(() => {
         try {
@@ -162,7 +191,7 @@ const AddSalesInquiry = () => {
     const handleCreateOrder = () => {
         // Call update header API when final submit button is clicked
         handleUpdateHeader(true); // true indicates final submit - should navigate back
-    } 
+    }
     // Helpers to compute display names robustly (avoid placeholder values)
     const isPlaceholderString = (s) => typeof s === 'string' && /select/i.test(s);
 
@@ -237,8 +266,18 @@ const AddSalesInquiry = () => {
 
     const handleDateSelect = (date) => {
         const formatted = formatUiDate(date);
-        if (datePickerField === 'requested') setRequestedDate(formatted);
-        if (datePickerField === 'expected') setExpectedPurchaseDate(formatted);
+        if (datePickerField === 'requested') {
+            setRequestedDate(formatted);
+            if (formikSetFieldValueRef.current) {
+                formikSetFieldValueRef.current('RequestedDate', formatted);
+            }
+        }
+        if (datePickerField === 'expected') {
+            setExpectedPurchaseDate(formatted);
+            if (formikSetFieldValueRef.current) {
+                formikSetFieldValueRef.current('ExpectedPurchaseDate', formatted);
+            }
+        }
         setOpenDatePicker(false);
         setDatePickerField(null);
     };
@@ -973,7 +1012,7 @@ const AddSalesInquiry = () => {
             setHeaderResponse(resp);
             setHeaderSaved(true);
             setHeaderEditing(false);
-            
+
             if (isFromFinalSubmit) {
                 // Navigate back when called from final submit
                 try {
@@ -1011,263 +1050,354 @@ const AddSalesInquiry = () => {
                 <View style={styles.headerSeparator} />
                 <ScrollView contentContainerStyle={[styles.container]} showsVerticalScrollIndicator={false}>
                     {/* Section 1: HEADER */}
-                    <AccordionSection
-                        id={1}
-                        title="HEADER"
-                        expanded={expandedId === 1}
-                        onToggle={handleHeaderToggle}
-                        rightActions={
-                            headerSaved ? (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
-                                    <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
-                                    <TouchableOpacity onPress={() => { setHeaderEditing(true); setExpandedId(1); }}>
-                                        <Icon name="edit" size={rf(5)} color={COLORS.primary} />
-                                    </TouchableOpacity>
-                                </View>
-                            ) : null
-                        }
+                    <Formik
+                        initialValues={{
+                            VendorName: vendorName || '',
+                            VendorUUID: vendorUuid || '',
+                            CurrencyType: currencyType || '',
+                            CurrencyUUID: currencyUuid || '',
+                            RequestTitle: requestTitle || '',
+                            RequestedDate: requestedDate || '',
+                            ProjectName: projectName || '',
+                            ProjectUUID: selectedProjectUuid || '',
+                            ExpectedPurchaseDate: expectedPurchaseDate || '',
+                        }}
+                        enableReinitialize
+                        validationSchema={HeaderValidationSchema}
+                        onSubmit={async (values) => {
+                            // Keep local state in sync with Formik values
+                            setVendorName(values.VendorName || '');
+                            setVendorUuid(values.VendorUUID || null);
+                            setCurrencyType(values.CurrencyType || '');
+                            setCurrencyUuid(values.CurrencyUUID || null);
+                            setRequestTitle(values.RequestTitle || '');
+                            setRequestedDate(values.RequestedDate || '');
+                            setProjectName(values.ProjectName || '');
+                            setSelectedProjectUuid(values.ProjectUUID || null);
+                            setExpectedPurchaseDate(values.ExpectedPurchaseDate || '');
+
+                            // Call the appropriate submit handler
+                            try {
+                                if (headerEditing) {
+                                    await handleUpdateHeader(false);
+                                } else {
+                                    await handleApplyHeader();
+                                }
+                            } catch (e) {
+                                // Error already handled in handlers
+                            }
+                        }}
                     >
-                        {/* Reordered rows per request:
+                        {({ values, handleChange, handleBlur, setFieldValue, errors, touched, submitForm, submitCount }) => {
+                            // Store setFieldValue in ref so date handlers can use it
+                            formikSetFieldValueRef.current = setFieldValue;
+                            return (
+                                <AccordionSection
+                                    id={1}
+                                    title="HEADER"
+                                    expanded={expandedId === 1}
+                                    onToggle={handleHeaderToggle}
+                                    rightActions={
+                                        headerSaved ? (
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
+                                                <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
+                                                <TouchableOpacity onPress={() => { setHeaderEditing(true); setExpandedId(1); }}>
+                                                    <Icon name="edit" size={rf(5)} color={COLORS.primary} />
+                                                </TouchableOpacity>
+                                            </View>
+                                        ) : null
+                                    }
+                                >
+                                    {/* Reordered rows per request:
                             1) Vendor Name | Currency Type
                             2) Request Title | Requested Date
                             3) Project Name | Expected Purchase Date
                         */}
 
-                        {/* Show Inquiry No only when editing an existing header (have a header UUID).
+                                    {/* Show Inquiry No only when editing an existing header (have a header UUID).
                             This prevents an empty placeholder space when creating a new record. */}
-                        {(currentHeaderUuid || route?.params?.headerUuid) && (
-                            <View style={[styles.row, { marginBottom: hp(1) }]}>
-                                <View style={styles.col}>
-                                    <Text style={inputStyles.label}>Inquiry No</Text>
-                                    <TouchableOpacity
-                                        activeOpacity={0.8}
-                                        onPress={() => { /* no-op for now, read-only display */ }}
-                                    >
-                                        <View style={[inputStyles.box, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: wp(3) }]}>
-                                            <Text style={[inputStyles.input, { flex: 1, color: COLORS.text }]} numberOfLines={1} ellipsizeMode="tail">
-                                                {inquiryNo || '—'}
-                                            </Text>
-                                            <Icon name="keyboard-arrow-down" size={rf(4)} color={COLORS.textLight} />
+                                    {(currentHeaderUuid || route?.params?.headerUuid) && (
+                                        <View style={[styles.row, { marginBottom: hp(1) }]}>
+                                            <View style={styles.col}>
+                                                <Text style={inputStyles.label}>Inquiry No</Text>
+                                                <TouchableOpacity
+                                                    activeOpacity={0.8}
+                                                    onPress={() => { /* no-op for now, read-only display */ }}
+                                                >
+                                                    <View style={[inputStyles.box, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: wp(3) }]}>
+                                                        <Text style={[inputStyles.input, { flex: 1, color: COLORS.text }]} numberOfLines={1} ellipsizeMode="tail">
+                                                            {inquiryNo || '—'}
+                                                        </Text>
+                                                        <Icon name="keyboard-arrow-down" size={rf(4)} color={COLORS.textLight} />
+                                                    </View>
+                                                </TouchableOpacity>
+                                            </View>
                                         </View>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        )}
+                                    )}
 
-                        <View style={styles.row}>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Vendor Name*</Text>
-                                <View style={{ zIndex: 9998, elevation: 20 }}>
-                                    <Dropdown
-                                        placeholder="Select Vendor"
-                                        value={vendorUuid || vendorName}
-                                        options={vendors}
-                                        getLabel={(v) => (typeof v === 'string' ? v : v?.Name || v?.DisplayName || '')}
-                                        getKey={(v) => (typeof v === 'string' ? v : v?.UUID || v?.Id || v?.id || v?.Name)}
-                                        onSelect={(v) => {
-                                            if (v && typeof v === 'object') {
-                                                const name = v?.Name || v?.DisplayName || v?.name || '';
-                                                const uuid = v?.UUID || v?.Id || v?.id || null;
-                                                setVendorName(name);
-                                                setVendorUuid(uuid);
-                                            } else if (typeof v === 'string') {
-                                                // ignore placeholder-like selections
-                                                if (isPlaceholderString(v)) {
-                                                    setVendorName('');
-                                                    setVendorUuid(null);
-                                                    return;
-                                                }
-                                                setVendorName(v);
-                                                setVendorUuid(null);
-                                            } else {
-                                                setVendorName('');
-                                                setVendorUuid(null);
-                                            }
-                                        }}
-                                        renderInModal={true}
-                                        inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        // textStyle={inputStyles.input}
-                                    />
-                                </View>
-                            </View>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Currency Type*</Text>
-                                <View style={{ zIndex: 9999, elevation: 20 }}>
-                                    <Dropdown
-                                        placeholder="Select Currency"
-                                        value={currencyUuid || currencyType}
-                                        options={currencyOptions.length ? currencyOptions : currencyTypes}
-                                        getLabel={(c) => (typeof c === 'string' ? c : c?.Name || c?.CurrencyName || c?.Code || c?.DisplayName || c?.name || '')}
-                                        getKey={(c) => (typeof c === 'string' ? c : c?.UUID || c?.Id || c?.id || c?.Code || c?.Name)}
-                                        onSelect={(v) => {
-                                            if (v && typeof v === 'object') {
-                                                setCurrencyType(v?.Name || v?.CurrencyName || v?.Code || v?.DisplayName || v?.name || '');
-                                                setCurrencyUuid(v?.UUID || v?.Id || v?.id || null);
-                                            } else {
-                                                setCurrencyType(v);
-                                                setCurrencyUuid(null);
-                                            }
-                                        }}
-                                        renderInModal={true}
-                                        inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        // textStyle={inputStyles.input}
-                                    />
-                                </View>
-                            </View>
-                        </View>
-
-                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Request Title*</Text>
-                                <View style={[inputStyles.box]}>
-                                    <TextInput
-                                        style={[inputStyles.input, { color: COLORS.text }]}
-                                        value={requestTitle}
-                                        onChangeText={setRequestTitle}
-                                        placeholder="Request Title"
-                                        placeholderTextColor={COLORS.textLight}
-                                    />
-                                </View>
-                            </View>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Requested Date*</Text>
-                                <TouchableOpacity
-                                    activeOpacity={0.7}
-                                    onPress={() => openDatePickerFor('requested')}
-                                    style={{ marginTop: hp(0.8) }}
-                                >
-                                    <View style={[inputStyles.box, styles.innerFieldBox, styles.datePickerBox, { alignItems: 'center' }]}>
-                                        <Text style={[
-                                            inputStyles.input,
-                                            styles.datePickerText,
-                                            !requestedDate && { color: COLORS.textLight, fontFamily: TYPOGRAPHY.fontFamilyRegular },
-                                            requestedDate && { color: COLORS.text, fontFamily: TYPOGRAPHY.fontFamilyMedium }
-                                        ]}>
-                                            {requestedDate || 'dd/mm/yyyy'}
-                                        </Text>
-                                        <View style={[
-                                            styles.calendarIconContainer,
-                                            requestedDate && styles.calendarIconContainerSelected
-                                        ]}>
-                                            <Icon
-                                                name="calendar-today"
-                                                size={rf(3.2)}
-                                                color={requestedDate ? COLORS.primary : COLORS.textLight}
-                                            />
+                                    <View style={styles.row}>
+                                        <View style={styles.col}>
+                                            <Text style={inputStyles.label}>Vendor Name*</Text>
+                                            <View style={{ zIndex: 9998, elevation: 20 }}>
+                                                <Dropdown
+                                                    placeholder="Select Vendor"
+                                                    value={values.VendorUUID || values.VendorName || ''}
+                                                    options={vendors}
+                                                    getLabel={(v) => (typeof v === 'string' ? v : v?.Name || v?.DisplayName || '')}
+                                                    getKey={(v) => (typeof v === 'string' ? v : v?.UUID || v?.Id || v?.id || v?.Name)}
+                                                    onSelect={(v) => {
+                                                        if (v && typeof v === 'object') {
+                                                            const name = v?.Name || v?.DisplayName || v?.name || '';
+                                                            const uuid = v?.UUID || v?.Id || v?.id || null;
+                                                            setFieldValue('VendorName', name);
+                                                            setFieldValue('VendorUUID', uuid || '');
+                                                            setVendorName(name);
+                                                            setVendorUuid(uuid);
+                                                        } else if (typeof v === 'string') {
+                                                            // ignore placeholder-like selections
+                                                            if (isPlaceholderString(v)) {
+                                                                setFieldValue('VendorName', '');
+                                                                setFieldValue('VendorUUID', '');
+                                                                setVendorName('');
+                                                                setVendorUuid(null);
+                                                                return;
+                                                            }
+                                                            setFieldValue('VendorName', v);
+                                                            setFieldValue('VendorUUID', '');
+                                                            setVendorName(v);
+                                                            setVendorUuid(null);
+                                                        } else {
+                                                            setFieldValue('VendorName', '');
+                                                            setFieldValue('VendorUUID', '');
+                                                            setVendorName('');
+                                                            setVendorUuid(null);
+                                                        }
+                                                    }}
+                                                    renderInModal={true}
+                                                    inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                                                // textStyle={inputStyles.input}
+                                                />
+                                            </View>
+                                            {errors.VendorName && (touched.VendorName || submitCount > 0) ? (
+                                                <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.VendorName}</Text>
+                                            ) : null}
+                                        </View>
+                                        <View style={styles.col}>
+                                            <Text style={inputStyles.label}>Currency Type*</Text>
+                                            <View style={{ zIndex: 9999, elevation: 20 }}>
+                                                <Dropdown
+                                                    placeholder="Select Currency"
+                                                    value={values.CurrencyUUID || values.CurrencyType || ''}
+                                                    options={currencyOptions.length ? currencyOptions : currencyTypes}
+                                                    getLabel={(c) => (typeof c === 'string' ? c : c?.Name || c?.CurrencyName || c?.Code || c?.DisplayName || c?.name || '')}
+                                                    getKey={(c) => (typeof c === 'string' ? c : c?.UUID || c?.Id || c?.id || c?.Code || c?.Name)}
+                                                    onSelect={(v) => {
+                                                        if (v && typeof v === 'object') {
+                                                            const currencyName = v?.Name || v?.CurrencyName || v?.Code || v?.DisplayName || v?.name || '';
+                                                            const currencyUuid = v?.UUID || v?.Id || v?.id || null;
+                                                            setFieldValue('CurrencyType', currencyName);
+                                                            setFieldValue('CurrencyUUID', currencyUuid || '');
+                                                            setCurrencyType(currencyName);
+                                                            setCurrencyUuid(currencyUuid);
+                                                        } else {
+                                                            setFieldValue('CurrencyType', v || '');
+                                                            setFieldValue('CurrencyUUID', '');
+                                                            setCurrencyType(v);
+                                                            setCurrencyUuid(null);
+                                                        }
+                                                    }}
+                                                    renderInModal={true}
+                                                    inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                                                // textStyle={inputStyles.input}
+                                                />
+                                            </View>
+                                            {errors.CurrencyType && (touched.CurrencyType || submitCount > 0) ? (
+                                                <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.CurrencyType}</Text>
+                                            ) : null}
                                         </View>
                                     </View>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
 
-                        <View style={[styles.row, { marginTop: hp(1.5) }]}>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Project Name*</Text>
-                                <View style={{ zIndex: 9999, elevation: 20 }}>
-                                    <Dropdown
-                                        placeholder="Select Project"
-                                        value={selectedProjectUuid || projectName}
-                                        options={projects.length ? projects : projectsStatic}
-                                        getLabel={(p) => {
-                                            if (typeof p === 'string') return p;
-                                            return p?.ProjectTitle || p?.Project_Name || p?.Name || p?.ProjectName || p?.Title || p?.DisplayName || p?.projectTitle || p?.name || '';
-                                        }}
-                                        getKey={(p) => {
-                                            if (typeof p === 'string') return p;
-                                            return p?.Uuid || p?.UUID || p?.ProjectUUID || p?.Project_Id || p?.Id || p?.id || p?.uuid || '';
-                                        }}
-                                        onSelect={(v) => {
-                                            try { console.log('Project dropdown selected ->', v); } catch (e) { }
-                                            if (v && typeof v === 'object') {
-                                                const name = v?.ProjectTitle || v?.Name || v?.ProjectName || v?.Title || v?.DisplayName || v?.name || JSON.stringify(v);
-                                                const uuid = v?.Uuid || v?.UUID || v?.ProjectUUID || v?.Project_Id || v?.Id || v?.id || null;
-                                                console.log('Extracted UUID from object:', uuid, 'Name:', name);
-                                                setSelectedProject(v);
-                                                setSelectedProjectUuid(uuid);
-                                                setProjectName(name);
-                                            } else if (typeof v === 'string') {
-                                                // ignore placeholder-like selections
-                                                if (isPlaceholderString(v)) {
-                                                    setSelectedProject(null);
-                                                    setSelectedProjectUuid(null);
-                                                    setProjectName('');
-                                                    return;
-                                                }
-                                                
-                                                // Check if string contains JSON with UUID
-                                                try {
-                                                    const parsed = JSON.parse(v);
-                                                    if (parsed && typeof parsed === 'object') {
-                                                        const extractedUuid = parsed?.Uuid || parsed?.UUID || parsed?.ProjectUUID || parsed?.Id || null;
-                                                        const extractedName = parsed?.ProjectTitle || parsed?.Name || parsed?.ProjectName || v;
-                                                        console.log('Extracted UUID from JSON:', extractedUuid, 'Name:', extractedName);
-                                                        setSelectedProject(parsed);
-                                                        setSelectedProjectUuid(extractedUuid);
-                                                        setProjectName(extractedName);
-                                                        return;
-                                                    }
-                                                } catch (jsonError) {
-                                                    // Not JSON, treat as regular string
-                                                }
-                                                
-                                                // selected a primitive from static list
-                                                setSelectedProject(v);
-                                                setSelectedProjectUuid(v);
-                                                setProjectName(v);
-                                            } else {
-                                                setSelectedProject(null);
-                                                setSelectedProjectUuid(null);
-                                                setProjectName('');
-                                            }
-                                        }}
-                                        renderInModal={true}
-                                        inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                        // textStyle={inputStyles.input}
-                                    />
-                                </View>
-                            </View>
-                            <View style={styles.col}>
-                                <Text style={inputStyles.label}>Expected Purchase Date*</Text>
-                                <TouchableOpacity
-                                    activeOpacity={0.7}
-                                    onPress={() => openDatePickerFor('expected')}
-                                    style={{ marginTop: hp(0.8) }}
-                                >
-                                    <View style={[inputStyles.box, styles.innerFieldBox, styles.datePickerBox, { alignItems: 'center' }]}>
-                                        <Text style={[
-                                            inputStyles.input,
-                                            styles.datePickerText,
-                                            !expectedPurchaseDate && { color: COLORS.textLight, fontFamily: TYPOGRAPHY.fontFamilyRegular },
-                                            expectedPurchaseDate && { color: COLORS.text, fontFamily: TYPOGRAPHY.fontFamilyMedium }
-                                        ]}>
-                                            {expectedPurchaseDate || 'dd/mm/yyyy'}
-                                        </Text>
-                                        <View style={[
-                                            styles.calendarIconContainer,
-                                            expectedPurchaseDate && styles.calendarIconContainerSelected
-                                        ]}>
-                                            <Icon
-                                                name="calendar-today"
-                                                size={rf(3.2)}
-                                                color={expectedPurchaseDate ? COLORS.primary : COLORS.textLight}
-                                            />
+                                    <View style={[styles.row, { marginTop: hp(1.5) }]}>
+                                        <View style={styles.col}>
+                                            <Text style={inputStyles.label}>Request Title*</Text>
+                                            <View style={[inputStyles.box]}>
+                                                <TextInput
+                                                    style={[inputStyles.input, { color: COLORS.text }]}
+                                                    value={values.RequestTitle}
+                                                    onChangeText={(v) => {
+                                                        setFieldValue('RequestTitle', v);
+                                                        setRequestTitle(v);
+                                                    }}
+                                                    onBlur={handleBlur('RequestTitle')}
+                                                    placeholder="Request Title"
+                                                    placeholderTextColor={COLORS.textLight}
+                                                />
+                                            </View>
+                                            {errors.RequestTitle && (touched.RequestTitle || submitCount > 0) ? (
+                                                <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.RequestTitle}</Text>
+                                            ) : null}
+                                        </View>
+                                        <View style={styles.col}>
+                                            <Text style={inputStyles.label}>Requested Date*</Text>
+                                            <TouchableOpacity
+                                                activeOpacity={0.7}
+                                                onPress={() => openDatePickerFor('requested')}
+                                                style={{ marginTop: hp(0.8) }}
+                                            >
+                                                <View style={[inputStyles.box, styles.innerFieldBox, styles.datePickerBox, { alignItems: 'center' }]}>
+                                                    <Text style={[
+                                                        inputStyles.input,
+                                                        styles.datePickerText,
+                                                        !values.RequestedDate && { color: COLORS.textLight, fontFamily: TYPOGRAPHY.fontFamilyRegular },
+                                                        values.RequestedDate && { color: COLORS.text, fontFamily: TYPOGRAPHY.fontFamilyMedium }
+                                                    ]}>
+                                                        {values.RequestedDate || 'dd/mm/yyyy'}
+                                                    </Text>
+                                                    <View style={[
+                                                        styles.calendarIconContainer,
+                                                        values.RequestedDate && styles.calendarIconContainerSelected
+                                                    ]}>
+                                                        <Icon
+                                                            name="calendar-today"
+                                                            size={rf(3.2)}
+                                                            color={values.RequestedDate ? COLORS.primary : COLORS.textLight}
+                                                        />
+                                                    </View>
+                                                </View>
+                                            </TouchableOpacity>
+                                            {errors.RequestedDate && (touched.RequestedDate || submitCount > 0) ? (
+                                                <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.RequestedDate}</Text>
+                                            ) : null}
                                         </View>
                                     </View>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                        <View style={{ marginTop: hp(2), flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' }}>
-                            <TouchableOpacity
-                                activeOpacity={0.85}
-                                style={[styles.submitButton, headerSubmitting && styles.submitButtonDisabled]}
-                                onPress={headerEditing ? () => handleUpdateHeader(false) : handleApplyHeader}
-                                disabled={headerSubmitting}
-                            >
-                                <Text style={styles.submitButtonText}>{headerSubmitting ? (headerEditing ? 'Updating...' : 'Saving...') : (headerEditing ? 'Update Header' : 'Save Header')}</Text>
-                            </TouchableOpacity>
 
-                        </View>
-                    </AccordionSection>
+                                    <View style={[styles.row, { marginTop: hp(1.5) }]}>
+                                        <View style={styles.col}>
+                                            <Text style={inputStyles.label}>Project Name*</Text>
+                                            <View style={{ zIndex: 9999, elevation: 20 }}>
+                                                <Dropdown
+                                                    placeholder="Select Project"
+                                                    value={values.ProjectName || values.ProjectUUID || ''}
+                                                    options={projects.length ? projects : projectsStatic}
+                                                    getLabel={(p) => {
+                                                        if (typeof p === 'string') return p;
+                                                        return p?.ProjectTitle || p?.Project_Name || p?.Name || p?.ProjectName || p?.Title || p?.DisplayName || p?.projectTitle || p?.name || '';
+                                                    }}
+                                                    getKey={(p) => {
+                                                        if (typeof p === 'string') return p;
+                                                        return p?.Uuid || p?.UUID || p?.ProjectUUID || p?.Project_Id || p?.Id || p?.id || p?.uuid || '';
+                                                    }}
+                                                    onSelect={(v) => {
+                                                        try { console.log('Project dropdown selected ->', v); } catch (e) { }
+                                                        if (v && typeof v === 'object') {
+                                                            const name = v?.ProjectTitle || v?.Name || v?.ProjectName || v?.Title || v?.DisplayName || v?.name || JSON.stringify(v);
+                                                            const uuid = v?.Uuid || v?.UUID || v?.ProjectUUID || v?.Project_Id || v?.Id || v?.id || null;
+                                                            console.log('Extracted UUID from object:', uuid, 'Name:', name);
+                                                            setFieldValue('ProjectName', name);
+                                                            setFieldValue('ProjectUUID', uuid || '');
+                                                            setSelectedProject(v);
+                                                            setSelectedProjectUuid(uuid);
+                                                            setProjectName(name);
+                                                        } else if (typeof v === 'string') {
+                                                            // ignore placeholder-like selections
+                                                            if (isPlaceholderString(v)) {
+                                                                setFieldValue('ProjectName', '');
+                                                                setFieldValue('ProjectUUID', '');
+                                                                setSelectedProject(null);
+                                                                setSelectedProjectUuid(null);
+                                                                setProjectName('');
+                                                                return;
+                                                            }
+
+                                                            // Check if string contains JSON with UUID
+                                                            try {
+                                                                const parsed = JSON.parse(v);
+                                                                if (parsed && typeof parsed === 'object') {
+                                                                    const extractedUuid = parsed?.Uuid || parsed?.UUID || parsed?.ProjectUUID || parsed?.Id || null;
+                                                                    const extractedName = parsed?.ProjectTitle || parsed?.Name || parsed?.ProjectName || v;
+                                                                    console.log('Extracted UUID from JSON:', extractedUuid, 'Name:', extractedName);
+                                                                    setFieldValue('ProjectName', extractedName);
+                                                                    setFieldValue('ProjectUUID', extractedUuid || '');
+                                                                    setSelectedProject(parsed);
+                                                                    setSelectedProjectUuid(extractedUuid);
+                                                                    setProjectName(extractedName);
+                                                                    return;
+                                                                }
+                                                            } catch (jsonError) {
+                                                                // Not JSON, treat as regular string
+                                                            }
+
+                                                            // selected a primitive from static list
+                                                            setFieldValue('ProjectName', v);
+                                                            setFieldValue('ProjectUUID', v);
+                                                            setSelectedProject(v);
+                                                            setSelectedProjectUuid(v);
+                                                            setProjectName(v);
+                                                        } else {
+                                                            setFieldValue('ProjectName', '');
+                                                            setFieldValue('ProjectUUID', '');
+                                                            setSelectedProject(null);
+                                                            setSelectedProjectUuid(null);
+                                                            setProjectName('');
+                                                        }
+                                                    }}
+                                                    renderInModal={true}
+                                                    inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                                                // textStyle={inputStyles.input}
+                                                />
+                                            </View>
+                                            {errors.ProjectName && (touched.ProjectName || submitCount > 0) ? (
+                                                <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.ProjectName}</Text>
+                                            ) : null}
+                                        </View>
+                                        <View style={styles.col}>
+                                            <Text style={inputStyles.label}>Expected Purchase Date*</Text>
+                                            <TouchableOpacity
+                                                activeOpacity={0.7}
+                                                onPress={() => openDatePickerFor('expected')}
+                                                style={{ marginTop: hp(0.8) }}
+                                            >
+                                                <View style={[inputStyles.box, styles.innerFieldBox, styles.datePickerBox, { alignItems: 'center' }]}>
+                                                    <Text style={[
+                                                        inputStyles.input,
+                                                        styles.datePickerText,
+                                                        !values.ExpectedPurchaseDate && { color: COLORS.textLight, fontFamily: TYPOGRAPHY.fontFamilyRegular },
+                                                        values.ExpectedPurchaseDate && { color: COLORS.text, fontFamily: TYPOGRAPHY.fontFamilyMedium }
+                                                    ]}>
+                                                        {values.ExpectedPurchaseDate || 'dd/mm/yyyy'}
+                                                    </Text>
+                                                    <View style={[
+                                                        styles.calendarIconContainer,
+                                                        values.ExpectedPurchaseDate && styles.calendarIconContainerSelected
+                                                    ]}>
+                                                        <Icon
+                                                            name="calendar-today"
+                                                            size={rf(3.2)}
+                                                            color={values.ExpectedPurchaseDate ? COLORS.primary : COLORS.textLight}
+                                                        />
+                                                    </View>
+                                                </View>
+                                            </TouchableOpacity>
+                                            {errors.ExpectedPurchaseDate && (touched.ExpectedPurchaseDate || submitCount > 0) ? (
+                                                <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.ExpectedPurchaseDate}</Text>
+                                            ) : null}
+                                        </View>
+                                    </View>
+                                    <View style={{ marginTop: hp(2), flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                        <TouchableOpacity
+                                            activeOpacity={0.85}
+                                            style={[styles.submitButton, headerSubmitting && styles.submitButtonDisabled]}
+                                            onPress={submitForm}
+                                            disabled={headerSubmitting}
+                                        >
+                                            <Text style={styles.submitButtonText}>{headerSubmitting ? (headerEditing ? 'Updating...' : 'Saving...') : (headerEditing ? 'Update Header' : 'Save Header')}</Text>
+                                        </TouchableOpacity>
+
+                                    </View>
+                                </AccordionSection>
+                            );
+                        }}
+                    </Formik>
 
                     {/* Section 2: LINE */}
                     {headerSaved && (
@@ -1295,7 +1425,7 @@ const AddSalesInquiry = () => {
                                             }}
                                             renderInModal={true}
                                             inputBoxStyle={[inputStyles.box, { minHeight: hp(4.6), paddingVertical: 0, marginTop: hp(0.5) }]}
-                                            // textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
+                                        // textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
                                         />
                                     </View>
                                 </View>
@@ -1317,7 +1447,7 @@ const AddSalesInquiry = () => {
                                             }}
                                             renderInModal={true}
                                             inputBoxStyle={[inputStyles.box, { minHeight: hp(4.6), paddingVertical: 0, marginTop: hp(0.5) }]}
-                                            // textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
+                                        // textStyle={[inputStyles.input, { fontSize: rf(3.4) }]}
                                         />
                                     </View>
                                 </View>
@@ -1355,7 +1485,7 @@ const AddSalesInquiry = () => {
                                             }}
                                             renderInModal={true}
                                             inputBoxStyle={[inputStyles.box, { marginTop: hp(0.5) }]}
-                                            // textStyle={inputStyles.input}
+                                        // textStyle={inputStyles.input}
                                         />
                                     </View>
                                 </View>

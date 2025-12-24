@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
 import { useRoute } from '@react-navigation/native';
 import {
     View,
@@ -80,6 +82,42 @@ const AccordionSection = ({
         </View>
     );
 };
+
+// Validation schema for Header form
+const HeaderValidationSchema = Yup.object().shape({
+        // PurchaseOrderNumber: Yup.string().test('purchaseorder-or-uuid', 'Purchase Order Number is required', function (val) {
+        //     const { PurchaseOrderUUID } = this.parent || {};
+        //     const hasVal = typeof val === 'string' && val.trim() !== '';
+        //     const hasUuid = typeof PurchaseOrderUUID === 'string' && PurchaseOrderUUID.trim() !== '';
+        //     return !!(hasVal || hasUuid);
+        // }),
+    VendorName: Yup.string().trim().required('Vendor is required'),
+    CustomerUUID: Yup.string().test('vendor-uuid-or-name', 'Vendor is required', function (val) {
+        const { VendorName } = this.parent || {};
+        const hasUuid = typeof val === 'string' && val.trim() !== '';
+        const hasName = typeof VendorName === 'string' && VendorName.trim() !== '';
+        return !!(hasUuid || hasName);
+    }),
+    ProjectName: Yup.string().test('project-or-uuid', 'Project is required', function (val) {
+        const { ProjectUUID } = this.parent || {};
+        const hasVal = typeof val === 'string' && val.trim() !== '';
+        const hasUuid = typeof ProjectUUID === 'string' && ProjectUUID.trim() !== '';
+        return !!(hasVal || hasUuid);
+    }),
+    PaymentTerm: Yup.string().test('paymentterm-or-uuid', 'Payment term is required', function (val) {
+        const { PaymentTermUUID } = this.parent || {};
+        const hasVal = typeof val === 'string' && val.trim() !== '';
+        const hasUuid = typeof PaymentTermUUID === 'string' && PaymentTermUUID.trim() !== '';
+        return !!(hasVal || hasUuid);
+    }),
+    PaymentMethod: Yup.string().test('paymentmethod-or-uuid', 'Payment method is required', function (val) {
+        const { PaymentMethodUUID } = this.parent || {};
+        const hasVal = typeof val === 'string' && val.trim() !== '';
+        const hasUuid = typeof PaymentMethodUUID === 'string' && PaymentMethodUUID.trim() !== '';
+        return !!(hasVal || hasUuid);
+    }),
+    OrderDate: Yup.string().trim().required('Order Date is required'),
+});
 
 const AddSalesPerfomaInvoice = () => {
     // Keep header closed by default; only open when user clicks Edit
@@ -717,7 +755,7 @@ const AddSalesPerfomaInvoice = () => {
     const [showShippingTip, setShowShippingTip] = useState(false);
     const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
     const [prefillLoading, setPrefillLoading] = useState(false);
-
+    const formikSetFieldValueRef = useRef(null);
     // Show Proforma Invoice Number only when editing / prefilling an existing header
     const [showProformaInvoiceNoField, setShowProformaInvoiceNoField] = useState(false);
 
@@ -809,7 +847,12 @@ const AddSalesPerfomaInvoice = () => {
 
     const handleDateSelect = date => {
         const formatted = formatUiDate(date);
-        if (datePickerField === 'invoice') setInvoiceDate(formatted);
+        if (datePickerField === 'invoice') {
+            setInvoiceDate(formatted);
+            if (formikSetFieldValueRef.current) {
+                formikSetFieldValueRef.current('OrderDate', formatted);
+            }
+        }
         if (datePickerField === 'due') setDueDate(formatted);
         setOpenDatePicker(false);
         setDatePickerField(null);
@@ -1511,22 +1554,71 @@ const AddSalesPerfomaInvoice = () => {
                     showsVerticalScrollIndicator={false}
                 >
                     {/* Section 1: Header / Basic Details */}
-                    <AccordionSection
-                        id={1}
-                        title="Header"
-                        expanded={expandedId === 1}
-                        onToggle={headerSubmitted && !headerEditable ? () => { } : toggleSection}
-                        rightActions={
-                            headerSubmitted && !headerEditable ? (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
-                                    <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
-                                    <TouchableOpacity onPress={handleEditPress}>
-                                        <Icon name="edit" size={rf(5)} color={COLORS.primary} />
-                                    </TouchableOpacity>
-                                </View>
-                            ) : null
-                        }
+                    <Formik
+                        initialValues={{
+                            PurchaseOrderNumber: headerForm?.SalesOrderNo || headerForm?.PurchaseOrderNo || '',
+                            PurchaseOrderUUID: purchaseOrderUuid || '',
+                            VendorName: headerForm.CustomerName || '',
+                            CustomerUUID: headerForm.CustomerUUID || '',
+                            ProjectName: project || '',
+                            ProjectUUID: projectUUID || '',
+                            PaymentTerm: paymentTerm || '',
+                            PaymentTermUUID: paymentTermUuid || '',
+                            PaymentMethod: paymentMethod || '',
+                            PaymentMethodUUID: paymentMethodUUID || '',
+                            OrderDate: invoiceDate || '',
+                        }}
+                        enableReinitialize
+                        validationSchema={HeaderValidationSchema}
+                        onSubmit={async (values) => {
+                            // Keep local state in sync with Formik values
+                            setHeaderForm(s => ({
+                                ...s,
+                                SalesOrderNo: values.PurchaseOrderNumber || s.SalesOrderNo,
+                                CustomerName: values.VendorName || s.CustomerName,
+                                CustomerUUID: values.CustomerUUID || s.CustomerUUID,
+                            }));
+                            setPurchaseOrderUuid(values.PurchaseOrderUUID || null);
+                            setProject(values.ProjectName || '');
+                            setProjectUUID(values.ProjectUUID || null);
+                            setPaymentTerm(values.PaymentTerm || '');
+                            setPaymentTermUuid(values.PaymentTermUUID || null);
+                            setPaymentMethod(values.PaymentMethod || '');
+                            setPaymentMethodUUID(values.PaymentMethodUUID || null);
+                            setInvoiceDate(values.OrderDate || '');
+                            
+                            // Call the appropriate submit handler
+                            try {
+                                if (headerUUID && headerEditable) {
+                                    await updateHeader();
+                                } else {
+                                    await submitHeader();
+                                }
+                            } catch (e) {
+                                // Error already handled in handlers
+                            }
+                        }}
                     >
+                        {({ values, handleChange, handleBlur, setFieldValue, errors, touched, submitForm, submitCount }) => {
+                            // Store setFieldValue in ref so date handlers can use it
+                            formikSetFieldValueRef.current = setFieldValue;
+                            return (
+                                <AccordionSection
+                                    id={1}
+                                    title="Header"
+                                    expanded={expandedId === 1}
+                                    onToggle={headerSubmitted && !headerEditable ? () => { } : toggleSection}
+                                    rightActions={
+                                        headerSubmitted && !headerEditable ? (
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
+                                                <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
+                                                <TouchableOpacity onPress={handleEditPress}>
+                                                    <Icon name="edit" size={rf(5)} color={COLORS.primary} />
+                                                </TouchableOpacity>
+                                            </View>
+                                        ) : null
+                                    }
+                                >
 
                         <View style={styles.row}>
                             {/* <View style={styles.col}> */}
@@ -1596,17 +1688,17 @@ const AddSalesPerfomaInvoice = () => {
                         <View style={[styles.row, { marginTop: hp(1.5) }]}>
                             {/* { (headerSubmitted || route?.params?.prefillHeader) && ( */}
                             <View style={styles.col}>
-                                <Text style={[inputStyles.label,]}>Purchase Order Number* </Text>
+                                <Text style={[inputStyles.label,]}>Purchase Order Number </Text>
 
                                 {headerSubmitted && !headerEditable ? (
                                     <View style={[inputStyles.box, { marginTop: hp(1) }]} pointerEvents="none">
-                                        <Text style={[inputStyles.input, { color: '#000' }]}>{headerForm?.SalesOrderNo || headerForm?.PurchaseOrderNo || headerForm?.clientName || ''}</Text>
+                                        <Text style={[inputStyles.input, { color: '#000' }]}>{values.PurchaseOrderNumber || headerForm?.SalesOrderNo || headerForm?.PurchaseOrderNo || headerForm?.clientName || ''}</Text>
                                     </View>
                                 ) : (
                                     <View style={{ zIndex: 9999, elevation: 20 }}>
                                         <Dropdown
                                             placeholder="Select Purchase Order"
-                                            value={purchaseOrderUuid || headerForm?.SalesOrderNo?.Number || headerForm?.PurchaseOrderNo}
+                                            value={values.PurchaseOrderNumber || values.PurchaseOrderUUID || ''}
                                             options={purchaseOrderOptions}
                                             getLabel={p => (p?.OrderNo || String(p))}
                                             getKey={p => (p?.UUID || p)}
@@ -1615,13 +1707,18 @@ const AddSalesPerfomaInvoice = () => {
                                                 console.log('Purchase Order selected:', v);
                                                 if (v && typeof v === 'object') {
                                                     const orderUuid = v?.UUID || v?.Id || null;
+                                                    const orderNo = v?.OrderNo || v?.PurchaseOrderNo || String(v);
                                                     console.log('Order UUID being set:', orderUuid);
+                                                    setFieldValue('PurchaseOrderNumber', orderNo);
+                                                    setFieldValue('PurchaseOrderUUID', orderUuid || '');
                                                     // show only the order number to the user
-                                                    setHeaderForm(s => ({ ...s, SalesOrderNo: v?.OrderNo || v?.PurchaseOrderNo || String(v) }));
+                                                    setHeaderForm(s => ({ ...s, SalesOrderNo: orderNo }));
                                                     // store UUIDs for payload
                                                     setPurchaseOrderUuid(orderUuid);
                                                     setSalesOrderUuid(orderUuid);
                                                 } else {
+                                                    setFieldValue('PurchaseOrderNumber', v || '');
+                                                    setFieldValue('PurchaseOrderUUID', '');
                                                     setHeaderForm(s => ({ ...s, SalesOrderNo: v }));
                                                     setPurchaseOrderUuid(null);
                                                     setSalesOrderUuid(null);
@@ -1632,6 +1729,9 @@ const AddSalesPerfomaInvoice = () => {
                                         />
                                     </View>
                                 )}
+                                {/* {errors.PurchaseOrderNumber && (touched.PurchaseOrderNumber || submitCount > 0) ? (
+                                    <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.PurchaseOrderNumber}</Text>
+                                ) : null} */}
                             </View>
                             {/* )} */}
 
@@ -1641,7 +1741,7 @@ const AddSalesPerfomaInvoice = () => {
                                 <View style={{ zIndex: 9998, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="Vendor Name*"
-                                        value={headerForm.CustomerUUID || headerForm.CustomerName || headerForm.opportunityTitle}
+                                        value={values.CustomerUUID || values.VendorName || ''}
                                         options={customersOptions}
                                         getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
                                         getKey={c => (c?.UUID || c?.Id || c)}
@@ -1650,9 +1750,14 @@ const AddSalesPerfomaInvoice = () => {
                                             console.log('Vendor selected:', v);
                                             if (v && typeof v === 'object') {
                                                 const vendorUuid = v?.UUID || v?.Id || null;
+                                                const vendorName = v?.CustomerName || v?.Name || v;
                                                 console.log('Vendor UUID being set:', vendorUuid);
-                                                setHeaderForm(s => ({ ...s, CustomerName: v?.CustomerName || v?.Name || v, CustomerUUID: vendorUuid }));
+                                                setFieldValue('VendorName', vendorName);
+                                                setFieldValue('CustomerUUID', vendorUuid || '');
+                                                setHeaderForm(s => ({ ...s, CustomerName: vendorName, CustomerUUID: vendorUuid }));
                                             } else {
+                                                setFieldValue('VendorName', v || '');
+                                                setFieldValue('CustomerUUID', '');
                                                 setHeaderForm(s => ({ ...s, CustomerName: v, CustomerUUID: null }));
                                             }
                                         }}
@@ -1660,6 +1765,9 @@ const AddSalesPerfomaInvoice = () => {
                                         inputBoxStyle={inputStyles.box}
                                     />
                                 </View>
+                                {errors.VendorName && (touched.VendorName || submitCount > 0) ? (
+                                    <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.VendorName}</Text>
+                                ) : null}
                             </View>
 
 
@@ -1674,18 +1782,26 @@ const AddSalesPerfomaInvoice = () => {
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="Select Project*"
-                                        value={projectUUID || project}
+                                        value={values.ProjectName || values.ProjectUUID || ''}
                                         options={projectsOptions}
                                         getLabel={p => (p?.Name || p?.ProjectTitle || String(p))}
                                         getKey={p => (p?.Uuid || p?.Id || p)}
                                         onSelect={v => {
                                             if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
-                                            setProject(v?.ProjectTitle || v); setProjectUUID(v?.Uuid || v);
+                                            const projectName = v?.ProjectTitle || v?.Name || v || '';
+                                            const projectUuid = v?.Uuid || v?.Id || v || '';
+                                            setFieldValue('ProjectName', projectName);
+                                            setFieldValue('ProjectUUID', projectUuid || '');
+                                            setProject(projectName);
+                                            setProjectUUID(projectUuid);
                                         }}
                                         renderInModal={true}
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                                     />
                                 </View>
+                                {errors.ProjectName && (touched.ProjectName || submitCount > 0) ? (
+                                    <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.ProjectName}</Text>
+                                ) : null}
                             </View>
 
                             <View style={styles.col}>
@@ -1694,16 +1810,22 @@ const AddSalesPerfomaInvoice = () => {
                                 <View style={{ zIndex: 9999, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="Payment Term*"
-                                        value={paymentTermUuid || paymentTerm}
+                                        value={values.PaymentTerm || values.PaymentTermUUID || ''}
                                         options={paymentTermsOptions}
                                         getLabel={p => p?.Name || p?.Title || String(p)}
                                         getKey={p => p?.UUID || p?.Id || p}
                                         onSelect={v => {
                                             if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
                                             if (v && typeof v === 'object') {
-                                                setPaymentTerm(v?.Name || v?.Title || String(v));
-                                                setPaymentTermUuid(v?.UUID || v?.Id || null);
+                                                const termName = v?.Name || v?.Title || String(v);
+                                                const termUuid = v?.UUID || v?.Id || null;
+                                                setFieldValue('PaymentTerm', termName);
+                                                setFieldValue('PaymentTermUUID', termUuid || '');
+                                                setPaymentTerm(termName);
+                                                setPaymentTermUuid(termUuid);
                                             } else {
+                                                setFieldValue('PaymentTerm', v || '');
+                                                setFieldValue('PaymentTermUUID', '');
                                                 setPaymentTerm(v);
                                                 setPaymentTermUuid(null);
                                             }
@@ -1712,6 +1834,9 @@ const AddSalesPerfomaInvoice = () => {
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                                     />
                                 </View>
+                                {errors.PaymentTerm && (touched.PaymentTerm || submitCount > 0) ? (
+                                    <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.PaymentTerm}</Text>
+                                ) : null}
                             </View>
 
                         </View>
@@ -1722,16 +1847,22 @@ const AddSalesPerfomaInvoice = () => {
                                 <View style={{ zIndex: 9998, elevation: 20 }}>
                                     <Dropdown
                                         placeholder="Payment Method"
-                                        value={paymentMethodUUID || paymentMethod}
+                                        value={values.PaymentMethod || values.PaymentMethodUUID || ''}
                                         options={paymentMethodsOptions}
                                         getLabel={p => p?.Name || p?.Title || String(p)}
                                         getKey={p => p?.UUID || p?.Id || p}
                                         onSelect={v => {
                                             if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
                                             if (v && typeof v === 'object') {
-                                                setPaymentMethod(v?.Name || v?.Title || String(v));
-                                                setPaymentMethodUUID(v?.UUID || v?.Id || null);
+                                                const methodName = v?.Name || v?.Title || String(v);
+                                                const methodUuid = v?.UUID || v?.Id || null;
+                                                setFieldValue('PaymentMethod', methodName);
+                                                setFieldValue('PaymentMethodUUID', methodUuid || '');
+                                                setPaymentMethod(methodName);
+                                                setPaymentMethodUUID(methodUuid);
                                             } else {
+                                                setFieldValue('PaymentMethod', v || '');
+                                                setFieldValue('PaymentMethodUUID', '');
                                                 setPaymentMethod(v);
                                                 setPaymentMethodUUID(null);
                                             }
@@ -1740,6 +1871,9 @@ const AddSalesPerfomaInvoice = () => {
                                         inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                                     />
                                 </View>
+                                {errors.PaymentMethod && (touched.PaymentMethod || submitCount > 0) ? (
+                                    <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.PaymentMethod}</Text>
+                                ) : null}
                             </View>
 
                             <View style={styles.col}>
@@ -1763,48 +1897,42 @@ const AddSalesPerfomaInvoice = () => {
                                             style={[
                                                 inputStyles.input,
                                                 styles.datePickerText,
-                                                !invoiceDate && {
+                                                !values.OrderDate && {
                                                     color: COLORS.textLight,
                                                     fontFamily: TYPOGRAPHY.fontFamilyRegular,
                                                 },
-                                                invoiceDate && {
+                                                values.OrderDate && {
                                                     color: COLORS.text,
                                                     fontFamily: TYPOGRAPHY.fontFamilyMedium,
                                                 },
                                             ]}
                                         >
-                                            {invoiceDate || 'Order Date*'}
+                                            {values.OrderDate || 'Order Date*'}
                                         </Text>
                                         <View
                                             style={[
                                                 styles.calendarIconContainer,
-                                                invoiceDate && styles.calendarIconContainerSelected,
+                                                values.OrderDate && styles.calendarIconContainerSelected,
                                             ]}
                                         >
                                             <Icon
                                                 name="calendar-today"
                                                 size={rf(3.2)}
-                                                color={invoiceDate ? COLORS.primary : COLORS.textLight}
+                                                color={values.OrderDate ? COLORS.primary : COLORS.textLight}
                                             />
                                         </View>
                                     </View>
                                 </TouchableOpacity>
+                                {errors.OrderDate && (touched.OrderDate || submitCount > 0) ? (
+                                    <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.OrderDate}</Text>
+                                ) : null}
                             </View>
                         </View>
 
                         <View style={{ marginTop: hp(1.5), flexDirection: 'row', justifyContent: 'flex-end' }}>
                             <TouchableOpacity
                                 activeOpacity={0.8}
-                                onPress={() => {
-                                    console.log('Button pressed - headerUUID:', headerUUID, 'headerEditable:', headerEditable);
-                                    if (headerUUID && headerEditable) {
-                                        console.log('Calling updateHeader');
-                                        updateHeader();
-                                    } else {
-                                        console.log('Calling submitHeader');
-                                        submitHeader();
-                                    }
-                                }}
+                                onPress={submitForm}
                                 style={{
                                     backgroundColor: COLORS.primary,
                                     paddingVertical: hp(1),
@@ -1823,7 +1951,10 @@ const AddSalesPerfomaInvoice = () => {
                             </TouchableOpacity>
                         </View>
 
-                    </AccordionSection>
+                                </AccordionSection>
+                            );
+                        }}
+                    </Formik>
 
                     {/* Section 4: Create Order */}
                     {headerSubmitted ? (<AccordionSection

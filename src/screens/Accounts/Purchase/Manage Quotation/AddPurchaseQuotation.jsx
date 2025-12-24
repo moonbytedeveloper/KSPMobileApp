@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
 import {
   View,
   Text,
@@ -63,6 +65,21 @@ const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyl
     </View>
   );
 };
+
+// Validation schema for Header form
+const HeaderValidationSchema = Yup.object().shape({
+  VendorName: Yup.string().trim().required('Vendor is required'),
+  QuotationTitle: Yup.string().trim().required('Quotation Title is required'),
+  ProjectName: Yup.string().test('project-or-uuid', 'Project is required', function (val) {
+    const { ProjectUUID } = this.parent || {};
+    const hasVal = typeof val === 'string' && val.trim() !== '';
+    const hasUuid = typeof ProjectUUID === 'string' && ProjectUUID.trim() !== '';
+    return !!(hasVal || hasUuid);
+  }),
+  PaymentTerm: Yup.string().trim().required('Payment term is required'),
+  PaymentMethod: Yup.string().trim().required('Payment method is required'),
+  // PQDocument: Yup.mixed().required('PQ Document is required'),
+});
 
 const AddPurchaseQuotation = () => {
   const [expandedId, setExpandedId] = useState(1);
@@ -200,6 +217,8 @@ const AddPurchaseQuotation = () => {
   const [adjustments, setAdjustments] = useState('0');
   const [adjustmentLabel, setAdjustmentLabel] = useState('Adjustments');
   const [file, setFile] = useState(null);
+  const formikSetFieldValueRef = useRef(null);
+  const formikSubmitRef = useRef(null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [uploadedFilePaths, setUploadedFilePaths] = useState([]);
   const [file2, setFile2] = useState(null);
@@ -1006,6 +1025,10 @@ const AddPurchaseQuotation = () => {
 
         // Optimistically set the selected file for UI
         setFile(fileObj);
+        // Update Formik value if available
+        if (formikSetFieldValueRef.current) {
+          formikSetFieldValueRef.current('PQDocument', fileObj);
+        }
 
         // Immediately upload the picked file with fixed Filepath 'QuotationDocument'
         try {
@@ -1027,6 +1050,10 @@ const AddPurchaseQuotation = () => {
           setFile(null);
           setUploadedFiles([]);
           setUploadedFilePaths([]);
+          // Update Formik value if available
+          if (formikSetFieldValueRef.current) {
+            formikSetFieldValueRef.current('PQDocument', null);
+          }
         }
       }
     } catch (err) {
@@ -1107,6 +1134,10 @@ const AddPurchaseQuotation = () => {
     setFile(null);
     setUploadedFiles([]);
     setUploadedFilePaths([]);
+    // Update Formik value if available
+    if (formikSetFieldValueRef.current) {
+      formikSetFieldValueRef.current('PQDocument', null);
+    }
   };
 
   const removeFile2 = () => {
@@ -1537,22 +1568,61 @@ const AddPurchaseQuotation = () => {
           showsVerticalScrollIndicator={false}
         >
           {/* Section 1: Header / Basic Details */}
-          <AccordionSection
-            id={1}
-            title="Header"
-            expanded={expandedId === 1}
-            onToggle={toggleSection}
-            rightActions={
-              headerSubmitted && !headerEditable ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
-                  <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
-                  <TouchableOpacity onPress={() => { setHeaderEditable(true); setIsEditingHeader(true); setExpandedId(1); setShowPurchaseQuotationNoField(true); }}>
-                    <Icon name="edit" size={rf(4.4)} color={COLORS.primary} />
-                  </TouchableOpacity>
-                </View>
-              ) : null
-            }
+          <Formik
+            initialValues={{
+              VendorName: vendor || '',
+              QuotationTitle: headerForm.quotationTitle || '',
+              ProjectName: projectName || '',
+              ProjectUUID: projectUUID || '',
+              PaymentTerm: paymentTerm || '',
+              PaymentMethod: paymentMethod || '',
+              PQDocument: file || null,
+            }}
+            enableReinitialize
+            validationSchema={HeaderValidationSchema}
+            onSubmit={async (values) => {
+              // Keep local state in sync with Formik values
+              setVendor(values.VendorName || '');
+              setHeaderForm(s => ({ ...s, quotationTitle: values.QuotationTitle || '' }));
+              setProjectName(values.ProjectName || '');
+              setProjectUUID(values.ProjectUUID || null);
+              setPaymentTerm(values.PaymentTerm || '');
+              setPaymentMethod(values.PaymentMethod || '');
+              
+              // Call the appropriate submit handler
+              try {
+                const shouldUpdate = (isEditingHeader || (headerResponse?.UUID && headerEditable));
+                if (shouldUpdate) {
+                  await updateHeader();
+                } else {
+                  await submitHeader();
+                }
+              } catch (e) {
+                // Error already handled in handlers
+              }
+            }}
           >
+            {({ values, handleChange, handleBlur, setFieldValue, errors, touched, submitForm, submitCount }) => {
+              // Store setFieldValue and submitForm in refs so file handler and submit button can use them
+              formikSetFieldValueRef.current = setFieldValue;
+              formikSubmitRef.current = submitForm;
+              return (
+                <AccordionSection
+                  id={1}
+                  title="Header"
+                  expanded={expandedId === 1}
+                  onToggle={toggleSection}
+                  rightActions={
+                    headerSubmitted && !headerEditable ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
+                        <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
+                        <TouchableOpacity onPress={() => { setHeaderEditable(true); setIsEditingHeader(true); setExpandedId(1); setShowPurchaseQuotationNoField(true); }}>
+                          <Icon name="edit" size={rf(4.4)} color={COLORS.primary} />
+                        </TouchableOpacity>
+                      </View>
+                    ) : null
+                  }
+                >
             {showPurchaseQuotationNoField && (
               <View style={styles.row}>
                 <View style={styles.col}>
@@ -1593,7 +1663,7 @@ const AddPurchaseQuotation = () => {
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
                     placeholder="-Select Vendor-"
-                    value={vendor}
+                    value={values.VendorName || ''}
                     options={vendorOptions}
                     getLabel={p => (p?.label ?? String(p))}
                     getKey={p => (p?.value ?? String(p))}
@@ -1601,8 +1671,10 @@ const AddPurchaseQuotation = () => {
                       if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
                       try {
                         const selectedValue = opt && (opt.value ?? opt?.UUID ?? opt);
+                        setFieldValue('VendorName', selectedValue || '');
                         setVendor(selectedValue);
                       } catch (e) {
+                        setFieldValue('VendorName', opt || '');
                         setVendor(opt);
                       }
                     }}
@@ -1611,6 +1683,9 @@ const AddPurchaseQuotation = () => {
                   // textStyle={inputStyles.input}
                   />
                 </View>
+                {errors.VendorName && (touched.VendorName || submitCount > 0) ? (
+                  <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.VendorName}</Text>
+                ) : null}
               </View>
             </View>
 
@@ -1625,27 +1700,34 @@ const AddPurchaseQuotation = () => {
                   <TextInput
                     ref={quotationTitleRef}
                     onFocus={() => setFocusedQuotationTitle(true)}
-                    onBlur={() => setFocusedQuotationTitle(false)}
+                    onBlur={(e) => {
+                      setFocusedQuotationTitle(false);
+                      handleBlur('QuotationTitle')(e);
+                    }}
                     style={[
                       inputStyles.input,
                       { color: focusedQuotationTitle ? '#000000' : COLORS.text, textShadowColor: focusedQuotationTitle ? '#000000' : 'transparent' },
                     ]}
-                    value={headerForm.quotationTitle}
-                    onChangeText={v =>
-                      setHeaderForm(s => ({ ...s, quotationTitle: v }))
-                    }
+                    value={values.QuotationTitle}
+                    onChangeText={(v) => {
+                      setFieldValue('QuotationTitle', v);
+                      setHeaderForm(s => ({ ...s, quotationTitle: v }));
+                    }}
                     placeholder="eg."
                     placeholderTextColor={COLORS.textLight}
                     editable={headerEditable}
                   />
                 </View>
+                {errors.QuotationTitle && (touched.QuotationTitle || submitCount > 0) ? (
+                  <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.QuotationTitle}</Text>
+                ) : null}
               </View>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>Project Name*</Text>
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
                     placeholder="Select Project"
-                    value={projectUUID || projectName}
+                    value={values.ProjectName || ''}
                     options={projects}
                     getLabel={p => p?.label || ''}
                     getKey={p => p?.value}
@@ -1660,10 +1742,14 @@ const AddPurchaseQuotation = () => {
                         console.log('Final UUID being set:', selectedUUID);
                         console.log('Selected name:', selectedName);
 
+                        setFieldValue('ProjectName', selectedName);
+                        setFieldValue('ProjectUUID', selectedUUID);
                         setProjectUUID(selectedUUID); // Store UUID for API
                         setProjectName(selectedName); // Store name for display
                       } catch (e) {
                         console.log('Error in project selection:', e);
+                        setFieldValue('ProjectName', opt || '');
+                        setFieldValue('ProjectUUID', '');
                         setProjectUUID('');
                         setProjectName(opt);
                       }
@@ -1673,6 +1759,9 @@ const AddPurchaseQuotation = () => {
                   // textStyle={inputStyles.input}
                   />
                 </View>
+                {errors.ProjectName && (touched.ProjectName || submitCount > 0) ? (
+                  <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.ProjectName}</Text>
+                ) : null}
               </View>
             </View>
 
@@ -1684,19 +1773,29 @@ const AddPurchaseQuotation = () => {
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
                     placeholder="Select Payment Term"
-                    value={paymentTerm}
+                    value={values.PaymentTerm || ''}
                     options={paymentTermOptions}
                     getLabel={p => (p?.label ?? String(p))}
                     getKey={p => (p?.value ?? String(p))}
                     onSelect={opt => {
                       if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
-                      try { const v = opt && (opt.value ?? opt); setPaymentTerm(v); } catch (e) { setPaymentTerm(opt); }
+                      try {
+                        const v = opt && (opt.value ?? opt);
+                        setFieldValue('PaymentTerm', v || '');
+                        setPaymentTerm(v);
+                      } catch (e) {
+                        setFieldValue('PaymentTerm', opt || '');
+                        setPaymentTerm(opt);
+                      }
                     }}
                     renderInModal={true}
                     inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                   // textStyle={inputStyles.input}
                   />
                 </View>
+                {errors.PaymentTerm && (touched.PaymentTerm || submitCount > 0) ? (
+                  <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.PaymentTerm}</Text>
+                ) : null}
               </View>
               <View style={styles.col}>
                 <Text style={inputStyles.label}>payment Method* </Text>
@@ -1704,24 +1803,34 @@ const AddPurchaseQuotation = () => {
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
                     placeholder="Payment Method"
-                    value={paymentMethod}
+                    value={values.PaymentMethod || ''}
                     options={(paymentMethodOptions && paymentMethodOptions.length) ? paymentMethodOptions : paymentMethods.map(m => ({ label: m, value: m }))}
                     getLabel={p => (p?.label ?? String(p))}
                     getKey={p => (p?.value ?? String(p))}
                     onSelect={opt => {
                       if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
-                      try { const v = opt && (opt.value ?? opt); setPaymentMethod(v); } catch (e) { setPaymentMethod(opt); }
+                      try {
+                        const v = opt && (opt.value ?? opt);
+                        setFieldValue('PaymentMethod', v || '');
+                        setPaymentMethod(v);
+                      } catch (e) {
+                        setFieldValue('PaymentMethod', opt || '');
+                        setPaymentMethod(opt);
+                      }
                     }}
                     renderInModal={true}
                     inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
                   // textStyle={inputStyles.input}
                   />
                 </View>
+                {errors.PaymentMethod && (touched.PaymentMethod || submitCount > 0) ? (
+                  <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.PaymentMethod}</Text>
+                ) : null}
               </View>
             </View>
             <View style={[styles.row, { marginTop: hp(1.5) }]}>
               <View style={styles.attachCol}>
-                <Text style={inputStyles.label}>Upload PQ Document*</Text>
+                <Text style={inputStyles.label}>Upload PQ Document</Text>
                 <View
                   style={[
                     inputStyles.box,
@@ -1733,10 +1842,10 @@ const AddPurchaseQuotation = () => {
                     style={[inputStyles.input, { fontSize: rf(4.2) }]}
                     placeholder="Attach file"
                     placeholderTextColor="#9ca3af"
-                    value={file?.name || ''}
+                    value={values.PQDocument?.name || file?.name || ''}
                     editable={false}
                   />
-                  {file ? (
+                  {values.PQDocument || file ? (
                     <TouchableOpacity
                       activeOpacity={0.85}
                       onPress={removeFile}
@@ -1761,6 +1870,9 @@ const AddPurchaseQuotation = () => {
                     </TouchableOpacity>
                   )}
                 </View>
+                {/* {errors.PQDocument && (touched.PQDocument || submitCount > 0) ? (
+                  <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.PQDocument}</Text>
+                ) : null} */}
                 <Text style={styles.uploadHint}>
                   Allowed: PDF, PNG, JPG • Max size 10 MB
                 </Text>
@@ -1771,12 +1883,7 @@ const AddPurchaseQuotation = () => {
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => {
-                  const shouldUpdate = (isEditingHeader || (headerResponse?.UUID && headerEditable));
-                  if (shouldUpdate) {
-                    updateHeader();
-                  } else {
-                    submitHeader();
-                  }
+                  submitForm();
                 }}
                 style={{
                   backgroundColor: COLORS.primary,
@@ -1795,7 +1902,10 @@ const AddPurchaseQuotation = () => {
                 )}
               </TouchableOpacity>
             </View>
-          </AccordionSection>
+                </AccordionSection>
+              );
+            }}
+          </Formik>
 
           {/* Section 2: Billing Address */}
           {/* <AccordionSection
