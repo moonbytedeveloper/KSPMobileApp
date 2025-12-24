@@ -2362,10 +2362,11 @@ const AddSalesPerfomaInvoice = () => {
                                             activeOpacity={0.8}
                                             style={[
                                                 styles.addBtn,
-                                                { backgroundColor: (isAddingLine || (selectedProjectData?.IsTimesheetBased && !(currentItem.employeeUuid || currentItem.employeeName))) ? COLORS.primary : COLORS.primary },
+                                                (isAddingLine || (!(selectedProjectData?.IsTimesheetBased ? (currentItem.employeeUuid || currentItem.employeeName) : (currentItem.itemName || currentItem.itemNameUuid)))) ? { opacity: 1 } : null,
+                                                { backgroundColor: COLORS.primary },
                                             ]}
                                             onPress={handleAddLineItem}
-                                            disabled={isAddingLine || (selectedProjectData?.IsTimesheetBased && !(currentItem.employeeUuid || currentItem.employeeName))}
+                                            disabled={isAddingLine || (!(selectedProjectData?.IsTimesheetBased ? (currentItem.employeeUuid || currentItem.employeeName) : (currentItem.itemName || currentItem.itemNameUuid)))}
                                         >
                                             {isAddingLine ? (
                                                 <ActivityIndicator size="small" color="#fff" />

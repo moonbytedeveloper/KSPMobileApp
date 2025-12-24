@@ -1261,9 +1261,12 @@ const AddSalesInquiry = () => {
                             <View style={styles.addButtonWrapper}>
                                 <TouchableOpacity
                                     activeOpacity={0.8}
-                                    style={styles.addButton}
+                                    style={[
+                                        styles.addButton,
+                                        (lineAdding || !currentItem.itemType || !currentItem.itemName || !currentItem.quantity || !currentItem.unit) ? { opacity: 1 } : null
+                                    ]}
                                     onPress={handleAddItem}
-                                    disabled={lineAdding}
+                                    disabled={lineAdding || !currentItem.itemType || !currentItem.itemName || !currentItem.quantity || !currentItem.unit}
                                 >
                                     <Text style={styles.addButtonText}>{editLineItemId ? (lineAdding ? 'Updating...' : 'Update') : (lineAdding ? 'Adding...' : 'Add')}</Text>
                                 </TouchableOpacity>

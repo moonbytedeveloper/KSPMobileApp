@@ -2332,7 +2332,7 @@ const AddSalesInvoice = () => {
                                                 }}
                                                 renderInModal={true}
                                                 inputBoxStyle={[inputStyles.box, { width: '100%' }]}
-                                                textStyle={inputStyles.input}
+                                                // textStyle={inputStyles.input}
                                             />
                                         </View>
                                     </View>
@@ -2410,9 +2410,13 @@ const AddSalesInvoice = () => {
                                     <View style={{ flexDirection: 'row' }}>
                                         <TouchableOpacity
                                             activeOpacity={0.8}
-                                            style={[styles.addBtn, { backgroundColor: COLORS.primary }]}
+                                            style={[
+                                                styles.addBtn,
+                                                (isAddingLine || (!(showTimesheetDates ? (currentItem.employeeUuid || currentItem.employeeName) : (currentItem.itemName || currentItem.itemNameUuid)))) ? { opacity: 1 } : null,
+                                                { backgroundColor: COLORS.primary },
+                                            ]}
                                             onPress={handleAddLineItem}
-                                            disabled={isAddingLine}
+                                            disabled={isAddingLine || (!(showTimesheetDates ? (currentItem.employeeUuid || currentItem.employeeName) : (currentItem.itemName || currentItem.itemNameUuid)))}
                                         >
                                             {isAddingLine ? (
                                                 <ActivityIndicator size="small" color="#fff" />

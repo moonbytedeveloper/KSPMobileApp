@@ -2045,9 +2045,13 @@ const AddPurchaseInvoice = () => {
                                     <View style={{ flexDirection: 'row' }}>
                                         <TouchableOpacity
                                             activeOpacity={0.8}
-                                            style={[styles.addBtn, { backgroundColor: COLORS.primary }]}
+                                            style={[
+                                                styles.addBtn,
+                                                (isAddingLine || !(currentItem.itemName || currentItem.itemNameUuid)) ? { opacity: 1 } : null,
+                                                { backgroundColor: COLORS.primary },
+                                            ]}
                                             onPress={handleAddLineItem}
-                                            disabled={isAddingLine}
+                                            disabled={isAddingLine || !(currentItem.itemName || currentItem.itemNameUuid)}
                                         >
                                             {isAddingLine ? (
                                                 <ActivityIndicator size="small" color="#fff" />
