@@ -1187,6 +1187,28 @@ const AddPurchaseQuotation = () => {
     return () => { mounted = false; };
   }, []);
 
+  // When purchaseQuotationNumbers load, if we have a prefilling header, ensure
+  // headerForm.companyName matches one of the loaded options (case-insensitive)
+  // so the Dropdown shows the friendly label instead of a raw/unmatched value.
+  useEffect(() => {
+    try {
+      if (!headerResponse) return;
+      if (!Array.isArray(purchaseQuotationNumbers) || purchaseQuotationNumbers.length === 0) return;
+      const incoming = headerResponse.Inquiry_No || headerResponse.InquiryNo || headerResponse.PurchaseRequestNumber || headerResponse.PurchaseRequestNo || headerResponse.companyName || headerResponse.InquiryNumber || headerForm.companyName || '';
+      if (!incoming) return;
+      const candidate = String(incoming).trim();
+      const found = purchaseQuotationNumbers.find(p => String(p).trim().toLowerCase() === candidate.toLowerCase());
+      if (found) {
+        setHeaderForm(s => ({ ...s, companyName: found }));
+      } else {
+        // keep incoming value as fallback
+        setHeaderForm(s => ({ ...s, companyName: incoming }));
+      }
+    } catch (e) {
+      /* ignore */
+    }
+  }, [purchaseQuotationNumbers, headerResponse]);
+
   // Fetch payment terms for dropdown
   useEffect(() => {
     let mounted = true;
@@ -1507,7 +1529,7 @@ const AddPurchaseQuotation = () => {
           title="Add Quotation Order"
           onLeftPress={() => {
             navigation.goBack();
-          }}
+          }}  
         />
         <View style={styles.headerSeparator} />
         <ScrollView

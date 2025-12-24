@@ -5,6 +5,7 @@ import {
     Text,
     StyleSheet,
     TextInput,
+    useColorScheme,
     TouchableOpacity,
     ScrollView,
     Alert,
@@ -116,6 +117,8 @@ const AddSalesPerfomaInvoice = () => {
         textLight: COLORS.textLight,
         bg: '#fff',
     };
+    const colorScheme = useColorScheme && useColorScheme();
+    const inputTextColor = colorScheme === 'dark' ? '#ffffff' : COLORS.text;
     const paymentMethods = [
         'Cash',
         'Bank Transfer',
@@ -2122,7 +2125,16 @@ const AddSalesPerfomaInvoice = () => {
                                         value={String(discount)}
                                         onChangeText={setDiscount}
                                         keyboardType="numeric"
-                                        style={styles.inputBox}
+                                        placeholder="0.00"
+                                        placeholderTextColor={colorScheme === 'dark' ? '#bbbbbb' : COLORS.textLight}
+                                        selectionColor={inputTextColor}
+                                        style={[
+                                            styles.inputBox,
+                                            {
+                                                color: '#000',
+                                                borderColor: colorScheme === 'dark' ? '#444' : '#ccc',
+                                            },
+                                        ]}
                                     />
                                 </View>
 
