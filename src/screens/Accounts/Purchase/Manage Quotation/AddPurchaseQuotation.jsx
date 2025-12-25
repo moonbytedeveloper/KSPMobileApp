@@ -24,7 +24,7 @@ import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
-import { getPurchasequotationVendor, getItems, postAddPurchaseQuotationHeader, addPurchaseOrder, updatePurchaseOrder, updatePurchaseQuotationHeader, addPurchaseQuotationLine, updatePurchaseQuotationLine, deletePurchaseQuotationLine, getPurchaseOrderLines, fetchProjects, getPurchaseQuotationHeaderById, uploadFiles } from '../../../../api/authServices';
+import { getPurchasequotationVendor, getItems, postAddPurchaseQuotationHeader, updatePurchaseQuotationHeader, addPurchaseQuotationLine, updatePurchaseQuotationLine, deletePurchaseQuotationLine, getPurchaseOrderLines, fetchProjects, getPurchaseQuotationHeaderById, uploadFiles } from '../../../../api/authServices';
 import { publish } from '../../../../utils/eventBus';
 import { getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { pick, types, isCancel } from '@react-native-documents/picker';
@@ -193,6 +193,8 @@ const AddPurchaseQuotation = () => {
   const [isAddingLine, setIsAddingLine] = useState(false);
   const [headerSaved, setHeaderSaved] = useState(false);
   const [headerResponse, setHeaderResponse] = useState(null);
+  console.log(headerResponse,'909090');
+  
   // Table controls
   const [tableSearch, setTableSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -1463,7 +1465,8 @@ const AddPurchaseQuotation = () => {
           purchaseQuotationNumber: hdr.QuotationNo || hdr.QuotationNumber || hdr.Quotation || hdr.QuotationNo || s.purchaseQuotationNumber || '',
         }));
 
-        setVendor(hdr.VendorName || hdr.Vendor || hdr.CustomerName || hdr.Vendor_UUID || hdr.VendorUUID || '');
+        // Prefer server UUIDs for vendor binding; fall back to readable name only if UUID not present
+        setVendor(hdr.Vendor_UUID || hdr.VendorUUID || hdr.VendorId || hdr.Vendor || hdr.VendorName || hdr.CustomerName || '');
 
         // Set project name for display and UUID for API
         const projectDisplayName = hdr.ProjectName || hdr.Project || hdr.ProjectTitle || '';
@@ -1503,6 +1506,8 @@ const AddPurchaseQuotation = () => {
         setIsPrefilling(true);
         const resp = await getPurchaseQuotationHeaderById({ headerUuid });
         const data = resp?.Data || resp || null;
+        console.log('getPurchaseQuotationHeaderById -> header UUID:',data);
+        
         if (!mounted || !data) return;
           console.log('getPurchaseQuotationHeaderById -> header UUID:', data?.UUID || data?.Uuid || data?.Id || data?.HeaderUUID || null);
         // reuse existing prefill logic used for route.headerData
@@ -1520,7 +1525,8 @@ const AddPurchaseQuotation = () => {
           purchaseQuotationNumber: data.QuotationNo || data.QuotationNumber || data.Quotation || data.QuotationNo || s.purchaseQuotationNumber || '',
         }));
 
-        setVendor(data.VendorName || data.Vendor || data.CustomerName || data.Vendor_UUID || data.VendorUUID || '');
+        // Prefer server UUIDs for vendor binding; fall back to readable name only if UUID not present
+        setVendor(data.Vendor_UUID || data.VendorUUID || data.VendorId || data.Vendor || data.VendorName || data.CustomerName || '');
         const projectDisplayName = data.ProjectName || data.Project || data.ProjectTitle || '';
         const projectId = data.ProjectUUID || data.Project_Id || data.ProjectId || '';
         setProjectName(projectDisplayName);

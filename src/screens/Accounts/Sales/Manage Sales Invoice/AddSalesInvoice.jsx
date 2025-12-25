@@ -715,6 +715,81 @@ const AddSalesInvoice = () => {
         })();
     }, [route?.params?.headerUuid, route?.params?.HeaderUUID, route?.params?.UUID]);
 
+    // When a header UUID is present (either from prefill or user selection),
+    // fetch the sales invoice lines for that header so the items table is populated.
+    useEffect(() => {
+        if (!headerUUID) return;
+        let mounted = true;
+
+        const extractApiMessage = (resp, err) => {
+            if (resp) {
+                if (typeof resp === 'string') return resp;
+                if (resp?.Message) return resp.Message;
+                if (resp?.message) return resp.message;
+                if (resp?.Error) return resp.Error;
+                if (resp?.error) return resp.error;
+                if (resp?.StatusMessage) return resp.StatusMessage;
+                if (resp?.Data && typeof resp.Data === 'string') return resp.Data;
+            }
+            if (err) {
+                if (err?.response?.data) return extractApiMessage(err.response.data);
+                return err?.message || String(err);
+            }
+            return null;
+        };
+
+        (async () => {
+            try {
+                setLinesLoading(true);
+                const cmp = await getCMPUUID();
+                const env = await getENVUUID();
+                const linesResp = await getSalesInvoiceLines({ headerUuid: headerUUID, cmpUuid: cmp, envUuid: env, start: 0, length: 1000 });
+
+                // If API returned an error payload, surface its message to the user
+                const possibleMsg = extractApiMessage(linesResp, null);
+                const isErrorResp = !!(linesResp && (linesResp?.Success === false || linesResp?.IsSuccess === false || linesResp?.Status === 'Error' || linesResp?.Status === 'error' || linesResp?.Error || linesResp?.error || (possibleMsg && !linesResp?.Data)));
+                if (isErrorResp && possibleMsg) {
+                    Alert.alert('Error', possibleMsg);
+                    if (mounted) setLinesLoading(false);
+                    return;
+                }
+
+                const rawLines = linesResp?.Data?.Records || linesResp?.Data || linesResp || [];
+                const list = Array.isArray(rawLines) ? rawLines : [];
+                const normalizedLines = list.map((l, idx) => {
+                    const qty = (l?.Quantity ?? l?.Qty ?? l?.quantity ?? 1);
+                    const rate = (l?.Rate ?? l?.RateAmount ?? l?.Price ?? 0);
+                    const amount = (l?.Amount ?? l?.Total ?? (Number(qty || 0) * Number(rate || 0)));
+                    return {
+                        id: idx + 1,
+                        selectedItem: null,
+                        name: l?.ItemName || l?.Name || l?.Item || l?.ItemTitle || String(l?.RawItem || '') || '',
+                        sku: l?.ItemCode || l?.SKU || l?.Sku || null,
+                        itemUuid: l?.ItemUUID || l?.ItemId || l?.Item || null,
+                        rate: String(rate ?? 0),
+                        desc: l?.Description || l?.Desc || '',
+                        hsn: l?.HSN || l?.HSNCode || '',
+                        qty: String(qty ?? 1),
+                        tax: l?.TaxType || l?.Tax || 'IGST',
+                        amount: String(Number(amount || 0).toFixed(2)),
+                        serverLineUuid: l?.UUID || l?.Id || l?.LineUUID || null,
+                    };
+                });
+                if (mounted) {
+                    if (normalizedLines.length > 0) setItems(normalizedLines);
+                }
+            } catch (e) {
+                const errMsg = extractApiMessage(null, e) || 'Failed to fetch invoice lines';
+                Alert.alert('Error', errMsg);
+                console.warn('Failed to fetch sales invoice lines for headerUUID', errMsg);
+            } finally {
+                if (mounted) setLinesLoading(false);
+            }
+        })();
+
+        return () => { mounted = false; };
+    }, [headerUUID]);
+
     // Map Sales Inquiry UUID to InquiryNo when options are loaded (for edit mode and prefill mode)
     useEffect(() => {
         console.log('🔄 AddSalesInvoice: Sales Inquiry mapping useEffect triggered');
@@ -1545,7 +1620,9 @@ const AddSalesInvoice = () => {
             setHeaderSubmitting(false);
         }
     };
-    const onCancel = () => { };
+    const onCancel = () => { 
+        navigation.goBack();
+    };
 
     const uiDateToApiDate = uiDateStr => {
         if (!uiDateStr) return '';
@@ -1862,11 +1939,11 @@ const AddSalesInvoice = () => {
                             </View>
 
                             <View style={styles.col}>
-                                <Text style={[inputStyles.label]}>Sales Order No* </Text>
+                                <Text style={[inputStyles.label]}>Sales Order No </Text>
 
                                 <View style={{ zIndex: 9997, elevation: 19 }}>
                                     <Dropdown
-                                        placeholder="Sales Order No.*"
+                                        placeholder="Sales Order No."
                                         value={salesOrderUuid || headerForm.salesOrderNo}
                                         options={salesOrderOptions}
                                         getLabel={so => (so?.OrderNo || so?.SalesOrderNo || so?.SalesOrderNumber || String(so))}
@@ -2507,7 +2584,7 @@ const AddSalesInvoice = () => {
                             <View>
                                 <View style={styles.tableControlsRow}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                        <Text style={{ marginRight: wp(2) }}>Show</Text>
+                                        <Text style={{ marginRight: wp(2) , color: '#000000' }}>Show</Text>
                                         <Dropdown
                                             placeholder={String(pageSize)}
                                             value={String(pageSize)}
@@ -2518,12 +2595,12 @@ const AddSalesInvoice = () => {
                                             inputBoxStyle={{ width: wp(18) }}
                                             textStyle={inputStyles.input}
                                         />
-                                        <Text style={{ marginLeft: wp(2) }}>entries</Text>
+                                        <Text style={{ marginLeft: wp(2) , color: '#000000'}}>entries</Text>
                                     </View>
 
                                     <View style={{ flex: 1, alignItems: 'flex-end' }}>
                                         <TextInput
-                                            style={[inputStyles.box, { width: wp(40), height: hp(5), paddingHorizontal: wp(2) }]}
+                                            style={[inputStyles.box, { width: wp(40), height: hp(5), paddingHorizontal: wp(2), color:'#000000' }]}
                                             placeholder="Search..."
                                             value={tableSearch}
                                             onChangeText={t => { setTableSearch(t); setPage(1); }}
@@ -2611,7 +2688,7 @@ const AddSalesInvoice = () => {
                                                         ))}
 
                                                         <View style={styles.paginationRow}>
-                                                            <Text style={{ color: COLORS.textMuted }}>
+                                                            <Text style={{ color: '#000000' }}>
                                                                 Showing {total === 0 ? 0 : start + 1} to {end} of {total} entries
                                                             </Text>
                                                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -2707,7 +2784,7 @@ const AddSalesInvoice = () => {
                                     value={adjustmentLabel}
                                     onChangeText={setAdjustmentLabel}
                                     underlineColorAndroid="transparent"
-                                    style={styles.labelInput}
+                                    style={[styles.labelInput, { color: '#000000' }]}
                                 />
 
                                 <View style={styles.inputRightGroup}>
@@ -2826,7 +2903,7 @@ const AddSalesInvoice = () => {
                             <View style={styles.notesCol}>
                                 <Text style={inputStyles.label}>Notes</Text>
                                 <TextInput
-                                    style={styles.noteBox}
+                                    style={[styles.noteBox, { color: '#000000' }]}
                                     multiline
                                     numberOfLines={4}
                                     value={notes}
@@ -2838,7 +2915,7 @@ const AddSalesInvoice = () => {
                             <View style={styles.notesCol}>
                                 <Text style={inputStyles.label}>Terms & Conditions</Text>
                                 <TextInput
-                                    style={styles.noteBox}
+                                    style={[styles.noteBox, { color: '#000000' }]}
                                     multiline
                                     numberOfLines={4}
                                     value={terms}

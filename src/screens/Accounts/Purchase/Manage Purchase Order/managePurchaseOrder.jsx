@@ -24,7 +24,7 @@ import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
-import { addPurchaseOrder, updatePurchaseOrder, addPurchaseOrderLine, updatePurchaseOrderLine, getVendors, getCountries, getStates, getCities, getPaymentTerms, getPaymentMethods, fetchProjects, getAllPurchaseInquiryNumbers, getPurchaseOrderHeaderById, getPurchaseOrderHeaders, getItems, getPurchaseOrderLines, deletePurchaseOrderLine } from '../../../../api/authServices';
+import { addPurchaseOrder, updatePurchaseOrder, addPurchaseOrderLine, updatePurchaseOrderLine, getVendors, getCountries, getStates, getCities, getPaymentTerms, getPaymentMethods, fetchProjects, getAllPurchaseInquiryNumbers, getPurchaseOrderHeaderById, getPurchaseOrderHeaders, getItems, getPurchaseOrderLines, deletePurchaseOrderLine, uploadFiles } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 
@@ -94,7 +94,7 @@ const HeaderValidationSchema = Yup.object().shape({
   DeliveryDate: Yup.string().trim().required('Delivery date is required'),
 });
 
-const ManageSalesOrder = () => {
+const ManagePurchaseOrder = () => {
   const [expandedIds, setExpandedIds] = useState([1]);
   const navigation = useNavigation();
   const toggleSection = id => setExpandedIds(prev => {
@@ -102,7 +102,7 @@ const ManageSalesOrder = () => {
     if (has) return (Array.isArray(prev) ? prev.filter(x => x !== id) : []);
     return Array.isArray(prev) ? [...prev, id] : [id];
   });
-   const screenTheme = { 
+  const screenTheme = {
     text: COLORS.text,
     textLight: COLORS.textLight,
     bg: '#fff',
@@ -116,7 +116,7 @@ const ManageSalesOrder = () => {
         setMasterItemsLoading(true);
         const c = await getCMPUUID();
         const e = await getENVUUID();
-        const resp = await getItems({ cmpUuid: c, envUuid: e, mode:"Purchase" });
+        const resp = await getItems({ cmpUuid: c, envUuid: e, mode: "Purchase" });
         const rawList = resp?.Data?.Records || resp?.Data || resp || [];
         const list = Array.isArray(rawList) ? rawList : [];
         const normalized = list.map(it => ({
@@ -193,6 +193,7 @@ const ManageSalesOrder = () => {
   const [serverTotalAmount, setServerTotalAmount] = useState('');
   const [linesLoading, setLinesLoading] = useState(false);
   const [file, setFile] = useState(null);
+  const [uploadedFilePath, setUploadedFilePath] = useState('');
   const formikSetFieldValueRef = useRef(null);
   const formikSubmitRef = useRef(null);
   const [showShippingTip, setShowShippingTip] = useState(false);
@@ -803,7 +804,7 @@ const ManageSalesOrder = () => {
         ShippingCityUUID: resolveCityUuid(shippingForm.city),
         // Discount entered on the UI (labelled 'Discount') is stored in `shippingCharges`
         Discount: parseFloat(shippingCharges) || 0,
-        FilePath: file?.path || file?.uri || '',
+        FilePath: uploadedFilePath || file?.path || '',
 
         // SubTotal: subtotalNum,
         // TotalTax: totalTaxNum,
@@ -1458,6 +1459,49 @@ const ManageSalesOrder = () => {
     return sum.toFixed(2);
   };
 
+  // Render numbered page buttons (with simple ellipses for long ranges)
+  const renderPageButtons = (currentPage, totalPages) => {
+    if (!totalPages || totalPages <= 1) return null;
+    const buttons = [];
+    const pushPage = (p) => {
+      buttons.push(
+        <TouchableOpacity
+          key={`p-${p}`}
+          style={[styles.pageButton, currentPage === p && styles.pageButtonActive, { marginHorizontal: wp(0.8) }]}
+          onPress={() => setPage(p)}
+          disabled={currentPage === p}
+        >
+          <Text style={[styles.pageButtonText, currentPage === p && styles.pageButtonTextActive]}>{String(p)}</Text>
+        </TouchableOpacity>
+      );
+    };
+
+    // If few pages, show all
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pushPage(i);
+      return buttons;
+    }
+
+    // Always show first
+    pushPage(1);
+    let left = Math.max(2, currentPage - 1);
+    let right = Math.min(totalPages - 1, currentPage + 1);
+
+    if (left > 2) {
+      buttons.push(<Text key="ell-left" style={{ marginHorizontal: wp(1) }}>...</Text>);
+    }
+
+    for (let i = left; i <= right; i++) pushPage(i);
+
+    if (right < totalPages - 1) {
+      buttons.push(<Text key="ell-right" style={{ marginHorizontal: wp(1) }}>...</Text>);
+    }
+
+    // Always show last
+    pushPage(totalPages);
+    return buttons;
+  };
+
   const addItem = () => {
     setItems(prev => {
       const nextId = prev.length ? prev[prev.length - 1].id + 1 : 1;
@@ -1810,7 +1854,7 @@ const ManageSalesOrder = () => {
         ShippingStateUUID: shippingForm.state || '',
         ShippingCityUUID: resolveCityUuid(shippingForm.city),
         Discount: parseFloat(adjustments) || 0,
-        FilePath: file?.path || file?.uri || '',
+        FilePath: uploadedFilePath || file?.path || '',
       };
 
       console.log('Final Submit payload ->', payload);
@@ -1843,7 +1887,7 @@ const ManageSalesOrder = () => {
       setIsSavingHeader(false);
     }
   };
-  const onCancel = () => { 
+  const onCancel = () => {
     navigation.goBack();
   };
 
@@ -1887,13 +1931,53 @@ const ManageSalesOrder = () => {
           return;
         }
 
-        // Set the selected file
-        setFile({
-          name: selectedFile.name,
-          uri: selectedFile.uri,
-          type: selectedFile.type,
+        // Set the selected file for UI
+        const fileObj = {
+          name: selectedFile.name || selectedFile.fileName || 'attachment',
+          uri: selectedFile.uri || selectedFile.fileUri || selectedFile.uriString,
+          type: selectedFile.type || selectedFile.mime || 'application/octet-stream',
           size: selectedFile.size,
-        });
+        };
+        setFile(fileObj);
+
+        // Immediately upload the picked file to CompanySetup/upload-file with fixed filepath
+        try {
+          const uploadResp = await uploadFiles(fileObj, { filepath: 'PurchaseOrderDocuments' });
+          console.log('uploadFiles response (PurchaseOrderDocuments):', uploadResp);
+          const upData = uploadResp?.Data || uploadResp || {};
+          const uploaded = upData?.Files || upData?.files || upData?.UploadedFiles || upData?.FilePaths || upData || [];
+          const finalRefs = Array.isArray(uploaded) ? uploaded : (uploaded ? [uploaded] : []);
+          // pick first path
+          const first = finalRefs[0] || {};
+          const remotePath = first?.RemoteResponse?.path || first?.path || first?.filePath || first?.FilePath || null;
+          if (remotePath) {
+            setUploadedFilePath(remotePath);
+            // If header already exists on server, immediately update header to include FilePath
+            try {
+              const routeUuid = route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.UUID || '';
+              const existingHeaderUuid = headerResponse?.UUID || headerResponse?.Uuid || headerResponse?.Id || headerResponse?.HeaderUUID || headerResponse?.HeaderId || routeUuid || '';
+              if (existingHeaderUuid) {
+                const updPayload = { UUID: existingHeaderUuid, FilePath: remotePath };
+                (async () => {
+                  try {
+                    const updResp = await updatePurchaseOrder(updPayload);
+                    console.log('updatePurchaseOrder (FilePath) resp ->', updResp);
+                    setHeaderResponse(updResp?.Data || updResp || headerResponse);
+                  } catch (uErr) {
+                    console.warn('Failed to update header with FilePath', uErr);
+                  }
+                })();
+              }
+            } catch (e) { console.warn('update header on upload error', e); }
+          } else {
+            console.warn('uploadFiles did not return path key', finalRefs);
+          }
+        } catch (uErr) {
+          console.warn('uploadFiles (PurchaseOrderDocuments) failed', uErr);
+          Alert.alert('Upload Error', 'Unable to upload the selected file. Please try again.');
+          setFile(null);
+          setUploadedFilePath('');
+        }
       }
     } catch (err) {
       if (isCancel && isCancel(err)) {
@@ -1905,6 +1989,7 @@ const ManageSalesOrder = () => {
 
   const removeFile = () => {
     setFile(null);
+    setUploadedFilePath('');
   };
 
   return (
@@ -1941,7 +2026,7 @@ const ManageSalesOrder = () => {
               setPaymentMethod(values.PaymentMethod || '');
               setPaymentMethodUUID(values.PaymentMethodUUID || null);
               setInvoiceDate(values.DeliveryDate || '');
-              
+
               // Call the submit handler
               try {
                 await saveHeader();
@@ -1971,237 +2056,237 @@ const ManageSalesOrder = () => {
                     </View>
                   ) : null}
                 >
-            <View style={styles.row}>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Purchase Inquiry No.</Text>
+                  <View style={styles.row}>
+                    <View style={styles.col}>
+                      <Text style={inputStyles.label}>Purchase Inquiry No.</Text>
 
-                {/* <Text style={[inputStyles.label, { fontWeight: '600' }]}>Sales Inquiry No.</Text> */}
-                {headerSaved && !isEditingHeader ? (
-                  <View style={[inputStyles.box]}>
-                    <Text style={inputStyles.input}>{renderLabel(SalesInquiryNo || headerForm.SalesInquiryUUID, ['InquiryNo', 'Name'])}</Text>
-                  </View>
-                ) : (
-                  <Dropdown
-                    placeholder="Purchase Inquiry No."
-                    value={headerForm.SalesInquiryUUID || SalesInquiryNo}
-                    options={SalesInquiryNosOptions}
-                    getLabel={c => (c?.InquiryNo || c?.Name || String(c))}
-                    getKey={c => (c?.UUID || c?.Id || c)}
-                    onSelect={v => {
-                      setSalesInquiry(v?.InquiryNo || String(v));
-                      // store the most likely UUID candidate(s) returned by the option
-                      const candidateUuid = v?.UUID || v?.Uuid || v?.Id || v?.InquiryUUID || v?.SalesInqNoUUID || v?.SalesInquiryUUID || v;
-                      setHeaderForm(s => ({ ...s, SalesInquiryUUID: candidateUuid }));
-                    }}
-                    inputBoxStyle={inputStyles.box}
-                    // textStyle={inputStyles.input}
-                  />
-                )}
-              </View>
-
-
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Vendor Name* </Text>
-
-                {/* <Text style={inputStyles.label}>Customer Name*</Text> */}
-                {headerSaved && !isEditingHeader ? (
-                  <View style={[inputStyles.box]}>
-                    <Text style={inputStyles.input}>{renderLabel(headerForm.CustomerName, ['CustomerName', 'Name', 'DisplayName'])}</Text>
-                  </View>
-                ) : (
-                  <Dropdown
-                    placeholder="Vendor Name*"
-                    value={values.VendorUUID || values.VendorName || ''}
-                    options={customersOptions}
-                    getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
-                    getKey={c => (c?.UUID || c?.Id || c)}
-                    onSelect={v => {
-                      if (v && typeof v === 'object') {
-                        const vendorName = v?.CustomerName || v?.Name || v || '';
-                        const vendorUuid = v?.UUID || v?.Id || null;
-                        setFieldValue('VendorName', vendorName);
-                        setFieldValue('VendorUUID', vendorUuid || '');
-                        setHeaderForm(s => ({
-                          ...s,
-                          CustomerName: vendorName,
-                          CustomerUUID: vendorUuid,
-                        }));
-                      } else {
-                        setFieldValue('VendorName', v || '');
-                        setFieldValue('VendorUUID', '');
-                        setHeaderForm(s => ({
-                          ...s,
-                          CustomerName: v,
-                          CustomerUUID: null,
-                        }));
-                      }
-                    }}
-                    inputBoxStyle={inputStyles.box}
-                    // textStyle={inputStyles.input}
-                  />
-                )}
-                {errors.VendorName && (touched.VendorName || submitCount > 0) ? (
-                  <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.VendorName}</Text>
-                ) : null}
-              </View>
-            </View>
-
-            <View style={[styles.row, { marginTop: hp(1.5) }]}>
-              {/* Purchase Order Number - Only shown in edit mode, auto-generated from server response */}
-
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Project Name </Text>
-
-                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
-                <View style={{ zIndex: 9998, elevation: 20 }}>
-                  {headerSaved && !isEditingHeader ? (
-                    <View style={[inputStyles.box]}>
-                      <Text style={inputStyles.input}>{renderLabel(project || projectUUID, ['ProjectTitle', 'Name'])}</Text>
+                      {/* <Text style={[inputStyles.label, { fontWeight: '600' }]}>Sales Inquiry No.</Text> */}
+                      {headerSaved && !isEditingHeader ? (
+                        <View style={[inputStyles.box]}>
+                          <Text style={inputStyles.input}>{renderLabel(SalesInquiryNo || headerForm.SalesInquiryUUID, ['InquiryNo', 'Name'])}</Text>
+                        </View>
+                      ) : (
+                        <Dropdown
+                          placeholder="Purchase Inquiry No."
+                          value={headerForm.SalesInquiryUUID || SalesInquiryNo}
+                          options={SalesInquiryNosOptions}
+                          getLabel={c => (c?.InquiryNo || c?.Name || String(c))}
+                          getKey={c => (c?.UUID || c?.Id || c)}
+                          onSelect={v => {
+                            setSalesInquiry(v?.InquiryNo || String(v));
+                            // store the most likely UUID candidate(s) returned by the option
+                            const candidateUuid = v?.UUID || v?.Uuid || v?.Id || v?.InquiryUUID || v?.SalesInqNoUUID || v?.SalesInquiryUUID || v;
+                            setHeaderForm(s => ({ ...s, SalesInquiryUUID: candidateUuid }));
+                          }}
+                          inputBoxStyle={inputStyles.box}
+                        // textStyle={inputStyles.input}
+                        />
+                      )}
                     </View>
-                  ) : (
-                    <Dropdown
-                      placeholder="Select Project*"
-                      value={projectUUID || project}
-                      options={projectsOptions}
-                      getLabel={p => (p?.Name || p?.ProjectTitle || String(p))}
-                      getKey={p => (p?.Uuid || p?.Id || p)}
-                      onSelect={v => { setProject(v?.ProjectTitle || v), setProjectUUID(v?.Uuid || v); }}
-                      renderInModal={true}
-                      inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                      // textStyle={inputStyles.input}
-                    />
-                  )}
-                </View>
-              </View>
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Payment Term* </Text>
 
-                {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
-                <View style={{ zIndex: 9998, elevation: 20 }}>
-                  {headerSaved && !isEditingHeader ? (
-                    <View style={[inputStyles.box]}>
-                      <Text style={inputStyles.input}>{renderLabel(paymentTerm || paymentTermUuid, ['Name', 'Term'])}</Text>
-                    </View>
-                  ) : (
-                    <Dropdown
-                      placeholder="Select Payment Term*"
-                      value={paymentTermUuid || paymentTerm}
-                      options={paymentTermsOptions}
-                      getLabel={p => (p?.Name || p?.Term || String(p))}
-                      getKey={p => (p?.UUID || p?.Id || p)}
-                      onSelect={v => { setPaymentTerm(v?.Name || v), setPaymentTermUuid(v?.UUID || v) }}
-                      renderInModal={true}
-                      inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                      // textStyle={inputStyles.input}
-                    />
-                  )}
-                </View>
-              </View>
-            </View>
 
-            <View style={[styles.row, { marginTop: hp(1.5) }]}>
+                    <View style={styles.col}>
+                      <Text style={inputStyles.label}>Vendor Name* </Text>
 
-              <View style={styles.col}>
-                <Text style={inputStyles.label}>Payment Method* </Text>
-
-                <View style={{ zIndex: 9998, elevation: 20 }}>
-                  {headerSaved && !isEditingHeader ? (
-                    <View style={[inputStyles.box]}>
-                      <Text style={inputStyles.input}>{renderLabel(paymentMethod || paymentMethodUUID, ['Name', 'Mode'])}</Text>
-                    </View>
-                  ) : (
-                    <Dropdown
-                      placeholder="Payment Method"
-                      value={values.PaymentMethod || ''}
-                      options={paymentMethodsOptions}
-                      getLabel={p => (p?.Name || p?.Mode || String(p))}
-                      getKey={p => (p?.UUID || p?.Id || p)}
-                      onSelect={v => {
-                        if (v && typeof v === 'object') {
-                          const methodName = v?.Name || v?.Mode || String(v) || '';
-                          const methodUuid = v?.UUID || v?.Id || null;
-                          setFieldValue('PaymentMethod', methodName);
-                          setFieldValue('PaymentMethodUUID', methodUuid || '');
-                          setPaymentMethod(methodName);
-                          setPaymentMethodUUID(methodUuid);
-                        } else {
-                          setFieldValue('PaymentMethod', v || '');
-                          setFieldValue('PaymentMethodUUID', '');
-                          setPaymentMethod(v);
-                          setPaymentMethodUUID(null);
-                        }
-                      }}
-                      renderInModal={true}
-                      inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                      // textStyle={inputStyles.input}
-                    />
-                  )}
-                </View>
-                {errors.PaymentMethod && (touched.PaymentMethod || submitCount > 0) ? (
-                  <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.PaymentMethod}</Text>
-                ) : null}
-              </View>
-              <View style={styles.col}>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => openDatePickerFor('invoice')}
-                  style={{ marginTop: hp(0.8) }}
-                >
-                  <Text style={inputStyles.label}>Delivery Date* </Text>
-
-                  <View
-                    style={[
-                      inputStyles.box,
-                      styles.innerFieldBox,
-                      styles.datePickerBox,
-                      { alignItems: 'center' },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        inputStyles.input,
-                        styles.datePickerText,
-                        !values.DeliveryDate && {
-                          color: COLORS.textLight,
-                          fontFamily: TYPOGRAPHY.fontFamilyRegular,
-                        },
-                        values.DeliveryDate && {
-                          color: COLORS.text,
-                          fontFamily: TYPOGRAPHY.fontFamilyMedium,
-                        },
-                      ]}
-                    >
-                      {values.DeliveryDate || 'Delivery Date*'}
-                    </Text>
-                    <View
-                      style={[
-                        styles.calendarIconContainer,
-                        values.DeliveryDate && styles.calendarIconContainerSelected,
-                      ]}
-                    >
-                      <Icon
-                        name="calendar-today"
-                        size={rf(3.2)}
-                        color={values.DeliveryDate ? COLORS.primary : COLORS.textLight}
-                      />
+                      {/* <Text style={inputStyles.label}>Customer Name*</Text> */}
+                      {headerSaved && !isEditingHeader ? (
+                        <View style={[inputStyles.box]}>
+                          <Text style={inputStyles.input}>{renderLabel(headerForm.CustomerName, ['CustomerName', 'Name', 'DisplayName'])}</Text>
+                        </View>
+                      ) : (
+                        <Dropdown
+                          placeholder="Vendor Name*"
+                          value={values.VendorUUID || values.VendorName || ''}
+                          options={customersOptions}
+                          getLabel={c => (c?.CustomerName || c?.Name || c?.DisplayName || String(c))}
+                          getKey={c => (c?.UUID || c?.Id || c)}
+                          onSelect={v => {
+                            if (v && typeof v === 'object') {
+                              const vendorName = v?.CustomerName || v?.Name || v || '';
+                              const vendorUuid = v?.UUID || v?.Id || null;
+                              setFieldValue('VendorName', vendorName);
+                              setFieldValue('VendorUUID', vendorUuid || '');
+                              setHeaderForm(s => ({
+                                ...s,
+                                CustomerName: vendorName,
+                                CustomerUUID: vendorUuid,
+                              }));
+                            } else {
+                              setFieldValue('VendorName', v || '');
+                              setFieldValue('VendorUUID', '');
+                              setHeaderForm(s => ({
+                                ...s,
+                                CustomerName: v,
+                                CustomerUUID: null,
+                              }));
+                            }
+                          }}
+                          inputBoxStyle={inputStyles.box}
+                        // textStyle={inputStyles.input}
+                        />
+                      )}
+                      {errors.VendorName && (touched.VendorName || submitCount > 0) ? (
+                        <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.VendorName}</Text>
+                      ) : null}
                     </View>
                   </View>
-                </TouchableOpacity>
-                {errors.DeliveryDate && (touched.DeliveryDate || submitCount > 0) ? (
-                  <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.DeliveryDate}</Text>
-                ) : null}
-              </View>
-            </View>
-            <View style={[styles.row, { marginTop: hp(1.5) }]}>
-              {(headerSaved || isEditingHeader) && headerForm.SalesOrderNo ? (
-                <View style={styles.col}>
-                  <Text style={inputStyles.label}>Purchase Order Number</Text>
-                  <View style={[inputStyles.box]} pointerEvents="none">
-                    <Text style={[inputStyles.input, { flex: 1, color: COLORS.textLight }]}>{renderLabel(headerForm.SalesOrderNo)}</Text>
+
+                  <View style={[styles.row, { marginTop: hp(1.5) }]}>
+                    {/* Purchase Order Number - Only shown in edit mode, auto-generated from server response */}
+
+                    <View style={styles.col}>
+                      <Text style={inputStyles.label}>Project Name </Text>
+
+                      {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
+                      <View style={{ zIndex: 9998, elevation: 20 }}>
+                        {headerSaved && !isEditingHeader ? (
+                          <View style={[inputStyles.box]}>
+                            <Text style={inputStyles.input}>{renderLabel(project || projectUUID, ['ProjectTitle', 'Name'])}</Text>
+                          </View>
+                        ) : (
+                          <Dropdown
+                            placeholder="Select Project*"
+                            value={projectUUID || project}
+                            options={projectsOptions}
+                            getLabel={p => (p?.Name || p?.ProjectTitle || String(p))}
+                            getKey={p => (p?.Uuid || p?.Id || p)}
+                            onSelect={v => { setProject(v?.ProjectTitle || v), setProjectUUID(v?.Uuid || v); }}
+                            renderInModal={true}
+                            inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                          // textStyle={inputStyles.input}
+                          />
+                        )}
+                      </View>
+                    </View>
+                    <View style={styles.col}>
+                      <Text style={inputStyles.label}>Payment Term* </Text>
+
+                      {/* <Text style={[inputStyles.label, { marginBottom: hp(1.5) }]}>Project Name*</Text> */}
+                      <View style={{ zIndex: 9998, elevation: 20 }}>
+                        {headerSaved && !isEditingHeader ? (
+                          <View style={[inputStyles.box]}>
+                            <Text style={inputStyles.input}>{renderLabel(paymentTerm || paymentTermUuid, ['Name', 'Term'])}</Text>
+                          </View>
+                        ) : (
+                          <Dropdown
+                            placeholder="Select Payment Term*"
+                            value={paymentTermUuid || paymentTerm}
+                            options={paymentTermsOptions}
+                            getLabel={p => (p?.Name || p?.Term || String(p))}
+                            getKey={p => (p?.UUID || p?.Id || p)}
+                            onSelect={v => { setPaymentTerm(v?.Name || v), setPaymentTermUuid(v?.UUID || v) }}
+                            renderInModal={true}
+                            inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                          // textStyle={inputStyles.input}
+                          />
+                        )}
+                      </View>
+                    </View>
                   </View>
-                </View>
-              ) : null}
-              {/* <View style={styles.col}>
+
+                  <View style={[styles.row, { marginTop: hp(1.5) }]}>
+
+                    <View style={styles.col}>
+                      <Text style={inputStyles.label}>Payment Method* </Text>
+
+                      <View style={{ zIndex: 9998, elevation: 20 }}>
+                        {headerSaved && !isEditingHeader ? (
+                          <View style={[inputStyles.box]}>
+                            <Text style={inputStyles.input}>{renderLabel(paymentMethod || paymentMethodUUID, ['Name', 'Mode'])}</Text>
+                          </View>
+                        ) : (
+                          <Dropdown
+                            placeholder="Payment Method"
+                            value={values.PaymentMethod || ''}
+                            options={paymentMethodsOptions}
+                            getLabel={p => (p?.Name || p?.Mode || String(p))}
+                            getKey={p => (p?.UUID || p?.Id || p)}
+                            onSelect={v => {
+                              if (v && typeof v === 'object') {
+                                const methodName = v?.Name || v?.Mode || String(v) || '';
+                                const methodUuid = v?.UUID || v?.Id || null;
+                                setFieldValue('PaymentMethod', methodName);
+                                setFieldValue('PaymentMethodUUID', methodUuid || '');
+                                setPaymentMethod(methodName);
+                                setPaymentMethodUUID(methodUuid);
+                              } else {
+                                setFieldValue('PaymentMethod', v || '');
+                                setFieldValue('PaymentMethodUUID', '');
+                                setPaymentMethod(v);
+                                setPaymentMethodUUID(null);
+                              }
+                            }}
+                            renderInModal={true}
+                            inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                          // textStyle={inputStyles.input}
+                          />
+                        )}
+                      </View>
+                      {errors.PaymentMethod && (touched.PaymentMethod || submitCount > 0) ? (
+                        <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.PaymentMethod}</Text>
+                      ) : null}
+                    </View>
+                    <View style={styles.col}>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => openDatePickerFor('invoice')}
+                        style={{ marginTop: hp(0.8) }}
+                      >
+                        <Text style={inputStyles.label}>Delivery Date* </Text>
+
+                        <View
+                          style={[
+                            inputStyles.box,
+                            styles.innerFieldBox,
+                            styles.datePickerBox,
+                            { alignItems: 'center' },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              inputStyles.input,
+                              styles.datePickerText,
+                              !values.DeliveryDate && {
+                                color: COLORS.textLight,
+                                fontFamily: TYPOGRAPHY.fontFamilyRegular,
+                              },
+                              values.DeliveryDate && {
+                                color: COLORS.text,
+                                fontFamily: TYPOGRAPHY.fontFamilyMedium,
+                              },
+                            ]}
+                          >
+                            {values.DeliveryDate || 'Delivery Date*'}
+                          </Text>
+                          <View
+                            style={[
+                              styles.calendarIconContainer,
+                              values.DeliveryDate && styles.calendarIconContainerSelected,
+                            ]}
+                          >
+                            <Icon
+                              name="calendar-today"
+                              size={rf(3.2)}
+                              color={values.DeliveryDate ? COLORS.primary : COLORS.textLight}
+                            />
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                      {errors.DeliveryDate && (touched.DeliveryDate || submitCount > 0) ? (
+                        <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.DeliveryDate}</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                  <View style={[styles.row, { marginTop: hp(1.5) }]}>
+                    {(headerSaved || isEditingHeader) && headerForm.SalesOrderNo ? (
+                      <View style={styles.col}>
+                        <Text style={inputStyles.label}>Purchase Order Number</Text>
+                        <View style={[inputStyles.box]} pointerEvents="none">
+                          <Text style={[inputStyles.input, { flex: 1, color: COLORS.textLight }]}>{renderLabel(headerForm.SalesOrderNo)}</Text>
+                        </View>
+                      </View>
+                    ) : null}
+                    {/* <View style={styles.col}>
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => openDatePickerFor('due')}
@@ -2248,7 +2333,7 @@ const ManageSalesOrder = () => {
                   </View>
                 </TouchableOpacity>
               </View> */}
-            </View>
+                  </View>
                 </AccordionSection>
               );
             }}
@@ -2606,7 +2691,7 @@ const ManageSalesOrder = () => {
                         }}
                         renderInModal={true}
                         inputBoxStyle={[inputStyles.box, { width: '100%' }]}
-                        // textStyle={inputStyles.input}
+                      // textStyle={inputStyles.input}
                       />
                     </View>
                   </View>
@@ -2721,7 +2806,7 @@ const ManageSalesOrder = () => {
                 <View>
                   <View style={styles.tableControlsRow}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={{ marginRight: wp(2), color: screenTheme.text  }}>Show</Text>
+                      <Text style={{ marginRight: wp(2), color: screenTheme.text }}>Show</Text>
                       <Dropdown
                         placeholder={String(pageSize)}
                         value={String(pageSize)}
@@ -2730,14 +2815,14 @@ const ManageSalesOrder = () => {
                         getKey={p => String(p)}
                         onSelect={v => { setPageSize(Number(v)); setPage(1); }}
                         inputBoxStyle={{ width: wp(18) }}
-                        // textStyle={inputStyles.input}
+                      // textStyle={inputStyles.input}
                       />
-                      <Text style={{ marginLeft: wp(2), color: screenTheme.text  }}>entries</Text>
+                      <Text style={{ marginLeft: wp(2), color: screenTheme.text }}>entries</Text>
                     </View>
 
                     <View style={{ flex: 1, alignItems: 'flex-end' }}>
                       <TextInput
-                        style={[inputStyles.box, { width: wp(40), height: hp(5), paddingHorizontal: wp(2) }]}
+                        style={[inputStyles.box, {color:'#000000', width: wp(40), height: hp(5), paddingHorizontal: wp(2) }]}
                         placeholder="Search..."
                         value={tableSearch}
                         onChangeText={t => { setTableSearch(t); setPage(1); }}
@@ -2757,14 +2842,14 @@ const ManageSalesOrder = () => {
                       <View style={styles.table}>
                         <View style={styles.thead}>
                           <View style={styles.tr}>
-                            <Text style={[styles.th, {color: screenTheme.text, width: wp(10) }]}>Sr.No</Text>
-                            <Text style={[styles.th, {color: screenTheme.text, width: wp(30) }]}>Item Details</Text>
-                            <Text style={[styles.th, {color: screenTheme.text, width: wp(30) }]}>Description</Text>
-                            <Text style={[styles.th, {color: screenTheme.text, width: wp(20) }]}>HSN/SAC</Text>
-                            <Text style={[styles.th, {color: screenTheme.text, width: wp(20) }]}>Quantity</Text>
-                            <Text style={[styles.th, {color: screenTheme.text, width: wp(20) }]}>Rate</Text>
-                            <Text style={[styles.th, {color: screenTheme.text, width: wp(20) }]}>Amount</Text>
-                            <Text style={[styles.th, {color: screenTheme.text, width: wp(40) }]}>Action</Text>
+                            <Text style={[styles.th, { color: screenTheme.text, width: wp(10) }]}>Sr.No</Text>
+                            <Text style={[styles.th, { color: screenTheme.text, width: wp(30) }]}>Item Details</Text>
+                            <Text style={[styles.th, { color: screenTheme.text, width: wp(30) }]}>Description</Text>
+                            <Text style={[styles.th, { color: screenTheme.text, width: wp(20) }]}>HSN/SAC</Text>
+                            <Text style={[styles.th, { color: screenTheme.text, width: wp(20) }]}>Quantity</Text>
+                            <Text style={[styles.th, { color: screenTheme.text, width: wp(20) }]}>Rate</Text>
+                            <Text style={[styles.th, { color: screenTheme.text, width: wp(20) }]}>Amount</Text>
+                            <Text style={[styles.th, { color: screenTheme.text, width: wp(40) }]}>Action</Text>
                           </View>
                         </View>
 
@@ -2835,9 +2920,11 @@ const ManageSalesOrder = () => {
                                     >
                                       <Text style={styles.pageButtonText}>Previous</Text>
                                     </TouchableOpacity>
-                                    <Text style={{ marginHorizontal: wp(2) }}>{currentPage}</Text>
+
+                                    {renderPageButtons(currentPage, totalPages)}
+
                                     <TouchableOpacity
-                                      style={styles.pageButton}
+                                      style={[styles.pageButton, { marginLeft: wp(2) }]}
                                       disabled={currentPage >= totalPages}
                                       onPress={() => setPage(p => Math.min(totalPages, p + 1))}
                                     >
@@ -3008,7 +3095,7 @@ const ManageSalesOrder = () => {
               {/* Notes + Attach file inline */}
               <View style={styles.notesAttachRow}>
                 <View style={styles.notesCol}>
-                  <Text style={inputStyles.label}>Notes</Text>
+                  <Text style={[inputStyles.label, {color:'#000000'}]}>Notes</Text>
                   <TextInput
                     style={styles.noteBox}
                     multiline
@@ -3020,7 +3107,7 @@ const ManageSalesOrder = () => {
                   />
                 </View>
                 <View style={styles.notesCol}>
-                  <Text style={inputStyles.label}>Terms & Conditions</Text>
+                  <Text style={[inputStyles.label, {color:'#000000'}]}>Terms & Conditions</Text>
                   <TextInput
                     style={styles.noteBox}
                     multiline
@@ -3084,42 +3171,44 @@ const ManageSalesOrder = () => {
                         </AccordionSection> */}
         </ScrollView>
 
-
-        <View style={styles.footerBar}>
-          <View
-            style={[
-              formStyles.actionsRow,
-              {
-                justifyContent: 'space-between',
-                paddingHorizontal: wp(3.5),
-                paddingVertical: hp(1),
-              },
-            ]}
-          >
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={[formStyles.primaryBtn, { paddingVertical: hp(1.4) }]}
-              onPress={handleCreateOrder}
-              disabled={false}
+        {(Array.isArray(expandedIds) ? expandedIds.includes(4) : expandedIds === 4) && (
+          <View style={styles.footerBar}>
+            <View
+              style={[
+                formStyles.actionsRow,
+                {
+                  justifyContent: 'space-between',
+                  paddingHorizontal: wp(3.5),
+                  paddingVertical: hp(1),
+                },
+              ]}
             >
-              <Text style={formStyles.primaryBtnText}>
-                Submit
-                {/* {isSubmitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Submit')} */}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={formStyles.cancelBtn}
-              onPress={onCancel}
-            >
-              <Text style={formStyles.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-          {/* <View style={styles.centerButtonContainer}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={[formStyles.primaryBtn, { paddingVertical: hp(1.4) }]}
+                onPress={handleCreateOrder}
+                disabled={false}
+              >
+                <Text style={formStyles.primaryBtnText}>
+                  Submit
+                  {/* {isSubmitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Submit')} */}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={formStyles.cancelBtn}
+                onPress={onCancel}
+              >
+                <Text style={formStyles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+            {/* <View style={styles.centerButtonContainer}>
                     <TouchableOpacity style={styles.primaryButton} onPress={handleCreateOrder}>
                         <Text style={styles.primaryButtonText}>Submit</Text>
                     </TouchableOpacity> */}
-        </View>
+          </View>
+
+        )}
         <DatePickerBottomSheet
           isVisible={openDatePicker}
           onClose={closeDatePicker}
@@ -3133,7 +3222,7 @@ const ManageSalesOrder = () => {
   );
 };
 
-export default ManageSalesOrder;
+export default ManagePurchaseOrder;
 
 const styles = StyleSheet.create({
   container: {
@@ -3717,6 +3806,12 @@ const styles = StyleSheet.create({
   pageButtonText: {
     color: COLORS.text,
     fontWeight: '600',
+  },
+  pageButtonActive: {
+    backgroundColor: COLORS.primary,
+  },
+  pageButtonTextActive: {
+    color: '#fff',
   },
   tdAction: {
     justifyContent: 'center',

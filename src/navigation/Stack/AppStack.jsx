@@ -845,7 +845,7 @@ const CustomDrawerContent = ({ navigation }) => {
                   <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
                     <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
                   </View>
-                  <Text style={styles.itemLabel}>Manage Sales Perfoma Invoice</Text>
+                  <Text style={styles.itemLabel}>Sales Proforma Invoice</Text>
                 </View>
                 <Icon name="chevron-right" size={rf(5)} color="#999" />
               </TouchableOpacity>
@@ -939,7 +939,7 @@ const CustomDrawerContent = ({ navigation }) => {
                   <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
                     <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
                   </View>
-                  <Text style={styles.itemLabel}>Manage Proforma Purchase Invoice</Text>
+                  <Text style={styles.itemLabel}>Purchase Proforma Invoice</Text>
                 </View>
                 <Icon name="chevron-right" size={rf(5)} color="#999" />
               </TouchableOpacity>

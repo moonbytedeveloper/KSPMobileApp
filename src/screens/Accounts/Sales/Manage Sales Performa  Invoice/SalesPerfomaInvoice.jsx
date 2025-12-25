@@ -397,7 +397,7 @@ const SalesPerfomaInvoice = () => {
     return (
         <View style={styles.screen}>
             <AppHeader
-                title="Sales Perfoma Invoice"
+                title="Sales Proforma Invoice"
                 onLeftPress={() => navigation.goBack()}
                 onRightPress={() => navigation.navigate('AddSalesPerfomaInvoice')}
                 rightButtonLabel="Add Perfoma In"

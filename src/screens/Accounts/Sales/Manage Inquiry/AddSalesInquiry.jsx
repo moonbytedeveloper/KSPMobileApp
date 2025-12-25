@@ -440,14 +440,29 @@ const AddSalesInquiry = () => {
                 const serverUuid = r?.UUID || r?.LineUUID || r?.Id || r?.Line_Id || null;
                 const itemUuid = r?.ItemUUID || r?.ItemUuid || r?.ItemId || r?.Item || null;
                 const name = r?.ItemName || r?.Name || r?.Item || r?.Description || '';
-                const qty = r?.Quantity ?? r?.Qty ?? r?.QuantityOrdered ?? 0;
+                const qtyRaw = r?.Quantity ?? r?.Qty ?? r?.QuantityOrdered ?? r?.Amount ?? 0;
+
+                // Detect possible ItemType UUID returned in different fields
+                const possibleItemTypeUuid = r?.ItemType_UUID || r?.ItemTypeUuid || r?.ItemTypeId || r?.ItemType || r?.ItemUUID || r?.ItemUuid || r?.UUID || r?.Uuid || null;
+                let itemTypeName = r?.ItemTypeName || r?.ItemType || '';
+                let resolvedItemTypeUuid = possibleItemTypeUuid || r?.ItemType_UUID || r?.ItemTypeUuid || null;
+                if ((!itemTypeName || itemTypeName === '') && possibleItemTypeUuid && Array.isArray(serverItemTypes) && serverItemTypes.length) {
+                    const found = serverItemTypes.find(it => (
+                        String(it?.UUID || it?.Uuid || it?.Id) === String(possibleItemTypeUuid)
+                    ));
+                    if (found) {
+                        itemTypeName = found?.Name || found?.DisplayName || '';
+                        resolvedItemTypeUuid = found?.UUID || found?.Uuid || found?.Id || resolvedItemTypeUuid;
+                    }
+                }
+
                 return {
                     id: r?.SrNo || idx + 1,
-                    itemType: r?.ItemTypeName || r?.ItemType || '',
-                    itemTypeUuid: r?.ItemType_UUID || r?.ItemTypeUuid || null,
+                    itemType: itemTypeName,
+                    itemTypeUuid: resolvedItemTypeUuid,
                     itemName: name,
                     itemNameUuid: itemUuid || null,
-                    quantity: qty,
+                    quantity: String(qtyRaw ?? ''),
                     unit: r?.Unit || '',
                     unitUuid: r?.Unit_UUID || r?.UnitUuid || null,
                     lineUuid: serverUuid,
@@ -678,17 +693,34 @@ const AddSalesInquiry = () => {
 
                     // Map any provided lines from headerRaw (if available)
                     const records = headerRaw?.Lines || headerRaw?.Data?.Lines || headerRaw?.LinesRecords || [];
-                    const mapped = (records || []).map((ln, idx) => ({
-                        id: ln?.SrNo || idx + 1,
-                        itemType: ln?.ItemTypeName || ln?.ItemType || '',
-                        itemTypeUuid: null,
-                        itemName: ln?.ItemName || ln?.Name || '',
-                        itemNameUuid: null,
-                        quantity: ln?.Quantity || 0,
-                        unit: ln?.Unit || '',
-                        unitUuid: null,
-                        lineUuid: ln?.UUID || null,
-                    }));
+                    const mapped = (records || []).map((ln, idx) => {
+                        // Try to detect an ItemType UUID returned in several possible fields
+                        const possibleItemTypeUuid = ln?.ItemType_UUID || ln?.ItemTypeUuid || ln?.ItemTypeId || ln?.ItemType || ln?.ItemUUID || ln?.ItemUuid || ln?.UUID || ln?.Uuid || null;
+                        // Resolve item type name via serverItemTypes lookup when available
+                        let itemTypeName = ln?.ItemTypeName || ln?.ItemType || '';
+                        let resolvedItemTypeUuid = possibleItemTypeUuid || null;
+                        if ((!itemTypeName || itemTypeName === '') && possibleItemTypeUuid && Array.isArray(serverItemTypes) && serverItemTypes.length) {
+                            const found = serverItemTypes.find(it => (
+                                String(it?.UUID || it?.Uuid || it?.Id) === String(possibleItemTypeUuid)
+                            ));
+                            if (found) {
+                                itemTypeName = found?.Name || found?.DisplayName || found?.ProjectTitle || '';
+                                resolvedItemTypeUuid = found?.UUID || found?.Uuid || found?.Id || resolvedItemTypeUuid;
+                            }
+                        }
+                        const qtyVal = (ln?.Quantity ?? ln?.Qty ?? ln?.Amount ?? 0);
+                        return {
+                            id: ln?.SrNo || idx + 1,
+                            itemType: itemTypeName,
+                            itemTypeUuid: resolvedItemTypeUuid,
+                            itemName: ln?.ItemName || ln?.Name || '',
+                            itemNameUuid: ln?.ItemName_UUID || ln?.ItemNameUuid || ln?.ItemNameId || null,
+                            quantity: String(qtyVal ?? ''),
+                            unit: ln?.Unit || '',
+                            unitUuid: ln?.Unit_UUID || ln?.UnitUuid || null,
+                            lineUuid: ln?.UUID || ln?.LineUUID || null,
+                        };
+                    });
                     try {
                         const currentJson = JSON.stringify(lineItems || []);
                         const mappedJson = JSON.stringify(mapped || []);
@@ -740,6 +772,16 @@ const AddSalesInquiry = () => {
             });
 
             setEditLineItemId(id);
+
+            // If server returned only the ItemType UUID (no name), resolve display name
+            if ((!item.itemType || item.itemType === '') && itemTypeUuid && Array.isArray(serverItemTypes) && serverItemTypes.length) {
+                const foundType = serverItemTypes.find(it => (
+                    String(it?.UUID || it?.Uuid || it?.Id) === String(itemTypeUuid)
+                ));
+                if (foundType) {
+                    setCurrentItem(prev => ({ ...prev, itemType: foundType?.Name || foundType?.DisplayName || '' }));
+                }
+            }
 
             // Ensure lookup lists are loaded for the selected item type and units
             // so the dropdowns show the selected option immediately.
@@ -904,7 +946,7 @@ const AddSalesInquiry = () => {
             userEditedRef.current = { project: false, customer: false, requestedDate: false, expectedDate: false };
             setExpandedId(null);
             // refresh lines
-            try { if (headerResp?.Data?.UUID) await loadSalesLines(headerResp.Data.UUID); } catch (e) { console.log('[AddSalesInquiry] post-update loadSalesLines error ->', e); }
+            try { if (headerResponse?.Data?.UUID) await loadSalesLines(headerResponse.Data.UUID); } catch (e) { console.log('[AddSalesInquiry] post-update loadSalesLines error ->', e); }
         } catch (e) {
             console.log('UpdateSalesHeader error ->', e?.message || e);
             Alert.alert('Error', e?.message || 'Failed to update header');

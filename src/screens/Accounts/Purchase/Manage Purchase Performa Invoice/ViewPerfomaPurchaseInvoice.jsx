@@ -395,14 +395,14 @@ const ViewPerfomaPurchaseInvoice = () => {
         setCurrentPage(nextPage);
     };
 
-    return (
+    return (   
         <>
         <View style={styles.screen}>
                 <AppHeader
-                    title="View Perfoma Purchase Invoice"
+                    title="View Proforma Purchase Invoice"
                 onLeftPress={() => navigation.goBack()}
                 onRightPress={() => navigation.navigate('AddPerfomaPurchaseInvoice')}
-                    rightButtonLabel="Add Perfoma In"
+                    rightButtonLabel="Add Proforma In"
                 showRight
             />
             <View style={styles.headerSeparator} />

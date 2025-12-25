@@ -1542,7 +1542,7 @@ const AddSalesPerfomaInvoice = () => {
         <>
             <View style={{ flex: 1, backgroundColor: '#fff' }}>
                 <AppHeader
-                    title="Add Purchase Perfoma Invoice"
+                    title="Add Purchase Proforma Invoice"
                     onLeftPress={() => {
                         resetFormState();
                         navigation.goBack();

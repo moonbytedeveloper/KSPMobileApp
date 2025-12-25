@@ -363,7 +363,9 @@ const AddSalesPerfomaInvoice = () => {
                 const headerUuid = data?.UUID || data?.Id || data?.HeaderUUID || null;
                 setHeaderUUID(headerUuid);
                 if (data?.FilePath) {
-                    setFile({ uri: data.FilePath, name: data.FilePath });
+                    // Do not prefill local `file.uri` with server path (avoids showing fake 'uri' value)
+                    // Keep only the uploaded server path for payload/display.
+                    setFile(null);
                     setUploadedFilePath(data.FilePath);
                 }
                 // If headerUUID exists, it's edit mode - make it editable by default
@@ -531,7 +533,9 @@ const AddSalesPerfomaInvoice = () => {
                 }
 
                 if (data?.FilePath) {
-                    setFile({ uri: data.FilePath, name: data.FilePath });
+                    // Avoid pre-populating `file.uri` with server path (prevents treating it like a local URI)
+                    setFile(null);
+                    setUploadedFilePath(data.FilePath);
                 }
 
                 // Fetch lines for this performa header and prefill the items table
@@ -1309,7 +1313,8 @@ const AddSalesPerfomaInvoice = () => {
                 const payload = {
                     UUID: existing.serverLineUuid || '',
                     HeaderUUID: headerUUID,
-                    ItemUUID: selectedProjectData?.IsTimesheetBased ? (currentItem.employeeUuid || null) : (currentItem.itemNameUuid || null),
+                    // For timesheet-based projects prefer employeeUuid, but fall back to itemNameUuid
+                    ItemUUID: selectedProjectData?.IsTimesheetBased ? (currentItem.employeeUuid || currentItem.itemNameUuid || null) : (currentItem.itemNameUuid || null),
                     Quantity: qty,
                     Rate: rate,
                     Description: description,
@@ -1322,16 +1327,16 @@ const AddSalesPerfomaInvoice = () => {
                     const resp = await updateSalesPerformaInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
                     console.log('update line resp ->', resp);
                     const updatedLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || existing.serverLineUuid;
-                    const nameVal = selectedProjectData?.IsTimesheetBased ? (currentItem.employeeName || '') : (currentItem.itemName || '');
+                    const nameVal = selectedProjectData?.IsTimesheetBased ? (currentItem.employeeName || currentItem.itemName || '') : (currentItem.itemName || '');
                     const uuidVal = selectedProjectData?.IsTimesheetBased ? (currentItem.employeeUuid || currentItem.itemNameUuid || null) : (currentItem.itemNameUuid || null);
-                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: nameVal, employeeName: currentItem.employeeName || '', employeeUuid: currentItem.employeeUuid || null, sku: uuidVal || null, itemUuid: uuidVal || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid }) : it));
+                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: nameVal, employeeName: currentItem.employeeName || currentItem.itemName || '', employeeUuid: currentItem.employeeUuid || currentItem.itemNameUuid || null, sku: uuidVal || null, itemUuid: uuidVal || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid }) : it));
                     // refresh header totals from server after update
                     await refreshHeaderTotals(headerUUID);
                 } else {
                     // local-only line - update in state
-                    const nameVal = selectedProjectData?.IsTimesheetBased ? (currentItem.employeeName || '') : (currentItem.itemName || '');
+                    const nameVal = selectedProjectData?.IsTimesheetBased ? (currentItem.employeeName || currentItem.itemName || '') : (currentItem.itemName || '');
                     const uuidVal = selectedProjectData?.IsTimesheetBased ? (currentItem.employeeUuid || currentItem.itemNameUuid || null) : (currentItem.itemNameUuid || null);
-                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: nameVal, employeeName: currentItem.employeeName || '', employeeUuid: currentItem.employeeUuid || null, sku: uuidVal || null, itemUuid: uuidVal || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate) }) : it));
+                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: nameVal, employeeName: currentItem.employeeName || currentItem.itemName || '', employeeUuid: currentItem.employeeUuid || currentItem.itemNameUuid || null, sku: uuidVal || null, itemUuid: uuidVal || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate) }) : it));
                     // Clear serverTotalAmount so UI will compute Total Amount from local subtotal
                     setServerTotalAmount('');
                 }
@@ -1344,7 +1349,8 @@ const AddSalesPerfomaInvoice = () => {
                 const payload = {
                     UUID: '', // empty to create new line on server
                     HeaderUUID: headerUUID,
-                    ItemUUID: selectedProjectData?.IsTimesheetBased ? (currentItem.employeeUuid || null) : (currentItem.itemNameUuid || null),
+                    // For timesheet-based projects prefer employeeUuid, but fall back to itemNameUuid
+                    ItemUUID: selectedProjectData?.IsTimesheetBased ? (currentItem.employeeUuid || currentItem.itemNameUuid || null) : (currentItem.itemNameUuid || null),
                     Quantity: qty,
                     Rate: rate,
                     Description: description,
@@ -1358,9 +1364,9 @@ const AddSalesPerfomaInvoice = () => {
                 // on success, update local items list (assign local id and keep server uuid if returned)
                 const nextId = items.length ? (items[items.length - 1].id + 1) : 1;
                 const serverLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || null;
-                const nameVal = selectedProjectData?.IsTimesheetBased ? (currentItem.employeeName || '') : (currentItem.itemName || '');
+                const nameVal = selectedProjectData?.IsTimesheetBased ? (currentItem.employeeName || currentItem.itemName || '') : (currentItem.itemName || '');
                 const uuidVal = selectedProjectData?.IsTimesheetBased ? (currentItem.employeeUuid || currentItem.itemNameUuid || null) : (currentItem.itemNameUuid || null);
-                setItems(prev => ([...prev, { id: nextId, selectedItem: null, name: nameVal, employeeName: currentItem.employeeName || '', employeeUuid: currentItem.employeeUuid || null, sku: uuidVal || null, itemUuid: uuidVal || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), tax: 'IGST', amount: computeAmount(qty, rate), serverLineUuid }]));
+                setItems(prev => ([...prev, { id: nextId, selectedItem: null, name: nameVal, employeeName:  currentItem.itemName || '', employeeUuid: currentItem.itemNameUuid || null, sku: uuidVal || null, itemUuid: uuidVal || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), tax: 'IGST', amount: computeAmount(qty, rate), serverLineUuid }]));
 
                 // reset line form
                 setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
@@ -1378,6 +1384,11 @@ const AddSalesPerfomaInvoice = () => {
     const handleEditItem = id => {
         const it = items.find(x => x.id === id);
         if (!it) return;
+        // For timesheet-based projects, some saved lines store the employee
+        // info in `name`/`itemUuid` instead of `employeeName`/`employeeUuid`.
+        // Prefer explicit employee fields, otherwise fall back to the item fields.
+        const fallbackEmployeeName = it.employeeName || it.name || '';
+        const fallbackEmployeeUuid = it.employeeUuid || it.itemUuid || it.sku || null;
         setCurrentItem({
             itemType: it.itemType || '',
             itemTypeUuid: it.itemTypeUuid || null,
@@ -1389,8 +1400,8 @@ const AddSalesPerfomaInvoice = () => {
             desc: it.desc || '',
             hsn: it.hsn || '',
             rate: it.rate || '',
-            employeeName: it.employeeName || '',
-            employeeUuid: it.employeeUuid || null,
+            employeeName: fallbackEmployeeName,
+            employeeUuid: fallbackEmployeeUuid,
         });
         setEditItemId(id);
     };
@@ -1423,7 +1434,8 @@ const AddSalesPerfomaInvoice = () => {
                 SubTotal: parseFloat(computeSubtotal()) || 0,
                 TotalTax: parseFloat(totalTax) || 0,
                 TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax) || 0),
-                FilePath: uploadedFilePath || file?.uri || file?.name || '',
+                // Ensure we never send content:// URIs — prefer server `uploadedFilePath`, then local `file.path` when available.
+                FilePath: uploadedFilePath || file?.path || '',
                 Notes: notes || '',
             };
 
@@ -1445,7 +1457,9 @@ const AddSalesPerfomaInvoice = () => {
             setHeaderSubmitting(false);
         }
     };
-    const onCancel = () => { };
+    const onCancel = () => { 
+        navigation.goBack();
+    };
 
     const uiDateToApiDate = uiDateStr => {
         if (!uiDateStr) return '';
@@ -1486,7 +1500,8 @@ const AddSalesPerfomaInvoice = () => {
                 SubTotal: parseFloat(computeSubtotal()) || 0,
                 TotalTax: parseFloat(totalTax) || 0,
                 TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax) || 0),
-                FilePath: uploadedFilePath || file?.uri || file?.name || '',
+                // Ensure we never send content:// URIs — prefer server `uploadedFilePath`, then local `file.path` when available.
+                FilePath: uploadedFilePath || file?.path || '',
             };
 
             console.log('submitHeader payload ->', payload);
@@ -1542,7 +1557,8 @@ const AddSalesPerfomaInvoice = () => {
                 AdjustmentField: adjustmentLabel || '',
                 AdjustmentPrice: parseFloat(adjustments) || 0,
                 TermsConditions: terms || '',
-                FilePath: uploadedFilePath || file?.uri || file?.name || '',
+                // Ensure we never send content:// URIs — prefer server `uploadedFilePath`, then local `file.path` when available.
+                FilePath: uploadedFilePath || file?.path || '',
                 SubTotal: parseFloat(computeSubtotal()) || 0,
                 TotalTax: parseFloat(totalTax) || 0,
                 TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax) || 0),
@@ -1665,7 +1681,7 @@ const AddSalesPerfomaInvoice = () => {
                     </View>
                 )}
                 <AppHeader
-                    title="Add Sales Perfoma Invoice"
+                    title="Add Sales Profoma In"
                     onLeftPress={() => {
                         navigation.goBack();
                     }}
@@ -2238,7 +2254,7 @@ const AddSalesPerfomaInvoice = () => {
                                 {/* Employee dropdown (assign to) - shown only for timesheet-based projects */}
                                 {selectedProjectData?.IsTimesheetBased && (
                                     <View style={{ width: '100%', marginBottom: hp(1) }}>
-                                        <Text style={inputStyles.label}>Assign To (Employee)</Text>
+                                        <Text style={inputStyles.label}>Employee Name</Text>
                                         <View style={{ zIndex: 10000, elevation: 22 }}>
                                             <Dropdown
                                                 placeholder="Select Employee"
@@ -2247,7 +2263,7 @@ const AddSalesPerfomaInvoice = () => {
                                                 getLabel={e => (e?.FullName || e?.Fullname || e?.Name || e?.DisplayName || e?.name || String(e))}
                                                 getKey={e => (e?.Uuid || e?.UUID || e?.Id || e?.id || e)}
                                                 onSelect={v => {
-                                                    if (v && typeof v === 'object') {
+                                                    if (v && typeof v === 'object') {      
                                                         setCurrentItem(ci => ({ ...ci, employeeName: v?.FullName || v?.Fullname || v?.Name || v?.DisplayName || v?.name || '', employeeUuid: v?.Uuid || v?.UUID || v?.Id || v?.id || null }));
                                                     } else {
                                                         setCurrentItem(ci => ({ ...ci, employeeName: v, employeeUuid: null }));
@@ -2743,7 +2759,7 @@ const AddSalesPerfomaInvoice = () => {
                             <View style={styles.notesCol}>
                                 <Text style={inputStyles.label}>Notes</Text>
                                 <TextInput
-                                    style={styles.noteBox}
+                                    style={[styles.noteBox, {color:'#000000'}]}
                                     multiline
                                     numberOfLines={4}
                                     value={notes}
@@ -2755,7 +2771,7 @@ const AddSalesPerfomaInvoice = () => {
                             <View style={styles.notesCol}>
                                 <Text style={inputStyles.label}>Terms & Conditions</Text>
                                 <TextInput
-                                    style={styles.noteBox}
+                                    style={[styles.noteBox, {color:'#000000'}]}
                                     multiline
                                     numberOfLines={4}
                                     value={terms}

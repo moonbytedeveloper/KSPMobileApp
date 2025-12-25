@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, RefreshControl } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useIsFocused } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
 import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -95,6 +95,7 @@ const ViewPurchaseQuotation = () => {
     const [ordersError, setOrdersError] = useState(null);
     const [refreshing, setRefreshing] = useState(false);
     const route = useRoute();
+    const isFocused = useIsFocused();
 
     const onRefresh = async () => {
         try {
@@ -190,6 +191,16 @@ const ViewPurchaseQuotation = () => {
         return () => { mounted = false; };
     }, []);
 
+    // When returning to this screen, always re-fetch the authoritative list
+    // so transient/optimistic items are replaced with server data.
+    useEffect(() => {
+        if (!isFocused) return;
+        // avoid double-refresh on initial mount if loading is already happening
+        if (!loadingOrders) {
+            onRefresh();
+        }
+    }, [isFocused]);
+
     // Load vendors once to map UUID -> name for cases where API returns UUID only
     useEffect(() => {
         let mounted = true;
@@ -230,6 +241,16 @@ const ViewPurchaseQuotation = () => {
                     _raw: added,
                 };
 
+                // If server didn't provide a stable UUID/Id for this added entry,
+                // refresh the full list from server to pick up the authoritative record.
+                const hasStableId = !!(added?.UUID || added?.Uuid || added?.Id || added?.PurchaseQuotationHeaderId || added?.PurchaseQuotationHeader_UUID);
+                if (!hasStableId) {
+                    // clear the param then refresh so we don't loop
+                    try { navigation.setParams({ addedQuotation: undefined }); } catch (_) {}
+                    onRefresh();
+                    return;
+                }
+
                 setOrders(prev => {
                     // avoid duplicates
                     if (prev.some(p => String(p.id) === String(mapped.id))) return prev;
@@ -263,11 +284,17 @@ const ViewPurchaseQuotation = () => {
                             dueDate: payload?.DueDate || '',
                             _raw: payload?._raw || payload,
                         };
-                        setOrders(prev => {
-                            if (prev && prev.some(p => String(p.id) === String(mapped.id))) return prev;
-                            return [mapped, ...(prev || [])];
-                        });
-                        setCurrentPage(0);
+                        const hasStableId = !!(payload?.UUID || payload?.Uuid || payload?.Id || payload?.PurchaseQuotationHeaderId || payload?.PurchaseQuotationHeader_UUID || (payload?._raw && (payload._raw?.UUID || payload._raw?.Uuid || payload._raw?.Id)));
+                        if (!hasStableId) {
+                            // if there's no stable id from server, refresh the list to pick up authoritative data
+                            onRefresh();
+                        } else {
+                            setOrders(prev => {
+                                if (prev && prev.some(p => String(p.id) === String(mapped.id))) return prev;
+                                return [mapped, ...(prev || [])];
+                            });
+                            setCurrentPage(0);
+                        }
                     } catch (e) { console.warn('event added handler error', e); }
                 });
 
@@ -286,12 +313,18 @@ const ViewPurchaseQuotation = () => {
                             _raw: payload?._raw || payload,
                         };
 
-                        setOrders(prev => {
-                            if (!prev || prev.length === 0) return [mapped];
-                            const replaced = prev.map(p => (String(p.id) === String(mapped.id) ? mapped : p));
-                            const found = prev.some(p => String(p.id) === String(mapped.id));
-                            return found ? replaced : [mapped, ...prev];
-                        });
+                        const hasStableId = !!(payload?.UUID || payload?.Uuid || payload?.Id || payload?.PurchaseQuotationHeaderId || payload?.PurchaseQuotationHeader_UUID || (payload?._raw && (payload._raw?.UUID || payload._raw?.Uuid || payload._raw?.Id)));
+                        if (!hasStableId) {
+                            // if update payload lacks a stable id, refresh from server
+                            onRefresh();
+                        } else {
+                            setOrders(prev => {
+                                if (!prev || prev.length === 0) return [mapped];
+                                const replaced = prev.map(p => (String(p.id) === String(mapped.id) ? mapped : p));
+                                const found = prev.some(p => String(p.id) === String(mapped.id));
+                                return found ? replaced : [mapped, ...prev];
+                            });
+                        }
                     } catch (e) { console.warn('event updated handler error', e); }
                 });
 
@@ -316,6 +349,13 @@ const ViewPurchaseQuotation = () => {
                 dueDate: updated?.DueDate || '',
                 _raw: updated,
             };
+
+            const hasStableId = !!(updated?.UUID || updated?.Uuid || updated?.Id || updated?.PurchaseQuotationHeaderId || updated?.PurchaseQuotationHeader_UUID || (updated?._raw && (updated._raw?.UUID || updated._raw?.Uuid || updated._raw?.Id)));
+            if (!hasStableId) {
+                try { navigation.setParams({ updatedQuotation: undefined }); } catch (_) {}
+                onRefresh();
+                return;
+            }
 
             setOrders(prev => {
                 if (!prev || prev.length === 0) return [mapped];

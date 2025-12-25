@@ -21,7 +21,7 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { COLORS, TYPOGRAPHY, inputStyles, SPACING, useThemeColors } from '../../../styles/styles';
 import AppHeader from '../../../../components/common/AppHeader';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useIsFocused } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { addSalesOrder, updateSalesOrder, addSalesOrderLine, updateSalesOrderLine, getCustomers, getCountries, getStates, getCities, getPaymentTerms, getPaymentMethods, fetchProjects, getAllSalesInquiryNumbers, getSalesOrderHeaderById, getItems, getSalesLines, getSalesOrderLines, deleteSalesOrderLine, getSalesOrderSlip, uploadFiles } from '../../../../api/authServices';
@@ -136,6 +136,7 @@ const ManageSalesOrder = () => {
   const [expandedIds, setExpandedIds] = useState([1]);
   const navigation = useNavigation();
   const route = useRoute();
+  const isFocused = useIsFocused();
   const toggleSection = id => setExpandedIds(prev => {
     const has = Array.isArray(prev) ? prev.includes(id) : prev === id;
     if (has) return (Array.isArray(prev) ? prev.filter(x => x !== id) : []);
@@ -508,6 +509,42 @@ const ManageSalesOrder = () => {
     })();
   }, [route?.params?.headerUuid, route?.params?.cmpUuid, route?.params?.envUuid, route?.params]);
 
+  // One-time reload: when user first arrives at this screen, reset Formik and clear local form state
+  React.useEffect(() => {
+    if (isFocused && !hasReloadedRef.current) {
+      try {
+        if (formikResetRef.current) formikResetRef.current();
+      } catch (e) { /* ignore reset errors */ }
+      try {
+        setHeaderForm({ SalesInquiryUUID: '', SalesInquiryNo: '', CustomerUUID: '', CustomerName: '', SalesOrderNo: '', DueDays: '' });
+        setBillingForm({ buildingNo: '', street1: '', street2: '', postalCode: '', country: '', state: '', city: '' });
+        setShippingForm({ buildingNo: '', street1: '', street2: '', postalCode: '', country: '', state: '', city: '' });
+        setIsShippingSame(false);
+        setItems([]);
+        setInvoiceDate('');
+        setDueDate('');
+        setDueDays('');
+        setPaymentTerm(''); setPaymentTermUuid(null);
+        setPaymentMethod(''); setPaymentMethodUUID(null);
+        setNotes(''); setTerms('');
+      } catch (e) { /* ignore state clear errors */ }
+      hasReloadedRef.current = true;
+    }
+  }, [isFocused]);
+
+  // When header section is opened for creating a new order, clear Formik validation
+  React.useEffect(() => {
+    try {
+      const headerOpen = Array.isArray(expandedIds) ? expandedIds.includes(1) : expandedIds === 1;
+      if (headerOpen && !headerSaved) {
+        // only clear validation for new header (not editing saved header)
+        if (formikResetRef.current) {
+          try { formikResetRef.current(); } catch (e) { /* ignore */ }
+        }
+      }
+    } catch (e) { /* ignore */ }
+  }, [expandedIds, headerSaved]);
+
   // Current item being entered in the LINE form
   const [currentItem, setCurrentItem] = useState({
     itemType: '',
@@ -585,7 +622,9 @@ const ManageSalesOrder = () => {
   // Refs used by Formik integration and helpers
   const formikSetFieldValueRef = React.useRef(null);
   const formikSubmitRef = React.useRef(null);
+  const formikResetRef = React.useRef(null);
   const dueDaysRef = React.useRef(null);
+  const hasReloadedRef = React.useRef(false);
   // Globals to expose Formik state outside its render scope (used by Billing/Shipping sections)
   let globalErrors = {};
   let globalTouched = {};
@@ -624,6 +663,49 @@ const ManageSalesOrder = () => {
     } catch (e) {
       return '';
     }
+  };
+
+  // Render numeric pagination buttons with ellipsis when needed
+  const renderPageButtons = (currentPage, totalPages) => {
+    const pages = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      // always show first
+      pages.push(1);
+      // near start
+      if (currentPage <= 4) {
+        for (let i = 2; i <= 5; i++) pages.push(i);
+        pages.push('...');
+      } else if (currentPage >= totalPages - 3) {
+        pages.push('...');
+        for (let i = totalPages - 4; i <= totalPages - 1; i++) pages.push(i);
+      } else {
+        pages.push('...');
+        pages.push(currentPage - 1);
+        pages.push(currentPage);
+        pages.push(currentPage + 1);
+        pages.push('...');
+      }
+      pages.push(totalPages);
+    }
+
+    return pages.map((p, idx) => {
+      if (p === '...') return (
+        <Text key={`dots-${idx}`} style={{ marginHorizontal: wp(1), color: COLORS.text }}>{p}</Text>
+      );
+      const isActive = p === currentPage;
+      return (
+        <TouchableOpacity
+          key={`pg-${p}`}
+          style={[styles.pageButton, isActive && styles.pageButtonActive, { marginHorizontal: wp(0.6) }]}
+          disabled={isActive}
+          onPress={() => setPage(p)}
+        >
+          <Text style={[styles.pageButtonText, isActive && styles.pageButtonTextActive]}>{p}</Text>
+        </TouchableOpacity>
+      );
+    });
   };
 
   // Permission handling for Android
@@ -2434,11 +2516,12 @@ const ManageSalesOrder = () => {
               try { await saveHeader(values); } catch (e) { /* allow saveHeader to handle alerts */ }
             }}
           >
-            {({ values, handleChange, handleBlur, setFieldValue, errors, touched, submitForm, submitCount }) => {
+            {({ values, handleChange, handleBlur, setFieldValue, errors, touched, submitForm, submitCount, resetForm }) => {
               // expose Formik handlers and state to outer scope
               try {
                 formikSubmitRef.current = submitForm;
                 formikSetFieldValueRef.current = setFieldValue;
+                try { formikResetRef.current = resetForm; } catch (e) { formikResetRef.current = null; }
                 // copy Formik state into globals so sections outside the Formik child can read validation state
                 globalErrors = errors || {};
                 globalTouched = touched || {};
@@ -3494,7 +3577,7 @@ const ManageSalesOrder = () => {
                                     >
                                       <Text style={styles.pageButtonText}>Previous</Text>
                                     </TouchableOpacity>
-                                    <Text style={{ marginHorizontal: wp(2) }}>{currentPage}</Text>
+                                    {renderPageButtons(currentPage, totalPages)}
                                     <TouchableOpacity
                                       style={styles.pageButton}
                                       disabled={currentPage >= totalPages}
@@ -4381,6 +4464,12 @@ const styles = StyleSheet.create({
     paddingVertical: hp(0.6),
     paddingHorizontal: wp(3),
     borderRadius: wp(0.8),
+  },
+  pageButtonActive: {
+    backgroundColor: COLORS.primary,
+  },
+  pageButtonTextActive: {
+    color: '#fff',
   },
   pageButtonText: {
     color: COLORS.text,

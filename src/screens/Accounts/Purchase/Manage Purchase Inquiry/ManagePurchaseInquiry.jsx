@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
@@ -45,11 +45,16 @@ const HeaderValidationSchema = Yup.object().shape({
         const hasName = typeof VendorName === 'string' && VendorName.trim() !== '';
         return !!(hasUuid || hasName);
     }),
-    CurrencyType: Yup.string().trim().required('Currency type is required'),
-    CurrencyUUID: Yup.string().test('currency-uuid-or-type', 'Currency type is required', function (val) {
+    CurrencyType: Yup.string().test('currency-type-or-uuid', 'Currency type is required', function (val) {
+        const { CurrencyUUID } = this.parent || {};
+        const hasType = (typeof val === 'string' && val.trim() !== '') || (val !== null && val !== undefined && String(val).trim() !== '');
+        const hasUuid = CurrencyUUID !== null && CurrencyUUID !== undefined && String(CurrencyUUID).trim() !== '';
+        return !!(hasType || hasUuid);
+    }),
+    CurrencyUUID: Yup.mixed().test('currency-uuid-or-type', 'Currency type is required', function (val) {
         const { CurrencyType } = this.parent || {};
-        const hasUuid = typeof val === 'string' && val.trim() !== '';
-        const hasType = typeof CurrencyType === 'string' && CurrencyType.trim() !== '';
+        const hasUuid = val !== null && val !== undefined && String(val).trim() !== '';
+        const hasType = (typeof CurrencyType === 'string' && CurrencyType.trim() !== '') || (CurrencyType !== null && CurrencyType !== undefined && String(CurrencyType).trim() !== '');
         return !!(hasUuid || hasType);
     }),
     RequestTitle: Yup.string().trim().required('Request Title is required'),
@@ -150,6 +155,64 @@ const AddSalesInquiry = () => {
     const [openDatePicker, setOpenDatePicker] = useState(false);
     const [datePickerField, setDatePickerField] = useState(null);
     const [datePickerSelectedDate, setDatePickerSelectedDate] = useState(new Date());
+
+    // Reset all local state to initial defaults so screen is fresh when reopened
+    const resetAllState = () => {
+        try {
+            setVendorName('');
+            setVendorUuid(null);
+            setVendors([]);
+            setCurrencyOptions([]);
+            setSelectedProject(null);
+            setSelectedProjectUuid(null);
+            setProjects([]);
+            setCurrencyType('');
+            setCurrencyUuid(null);
+            setCustomerName('');
+            setCustomerUuid(null);
+            setCustomers([]);
+            setServerItemTypes([]);
+            setItemTypesLoading(false);
+            setServerItemMasters([]);
+            setItemMastersLoading(false);
+            setServerUnits([]);
+            setUnitsLoading(false);
+            setRequestTitle('');
+            setRequestedDate('');
+            setExpectedPurchaseDate('');
+            setProjectName('');
+            setInquiryNo('');
+            setCountry('');
+            setLoading(false);
+            setSuccessSheetVisible(false);
+            setSuccessMessage('');
+            setHeaderSubmitting(false);
+            setHeaderSaved(false);
+            setHeaderResponse(null);
+            setHeaderEditing(false);
+            setLineItems([]);
+            setLineAdding(false);
+            setHeaderLinesMap({});
+            setCurrentHeaderUuid(null);
+            setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
+            setEditLineItemId(null);
+            setOpenDatePicker(false);
+            setDatePickerField(null);
+            setDatePickerSelectedDate(new Date());
+        } catch (e) {
+            console.warn('resetAllState error', e);
+        }
+    };
+
+    // Clear local state when this screen loses focus so next open is fresh
+    useEffect(() => {
+        const unsub = navigation.addListener && navigation.addListener('blur', () => {
+            resetAllState();
+        });
+        return () => {
+            try { if (unsub && typeof unsub === 'function') unsub(); } catch (_) { }
+        };
+    }, [navigation]);
 
     const formatUiDate = (date) => {
         try {
@@ -1033,6 +1096,8 @@ const AddSalesInquiry = () => {
     };
 
     const handleCancel = () => {
+        // Reset local state then navigate back so next open is a fresh screen
+        try { resetAllState(); } catch (_) { }
         navigation.goBack();
     };
 
@@ -1194,7 +1259,7 @@ const AddSalesInquiry = () => {
                                                     onSelect={(v) => {
                                                         if (v && typeof v === 'object') {
                                                             const currencyName = v?.Name || v?.CurrencyName || v?.Code || v?.DisplayName || v?.name || '';
-                                                            const currencyUuid = v?.UUID || v?.Id || v?.id || null;
+                                                            const currencyUuid = v?.Uuid || v?.Id || v?.id || null;
                                                             setFieldValue('CurrencyType', currencyName);
                                                             setFieldValue('CurrencyUUID', currencyUuid || '');
                                                             setCurrencyType(currencyName);
