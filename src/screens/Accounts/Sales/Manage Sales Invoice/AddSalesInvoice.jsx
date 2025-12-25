@@ -378,8 +378,30 @@ const AddSalesInvoice = () => {
             setAdjustments(String(data?.AdjustmentPrice ?? data?.Adjustment ?? 0));
             setTerms(data?.TermsConditions || data?.Terms || '');
             setNotes(data?.CustomerNotes || data?.Notes || '');
-            const headerUuid = data?.UUID || data?.Id || data?.HeaderUUID || null;
-            setHeaderUUID(headerUuid);
+            // Safely extract header UUID from prefill data. Some payloads contain
+            // non-header identifiers in ambiguous fields; accept only GUID-like
+            // or numeric/string ids and avoid setting headerUUID to objects.
+            const isGuidString = v => typeof v === 'string' && (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) || /^[0-9a-f]{32}$/i.test(v));
+            const extractHeaderUuidFromPrefill = (d) => {
+                if (!d) return null;
+                const candidates = [d?.HeaderUUID, d?.HeaderId, d?.UUID, d?.Uuid, d?.Id];
+                for (const c of candidates) {
+                    if (isGuidString(c)) return c;
+                    if (typeof c === 'string' && c.trim() !== '' && !c.includes('[object')) return c;
+                }
+                // fallback: scan top-level string properties for a GUID-like value
+                try {
+                    for (const k in d) {
+                        if (!Object.prototype.hasOwnProperty.call(d, k)) continue;
+                        const v = d[k];
+                        if (isGuidString(v)) return v;
+                    }
+                } catch (e) { /* ignore */ }
+                return null;
+            };
+
+            const headerUuid = extractHeaderUuidFromPrefill(data) || null;
+            if (headerUuid) setHeaderUUID(headerUuid);
             if (data?.FilePath) setFile({ uri: data.FilePath, name: data.FilePath });
             // If headerUUID exists, it's edit mode - make it editable by default
             // Otherwise, it's view mode - make it non-editable
@@ -420,38 +442,56 @@ const AddSalesInvoice = () => {
                 const envUuid = route?.params?.envUuid || route?.params?.envUUID || route?.params?.env || undefined;
 
                 if (!resolvedHeaderUuid) {
-                    // attempt to search by SalesInvNo or SalesInqNo from prefillHeader or candidate string
-                    const possibleSearches = [];
+                    // If a prefill header was provided by the caller, prefer that binding
+                    // and avoid attempting a list search which can mistakenly pick
+                    // the wrong record and overwrite the header UUID.
                     if (prefill) {
-                        const sInv = prefill?.SalesInvNo || prefill?.SalesInvoiceNo || prefill?.SalesInvNo || prefill?.SalesInv || prefill?.SalesInvNo || prefill?.SalesInvNo;
-                        const sInq = prefill?.SalesInqNo || prefill?.SalesInquiryNo || prefill?.SalesInqNo || prefill?.SalesInq;
-                        if (sInv) possibleSearches.push(String(sInv));
-                        if (sInq) possibleSearches.push(String(sInq));
-                    }
-                    if (candidateHeaderUuid) possibleSearches.push(String(candidateHeaderUuid));
+                        const p = prefill?.Data || prefill;
+                        const prefillCandidate = p?.HeaderUUID || p?.UUID || p?.Uuid || p?.Id || null;
+                        if (prefillCandidate) {
+                            console.log('Using header UUID from prefill ->', prefillCandidate);
+                            resolvedHeaderUuid = prefillCandidate;
+                        } else {
+                            // Prefill exists but has no usable header UUID: do not run the list search
+                            // to avoid accidental binding from ambiguous search results.
+                            console.log('Prefill provided but lacks header UUID; skipping list search per prefill preference.');
+                            return;
+                        }
+                    } else {
+                        // No prefill: fall back to resolving via candidate or search terms
+                        const possibleSearches = [];
+                        if (candidateHeaderUuid) possibleSearches.push(String(candidateHeaderUuid));
+                        // attempt to search by SalesInvNo or SalesInqNo if available (from earlier candidate sources)
+                        if (route?.params?.prefillHeader) {
+                            const s = route.params.prefillHeader;
+                            const sInv = s?.SalesInvNo || s?.SalesInvoiceNo || s?.SalesInv || s?.SalesPerInvNo || null;
+                            const sInq = s?.SalesInqNo || s?.SalesInquiryNo || s?.SalesInq || null;
+                            if (sInv) possibleSearches.push(String(sInv));
+                            if (sInq) possibleSearches.push(String(sInq));
+                        }
 
-                    for (const term of possibleSearches) {
-                        if (!term) continue;
-                        try {
-                            console.log('Attempting to resolve header UUID by searching with:', term);
-                            const listResp = await getSalesInvoiceHeaders({ cmpUuid, envUuid, start: 0, length: 10, searchValue: term });
-                            const listData = listResp?.Data || listResp || {};
-                            const records = Array.isArray(listData?.Records) ? listData.Records : (Array.isArray(listResp) ? listResp : []);
-                            if (records && records.length > 0) {
-                                // try to find a record with a full UUID-like value
-                                const found = records.find(r => {
-                                    const candidate = r?.UUID || r?.Uuid || r?.Id || r?.HeaderUUID || r?.HeaderId || r?.SalesInvoiceUUID || r?.SalesInvoiceId || '';
-                                    return typeof candidate === 'string' && (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidate) || /^[0-9a-f]{32}$/i.test(candidate));
-                                }) || records[0];
-                                const candidate = found?.UUID || found?.Uuid || found?.Id || found?.HeaderUUID || found?.HeaderId || found?.SalesInvoiceUUID || found?.SalesInvoiceId || null;
-                                if (candidate) {
-                                    console.log('Resolved header UUID from search ->', candidate);
-                                    resolvedHeaderUuid = candidate;
-                                    break;
+                        for (const term of possibleSearches) {
+                            if (!term) continue;
+                            try {
+                                console.log('Attempting to resolve header UUID by searching with:', term);
+                                const listResp = await getSalesInvoiceHeaders({ cmpUuid, envUuid, start: 0, length: 10, searchValue: term });
+                                const listData = listResp?.Data || listResp || {};
+                                const records = Array.isArray(listData?.Records) ? listData.Records : (Array.isArray(listResp) ? listResp : []);
+                                if (records && records.length > 0) {
+                                    const found = records.find(r => {
+                                        const candidate = r?.UUID || r?.Uuid || r?.Id || r?.HeaderUUID || r?.HeaderId || r?.SalesInvoiceUUID || r?.SalesInvoiceId || '';
+                                        return typeof candidate === 'string' && (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidate) || /^[0-9a-f]{32}$/i.test(candidate));
+                                    }) || records[0];
+                                    const candidate = found?.UUID || found?.Uuid || found?.Id || found?.HeaderUUID || found?.HeaderId || found?.SalesInvoiceUUID || found?.SalesInvoiceId || null;
+                                    if (candidate) {
+                                        console.log('Resolved header UUID from search ->', candidate);
+                                        resolvedHeaderUuid = candidate;
+                                        break;
+                                    }
                                 }
+                            } catch (e) {
+                                console.warn('Search attempt failed for term', term, e?.message || e);
                             }
-                        } catch (e) {
-                            console.warn('Search attempt failed for term', term, e?.message || e);
                         }
                     }
                 }
@@ -592,7 +632,27 @@ const AddSalesInvoice = () => {
                 setAdjustments(String(data?.AdjustmentPrice ?? data?.Adjustment ?? 0));
                 setTerms(data?.TermsConditions || data?.Terms || '');
                 setNotes(data?.CustomerNotes || data?.Notes || '');
-                setHeaderUUID(data?.UUID || data?.Id || data?.HeaderUUID || headerUuid);
+                // When pre-filling from fetched API `data`, prefer a validated header UUID.
+                const extractHeaderUuidFromPrefill_local = (d) => {
+                    if (!d) return null;
+                    const isGuidString = v => typeof v === 'string' && (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) || /^[0-9a-f]{32}$/i.test(v));
+                    const candidates = [d?.UUID, d?.Id, d?.HeaderUUID, d?.HeaderId, d?.Uuid];
+                    for (const c of candidates) {
+                        if (isGuidString(c)) return c;
+                        if (typeof c === 'string' && c.trim() !== '' && !c.includes('[object')) return c;
+                    }
+                    try {
+                        for (const k in d) {
+                            if (!Object.prototype.hasOwnProperty.call(d, k)) continue;
+                            const v = d[k];
+                            if (isGuidString(v)) return v;
+                        }
+                    } catch (e) { /* ignore */ }
+                    return null;
+                };
+
+                const safeHeaderUuid = extractHeaderUuidFromPrefill_local(data) || headerUuid;
+                if (safeHeaderUuid) setHeaderUUID(safeHeaderUuid);
 
                 // Populate tax and server total if provided by API
                 const headerTax = data?.TotalTax ?? data?.TaxAmount ?? data?.HeaderTotalTax ?? 0;
@@ -3676,3 +3736,6 @@ const styles = StyleSheet.create({
         borderTopColor: '#1e2530',
     },
 });
+
+
+//addsalesinvoice
