@@ -305,7 +305,7 @@ const ManagePurchaseOrder = () => {
   const getUuidVal = (v) => {
     if (!v && v !== 0) return '';
     if (typeof v === 'string') return v;
-    return v?.UUID || v?.Uuid || v?.Id || '';
+    return v?.UUID || v?.Inquiry_No || v?.Uuid || v?.Id || '';
   };
 
   // Helper to prefill header/billing/shipping from a server/object payload
@@ -392,12 +392,20 @@ const ManagePurchaseOrder = () => {
       }
 
       // Sales Inquiry display (support multiple key names and nested structures)
-      const sinqUuid = data?.SalesInquiryUUID || data?.SalesInquiryId || data?.SalesInquiry || data?.SalesInquiryUuid || data?.Header?.SalesInquiryUUID || data?.Header?.SalesInquiryId || null;
+      const sinqUuid = data?.SalesInquiryUUID || data?.SalesInquiryId || data?.SalesInquiry || data?.SalesInquiryUuid || data?.Inquiry_No || data?.InquiryUUID || data?.Header?.SalesInquiryUUID || data?.Header?.SalesInquiryId || null;
       // immediate attempt to set SalesInquiry display value from many possible keys
       const immediateInquiryNo = data?.SalesInquiryNo || data?.SalesInquiryNumber || data?.SalesInquiry || data?.InquiryNo || data?.InquiryNumber || data?.Inquiry || data?.Header?.SalesInquiryNo || data?.Header?.InquiryNo || data?.Header?.SalesInquiryNumber || null;
       if (immediateInquiryNo) setSalesInquiry(immediateInquiryNo);
       if (sinqUuid) {
-        setHeaderForm(s => ({ ...s, SalesInquiryUUID: getUuidVal(sinqUuid) }));
+        const resolved = getUuidVal(sinqUuid);
+        setHeaderForm(s => ({ ...s, SalesInquiryUUID: resolved }));
+        // if inquiries lookup already loaded, try to derive display value
+        if (Array.isArray(SalesInquiryNosOptions) && SalesInquiryNosOptions.length) {
+          const found = SalesInquiryNosOptions.find(x => (
+            String(x?.UUID) === String(resolved) || String(x?.Uuid) === String(resolved) || String(x?.Id) === String(resolved) || String(x?.InquiryUUID) === String(resolved) || String(x?.SalesInquiryUUID) === String(resolved)
+          ));
+          if (found) setSalesInquiry(found?.InquiryNo || found?.Name || found?.raw?.InquiryNo || String(found));
+        }
       }
 
       // Dates: robust parsing for various server date formats -> UI format dd-MMM-yyyy
@@ -507,6 +515,13 @@ const ManagePurchaseOrder = () => {
         const headerTotal = data?.TotalAmount ?? data?.NetAmount ?? data?.HeaderTotalAmount ?? null;
         if (headerTax !== null && typeof headerTax !== 'undefined') setTotalTax(String(headerTax));
         if (headerTotal !== null && typeof headerTotal !== 'undefined') setServerTotalAmount(String(headerTotal));
+        // Also bind notes, terms and discount/shipping charges so UI prefill shows them
+        const noteVal = data?.Notes || data?.CustomerNotes || data?.Note || '';
+        const termsVal = data?.Terms_Conditions || data?.Terms || data?.TermsAndConditions || '';
+        const discountVal = data?.Discount ?? data?.ShippingCharges ?? data?.ShippingCharge ?? data?.DiscountAmount ?? data?.DiscountValue ?? null;
+        if (noteVal) setNotes(noteVal);
+        if (typeof termsVal === 'string' && termsVal.trim() !== '') setTerms(termsVal);
+        if (discountVal !== null && typeof discountVal !== 'undefined') setShippingCharges(String(discountVal));
       } catch (e) { /* ignore */ }
 
       setIsEditingHeader(true);
@@ -785,8 +800,8 @@ const ManagePurchaseOrder = () => {
         Payment_Term: paymentTermUuid || '',
         Payment_Mode: paymentMethodUUID || '',
         DeliveryDate: uiDateToApiDate(invoiceDate),
-        Note: notes || '',
-        Terms_Conditions: terms || '',
+        Note: (typeof notes === 'string' && notes.trim() !== '') ? notes : (headerResponse?.Note || headerResponse?.NoteText || headerResponse?.Notes || ''),
+        Terms_Conditions: (typeof terms === 'string' && terms.trim() !== '') ? terms : (headerResponse?.Terms_Conditions || headerResponse?.Terms || headerResponse?.TermsAndConditions || ''),
         BillingBuildingNo: billingForm.buildingNo || '',
         BillingStreet1: billingForm.street1 || '',
         BillingStreet2: billingForm.street2 || '',
@@ -830,6 +845,17 @@ const ManagePurchaseOrder = () => {
       console.log('saveHeader resp ->', resp);
       const data = resp?.Data || resp || {};
       setHeaderResponse(data);
+      // ensure local UI fields reflect any server-sent values (notes/terms/discount)
+      try {
+        const noteVal = data?.Notes || data?.CustomerNotes || data?.Note || headerResponse?.Note || '';
+        const termsVal = data?.Terms_Conditions || data?.Terms || data?.TermsAndConditions || headerResponse?.Terms_Conditions || '';
+        const discountVal = data?.Discount ?? data?.ShippingCharges ?? data?.ShippingCharge ?? data?.DiscountAmount ?? headerResponse?.Discount ?? '';
+        if (noteVal) setNotes(noteVal);
+        if (typeof termsVal === 'string' && termsVal.trim() !== '') setTerms(termsVal);
+        if (discountVal !== null && typeof discountVal !== 'undefined') setShippingCharges(String(discountVal));
+      } catch (e) { /* ignore */ }
+      // run prefill to populate header/billing/shipping and other derived display fields
+      try { prefillFromData(data); } catch (e) { /* ignore */ }
       setHeaderSaved(true);
       setIsEditingHeader(false);
       // collapse header section after successful save
@@ -1461,7 +1487,7 @@ const ManagePurchaseOrder = () => {
 
   // Render numbered page buttons (with simple ellipses for long ranges)
   const renderPageButtons = (currentPage, totalPages) => {
-    if (!totalPages || totalPages <= 1) return null;
+    // if (!totalPages || totalPages <= 1) return null;
     const buttons = [];
     const pushPage = (p) => {
       buttons.push(
@@ -1836,8 +1862,8 @@ const ManagePurchaseOrder = () => {
         Payment_Term: paymentTermUuid || '',
         Payment_Mode: paymentMethodUUID || '',
         DeliveryDate: uiDateToApiDate(invoiceDate) || '',
-        Terms_Conditions: terms || '',
-        Note: notes || '',
+        Terms_Conditions: (typeof terms === 'string' && terms.trim() !== '') ? terms : (headerResponse?.Terms_Conditions || headerResponse?.Terms || headerResponse?.TermsAndConditions || ''),
+        Note: (typeof notes === 'string' && notes.trim() !== '') ? notes : (headerResponse?.Note || headerResponse?.NoteText || headerResponse?.Notes || ''),
         BillingBuildingNo: billingForm.buildingNo || '',
         BillingStreet1: billingForm.street1 || '',
         BillingStreet2: billingForm.street2 || '',
@@ -1853,7 +1879,7 @@ const ManagePurchaseOrder = () => {
         ShippingCountryUUID: shippingForm.country || '',
         ShippingStateUUID: shippingForm.state || '',
         ShippingCityUUID: resolveCityUuid(shippingForm.city),
-        Discount: parseFloat(adjustments) || 0,
+        Discount: parseFloat(shippingCharges) || 0,
         FilePath: uploadedFilePath || file?.path || '',
       };
 
@@ -1876,6 +1902,15 @@ const ManagePurchaseOrder = () => {
       console.log('Final submit resp ->', resp);
       const data = resp?.Data || resp || {};
       setHeaderResponse(data);
+      try {
+        const noteVal = data?.Notes || data?.CustomerNotes || data?.Note || headerResponse?.Note || '';
+        const termsVal = data?.Terms_Conditions || data?.Terms || data?.TermsAndConditions || headerResponse?.Terms_Conditions || '';
+        const discountVal = data?.Discount ?? data?.ShippingCharges ?? data?.ShippingCharge ?? data?.DiscountAmount ?? headerResponse?.Discount ?? '';
+        if (noteVal) setNotes(noteVal);
+        if (typeof termsVal === 'string' && termsVal.trim() !== '') setTerms(termsVal);
+        if (discountVal !== null && typeof discountVal !== 'undefined') setShippingCharges(String(discountVal));
+      } catch (e) { /* ignore */ }
+      try { prefillFromData(data); } catch (e) { /* ignore */ }
       setHeaderSaved(true);
       Alert.alert('Success', 'Order submitted successfully');
       // reload lines to ensure totals reflect server
@@ -1947,9 +1982,35 @@ const ManagePurchaseOrder = () => {
           const upData = uploadResp?.Data || uploadResp || {};
           const uploaded = upData?.Files || upData?.files || upData?.UploadedFiles || upData?.FilePaths || upData || [];
           const finalRefs = Array.isArray(uploaded) ? uploaded : (uploaded ? [uploaded] : []);
-          // pick first path
-          const first = finalRefs[0] || {};
-          const remotePath = first?.RemoteResponse?.path || first?.path || first?.filePath || first?.FilePath || null;
+
+          const extractPathFromRef = (ref) => {
+            if (!ref) return null;
+            if (typeof ref === 'string') return ref;
+            if (ref.RemoteResponse) {
+              const rr = ref.RemoteResponse;
+              if (typeof rr === 'string') return rr;
+              if (rr.path) return rr.path;
+              if (rr.Path) return rr.Path;
+              if (rr.filePath) return rr.filePath;
+            }
+            if (ref.path) return ref.path;
+            if (ref.Path) return ref.Path;
+            if (ref.filePath) return ref.filePath;
+            if (ref.FilePath) return ref.FilePath;
+            if (ref.Document) {
+              const d = ref.Document;
+              if (!d) return null;
+              if (typeof d === 'string') return d;
+              if (d.path) return d.path;
+              if (d.FilePath) return d.FilePath;
+            }
+            return null;
+          };
+
+          const first = finalRefs[0] || null;
+          let remotePath = extractPathFromRef(first) || extractPathFromRef(upData) || null;
+          if (remotePath && typeof remotePath !== 'string') remotePath = String(remotePath);
+
           if (remotePath) {
             setUploadedFilePath(remotePath);
             // If header already exists on server, immediately update header to include FilePath
@@ -2961,45 +3022,11 @@ const ManagePurchaseOrder = () => {
                     />
 
                     {/* Question Icon with Tooltip */}
-                    <View style={styles.helpIconWrapper}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          setShowShippingTip(!showShippingTip);
-                          setShowAdjustmentTip(false);
-                        }}
-                        style={styles.helpIconContainer}
-                      >
-                        <Text style={styles.helpIcon}>?</Text>
-                      </TouchableOpacity>
-
-                      {/* Tooltip */}
-                      {showShippingTip && (
-                        <>
-                          <Modal
-                            transparent
-                            visible={showShippingTip}
-                            animationType="none"
-                            onRequestClose={() => setShowShippingTip(false)}
-                          >
-                            <TouchableWithoutFeedback
-                              onPress={() => setShowShippingTip(false)}
-                            >
-                              <View style={styles.modalOverlay} />
-                            </TouchableWithoutFeedback>
-                          </Modal>
-                          <View style={styles.tooltipBox}>
-                            <Text style={styles.tooltipText}>
-                              Amount spent on shipping the goods.
-                            </Text>
-                            <View style={styles.tooltipArrow} />
-                          </View>
-                        </>
-                      )}
-                    </View>
+                    
                   </View>
 
                   <Text style={styles.value}>
-                    ₹{parseFloat(shippingCharges || 0).toFixed(2)}
+                  - ₹{parseFloat(shippingCharges || 0).toFixed(2)}
                   </Text>
                 </View>
 
@@ -3097,7 +3124,7 @@ const ManagePurchaseOrder = () => {
                 <View style={styles.notesCol}>
                   <Text style={[inputStyles.label, {color:'#000000'}]}>Notes</Text>
                   <TextInput
-                    style={styles.noteBox}
+                    style={[styles.noteBox, {color:'#000000'}]}
                     multiline
                     numberOfLines={4}
                     value={notes}
@@ -3109,7 +3136,7 @@ const ManagePurchaseOrder = () => {
                 <View style={styles.notesCol}>
                   <Text style={[inputStyles.label, {color:'#000000'}]}>Terms & Conditions</Text>
                   <TextInput
-                    style={styles.noteBox}
+                    style={[styles.noteBox, {color:'#000000'}]}
                     multiline
                     numberOfLines={4}
                     value={terms}

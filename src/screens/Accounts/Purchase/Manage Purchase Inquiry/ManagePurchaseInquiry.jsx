@@ -9,7 +9,7 @@ import { COLORS, TYPOGRAPHY, inputStyles, formStyles } from '../../../styles/sty
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
-import { addSalesInquiry, getCustomers, getItemTypes, getItemMasters, getUnits, addSalesHeader, addPurchaseInquiryHeader, addSalesLine, addPurchaseInquiryLine, updateSalesHeader, getSalesHeader, getSalesLines, updateSalesLine, deleteSalesLine, getPurchasequotationVendor, getCurrencies, getProjects, getPurchaseInquiryHeader, updatePurchaseInquiryHeader, updatePurchaseInquiryLine, deletePurchaseInquiryLine } from '../../../../api/authServices';
+import { addSalesInquiry, getCustomers, getItemTypes, getItems, getUnits, addSalesHeader, addPurchaseInquiryHeader, addSalesLine, addPurchaseInquiryLine, updateSalesHeader, getSalesHeader, getSalesLines, updateSalesLine, deleteSalesLine, getPurchasequotationVendor, getCurrencies, getProjects, getPurchaseInquiryHeader, getPurchaseInquiryLines, updatePurchaseInquiryHeader, updatePurchaseInquiryLine, deletePurchaseInquiryLine } from '../../../../api/authServices';
 import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { uiDateToApiDate } from '../../../../utils/dateUtils';
 import BottomSheetConfirm from '../../../../components/common/BottomSheetConfirm';
@@ -573,8 +573,8 @@ const AddSalesInquiry = () => {
     const fetchItemMasters = async (itemTypeUuid = null) => {
         try {
             setItemMastersLoading(true);
-            const resp = await getItemMasters({ itemTypeUuid });
-            console.log('GetItemMasters resp ->', resp);
+            const resp = await getItems({ mode:'Purchase' });
+            console.log('getItems resp ->', resp);
             const data = resp?.Data || resp || [];
             const list = Array.isArray(data) ? data : (data?.List || []);
             setServerItemMasters(list);
@@ -710,6 +710,7 @@ const AddSalesInquiry = () => {
                     fetchItemTypes(),
                     fetchItemMasters(null),
                     fetchUnits(),
+                    fetchCurrenciesFromServer(),
                 ]);
                 customersList = results[0] || [];
             } catch (e) {
@@ -737,6 +738,13 @@ const AddSalesInquiry = () => {
                 if (reqRaw) {
                     const ui = formatUiDate(reqRaw);
                     if (ui) setRequestedDate(ui);
+                }
+
+                // Expected Purchase Date (many possible server keys)
+                const expRaw = pickFirst(['ExpectedPurchaseDate', 'ExpectedDate', 'Expected_PurchaseDate', 'RequestedDeliveryDate', 'DeliveryDate', 'ExpectedDeliveryDate', 'ExpectedPurchase_Date']);
+                if (expRaw) {
+                    const uiExp = formatUiDate(expRaw);
+                    if (uiExp) setExpectedPurchaseDate(uiExp);
                 }
 
                 // Vendor
@@ -777,9 +785,26 @@ const AddSalesInquiry = () => {
                 // Track current header UUID and load only its lines (if any)
                 const resolvedHeaderUuid = extractHeaderUuid(headerDataNormalized || headerResp);
                 setCurrentHeaderUuid(resolvedHeaderUuid);
-                // load any cached lines for this header (in-memory)
-                const cached = resolvedHeaderUuid ? (headerLinesMap[resolvedHeaderUuid] || []) : [];
-                setLineItems(cached);
+                // Attempt to fetch lines from server for this header (preferred)
+                try {
+                    if (resolvedHeaderUuid) {
+                        const linesResp = await getPurchaseInquiryLines({ headerUuid: resolvedHeaderUuid, cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
+                        const linesData = (linesResp && (linesResp.Data || linesResp.List || linesResp)) || [];
+                        const serverLines = Array.isArray(linesData) ? linesData : (linesData.List || []);
+                        if (serverLines && serverLines.length) {
+                            setLineItems(serverLines.map((ln, idx) => ({ ...ln, id: idx + 1 })));
+                            // cache lines
+                            setHeaderLinesMap(prev => ({ ...prev, [resolvedHeaderUuid]: serverLines }));
+                        } else {
+                            const cached = resolvedHeaderUuid ? (headerLinesMap[resolvedHeaderUuid] || []) : [];
+                            setLineItems(cached);
+                        }
+                    }
+                } catch (linesErr) {
+                    console.log('Error fetching inquiry lines ->', linesErr?.message || linesErr);
+                    const cached = resolvedHeaderUuid ? (headerLinesMap[resolvedHeaderUuid] || []) : [];
+                    setLineItems(cached);
+                }
 
                 // NOTE: lines for purchase inquiry may be fetched separately if endpoint exists.
                 // For now, leave lineItems as-is; they will be editable once header is saved.
@@ -792,6 +817,32 @@ const AddSalesInquiry = () => {
             }
         })();
     }, [route?.params]);
+
+    // If prefill provided only a vendor UUID but not a display name, try to resolve it
+    // from the loaded `vendors` lookup so validation and display show the name.
+    useEffect(() => {
+        try {
+            if (vendorUuid && (!vendorName || String(vendorName).trim() === '') && Array.isArray(vendors) && vendors.length) {
+                const found = vendors.find(v => {
+                    const id = v?.UUID || v?.Uuid || v?.Id || v?.id || v;
+                    return String(id) === String(vendorUuid) || String(v?.VendorUUID) === String(vendorUuid) || String(v?.VendorId) === String(vendorUuid);
+                });
+                if (found) {
+                    const name = found?.Name || found?.VendorName || found?.DisplayName || String(found);
+                    setVendorName(name || '');
+                    // update Formik if it's mounted
+                    if (formikSetFieldValueRef && formikSetFieldValueRef.current) {
+                        try {
+                            formikSetFieldValueRef.current('VendorName', name || '');
+                            formikSetFieldValueRef.current('VendorUUID', vendorUuid || '');
+                        } catch (_) { }
+                    }
+                }
+            }
+        } catch (e) {
+            // ignore
+        }
+    }, [vendorUuid, vendors]);
 
     const handleEditItem = (id) => {
         const item = lineItems.find(i => i.id === id);
@@ -1000,6 +1051,22 @@ const AddSalesInquiry = () => {
             setHeaderEditing(false);
             // Open LINE section after successful header submission
             setExpandedId(2);
+            // Fetch server lines for the newly created header (if backend returned header UUID)
+            try {
+                const createdHeaderUuid = extractHeaderUuid(resp);
+                if (createdHeaderUuid) {
+                    setCurrentHeaderUuid(createdHeaderUuid);
+                    const linesResp = await getPurchaseInquiryLines({ headerUuid: createdHeaderUuid, cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
+                    const linesData = (linesResp && (linesResp.Data || linesResp.List || linesResp)) || [];
+                    const serverLines = Array.isArray(linesData) ? linesData : (linesData.List || []);
+                    if (serverLines && serverLines.length) {
+                        setLineItems(serverLines.map((ln, idx) => ({ ...ln, id: idx + 1 })));
+                        setHeaderLinesMap(prev => ({ ...prev, [createdHeaderUuid]: serverLines }));
+                    }
+                }
+            } catch (e) {
+                console.log('Fetch lines after create error ->', e?.message || e);
+            }
             // success notification removed (non-blocking flow requested)
         } catch (e) {
             console.log('AddPurchaseInquiryHeader error ->', e?.message || e);
@@ -1086,6 +1153,22 @@ const AddSalesInquiry = () => {
             } else {
                 // Open LINE section after regular header update
                 setExpandedId(2);
+            }
+            // Refresh lines from server for this header
+            try {
+                const updatedHeaderUuid = extractHeaderUuid(resp);
+                if (updatedHeaderUuid) {
+                    setCurrentHeaderUuid(updatedHeaderUuid);
+                    const linesResp = await getPurchaseInquiryLines({ headerUuid: updatedHeaderUuid, cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
+                    const linesData = (linesResp && (linesResp.Data || linesResp.List || linesResp)) || [];
+                    const serverLines = Array.isArray(linesData) ? linesData : (linesData.List || []);
+                    if (serverLines && serverLines.length) {
+                        setLineItems(serverLines.map((ln, idx) => ({ ...ln, id: idx + 1 })));
+                        setHeaderLinesMap(prev => ({ ...prev, [updatedHeaderUuid]: serverLines }));
+                    }
+                }
+            } catch (e) {
+                console.log('Fetch lines after update error ->', e?.message || e);
             }
         } catch (e) {
             console.log('UpdatePurchaseInquiryHeader error ->', e?.message || e);
@@ -1206,14 +1289,24 @@ const AddSalesInquiry = () => {
                                             <View style={{ zIndex: 9998, elevation: 20 }}>
                                                 <Dropdown
                                                     placeholder="Select Vendor"
-                                                    value={values.VendorUUID || values.VendorName || ''}
+                                                    value={(function() {
+                                                        try {
+                                                            const list = Array.isArray(vendors) ? vendors : [];
+                                                            const vid = values.VendorUUID || vendorUuid || '';
+                                                            if (vid) {
+                                                                const found = list.find(x => String(x?.UUID || x?.Uuid || x?.Id || x?.id || x) === String(vid));
+                                                                if (found) return found;
+                                                            }
+                                                            return values.VendorName || values.VendorUUID || '';
+                                                        } catch (e) { return values.VendorName || values.VendorUUID || ''; }
+                                                    })()}
                                                     options={vendors}
                                                     getLabel={(v) => (typeof v === 'string' ? v : v?.Name || v?.DisplayName || '')}
                                                     getKey={(v) => (typeof v === 'string' ? v : v?.UUID || v?.Id || v?.id || v?.Name)}
                                                     onSelect={(v) => {
                                                         if (v && typeof v === 'object') {
                                                             const name = v?.Name || v?.DisplayName || v?.name || '';
-                                                            const uuid = v?.UUID || v?.Id || v?.id || null;
+                                                            const uuid = v?.Uuid ||v?.UUID || v?.Id || v?.id || null;
                                                             setFieldValue('VendorName', name);
                                                             setFieldValue('VendorUUID', uuid || '');
                                                             setVendorName(name);
@@ -1253,7 +1346,7 @@ const AddSalesInquiry = () => {
                                                 <Dropdown
                                                     placeholder="Select Currency"
                                                     value={values.CurrencyUUID || values.CurrencyType || ''}
-                                                    options={currencyOptions.length ? currencyOptions : currencyTypes}
+                                                    options={currencyOptions || []}
                                                     getLabel={(c) => (typeof c === 'string' ? c : c?.Name || c?.CurrencyName || c?.Code || c?.DisplayName || c?.name || '')}
                                                     getKey={(c) => (typeof c === 'string' ? c : c?.UUID || c?.Id || c?.id || c?.Code || c?.Name)}
                                                     onSelect={(v) => {
@@ -1342,8 +1435,18 @@ const AddSalesInquiry = () => {
                                             <View style={{ zIndex: 9999, elevation: 20 }}>
                                                 <Dropdown
                                                     placeholder="Select Project"
-                                                    value={values.ProjectName || values.ProjectUUID || ''}
-                                                    options={projects.length ? projects : projectsStatic}
+                                                    value={(function() {
+                                                        try {
+                                                            const list = Array.isArray(projects) ? projects : [];
+                                                            const pid = values.ProjectUUID || selectedProjectUuid || '';
+                                                            if (pid) {
+                                                                const found = list.find(x => String(x?.Uuid || x?.UUID || x?.ProjectUUID || x?.Project_Id || x?.Id || x?.id || x) === String(pid));
+                                                                if (found) return found;
+                                                            }
+                                                            return values.ProjectName || values.ProjectUUID || '';
+                                                        } catch (e) { return values.ProjectName || values.ProjectUUID || ''; }
+                                                    })()}
+                                                    options={projects || []}
                                                     getLabel={(p) => {
                                                         if (typeof p === 'string') return p;
                                                         return p?.ProjectTitle || p?.Project_Name || p?.Name || p?.ProjectName || p?.Title || p?.DisplayName || p?.projectTitle || p?.name || '';
@@ -1474,7 +1577,7 @@ const AddSalesInquiry = () => {
                                         <Dropdown
                                             placeholder="- Select Item -"
                                             value={currentItem.itemTypeUuid || currentItem.itemType}
-                                            options={serverItemTypes.length ? serverItemTypes : demoItemTypes}
+                                            options={serverItemTypes || []}
                                             getLabel={(it) => it?.Name || it?.DisplayName || it?.name || it}
                                             getKey={(it) => it?.UUID || it?.Id || it}
                                             onSelect={(v) => {
@@ -1500,7 +1603,7 @@ const AddSalesInquiry = () => {
                                         <Dropdown
                                             placeholder="- Select Item -"
                                             value={currentItem.itemNameUuid || currentItem.itemName}
-                                            options={serverItemMasters.length ? serverItemMasters : itemNames}
+                                            options={serverItemMasters || []}
                                             getLabel={(it) => it?.Name || it?.DisplayName || it?.name || it}
                                             getKey={(it) => it?.UUID || it?.Id || it}
                                             onSelect={(v) => {
@@ -1538,7 +1641,7 @@ const AddSalesInquiry = () => {
                                         <Dropdown
                                             placeholder="- Select Unit -"
                                             value={currentItem.unitUuid || currentItem.unit}
-                                            options={serverUnits.length ? serverUnits : units}
+                                            options={serverUnits || []}
                                             getLabel={(u) => u?.Name || u?.DisplayName || u?.name || u}
                                             getKey={(u) => u?.UUID || u?.Id || u}
                                             onSelect={(v) => {

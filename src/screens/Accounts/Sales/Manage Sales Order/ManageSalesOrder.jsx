@@ -902,6 +902,7 @@ const ManageSalesOrder = () => {
         ShippingCharges: parseFloat(shippingCharges) || 0,
         AdjustmentField: adjustmentLabel || '',
         AdjustmentPrice: parseFloat(adjustments) || 0,
+        Discount: parseFloat(adjustments) || 0,
         Days: parseInt(use.DueDays || dueDays, 10) || 0,
         // Attach uploaded file path when available (returned by /api/CompanySetup/upload-file)
         FilePath: uploadedFilePath || '',
@@ -2162,6 +2163,7 @@ const ManageSalesOrder = () => {
         ShippingCharges: parseFloat(shippingCharges) || 0,
         AdjustmentField: adjustmentLabel || '',
         AdjustmentPrice: parseFloat(adjustments) || 0,
+        Discount: parseFloat(adjustments) || 0,
         Days: parseInt(dueDays, 10) || 0,
         FilePath: uploadedFilePath || '',
       };
@@ -3579,7 +3581,7 @@ const ManageSalesOrder = () => {
                                     </TouchableOpacity>
                                     {renderPageButtons(currentPage, totalPages)}
                                     <TouchableOpacity
-                                      style={styles.pageButton}
+                                      style={[styles.pageButton,{ marginLeft: wp(2) }]}
                                       disabled={currentPage >= totalPages}
                                       onPress={() => setPage(p => Math.min(totalPages, p + 1))}
                                     >

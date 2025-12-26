@@ -24,11 +24,11 @@ import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
-import { getPurchasequotationVendor, getItems, postAddPurchaseQuotationHeader, updatePurchaseQuotationHeader, addPurchaseQuotationLine, updatePurchaseQuotationLine, deletePurchaseQuotationLine, getPurchaseOrderLines, fetchProjects, getPurchaseQuotationHeaderById, uploadFiles } from '../../../../api/authServices';
+import { getPurchasequotationVendor, getItems, postAddPurchaseQuotationHeader, updatePurchaseQuotationHeader, addPurchaseQuotationLine, updatePurchaseQuotationLine, deletePurchaseQuotationLine, getPurchaseQuotationLines, fetchProjects, getPurchaseQuotationHeaderById, uploadFiles } from '../../../../api/authServices';
 import { publish } from '../../../../utils/eventBus';
 import { getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { pick, types, isCancel } from '@react-native-documents/picker';
-import { getpurchaseQuotationNumber } from '../../../../api/authServices';
+import { getAllPurchaseInquiryNumbers } from '../../../../api/authServices';
 import { getPaymentTerms, getPaymentMethods } from '../../../../api/authServices';
 
 const COL_WIDTHS = {
@@ -360,25 +360,34 @@ const AddPurchaseQuotation = () => {
 
   const isHeaderValid = () => {
     return (
-      projectName && String(projectName).trim() !== '' &&
+      ( (projectName && String(projectName).trim() !== '') || (projectUUID && String(projectUUID).trim() !== '') ) &&
       headerForm.companyName && String(headerForm.companyName).trim() !== '' &&
       vendor && String(vendor).trim() !== '' &&
       headerForm.quotationTitle && String(headerForm.quotationTitle).trim() !== '' &&
       paymentTerm && String(paymentTerm).trim() !== '' &&
       paymentMethod && String(paymentMethod).trim() !== '' &&
-      file
+      true
     );
   };
 
   const validateHeaderFields = () => {
     const errors = {};
-    if (!projectName || String(projectName).trim() === '') errors.projectName = 'Project Name is required';
+    // If project UUID present but no display name, try to resolve label from loaded projects
+    if ((!projectName || String(projectName).trim() === '') && (projectUUID && String(projectUUID).trim() !== '')) {
+      try {
+        const found = (projects || []).find(p => String(p.value) === String(projectUUID));
+        if (found && found.label) {
+          setProjectName(found.label);
+          try { if (formikSetFieldValueRef.current) formikSetFieldValueRef.current('ProjectName', found.label); } catch (_) {}
+        }
+      } catch (_) { }
+    }
+    if ((!projectName || String(projectName).trim() === '') && (!projectUUID || String(projectUUID).trim() === '')) errors.projectName = 'Project Name is required';
     if (!headerForm.companyName || String(headerForm.companyName).trim() === '') errors.companyName = 'Purchase Inquiry No is required';
     if (!vendor || String(vendor).trim() === '') errors.vendor = 'Vendor Name is required';
     if (!headerForm.quotationTitle || String(headerForm.quotationTitle).trim() === '') errors.quotationTitle = 'Quotation Title is required';
     if (!paymentTerm || String(paymentTerm).trim() === '') errors.paymentTerm = 'Payment Term is required';
     if (!paymentMethod || String(paymentMethod).trim() === '') errors.paymentMethod = 'Payment Method is required';
-    if (!file) errors.file = 'PQ Document is required';
     setHeaderErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -404,12 +413,13 @@ const AddPurchaseQuotation = () => {
       const e = await getENVUUID();
       let resp;
       try {
-        resp = await getPurchaseOrderLines({ headerUuid, cmpUuid: c, envUuid: e });
+        resp = await getPurchaseQuotationLines({ headerUuid, cmpUuid: c, envUuid: e });
       } catch (e) {
         // fallback attempt
-        resp = await getPurchaseOrderLines({ headerUuid, cmpUuid: c, envUuid: e });
+        resp = await getPurchaseQuotationLines({ headerUuid, cmpUuid: c, envUuid: e });
       }
-
+   console.log(resp,'getPurchaseQuotationLines');
+   
       const raw = resp?.Data?.Records || resp?.Data || resp || [];
       const list = Array.isArray(raw) ? raw : [];
       const normalized = list.map((r, idx) => {
@@ -745,10 +755,10 @@ const AddPurchaseQuotation = () => {
         ProjectUUID: projectUUID || '',
         PaymentTerm: paymentTerm || '',
         PaymentMode: paymentMethod || '',
-        Note: notes || '',
+        Note: terms || '',
         QuotationTitle: headerForm.quotationTitle || '',
         QuotationNo: headerForm.purchaseOrderNumber || '',
-        TermsConditions: terms || '',
+        TermsConditions: notes || '',
         TotalTax: totalTaxNum,
         TotalAmount: totalAmountNum,
         ShippingCharges: parseFloat(shippingCharges) || 0,
@@ -756,6 +766,12 @@ const AddPurchaseQuotation = () => {
         AdjustmentField: adjustmentLabel || '',
         AdjustmentPrice: parseFloat(adjustments) || 0,
       };
+      // Ensure we include HeaderUUID (backend may expect this key) and put header UUID into `UUID` as well
+      const resolvedHeaderUuid = headerResponse?.UUID || headerResponse?.Uuid || headerResponse?.Id || headerResponse?.HeaderUUID || route?.params?.headerUuid || '';
+      if (resolvedHeaderUuid) {
+        payload.HeaderUUID = resolvedHeaderUuid;
+        payload.UUID = resolvedHeaderUuid;
+      }
       // Attach uploaded file path(s) when updating header as QuotationDocument
       if (Array.isArray(uploadedFilePaths) && uploadedFilePaths.length > 0) {
         payload.QuotationDocument = uploadedFilePaths.length === 1 ? uploadedFilePaths[0] : uploadedFilePaths;
@@ -837,6 +853,13 @@ const AddPurchaseQuotation = () => {
         QuotationDocument: Array.isArray(uploadedFilePaths) && uploadedFilePaths.length > 0 ? (uploadedFilePaths.length === 1 ? uploadedFilePaths[0] : uploadedFilePaths) : undefined,
         AnotherDocument: Array.isArray(uploadedAnotherFilePaths) && uploadedAnotherFilePaths.length > 0 ? (uploadedAnotherFilePaths.length === 1 ? uploadedAnotherFilePaths[0] : uploadedAnotherFilePaths) : undefined,
       };
+
+      // Ensure HeaderUUID is present for update calls and place header UUID in `UUID`
+      const resolvedHeaderUuid2 = headerResponse?.UUID || headerResponse?.Uuid || headerResponse?.Id || headerResponse?.HeaderUUID || route?.params?.headerUuid || '';
+      if (resolvedHeaderUuid2) {
+        payload.HeaderUUID = resolvedHeaderUuid2;
+        payload.UUID = resolvedHeaderUuid2;
+      }
 
       let resp;
       if (headerResponse?.UUID) {
@@ -938,6 +961,8 @@ const AddPurchaseQuotation = () => {
         QuotationDocument: Array.isArray(uploadedFilePaths) && uploadedFilePaths.length > 0 ? (uploadedFilePaths.length === 1 ? uploadedFilePaths[0] : uploadedFilePaths) : undefined,
         AnotherDocument: Array.isArray(uploadedAnotherFilePaths) && uploadedAnotherFilePaths.length > 0 ? (uploadedAnotherFilePaths.length === 1 ? uploadedAnotherFilePaths[0] : uploadedAnotherFilePaths) : undefined,
       };
+      // Also add HeaderUUID for API compatibility
+      if (headerUuid) payload.HeaderUUID = headerUuid;
       const resp = await updatePurchaseQuotationHeader(payload);
       const data = resp?.Data || resp || {};
       // update local headerResponse with server-returned data
@@ -1188,8 +1213,13 @@ const AddPurchaseQuotation = () => {
       const incoming = headerResponse.PaymentMethodUUID || headerResponse.PaymentMethod || headerResponse.PaymentMode || headerResponse.PaymentMethodName || null;
       if (!incoming) return;
       const resolved = resolveOptionValue(paymentMethodOptions, incoming);
-      if (resolved) setPaymentMethod(resolved);
-      else setPaymentMethod(incoming);
+      if (resolved) {
+        setPaymentMethod(resolved);
+        try { if (formikSetFieldValueRef.current) formikSetFieldValueRef.current('PaymentMethod', resolved); } catch (_) {}
+      } else {
+        setPaymentMethod(incoming);
+        try { if (formikSetFieldValueRef.current) formikSetFieldValueRef.current('PaymentMethod', incoming); } catch (_) {}
+      }
     } catch (e) { /* ignore */ }
   }, [paymentMethodOptions, headerResponse]);
 
@@ -1198,21 +1228,36 @@ const AddPurchaseQuotation = () => {
     let mounted = true;
     const loadNumbers = async () => {
       try {
-        const resp = await getpurchaseQuotationNumber();
-        console.log('getpurchaseQuotationNumber response ->', resp);
+        const cmp = await getCMPUUID();
+        const env = await getENVUUID();
+        const resp = await getAllPurchaseInquiryNumbers({ cmpUuid: cmp, envUuid: env });
+        console.log('getAllPurchaseInquiryNumbers() response ->', resp);
         const list = resp?.Data || resp || [];
         if (!mounted) return;
         const mapped = (Array.isArray(list) ? list : []).map(it => {
           if (!it) return '';
           if (typeof it === 'string') return it.toString().trim();
           // common fields containing number/label
-          const v = it.QuotationNumber || it.PurchaseQuotationNumber || it.Number || it.Value || it.Label || it.Text || '';
+          const v = it.InquiryNo  || it.Value || it.Label || it.Text || '';
           return v ? String(v).trim() : '';
         }).filter(Boolean);
         const unique = Array.from(new Set(mapped));
         setPurchaseQuotationNumbers(unique);
       } catch (err) {
-        console.error('Error loading purchase quotation numbers ->', err && (err.message || err));
+        try { console.error('Error loading purchase inquiry numbers ->', err && (err.message || err)); } catch (_) {}
+        // Prefer server-provided message when available
+        let msg = '';
+        try {
+          if (err && err.response && err.response.data) {
+            msg = err.response.data.Message || err.response.data.message || '';
+          } else if (err && err.data) {
+            msg = err.data.Message || err.data.message || '';
+          } else if (err && err.message) {
+            msg = err.message;
+          }
+        } catch (_) { msg = '' }
+        if (!msg) msg = 'Unable to load purchase inquiry numbers';
+        Alert.alert('Error', msg);
         setPurchaseQuotationNumbers([]);
       }
     };
@@ -1300,8 +1345,13 @@ const AddPurchaseQuotation = () => {
               // Try to find by value first, then by label (case-insensitive)
               let found = finalMethods.find(m => String(m.value) === String(incoming));
               if (!found) found = finalMethods.find(m => String(m.label).toLowerCase() === String(incoming).toLowerCase());
-              if (found) setPaymentMethod(found.value);
-              else setPaymentMethod(incoming);
+              if (found) {
+                setPaymentMethod(found.value);
+                try { if (formikSetFieldValueRef.current) formikSetFieldValueRef.current('PaymentMethod', found.value); } catch (_) {}
+              } else {
+                setPaymentMethod(incoming);
+                try { if (formikSetFieldValueRef.current) formikSetFieldValueRef.current('PaymentMethod', incoming); } catch (_) {}
+              }
             }
           }
         } catch (e) { /* ignore */ }
@@ -1389,18 +1439,22 @@ const AddPurchaseQuotation = () => {
           if (uuid) {
             // Store UUID for Dropdown `value` so option is selected correctly
             setProjectUUID(uuid);
+            try { if (formikSetFieldValueRef.current) { formikSetFieldValueRef.current('ProjectUUID', uuid); } } catch (_) {}
             // Also try to set a friendly display name when available
             if (name) setProjectName(name);
+            try { if (formikSetFieldValueRef.current && name) { formikSetFieldValueRef.current('ProjectName', name); } } catch (_) {}
           } else if (name) {
             // Try to resolve the label to one of the loaded options and set the matching value
             const found = normalized.find(p => String(p.label).toLowerCase() === String(name).toLowerCase());
             if (found) {
               setProjectUUID(found.value);
               setProjectName(found.label);
+              try { if (formikSetFieldValueRef.current) { formikSetFieldValueRef.current('ProjectUUID', found.value); formikSetFieldValueRef.current('ProjectName', found.label); } } catch (_) {}
             } else {
               // Fallback: keep display name, UUID blank
               setProjectName(name);
               setProjectUUID('');
+              try { if (formikSetFieldValueRef.current) { formikSetFieldValueRef.current('ProjectName', name); formikSetFieldValueRef.current('ProjectUUID', ''); } } catch (_) {}
             }
           }
         }
@@ -1428,17 +1482,42 @@ const AddPurchaseQuotation = () => {
   useEffect(() => {
     try {
       if (!headerResponse) return;
-      const incoming = headerResponse.ProjectUUID || headerResponse.ProjectId || headerResponse.Project || headerResponse.ProjectName || headerResponse.ProjectTitle || null;
-      if (!incoming) return;
+      // Try many possible locations and shapes for a project UUID provided by backend
+      const tryExtract = (obj) => {
+        if (!obj) return null;
+        // direct keys
+        const direct = obj.ProjectUUID || obj.ProjectId || obj.Project_Id || obj.Project || obj.projectUUID || obj.projectId || obj.ProjectID || obj.ProjectIdentifier;
+        if (direct) return direct;
+        // nested project object
+        const nested = obj.Project || obj.project || obj.ProjectObj || obj.ProjectInfo || null;
+        if (nested && typeof nested === 'object') {
+          return nested.UUID || nested.Uuid || nested.Id || nested.Id || nested.ProjectUUID || nested.projectUUID || nested.projectId || nested.Id;
+        }
+        return null;
+      };
+
+      const incomingRaw = tryExtract(headerResponse) || headerResponse.ProjectName || headerResponse.ProjectTitle || null;
+      if (!incomingRaw) return;
+
+      // If incomingRaw is an object, try its inner id keys
+      let incoming = incomingRaw;
+      if (typeof incomingRaw === 'object') {
+        incoming = incomingRaw.UUID || incomingRaw.Uuid || incomingRaw.Id || incomingRaw.value || incomingRaw.ProjectUUID || null;
+      }
+
       const resolved = resolveOptionValue(projects, incoming);
       if (resolved) {
         setProjectUUID(resolved);
+        try { if (formikSetFieldValueRef.current) formikSetFieldValueRef.current('ProjectUUID', resolved); } catch (_) {}
         const label = (projects.find(p => String(p.value) === String(resolved)) || {}).label || '';
         if (label) setProjectName(label);
+        try { if (label) { try { if (formikSetFieldValueRef.current) formikSetFieldValueRef.current('ProjectName', label); } catch (_) {} } } catch (_) {}
       } else {
-        // fallback: keep what server provided
-        setProjectUUID(incoming);
+        // fallback: if incoming looks like a UUID, set it as UUID and set name if available
+        setProjectUUID(incoming || '');
+        try { if (formikSetFieldValueRef.current) formikSetFieldValueRef.current('ProjectUUID', incoming || ''); } catch (_) {}
         if (headerResponse.ProjectName || headerResponse.ProjectTitle) setProjectName(headerResponse.ProjectName || headerResponse.ProjectTitle);
+        try { if (headerResponse.ProjectName || headerResponse.ProjectTitle) { try { if (formikSetFieldValueRef.current) formikSetFieldValueRef.current('ProjectName', headerResponse.ProjectName || headerResponse.ProjectTitle); } catch (_) {} } } catch (_) {}
       }
     } catch (e) { /* ignore */ }
   }, [projects, headerResponse]);
@@ -1470,9 +1549,15 @@ const AddPurchaseQuotation = () => {
 
         // Set project name for display and UUID for API
         const projectDisplayName = hdr.ProjectName || hdr.Project || hdr.ProjectTitle || '';
-        const projectId = hdr.ProjectUUID || hdr.Project_Id || hdr.ProjectId || '';
+        const projectId = hdr.ProjectUUID || hdr.Project_Id || hdr.ProjectId || hdr.UUID || hdr.Uuid || '';
         setProjectName(projectDisplayName); // Use name for display
         setProjectUUID(projectId); // Use UUID for API
+        try {
+          if (formikSetFieldValueRef.current) {
+            formikSetFieldValueRef.current('ProjectName', projectDisplayName || '');
+            formikSetFieldValueRef.current('ProjectUUID', projectId || '');
+          }
+        } catch (_) {}
 
         setPaymentTerm(hdr.PaymentTermUUID || hdr.PaymentTerm || hdr.PaymentTermUUID || '');
         setPaymentMethod(hdr.PaymentMethodUUID || hdr.PaymentMethod || hdr.PaymentMethodUUID || '');
@@ -1490,6 +1575,13 @@ const AddPurchaseQuotation = () => {
         if (uuidToLoad) {
           loadPurchaseOrderLines(uuidToLoad);
         }
+        // Prefill notes and terms/conditions from server keys
+        try {
+          const incomingTerms = hdr.TermsConditions || hdr.Terms || hdr.TermsAndConditions || hdr.Terms_Conditions || hdr.TermsCondition || hdr.TermsandConditions || '';
+          const incomingNotes = hdr.Notes || hdr.Note || hdr.NotesText || hdr.Remarks || hdr.Remark || '';
+          if (incomingTerms) setTerms(incomingTerms);
+          if (incomingNotes) setNotes(incomingNotes);
+        } catch (e) { /* ignore */ }
       }
     } catch (e) {
       console.warn('prefill from route params failed', e);
@@ -1503,10 +1595,12 @@ const AddPurchaseQuotation = () => {
     let mounted = true;
     (async () => {
       try {
-        setIsPrefilling(true);
+        // setIsPrefilling(true);
         const resp = await getPurchaseQuotationHeaderById({ headerUuid });
+        try { console.log('getPurchaseQuotationHeaderById raw response ->', resp); } catch (_) {}
+        try { console.log('getPurchaseQuotationHeaderById raw response (stringified) ->', JSON.stringify(resp, null, 2)); } catch (_) {}
         const data = resp?.Data || resp || null;
-        console.log('getPurchaseQuotationHeaderById -> header UUID:',data);
+        console.log('getPurchaseQuotationHeaderById -> header UUID:', data);
         
         if (!mounted || !data) return;
           console.log('getPurchaseQuotationHeaderById -> header UUID:', data?.UUID || data?.Uuid || data?.Id || data?.HeaderUUID || null);
@@ -1528,9 +1622,15 @@ const AddPurchaseQuotation = () => {
         // Prefer server UUIDs for vendor binding; fall back to readable name only if UUID not present
         setVendor(data.Vendor_UUID || data.VendorUUID || data.VendorId || data.Vendor || data.VendorName || data.CustomerName || '');
         const projectDisplayName = data.ProjectName || data.Project || data.ProjectTitle || '';
-        const projectId = data.ProjectUUID || data.Project_Id || data.ProjectId || '';
+        const projectId = data.ProjectUUID || data.Project_Id || data.ProjectId || data.UUID || data.Uuid || '';
         setProjectName(projectDisplayName);
         setProjectUUID(projectId);
+        try {
+          if (formikSetFieldValueRef.current) {
+            formikSetFieldValueRef.current('ProjectName', projectDisplayName || '');
+            formikSetFieldValueRef.current('ProjectUUID', projectId || '');
+          }
+        } catch (_) {}
         setPaymentTerm(data.PaymentTermUUID || data.PaymentTerm || data.PaymentTermUUID || '');
         setPaymentMethod(data.PaymentMethodUUID || data.PaymentMethod || data.PaymentMethodUUID || '');
 
@@ -1538,6 +1638,13 @@ const AddPurchaseQuotation = () => {
         if (uuidToLoad) {
           try { await loadPurchaseOrderLines(uuidToLoad); } catch (e) { /* ignore */ }
         }
+        // Prefill notes and terms/conditions from server response
+        try {
+          const incomingTerms = data.TermsConditions || data.Terms || data.TermsAndConditions || data.Terms_Conditions || data.TermsCondition || data.TermsandConditions || '';
+          const incomingNotes = data.Notes || data.Note || data.NotesText || data.Remarks || data.Remark || '';
+          if (incomingTerms) setTerms(incomingTerms);
+          if (incomingNotes) setNotes(incomingNotes);
+        } catch (e) { /* ignore */ }
       } catch (err) {
         console.warn('Failed to load purchase quotation header by id', err?.message || err);
       } finally {
@@ -1580,8 +1687,8 @@ const AddPurchaseQuotation = () => {
               QuotationTitle: headerForm.quotationTitle || '',
               ProjectName: projectName || '',
               ProjectUUID: projectUUID || '',
-              PaymentTerm: paymentTerm || '',
-              PaymentMethod: paymentMethod || '',
+              PaymentTerm: paymentTerm || headerResponse?.PaymentTermUUID || headerResponse?.PaymentTerm || '',
+              PaymentMethod: paymentMethod || headerResponse?.PaymentMode || headerResponse?.PaymentMethod || headerResponse?.PaymentMethodUUID || '',
               PQDocument: file || null,
             }}
             enableReinitialize
@@ -1733,7 +1840,7 @@ const AddPurchaseQuotation = () => {
                 <View style={{ zIndex: 9998, elevation: 20 }}>
                   <Dropdown
                     placeholder="Select Project"
-                    value={values.ProjectName || ''}
+                    value={values.ProjectUUID || projectUUID || ''}
                     options={projects}
                     getLabel={p => p?.label || ''}
                     getKey={p => p?.value}
@@ -1752,12 +1859,14 @@ const AddPurchaseQuotation = () => {
                         setFieldValue('ProjectUUID', selectedUUID);
                         setProjectUUID(selectedUUID); // Store UUID for API
                         setProjectName(selectedName); // Store name for display
+                        try { if (formikSetFieldValueRef.current) { formikSetFieldValueRef.current('ProjectUUID', selectedUUID); formikSetFieldValueRef.current('ProjectName', selectedName); } } catch (_) {}
                       } catch (e) {
                         console.log('Error in project selection:', e);
                         setFieldValue('ProjectName', opt || '');
                         setFieldValue('ProjectUUID', '');
                         setProjectUUID('');
                         setProjectName(opt);
+                        try { if (formikSetFieldValueRef.current) { formikSetFieldValueRef.current('ProjectUUID', ''); formikSetFieldValueRef.current('ProjectName', opt || ''); } } catch (_) {}
                       }
                     }}
                     renderInModal={true}

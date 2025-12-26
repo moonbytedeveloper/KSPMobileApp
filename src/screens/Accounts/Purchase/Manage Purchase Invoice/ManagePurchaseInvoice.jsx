@@ -411,19 +411,19 @@ const ManagePurchaseInvoice = () => {
                             key={key}
                             item={{
                                 soleExpenseCode: key,
-                                expenseName: projectName || invoiceNo,
-                                amount: invoiceNo,
+                                expenseName:  invoiceNo ,
+                                amount:  order.TotalAmount || order.Total || order.Amount || '0',
                             }}
                             isActive={activeOrderId === key}
                             onToggle={() => setActiveOrderId((prev) => (prev === key ? null : key))}
                             customRows={[
                                 { label: 'Vendor Name', value: vendorName },
                                 { label: 'Purchase Order No', value: PurchaseOrderNo },
+                                { label: 'Project Name', value: projectName || '-' },
                                 { label: 'Order Date', value: orderDate },
-                                { label: 'Total Amount', value: order.TotalAmount || order.Total || order.Amount || '0' },
                             ]}
-                            headerLeftLabel="Project Name"
-                            headerRightLabel="Purchase Invoice Number"
+                            headerLeftLabel="Purchase Invoice Number "
+                            headerRightLabel="Total Amount"
                             footerComponent={renderFooterActions(order)}
                             headerRightContainerStyle={styles.headerRightContainer}
                         />

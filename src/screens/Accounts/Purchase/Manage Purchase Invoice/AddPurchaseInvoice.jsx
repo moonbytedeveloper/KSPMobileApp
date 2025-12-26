@@ -134,22 +134,7 @@ const AddPurchaseInvoice = () => {
         setExpandedId(prev => (prev === id ? null : id));
     };
 
-    // Demo options for dropdowns
-    const paymentTerms = ['Monthly'];
-    const projects = ['Mobile App',];
-    const taxOptions = ['IGST', 'CGST', 'SGST', 'No Tax'];
-    const countries = ['India', 'United States', 'United Kingdom'];
-    const salesInquiries = ['KSPIN002', 'KSPIN005'];
-    const customers = ['Acme Corp', 'Beta Ltd'];
-    const state = ['Gujarat', 'Delhi', 'Mumbai'];
-    const city = ['vadodara', 'surat',];
-
-    const paymentMethods = [
-        'Cash',
-        'Bank Transfer',
-        'Mobile App Development',
-
-    ];
+    // Demo options for dropdowns (removed static demo data)
    const screenTheme = { 
     text: COLORS.text,
     textLight: COLORS.textLight,

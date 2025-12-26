@@ -125,7 +125,7 @@ const PATHS = {
     getCustomers: Config.API_GET_CUSTOMERS_PATH || '/api/Account/GetCustomers',
     getVendors: Config.API_GET_VENDORS_PATH || '/api/Account/PurchasequotationVendors',
     getItemTypes: Config.API_GET_ITEM_TYPES_PATH || '/api/Account/ItemTypes',
-    getItemMasters: Config.API_GET_ITEM_MASTERS_PATH || '/api/Account/ItemMasters',
+    // getItemMasters: Config.API_GET_ITEM_MASTERS_PATH || '/api/Account/ItemMasters',
     getUnits: Config.API_GET_UNITS_PATH || '/api/Account/Units',
     addSalesHeader: Config.API_ADD_SALES_HEADER_PATH || '/api/Account/AddSalesHeader',
     addSalesLine: Config.API_ADD_SALES_LINE_PATH || '/api/Account/AddSalesLine',
@@ -137,6 +137,7 @@ const PATHS = {
     getSalesLines: Config.API_GET_SALES_LINES_PATH || '/api/Account/GetSalesLines',
     // Note: backend exposes purchase order lines list at '/api/Account/purchaseorderlines' (plural)
     getPurchaseOrderLines: Config.API_GET_PURCHASE_ORDER_LINES_PATH || '/api/Account/purchaseorderlines',
+    getPurchaseQuotationLines: Config.API_GET_PURCHASE_QUOTATION_LINES_PATH || '/api/Account/GetPurchaseQuotationLines',
     deletePurchaseOrderLine: Config.API_GET_PURCHASE_ORDER_LINES_PATH || '/api/Account/purchaseorderline',
     getSalesOrderHeaders: Config.API_GET_SALES_ORDER_HEADERS_PATH || '/api/Account/GetSalesOrderHeaders',
     getSalesOrderHeaderById: Config.API_GET_SALES_ORDER_HEADER_BY_ID_PATH || '/api/Account/GetSalesOrderHeaderById',
@@ -146,6 +147,7 @@ const PATHS = {
     termsOfPayment: Config.API_TERMS_OF_PAYMENT_PATH || '/api/Account/termsofpayment',
     modeOfPayment: Config.API_MODE_OF_PAYMENT_PATH || '/api/Account/modeofpayment',
     getpurchaseInquiryHeader: Config.API_GET_PURCHASE_INQUIRY_HEADER_PATH || 'api/Account/GetPurchaseInquiryHeader',
+    getPurchaseInquiryLines: Config.API_GET_PURCHASE_INQUIRY_LINES_PATH || '/api/Account/GetPurchaseInquiryLines',
     // Account Purchase
     deletePurchaseQuotationLine: Config.API_DELETE_PURCHASE_QUOTATION_LINE_PATH || '/api/Account/DeletePurchaseQuotationLine',
     UpdatePurchaseQuotationLine: Config.API_UPDATE_PURCHASE_QUOTATION_LINE_PATH || '/api/Account/UpdatePurchaseQuotationLine',
@@ -680,7 +682,7 @@ export async function getPurchaseQuotationHeaderById({ headerUuid, cmpUuid, envU
             ]);
             u = uu; c = cc; e = ee;
         }
-        const params = { headerUuid, cmpUuid: c, envUuid: e };
+        const params = { Uuid: headerUuid, cmpUuid: c, envUuid: e };
         console.log('[authServices] getPurchaseQuotationHeaderById params ->', params);
         const resp = await api.get(PATHS.getPurchaseQuotationHeaderById, { params });
         console.log('[authServices] getPurchaseQuotationHeaderById response ->', resp && resp.status);
@@ -692,13 +694,13 @@ export async function getPurchaseQuotationHeaderById({ headerUuid, cmpUuid, envU
 }
 
 // Get item masters (item names) optionally filtered by ItemType UUID
-export async function getItemMasters({ itemTypeUuid, cmpUuid, envUuid, userUuid } = {}) {
-    const [c, e] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID()]);
-    const params = { cmpUuid: c, envUuid: e };
-    if (itemTypeUuid) params.ItemType_UUID = itemTypeUuid;
-    const resp = await api.get(PATHS.getItemMasters, { params });
-    return resp.data;
-}
+// export async function getItemMasters({ itemTypeUuid, cmpUuid, envUuid, userUuid } = {}) {
+//     const [c, e] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID()]);
+//     const params = { cmpUuid: c, envUuid: e };
+//     if (itemTypeUuid) params.ItemType_UUID = itemTypeUuid;
+//     const resp = await api.get(PATHS.getItemMasters, { params });
+//     return resp.data;
+// }
 
 // Get items list (supports optional search / pagination)
 export async function getItems({ search, page, pageSize, cmpUuid, envUuid, userUuid, mode } = {}) {
@@ -1276,6 +1278,26 @@ export async function getPurchaseOrderLines({ headerUuid, cmpUuid, envUuid, user
     return resp.data;
 }
 
+export async function getPurchaseQuotationLines({ headerUuid, cmpUuid, envUuid, userUuid } = {}) {
+    if (!headerUuid) throw new Error('headerUuid is required');
+    const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+    // include multiple key names for header uuid to handle backend naming differences
+    const params = { headerUuid, UUID: headerUuid, HeaderUUID: headerUuid, cmpUuid: c, envUuid: e, userUuid: u };
+    console.log('[authServices] getPurchaseQuotationLines params ->', params);
+    const resp = await api.get(PATHS.getPurchaseQuotationLines, { params });
+    console.log('[authServices] getPurchaseQuotationLines resp ->', resp?.status);
+    return resp.data;
+}
+
+export async function getPurchaseInquiryLines({ headerUuid, cmpUuid, envUuid, userUuid } = {}) {
+    if (!headerUuid) throw new Error('headerUuid is required');
+    const [c, e, u] = await Promise.all([cmpUuid || getCMPUUID(), envUuid || getENVUUID(), userUuid || getUUID()]);
+    const params = { headerUuid, UUID: headerUuid, HeaderUUID: headerUuid, cmpUuid: c, envUuid: e, userUuid: u };
+    console.log('[authServices] getPurchaseInquiryLines params ->', params);
+    const resp = await api.get(PATHS.getPurchaseInquiryLines, { params });
+    console.log('[authServices] getPurchaseInquiryLines resp ->', resp?.status);
+    return resp.data;
+}
 
 
 

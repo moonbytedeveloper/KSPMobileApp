@@ -464,17 +464,17 @@ const ViewPerfomaPurchaseInvoice = () => {
                             item={{
                                 soleExpenseCode: id,
                                 // Show project name in the left header; fallback to purchase order no.
-                                expenseName: projectName || PurchaseOrderNo,
+                                expenseName: invoiceNo ,
                                 amount: order.TotalAmount || order.GrandTotal || order.Amount || order.Total || amount || '0',
                             }}
                             isActive={activeOrderId === id}
                             onToggle={() => setActiveOrderId((prev) => (prev === id ? null : id))}
                             customRows={[
                                 { label: 'Vendor Name', value: customerName },
-                                { label: 'Invoice No', value: invoiceNo },
+                                { label: 'Project', value: projectName },
                                 { label: 'Order Date', value: orderDate },
                             ]}
-                            headerLeftLabel="Project"
+                            headerLeftLabel="Proforma Invoice"
                             headerRightLabel="Amount"
                             footerComponent={renderFooterActions(order)}
                             headerRightContainerStyle={styles.headerRightContainer}

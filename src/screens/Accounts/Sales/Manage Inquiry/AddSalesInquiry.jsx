@@ -11,7 +11,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 // Network API calls removed from this screen — local-only behavior
 import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
-import { fetchProjects, getSalesHeader, updateSalesHeader, getCustomers, addSalesInquiry, addSalesLine, updateSalesLine, deleteSalesLine, getItemTypes, getItemMasters, getUnits, getSalesLines } from '../../../../api/authServices';
+import { fetchProjects, getSalesHeader, updateSalesHeader, getCustomers, addSalesInquiry, addSalesLine, updateSalesLine, deleteSalesLine, getItemTypes, getItems, getUnits, getSalesLines } from '../../../../api/authServices';
 import { uiDateToApiDate } from '../../../../utils/dateUtils';
 import BottomSheetConfirm from '../../../../components/common/BottomSheetConfirm';
 
@@ -533,7 +533,7 @@ const AddSalesInquiry = () => {
         try {
             // Prefer API-backed item masters for the given item type
             // Call signature: pass identifier if available (service may accept an object or raw id)
-            const resp = await getItemMasters(itemTypeUuid ? { itemTypeUuid } : {});
+            const resp = await getItems(itemTypeUuid ? { itemTypeUuid } : {});
             const list = resp?.Data || resp?.Records || resp?.List || resp || [];
             const arr = Array.isArray(list) ? list : [];
             setServerItemMasters(arr);

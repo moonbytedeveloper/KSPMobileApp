@@ -142,14 +142,7 @@ const AddSalesPerfomaInvoice = () => {
     };
 
     // Demo options for dropdowns
-    const paymentTerms = ['Monthly'];
-    const projects = ['Mobile App',];
-    const taxOptions = ['IGST', 'CGST', 'SGST', 'No Tax'];
-    const countries = ['India', 'United States', 'United Kingdom'];
-    const salesInquiries = ['KSPIN002', 'KSPIN005'];
-    const customers = ['Acme Corp', 'Beta Ltd'];
-    const state = ['Gujarat', 'Delhi', 'Mumbai'];
-    const city = ['vadodara', 'surat',];
+     
     const screenTheme = {
         text: COLORS.text,
         textLight: COLORS.textLight,
@@ -157,12 +150,7 @@ const AddSalesPerfomaInvoice = () => {
     };
     const colorScheme = useColorScheme && useColorScheme();
     const inputTextColor = colorScheme === 'dark' ? '#ffffff' : COLORS.text;
-    const paymentMethods = [
-        'Cash',
-        'Bank Transfer',
-        'Mobile App Development',
-
-    ];
+    
 
     // Lookup option state (bound same as ManageSalesOrder)
     const [paymentTermsOptions, setPaymentTermsOptions] = useState([]);
@@ -254,7 +242,6 @@ const AddSalesPerfomaInvoice = () => {
                 });
 
                 const normalizedInquiries = (Array.isArray(inquiriesList) ? inquiriesList : []).map((r) => {
-                    console.log('Raw inquiry data:', r);
                     const inquiryNo = r?.SalesInqNo || r?.SalesInquiryNo || r?.InquiryNo || r?.Name || r?.Title || String(r);
                     return {
                         UUID: r?.UUID || r?.Uuid || r?.Id || r?.InquiryUUID || r?.SalesInquiryUUID || inquiryNo,
@@ -309,7 +296,7 @@ const AddSalesPerfomaInvoice = () => {
                 // Normalize Purchase Orders
                 const purchaseOrdersList = extractArray(purchaseOrdersResp);
                 const normalizedPurchaseOrders = (Array.isArray(purchaseOrdersList) ? purchaseOrdersList : []).map((r) => {
-                    console.log('Raw purchase order data:', r);
+                    // console.log('Raw purchase order data:', r);
                     const uuid = r?.UUID || r?.Uuid || r?.Id || r?.PurchaseOrderUUID || r?.PurchaseOrderId || null;
                     // Prefer explicit readable fields; handle shapes like { Uuid: '...', Number: '1-003' }
                     const orderNoCandidates = [
@@ -389,6 +376,12 @@ const AddSalesPerfomaInvoice = () => {
                 // also set salesOrderUuid for backward compatibility
                 setSalesOrderUuid(poUuid);
             }
+            // Map Purchase Inquiry UUID (backend may provide PurchaseInqNoUUID)
+            const pInqUuid = data?.PurchaseInqNoUUID || data?.PurchaseInquiryUUID || data?.PurchaseInquiryId || null;
+            if (pInqUuid) {
+                setSalesInquiryUuid(pInqUuid);
+                setHeaderForm(s => ({ ...s, salesInquiryUUID: pInqUuid }));
+            }
             setInvoiceDate(data?.OrderDate || data?.PerformaDate || '');
             setDueDate(data?.DueDate || '');
             setShippingCharges(String(data?.ShippingCharges ?? data?.ShippingCharge ?? 0));
@@ -398,11 +391,10 @@ const AddSalesPerfomaInvoice = () => {
             const headerUuid = data?.UUID || data?.Id || data?.HeaderUUID || null;
             setHeaderUUID(headerUuid);
             if (data?.FilePath) setFile({ uri: data.FilePath, name: data.FilePath });
-            // If headerUUID exists, it's edit mode - make it editable by default
-            // Otherwise, it's view mode - make it non-editable
+            // If headerUUID exists, treat this as edit mode: open header and enable editing
             setHeaderSubmitted(true);
-            setHeaderEditable(false); // always start prefill in view mode; user must click Edit to enable
-            // Do not auto-open header on prefill; user must click Edit to open
+            setHeaderEditable(true);
+            setExpandedId(1);
         } catch (e) {
             console.warn('prefill header failed', e);
         } finally {
@@ -432,7 +424,7 @@ const AddSalesPerfomaInvoice = () => {
                 }
 
                 // Extract Sales Inquiry UUID
-                const inquiryUuid = data?.SalesInqNoUUID || data?.SalesInquiryUUID || data?.SalesInquiryId || data?.SalesInquiryUuid || null;
+                const inquiryUuid = data?.SalesInqNoUUID || data?.SalesInquiryUUID || data?.SalesInquiryId || data?.SalesInquiryUuid || data?.PurchaseInqNoUUID || data?.PurchaseInqNoUuid || null;
                 if (inquiryUuid) {
                     setSalesInquiryUuid(inquiryUuid);
                 }
@@ -453,6 +445,13 @@ const AddSalesPerfomaInvoice = () => {
                 const payMethodUuid = data?.PaymentMethodUUID || data?.PaymentMethodId || data?.PaymentMethod || null;
                 if (payMethodUuid) {
                     setPaymentMethodUUID(payMethodUuid);
+                }
+
+                // Also accept VendorUUID as customer identifier
+                const vendorUuid = data?.VendorUUID || data?.VendorId || data?.Vendor || null;
+                if (vendorUuid) {
+                    // update header form's CustomerUUID so the Customer mapping effect can resolve the display name
+                    setHeaderForm(s => ({ ...s, CustomerUUID: vendorUuid }));
                 }
 
                 // Extract Sales Order UUID (also consider PurchaseOrder keys)
@@ -515,6 +514,18 @@ const AddSalesPerfomaInvoice = () => {
                     setServerTotalAmount(String(headerTotal));
                 }
 
+                // Prefill discount if provided by API
+                const discountVal = data?.Discount ?? data?.DiscountAmount ?? data?.DiscountValue ?? null;
+                if (discountVal !== null && typeof discountVal !== 'undefined') {
+                    setDiscount(String(discountVal));
+                }
+
+                // Some APIs return payment identifier under `PaymentMode` — treat it as PaymentMethodUUID
+                const paymentModeFallback = data?.PaymentMode || data?.PaymentModeUUID || data?.PaymentModeId || null;
+                if (paymentModeFallback && !paymentMethodUUID) {
+                    setPaymentMethodUUID(paymentModeFallback);
+                }
+
                 if (data?.FilePath) {
                     setFile({ uri: data.FilePath, name: data.FilePath });
                 }
@@ -555,9 +566,10 @@ const AddSalesPerfomaInvoice = () => {
                 }
 
                 // Mark as submitted (view mode). Keep edit disabled until user clicks Edit
+                // For edit flow, open header and enable editing so user can edit immediately
                 setHeaderSubmitted(true);
-                setHeaderEditable(false);
-                // Do not auto-open header here; user must click Edit to make changes
+                setHeaderEditable(true);
+                setExpandedId(1);
             } catch (e) {
                 console.error('Error fetching header data:', e);
                 Alert.alert('Error', e?.message || 'Unable to load header data');
@@ -770,6 +782,16 @@ const AddSalesPerfomaInvoice = () => {
             // ignore
         }
     }, [route?.params]);
+
+    // If user edits discount, clear any server-provided total so UI recalculates locally
+    useEffect(() => {
+        try {
+            // When discount is changed by user, prefer local computation over stale server total
+            if (serverTotalAmount) setServerTotalAmount('');
+        } catch (e) {
+            // ignore
+        }
+    }, [discount]);
 
     // Permission handling for Android
     const requestStoragePermissionAndroid = async () => {
@@ -1161,40 +1183,14 @@ const AddSalesPerfomaInvoice = () => {
         }
         setHeaderSubmitting(true);
         try {
-            const payload = {
-                UUID: headerUUID,
-                SalesInvNo: headerForm.salesInquiryText || '',
-                SalesInqNoUUID: salesInquiryUuid || headerForm.salesInquiryUUID || '',
-                // pass the selected order UUID to server (prefer purchaseOrderUuid)
-                SalesOrderNo: purchaseOrderUuid || salesOrderUuid || headerForm.clientName || '',
-                CustomerUUID: headerForm.CustomerUUID || headerForm.CustomerUUID || '',
-                ProjectUUID: projectUUID || project || '',
-                PaymentTermUUID: paymentTermUuid || paymentTerm || '',
-                PaymentMethodUUID: paymentMethodUUID || paymentMethod || '',
-                OrderDate: uiDateToApiDate(invoiceDate),
-                DueDate: uiDateToApiDate(dueDate),
-                CustomerNotes: notes || '',
-                ShippingCharges: parseFloat(shippingCharges) || 0,
-                AdjustmentField: adjustmentLabel || '',
-                AdjustmentPrice: parseFloat(adjustments) || 0,
-                TermsConditions: terms || '',
-                SubTotal: parseFloat(computeSubtotal()) || 0,
-                TotalTax: parseFloat(totalTax) || 0,
-                TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) - (parseFloat(discount) || 0) + (parseFloat(totalTax) || 0),
-                FilePath: uploadedFilePath || file?.uri || file?.name || '',
-                Notes: notes || '',
-            };
-
+            const payload = buildHeaderUpdatePayload();
             console.log('Final submit - update header payload ->', payload);
             const resp = await updatePurchasePerformaInvoiceHeader(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
             console.log('updatePurchasePerformaInvoiceHeader resp ->', resp);
             Alert.alert('Success', 'Performa header updated successfully');
-            // Refresh header totals from server after update
             await refreshHeaderTotals(headerUUID);
-            // Mark as submitted and collapse sections
             setHeaderSubmitted(true);
             setHeaderEditable(false);
-            // Collapse sections after final submit
             setExpandedId(null);
         } catch (e) {
             console.error('Final submit error', e);
@@ -1285,6 +1281,68 @@ const AddSalesPerfomaInvoice = () => {
         }
     };
 
+    // Unified builder for header update payload (used by both header update and final submit)
+    const buildHeaderUpdatePayload = () => {
+        const subtotal = parseFloat(computeSubtotal()) || 0;
+        const shipping = parseFloat(shippingCharges) || 0;
+        const adjustment = parseFloat(adjustments) || 0;
+        const disc = parseFloat(discount) || 0;
+        const totalTaxNum = parseFloat(totalTax) || 0;
+        const totalAmount = subtotal + shipping + adjustment - disc + totalTaxNum;
+
+        // Helper to detect UUID-like strings
+        const looksLikeUuid = v => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+        // Try to resolve a payment term display name (e.g. "Net 50") to its UUID from options
+        const resolvePaymentTermUuidFromOptions = (label) => {
+            if (!label) return null;
+            const found = (paymentTermsOptions || []).find(p =>
+                (p?.UUID && String(p?.UUID) === String(label)) ||
+                (p?.Uuid && String(p?.Uuid) === String(label)) ||
+                (p?.Id && String(p?.Id) === String(label)) ||
+                String(p?.Name || p?.Title || p?.Label || p?.Value || p)?.trim() === String(label).trim()
+            );
+            return found ? (found?.UUID || found?.Uuid || found?.Id || null) : null;
+        };
+
+        const resolvedPaymentTermUuid = paymentTermUuid || headerForm.PaymentTermUUID || resolvePaymentTermUuidFromOptions(paymentTerm || headerForm.PaymentTerm);
+
+        return {
+            UUID: headerUUID || headerForm.UUID || '',
+            InvoiceNo: headerForm.salesInquiryText || headerForm.InvoiceNo || '',
+            SalesInvNo: headerForm.salesInquiryText || headerForm.InvoiceNo || '',
+            PurchaseInqNoUUID: salesInquiryUuid || headerForm.salesInquiry || '',
+            SalesInqNoUUID: salesInquiryUuid || headerForm.salesInquiry || '',
+            PurchaseOrderNo: purchaseOrderUuid || salesOrderUuid || headerForm.PurchaseOrderUUID || '',
+            SalesOrderNo: purchaseOrderUuid || salesOrderUuid || headerForm.SalesOrderNo || '',
+            VendorUUID: headerForm.CustomerUUID || headerForm.VendorUUID || '',
+            CustomerUUID: headerForm.CustomerUUID || headerForm.VendorUUID || '',
+            VendorName: headerForm.CustomerName || headerForm.VendorName || '',
+            ProjectUUID: projectUUID || project || '',
+            ProjectName: project || headerForm.ProjectName || '',
+            PaymentTermUUID: resolvedPaymentTermUuid || '',
+            // For payload, send PaymentTerm as UUID when possible (backend expects UUID)
+            PaymentTerm: resolvedPaymentTermUuid || paymentTerm || headerForm.PaymentTerm || '',
+            PaymentMethodUUID: paymentMethodUUID || headerForm.PaymentMethodUUID || (looksLikeUuid(headerForm.PaymentMode) ? headerForm.PaymentMode : (looksLikeUuid(headerForm.PaymentMethod) ? headerForm.PaymentMethod : '')),
+            PaymentMode: paymentMethodUUID || headerForm.PaymentMethodUUID || paymentMethod || headerForm.PaymentMode || headerForm.PaymentMethod || '',
+            OrderDate: uiDateToApiDate(invoiceDate),
+            DueDate: uiDateToApiDate(dueDate),
+            Note: notes || headerForm.Note || headerForm.Notes || '',
+            CustomerNotes: notes || headerForm.CustomerNotes || '',
+            TermsConditions: terms || headerForm.TermsConditions || '',
+            FilePath: uploadedFilePath || file?.uri || file?.name || headerForm.FilePath || '',
+            SubTotal: subtotal,
+            TotalTax: totalTaxNum,
+            TotalAmount: totalAmount,
+            ShippingCharges: shipping,
+            AdjustmentField: adjustmentLabel || headerForm.AdjustmentField || '',
+            AdjustmentPrice: adjustment || headerForm.AdjustmentPrice || 0,
+            Discount: disc,
+            IsActive: true,
+            IsDisplay: true,
+        };
+    };
+
     const updateHeader = async () => {
         console.log('updateHeader called, headerUUID:', headerUUID);
         // Update existing header - requires headerUUID
@@ -1297,32 +1355,8 @@ const AddSalesPerfomaInvoice = () => {
         setHeaderSubmitting(true);
         try {
             console.log('updateHeader: Building payload...');
-            const payload = {
-                UUID: headerUUID || headerForm.UUID || '',
-                InvoiceNo: headerForm.salesInquiryText || '',
-                PurchaseInqNoUUID: salesInquiryUuid || headerForm.salesInquiryUUID || '',
-                PurchaseOrderUUID: purchaseOrderUuid || salesOrderUuid || '',
-                VendorUUID: headerForm.CustomerUUID || '',
-                VendorName: headerForm.CustomerName || '',
-                ProjectUUID: projectUUID || project || '',
-                ProjectName: project || '',
-                PaymentTermUUID: paymentTermUuid || '',
-                PaymentTerm: paymentTerm || '',
-                PaymentMethodUUID: paymentMethodUUID || '',
-                PaymentMode: paymentMethod || '',
-                OrderDate: uiDateToApiDate(invoiceDate),
-                Note: notes || '',
-                TermsConditions: terms || '',
-                FilePath: uploadedFilePath || file?.uri || file?.name || '',
-                SubTotal: parseFloat(computeSubtotal()) || 0,
-                TotalTax: parseFloat(totalTax) || 0,
-                TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) - (parseFloat(discount) || 0) + (parseFloat(totalTax) || 0),
-                Discount: parseFloat(discount) || 0,
-                IsActive: true,
-                IsDisplay: true,
-            };
+            const payload = buildHeaderUpdatePayload();
             console.log('updateHeader payload ->', payload);
-
             const resp = await updatePurchasePerformaInvoiceHeader(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
             console.log('updateHeader resp ->', resp);
             Alert.alert('Success', 'Header updated successfully');
@@ -1492,6 +1526,13 @@ const AddSalesPerfomaInvoice = () => {
                 CustomerUUID: data?.CustomerUUID || data?.CustomerId || s.CustomerUUID || null,
                 CustomerName: data?.CustomerName || s.CustomerName || '',
             }));
+
+            // Also map Purchase Inquiry UUID (backend may return PurchaseInqNoUUID)
+            const pInqUuid = data?.PurchaseInqNoUUID || data?.PurchaseInqNoUuid || data?.PurchaseInquiryUUID || null;
+            if (pInqUuid) {
+                setSalesInquiryUuid(pInqUuid);
+                setHeaderForm(s => ({ ...s, salesInquiryUUID: pInqUuid }));
+            }
 
             if (data?.OrderDate) {
                 const orderDate = data.OrderDate;
@@ -2320,9 +2361,9 @@ const AddSalesPerfomaInvoice = () => {
                         {/* Notes + Attach file inline */}
                         <View style={styles.notesAttachRow}>
                             <View style={styles.notesCol}>
-                                <Text style={inputStyles.label}>Notes</Text>
+                                <Text style={[inputStyles.label,{color:'#000000'}]}>Notes</Text>
                                 <TextInput
-                                    style={styles.noteBox}
+                                    style={[styles.noteBox,{color:'#000000'}]}
                                     multiline
                                     numberOfLines={4}
                                     value={notes}
@@ -2332,9 +2373,9 @@ const AddSalesPerfomaInvoice = () => {
                                 />
                             </View>
                             <View style={styles.notesCol}>
-                                <Text style={inputStyles.label}>Terms & Conditions</Text>
+                                <Text style={[inputStyles.label,{color:'#000000'}]}>Terms & Conditions</Text>
                                 <TextInput
-                                    style={styles.noteBox}
+                                    style={[styles.noteBox,{color:'#000000'}]}
                                     multiline
                                     numberOfLines={4}
                                     value={terms}

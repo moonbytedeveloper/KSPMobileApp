@@ -151,6 +151,27 @@ const ManageSalesInvoice = () => {
         return '';
     };
 
+    // Helper to prefer server-provided error/success messages from various response shapes
+    const extractApiMessage = (obj) => {
+        if (!obj) return '';
+        // axios error wrapper
+        if (obj.response && obj.response.data) {
+            const d = obj.response.data;
+            return d.Message || d.message || (d.Data && (d.Data.Message || d.Data.message)) || '';
+        }
+        // axios success response
+        if (obj.data) {
+            const d = obj.data;
+            return d.Message || d.message || (d.Data && (d.Data.Message || d.Data.message)) || '';
+        }
+        // raw object returned by some APIs
+        if (typeof obj === 'object') {
+            return obj.Message || obj.message || (obj.Data && (obj.Data.Message || obj.Data.message)) || (obj.data && (obj.data.Message || obj.data.message)) || '';
+        }
+        if (typeof obj === 'string') return obj;
+        return '';
+    };
+
     useEffect(() => {
         fetchSalesInvoices(currentPage, itemsPerPage, searchQuery);
     }, [currentPage, itemsPerPage, searchQuery]);
@@ -224,7 +245,8 @@ const ManageSalesInvoice = () => {
             });
         } catch (error) {
             console.warn('Download PDF error:', error);
-            Alert.alert('Error', error?.message || 'Failed to generate PDF');
+            const pdfErrMsg = extractApiMessage(error) || error?.message || 'Failed to generate PDF';
+            Alert.alert('Error', pdfErrMsg);
         } finally {
             setIsGeneratingPDF(false);
         }
@@ -262,10 +284,12 @@ const ManageSalesInvoice = () => {
                                     console.log('deleteSalesInvoiceHeader resp ->', resp && resp.status, resp?.data);
                                     // refresh the list after deletion
                                     await fetchSalesInvoices(currentPage, itemsPerPage, searchQuery);
-                                    Alert.alert('Success', 'Sales invoice deleted');
+                                    const delMsg = extractApiMessage(resp) || 'Sales invoice deleted';
+                                    Alert.alert('Success', delMsg);
                                 } catch (e) {
                                     console.warn('delete sales invoice header error', e);
-                                    Alert.alert('Error', e?.message || 'Unable to delete sales invoice');
+                                    const delErr = extractApiMessage(e) || e?.message || 'Unable to delete sales invoice';
+                                    Alert.alert('Error', delErr);
                                 }
                             }
                         }
@@ -349,7 +373,8 @@ const ManageSalesInvoice = () => {
             Alert.alert('Action Triggered', `${actionLabel} clicked for ${idLabel}`);
         } catch (err) {
             console.warn('handleQuickAction error', err);
-            Alert.alert('Error', err?.message || 'Action failed');
+            const actErr = extractApiMessage(err) || err?.message || 'Action failed';
+            Alert.alert('Error', actErr);
         }
     };
 
@@ -537,13 +562,15 @@ const ManageSalesInvoice = () => {
 
             const resp = await updateSalesInvoicePayment(payload, { cmpUuid: cmp, envUuid: env, userUuid: user });
             console.log('updateSalesInvoicePayment resp ->', resp);
-            Alert.alert('Success', 'Payment updated successfully');
+            const payMsg = extractApiMessage(resp) || 'Payment updated successfully';
+            Alert.alert('Success', payMsg);
             // refresh summary
             fetchSalesInvoicePayment(forwardTarget);
             closeForwardModal();
         } catch (e) {
             console.warn('handleForwardSubmit error', e);
-            Alert.alert('Error', e?.message || 'Unable to prepare payload');
+            const fErr = extractApiMessage(e) || e?.message || 'Unable to prepare payload';
+            Alert.alert('Error', fErr);
         } finally {
             setForwardSubmitting(false);
         }
@@ -665,7 +692,8 @@ const ManageSalesInvoice = () => {
             navigation.navigate('FileViewerScreen', { pdfBase64, fileName });
         } catch (e) {
             console.warn('open sales order slip error', e);
-            Alert.alert('Error', e?.message || 'Unable to open sales order PDF');
+            const soErr = extractApiMessage(e) || e?.message || 'Unable to open sales order PDF';
+            Alert.alert('Error', soErr);
         } finally {
             setIsGeneratingPDF(false);
         }
@@ -691,7 +719,8 @@ const ManageSalesInvoice = () => {
             navigation.navigate('FileViewerScreen', { pdfBase64, fileName });
         } catch (e) {
             console.warn('open sales performa slip error', e);
-            Alert.alert('Error', e?.message || 'Unable to open performa PDF');
+            const pfErr = extractApiMessage(e) || e?.message || 'Unable to open performa PDF';
+            Alert.alert('Error', pfErr);
         } finally {
             setIsGeneratingPDF(false);
         }

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { RefreshControl } from 'react-native';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -27,6 +28,7 @@ const ViewPurchaseOrder = () => {
     const [orderRelatedModalVisible, setOrderRelatedModalVisible] = useState(false);
     const [orderRelatedLoading, setOrderRelatedLoading] = useState(false);
     const [orderRelatedData, setOrderRelatedData] = useState({ PurchaseInvoices: [], ProformaInvoices: [] });
+    const [refreshing, setRefreshing] = useState(false);
 
     // Server-backed paging: fetch whenever page, pageSize or search changes
     const totalPages = useMemo(() => {
@@ -85,12 +87,29 @@ const ViewPurchaseOrder = () => {
         }
     };
 
-    // Reload data when screen comes into focus (after adding/editing)
-    useFocusEffect(
-        React.useCallback(() => {
+    const onRefresh = async () => {
+        try {
+            setRefreshing(true);
+            await loadPurchaseOrders();
+        } catch (err) {
+            console.warn('Refresh failed', err);
+        } finally {
+            setRefreshing(false);
+        }
+    };
+
+    // Reload data when page, pageSize or search changes and also when screen gains focus
+    useEffect(() => {
+        loadPurchaseOrders();
+    }, [currentPage, itemsPerPage, searchQuery]);
+
+    // Also refresh when screen comes into focus (e.g. after add/edit on another screen)
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
             loadPurchaseOrders();
-        }, [currentPage, itemsPerPage, searchQuery])
-    );
+        });
+        return unsubscribe;
+    }, [navigation]);
 
     const handleDownloadPDF = async (order) => {
         try {
@@ -383,7 +402,7 @@ const ViewPurchaseOrder = () => {
                 </View>
             </View>
 
-            <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}>
                 {paginatedOrders.map((order) => (
                     <AccordionItem
                         key={order.id}

@@ -575,8 +575,8 @@ const ViewPurchaseQuotation = () => {
                                 key={order.id}
                                 item={{
                                     soleExpenseCode: order.id,
-                                    expenseName: order.customerName,
-                                    amount:  order.quotationNumber || '',
+                                    expenseName:  order.quotationNumber || '-',
+                                    amount: order.customerName  || '-',
                                     headerTitle: order.customerName || order.quotationTitle,
                                 }}
                             isActive={activeOrderId === order.id}
@@ -587,8 +587,8 @@ const ViewPurchaseQuotation = () => {
                                 { label: 'Quotation Title', value: order.quotationTitle || order.salesOrderNumber || 'Title' },
                                 // { label: 'Due Date', value: order.dueDate },
                             ]}
-                            headerLeftLabel="Vendor Name"
-                            headerRightLabel="Quotation No."
+                            headerLeftLabel="Quotation No."
+                            headerRightLabel="Vendor Name "
                             footerComponent={renderFooterActions(order)}
                             headerRightContainerStyle={styles.headerRightContainer}
                         />
