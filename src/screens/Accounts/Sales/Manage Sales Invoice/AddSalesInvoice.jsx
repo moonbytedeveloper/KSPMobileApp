@@ -223,8 +223,8 @@ const AddSalesInvoice = () => {
     // State to control visibility of From/To Date fields
     const [showTimesheetDates, setShowTimesheetDates] = useState(false);
 
-    // Fetch lookups (payment terms, methods, projects, inquiries) similar to ManageSalesOrder
-    React.useEffect(() => {
+    // Extracted lookup loader so it can be reused when returning from FileViewer
+    const loadLookups = async () => {
         const extractArray = (resp) => {
             const d = resp?.Data ?? resp;
             if (Array.isArray(d)) return d;
@@ -234,79 +234,75 @@ const AddSalesInvoice = () => {
             return [];
         };
 
-        (async () => {
-            try {
-                const [custResp, termsResp, methodsResp, projectsResp, inquiriesResp, salesOrdersResp] = await Promise.all([
-                    getCustomers(),
-                    getPaymentTerms(),
-                    getPaymentMethods(),
-                    fetchProjects(),
-                    getAllSalesInquiryNumbers(),
-                    getSalesOrderNumbers(),
-                ]);
+        try {
+            const [custResp, termsResp, methodsResp, projectsResp, inquiriesResp, salesOrdersResp] = await Promise.all([
+                getCustomers(),
+                getPaymentTerms(),
+                getPaymentMethods(),
+                fetchProjects(),
+                getAllSalesInquiryNumbers(),
+                getSalesOrderNumbers(),
+            ]);
 
-                const custList = extractArray(custResp);
-                const termsList = extractArray(termsResp);
-                const methodsList = extractArray(methodsResp);
-                const projectsList = extractArray(projectsResp);
-                const inquiriesList = extractArray(inquiriesResp);
-                const salesOrdersList = extractArray(salesOrdersResp);
-                console.log(salesOrdersList, 'salesordernum');
+            const custList = extractArray(custResp);
+            const termsList = extractArray(termsResp);
+            const methodsList = extractArray(methodsResp);
+            const projectsList = extractArray(projectsResp);
+            const inquiriesList = extractArray(inquiriesResp);
+            const salesOrdersList = extractArray(salesOrdersResp);
 
-                const normalizedInquiries = (Array.isArray(inquiriesList) ? inquiriesList : []).map((r) => ({
-                    UUID: r?.UUID || r?.Uuid || r?.Id || r?.InquiryUUID || r?.SalesInquiryUUID || null,
-                    InquiryNo: r?.SalesInqNo || r?.SalesInquiryNo || r?.InquiryNo || r?.Name || r?.Title || String(r),
-                    raw: r,
-                }));
+            const normalizedInquiries = (Array.isArray(inquiriesList) ? inquiriesList : []).map((r) => ({
+                UUID: r?.UUID || r?.Uuid || r?.Id || r?.InquiryUUID || r?.SalesInquiryUUID || null,
+                InquiryNo: r?.SalesInqNo || r?.SalesInquiryNo || r?.InquiryNo || r?.Name || r?.Title || String(r),
+                raw: r,
+            }));
 
-                setCustomersOptions(custList);
-                setPaymentTermsOptions(termsList);
-                setPaymentMethodsOptions(methodsList);
-                setProjectsOptions(projectsList);
-                setSalesInquiryNosOptions(normalizedInquiries);
-                const normalizedSalesOrders = (Array.isArray(salesOrdersList) ? salesOrdersList : []).map((r) => {
-                    const uuid = r?.UUID || r?.Uuid || r?.Id || r?.SalesOrderUUID || r?.SalesOrderId || null;
+            setCustomersOptions(custList);
+            setPaymentTermsOptions(termsList);
+            setPaymentMethodsOptions(methodsList);
+            setProjectsOptions(projectsList);
+            setSalesInquiryNosOptions(normalizedInquiries);
 
-                    const extractString = (val) => {
-                        if (val === null || val === undefined) return '';
-                        if (typeof val === 'string') return val;
-                        if (typeof val === 'number' || typeof val === 'boolean') return String(val);
-                        if (typeof val === 'object') {
-                            // try explicit readable subfields (including 'Names')
-                            const sub = val?.Names || val?.Name || val?.Title || val?.OrderNo || val?.SalesOrderNo || val?.SalesOrderNumber || val?.Value || val?.Text || val?.DisplayName;
-                            if (typeof sub === 'string' && sub.trim() !== '') return sub;
-                            // search for first string property that isn't an id/uuid
-                            try {
-                                for (const k in val) {
-                                    if (!Object.prototype.hasOwnProperty.call(val, k)) continue;
-                                    const low = String(k).toLowerCase();
-                                    if (/(uuid|^id$|id$|guid)$/.test(low)) continue; // skip id-like keys
-                                    const v = val[k];
-                                    if (typeof v === 'string' && v.trim() !== '') return v;
-                                }
-                            } catch (e) { }
-                            // fallback to toString if informative
-                            try {
-                                const s = val?.toString && val.toString();
-                                if (s && s !== '[object Object]') return s;
-                            } catch (e) { }
-                            return JSON.stringify(val);
-                        }
-                        return String(val);
-                    };
+            const normalizedSalesOrders = (Array.isArray(salesOrdersList) ? salesOrdersList : []).map((r) => {
+                const uuid = r?.UUID || r?.Uuid || r?.Id || r?.SalesOrderUUID || r?.SalesOrderId || null;
 
-                    const rawOrderCandidate = r?.SalesOrderNo ?? r?.SalesOrderNumber ?? r?.OrderNumber ?? r?.OrderNo ?? r?.Name ?? r?.Title ?? r;
-                    const orderNoStr = extractString(rawOrderCandidate);
-                    return { UUID: uuid, OrderNo: orderNoStr, raw: r };
-                });
-                setSalesOrderOptions(normalizedSalesOrders);
-                console.log(normalizedSalesOrders, 'normalizedSalesOrders');
+                const extractString = (val) => {
+                    if (val === null || val === undefined) return '';
+                    if (typeof val === 'string') return val;
+                    if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+                    if (typeof val === 'object') {
+                        const sub = val?.Names || val?.Name || val?.Title || val?.OrderNo || val?.SalesOrderNo || val?.SalesOrderNumber || val?.Value || val?.Text || val?.DisplayName;
+                        if (typeof sub === 'string' && sub.trim() !== '') return sub;
+                        try {
+                            for (const k in val) {
+                                if (!Object.prototype.hasOwnProperty.call(val, k)) continue;
+                                const low = String(k).toLowerCase();
+                                if (/(uuid|^id$|id$|guid)$/.test(low)) continue;
+                                const v = val[k];
+                                if (typeof v === 'string' && v.trim() !== '') return v;
+                            }
+                        } catch (e) { }
+                        try {
+                            const s = val?.toString && val.toString();
+                            if (s && s !== '[object Object]') return s;
+                        } catch (e) { }
+                        return JSON.stringify(val);
+                    }
+                    return String(val);
+                };
 
-            } catch (e) {
-                console.warn('Lookup fetch error', e?.message || e);
-            }
-        })();
-    }, []);
+                const rawOrderCandidate = r?.SalesOrderNo ?? r?.SalesOrderNumber ?? r?.OrderNumber ?? r?.OrderNo ?? r?.Name ?? r?.Title ?? r;
+                const orderNoStr = extractString(rawOrderCandidate);
+                return { UUID: uuid, OrderNo: orderNoStr, raw: r };
+            });
+            setSalesOrderOptions(normalizedSalesOrders);
+
+        } catch (e) {
+            console.warn('Lookup fetch error', e?.message || e);
+        }
+    };
+
+    React.useEffect(() => { loadLookups(); }, []);
 
     // Prefill header if navigated here with `prefillHeader` param
     useEffect(() => {
@@ -425,7 +421,10 @@ const AddSalesInvoice = () => {
 
             const headerUuid = extractHeaderUuidFromPrefill(data) || null;
             if (headerUuid) setHeaderUUID(headerUuid);
-            if (data?.FilePath) setFile({ uri: data.FilePath, name: data.FilePath });
+            if (data?.FilePath) {
+                try { setUploadedFilePath(data.FilePath); } catch (e) { }
+                setFile({ uri: data.FilePath, name: data.FilePath });
+            }
             // If headerUUID exists, it's edit mode - make it editable by default
             // Otherwise, it's view mode - make it non-editable
             setHeaderSubmitted(true);
@@ -761,6 +760,79 @@ const AddSalesInvoice = () => {
             }
         })();
     }, [route?.params?.headerUuid, route?.params?.HeaderUUID, route?.params?.UUID]);
+
+    // When returning from FileViewer/Image viewer with preserveHeaderOnReturn,
+    // refresh lookups and re-fetch header-by-id so FilePath and other header fields are available.
+    useEffect(() => {
+        const preserve = route?.params?.preserveHeaderOnReturn;
+        if (!preserve) return;
+        (async () => {
+            try {
+                setPrefillLoading(true);
+                try { await loadLookups(); } catch (e) { console.warn('loadLookups failed on return', e); }
+                const hdr = headerUUID || route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.UUID || null;
+                if (!hdr) return;
+                const cmp = route?.params?.cmpUuid || route?.params?.cmpUUID || route?.params?.cmp || undefined;
+                const env = route?.params?.envUuid || route?.params?.envUUID || route?.params?.env || undefined;
+                const resp = await getSalesInvoiceHeaderById({ headerUuid: hdr, cmpUuid: cmp, envUuid: env });
+                const data = resp?.Data || resp || null;
+                if (data) {
+                    try {
+                        setHeaderForm(s => ({
+                            ...s,
+                            salesInquiryText: data?.SalesPerInvNo || data?.SalesInvoiceNo || data?.SalesInvNo || s.salesInquiryText || '',
+                            salesInquiry: data?.SalesInqNo || data?.SalesInquiryNo || data?.InquiryNo || s.salesInquiry || '',
+                            clientName: data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || s.clientName || '',
+                        }));
+
+                        setHeaderUUID(data?.UUID || data?.Id || data?.HeaderUUID || hdr);
+                        if (data?.FilePath) {
+                            try { setUploadedFilePath(data.FilePath); } catch (e) { }
+                            setFile(null);
+                        }
+                        setHeaderSubmitted(true);
+                        setHeaderEditable(true);
+                        setExpandedId(1);
+                        setHeaderResponse(data);
+
+                        // reload lines for header
+                        try {
+                            setLinesLoading(true);
+                            const cmp2 = await getCMPUUID();
+                            const env2 = await getENVUUID();
+                            const linesResp = await getSalesInvoiceLines({ headerUuid: data?.UUID || hdr, cmpUuid: cmp2, envUuid: env2, start: 0, length: 1000 });
+                            const rawLines = linesResp?.Data?.Records || linesResp?.Data || linesResp || [];
+                            const list = Array.isArray(rawLines) ? rawLines : [];
+                            const normalized = list.map((l, idx) => ({
+                                id: idx + 1,
+                                selectedItem: null,
+                                name: l?.ItemName || l?.Name || l?.Item || l?.ItemTitle || String(l?.RawItem || '') || '',
+                                sku: l?.ItemCode || l?.SKU || l?.Sku || null,
+                                itemUuid: l?.ItemUUID || l?.ItemId || l?.Item || null,
+                                rate: String(l?.Rate ?? l?.RateAmount ?? l?.Price ?? 0),
+                                desc: l?.Description || l?.Desc || '',
+                                hsn: l?.HSN || l?.HSNCode || '',
+                                qty: String(l?.Quantity ?? l?.Qty ?? l?.quantity ?? 1),
+                                tax: l?.TaxType || l?.Tax || 'IGST',
+                                amount: String(Number(l?.Amount ?? l?.Total ?? 0).toFixed(2)),
+                                serverLineUuid: l?.UUID || l?.Id || l?.LineUUID || null,
+                            }));
+                            if (normalized.length > 0) setItems(normalized);
+                        } catch (le) {
+                            console.warn('Failed to reload lines on return', le?.message || le);
+                        } finally {
+                            setLinesLoading(false);
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+            } catch (e) {
+                console.warn('preserveHeaderOnReturn handler failed', e);
+            } finally {
+                setPrefillLoading(false);
+                try { if (navigation && navigation.setParams) navigation.setParams({ preserveHeaderOnReturn: false }); } catch (e) { }
+            }
+        })();
+    }, [route?.params?.preserveHeaderOnReturn]);
 
     // When a header UUID is present (either from prefill or user selection),
     // fetch the sales invoice lines for that header so the items table is populated.
@@ -3071,7 +3143,7 @@ const AddSalesInvoice = () => {
                                         {hasDocumentAvailable() && (
                                     <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm }}>
                                         <Text style={inputStyles.label}>Document</Text>
-                                            <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton]} onPress={() => viewDocument({ fileName: headerForm?.SalesInvoiceNo || 'Document' })}>
+                                            <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton,{ marginTop: SPACING.sm }]} onPress={() => viewDocument({ fileName: headerForm?.SalesInvoiceNo || 'Document' })}>
                                             <Text style={{ color: '#fff', fontWeight: '600', fontSize: rf(3.4) }}>View Document</Text>
                                         </TouchableOpacity>
                                     </View>
@@ -3134,7 +3206,7 @@ const AddSalesInvoice = () => {
                     onDateSelect={handleDateSelect}
                     title="Select Date"
                 />
-                {(Array.isArray(expandedIds) ? expandedIds.includes(4) : expandedIds === 4) && (
+                {(Array.isArray(expandedId) ? expandedId.includes(4) : expandedId === 4) && (
 
                     <View style={styles.footerBar}>
                         <View

@@ -2421,7 +2421,7 @@ const AddPurchaseInvoice = () => {
                                 {hasDocumentAvailable() && (
                                     <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm }}>
                                         <Text style={inputStyles.label}>Document</Text>
-                                        <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton]} onPress={() => viewDocument({ fileName: headerForm?.PurchaseInvoiceNo || 'Document' })}>
+                                        <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton,{ marginTop: SPACING.sm }]} onPress={() => viewDocument({ fileName: headerForm?.PurchaseInvoiceNo || 'Document' })}>
                                             <Text style={{ color: '#fff', fontWeight: '600', fontSize: rf(3.4) }}>View Document</Text>
                                         </TouchableOpacity>
                                     </View>

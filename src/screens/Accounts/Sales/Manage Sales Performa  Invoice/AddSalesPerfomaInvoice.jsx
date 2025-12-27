@@ -172,8 +172,8 @@ const AddSalesPerfomaInvoice = () => {
     const [salesInquiryUuid, setSalesInquiryUuid] = useState(null);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
 
-    // Fetch lookups (payment terms, methods, projects, inquiries) similar to ManageSalesOrder
-    React.useEffect(() => {
+    // Extracted loader so it can be re-used when returning from FileViewer
+    const loadLookups = async () => {
         const extractArray = (resp) => {
             const d = resp?.Data ?? resp;
             if (Array.isArray(d)) return d;
@@ -183,85 +183,81 @@ const AddSalesPerfomaInvoice = () => {
             return [];
         };
 
-        (async () => {
-            try {
-                setIsInitialLoading(true);
-                const [custResp, termsResp, methodsResp, employeesResp, projectsResp, inquiriesResp, salesOrdersResp] = await Promise.all([
-                    getCustomers(),
-                    getPaymentTerms(),
-                    getPaymentMethods(),
-                    getEmployees(),
-                    fetchProjects(),
-                    getAllSalesInquiryNumbers(),
-                    getSalesOrderNumbers(),
-                ]);
+        try {
+            setIsInitialLoading(true);
+            const [custResp, termsResp, methodsResp, employeesResp, projectsResp, inquiriesResp, salesOrdersResp] = await Promise.all([
+                getCustomers(),
+                getPaymentTerms(),
+                getPaymentMethods(),
+                getEmployees(),
+                fetchProjects(),
+                getAllSalesInquiryNumbers(),
+                getSalesOrderNumbers(),
+            ]);
 
-                const custList = extractArray(custResp);
-                const termsList = extractArray(termsResp);
-                const methodsList = extractArray(methodsResp);
-                const projectsList = extractArray(projectsResp);
-                const inquiriesList = extractArray(inquiriesResp);
-                const salesOrdersList = extractArray(salesOrdersResp);
-                console.log(projectsResp, 'projectsResp');
+            const custList = extractArray(custResp);
+            const termsList = extractArray(termsResp);
+            const methodsList = extractArray(methodsResp);
+            const projectsList = extractArray(projectsResp);
+            const inquiriesList = extractArray(inquiriesResp);
+            const salesOrdersList = extractArray(salesOrdersResp);
 
-                const normalizedInquiries = (Array.isArray(inquiriesList) ? inquiriesList : []).map((r) => ({
-                    UUID: r?.UUID || r?.Uuid || r?.Id || r?.InquiryUUID || r?.SalesInquiryUUID || null,
-                    InquiryNo: r?.SalesInqNo || r?.SalesInquiryNo || r?.InquiryNo || r?.Name || r?.Title || String(r),
-                    raw: r,
-                }));
+            const normalizedInquiries = (Array.isArray(inquiriesList) ? inquiriesList : []).map((r) => ({
+                UUID: r?.UUID || r?.Uuid || r?.Id || r?.InquiryUUID || r?.SalesInquiryUUID || null,
+                InquiryNo: r?.SalesInqNo || r?.SalesInquiryNo || r?.InquiryNo || r?.Name || r?.Title || String(r),
+                raw: r,
+            }));
 
-                setCustomersOptions(custList);
-                setPaymentTermsOptions(termsList);
-                setPaymentMethodsOptions(methodsList);
-                const employeesList = extractArray(employeesResp);
-                setEmployeesOptions(employeesList);
-                setProjectsOptions(projectsList);
-                setSalesInquiryNosOptions(normalizedInquiries);
-                const normalizedSalesOrders = (Array.isArray(salesOrdersList) ? salesOrdersList : []).map((r) => {
-                    const uuid = r?.UUID || r?.Uuid || r?.Id || r?.SalesOrderUUID || r?.SalesOrderId || null;
+            setCustomersOptions(custList);
+            setPaymentTermsOptions(termsList);
+            setPaymentMethodsOptions(methodsList);
+            const employeesList = extractArray(employeesResp);
+            setEmployeesOptions(employeesList);
+            setProjectsOptions(projectsList);
+            setSalesInquiryNosOptions(normalizedInquiries);
+            const normalizedSalesOrders = (Array.isArray(salesOrdersList) ? salesOrdersList : []).map((r) => {
+                const uuid = r?.UUID || r?.Uuid || r?.Id || r?.SalesOrderUUID || r?.SalesOrderId || null;
 
-                    const extractString = (val) => {
-                        if (val === null || val === undefined) return '';
-                        if (typeof val === 'string') return val;
-                        if (typeof val === 'number' || typeof val === 'boolean') return String(val);
-                        if (typeof val === 'object') {
-                            // try explicit readable subfields (including 'Names')
-                            const sub = val?.Names || val?.Name || val?.Title || val?.OrderNo || val?.SalesOrderNo || val?.SalesOrderNumber || val?.Value || val?.Text || val?.DisplayName;
-                            if (typeof sub === 'string' && sub.trim() !== '') return sub;
-                            // search for first string property that isn't an id/uuid
-                            try {
-                                for (const k in val) {
-                                    if (!Object.prototype.hasOwnProperty.call(val, k)) continue;
-                                    const low = String(k).toLowerCase();
-                                    if (/(uuid|^id$|id$|guid)$/.test(low)) continue; // skip id-like keys
-                                    const v = val[k];
-                                    if (typeof v === 'string' && v.trim() !== '') return v;
-                                }
-                            } catch (e) { }
-                            // fallback to toString if informative
-                            try {
-                                const s = val?.toString && val.toString();
-                                if (s && s !== '[object Object]') return s;
-                            } catch (e) { }
-                            return JSON.stringify(val);
-                        }
-                        return String(val);
-                    };
+                const extractString = (val) => {
+                    if (val === null || val === undefined) return '';
+                    if (typeof val === 'string') return val;
+                    if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+                    if (typeof val === 'object') {
+                        const sub = val?.Names || val?.Name || val?.Title || val?.OrderNo || val?.SalesOrderNo || val?.SalesOrderNumber || val?.Value || val?.Text || val?.DisplayName;
+                        if (typeof sub === 'string' && sub.trim() !== '') return sub;
+                        try {
+                            for (const k in val) {
+                                if (!Object.prototype.hasOwnProperty.call(val, k)) continue;
+                                const low = String(k).toLowerCase();
+                                if (/(uuid|^id$|id$|guid)$/.test(low)) continue;
+                                const v = val[k];
+                                if (typeof v === 'string' && v.trim() !== '') return v;
+                            }
+                        } catch (e) { }
+                        try {
+                            const s = val?.toString && val.toString();
+                            if (s && s !== '[object Object]') return s;
+                        } catch (e) { }
+                        return JSON.stringify(val);
+                    }
+                    return String(val);
+                };
 
-                    const rawOrderCandidate = r?.SalesOrderNo ?? r?.SalesOrderNumber ?? r?.OrderNumber ?? r?.OrderNo ?? r?.Name ?? r?.Title ?? r;
-                    const orderNoStr = extractString(rawOrderCandidate);
-                    return { UUID: uuid, OrderNo: orderNoStr, raw: r };
-                });
-                setSalesOrderOptions(normalizedSalesOrders);
-                console.log(normalizedSalesOrders, 'normalizedSalesOrders');
+                const rawOrderCandidate = r?.SalesOrderNo ?? r?.SalesOrderNumber ?? r?.OrderNumber ?? r?.OrderNo ?? r?.Name ?? r?.Title ?? r;
+                const orderNoStr = extractString(rawOrderCandidate);
+                return { UUID: uuid, OrderNo: orderNoStr, raw: r };
+            });
+            setSalesOrderOptions(normalizedSalesOrders);
 
-            } catch (e) {
-                console.warn('Lookup fetch error', e?.message || e);
-            } finally {
-                setIsInitialLoading(false);
-            }
-        })();
-    }, []);
+        } catch (e) {
+            console.warn('Lookup fetch error', e?.message || e);
+        } finally {
+            setIsInitialLoading(false);
+        }
+    };
+
+    // call on mount
+    React.useEffect(() => { loadLookups(); }, []);
 
     // Prefill header if navigated here with `prefillHeader` param
     useEffect(() => {
@@ -389,6 +385,31 @@ const AddSalesPerfomaInvoice = () => {
         if (!preserve) return;
         (async () => {
             try {
+                // Refresh lookups first so mappings (UUID->display) work correctly
+                try { await loadLookups(); } catch (e) { console.warn('loadLookups failed on return', e); }
+                    // Also refresh master items list (item dropdowns) so item fields don't appear blank
+                    try {
+                        setMasterItemsLoading(true);
+                        const c = await getCMPUUID();
+                        const e = await getENVUUID();
+                        const resp = await getItems({ cmpUuid: c, envUuid: e, mode: "Sales" }).catch(err => { console.warn('getItems failed on return', err); return null; });
+                        const rawList = resp?.Data?.Records || resp?.Data || resp || [];
+                        const list = Array.isArray(rawList) ? rawList : [];
+                        const normalized = list.map(it => ({
+                            name: it?.Name || it?.name || it?.ItemName || '',
+                            sku: it?.SKU || it?.sku || it?.Sku || it?.ItemCode || '',
+                            rate: (it?.Rate ?? it?.rate ?? it?.Price) || 0,
+                            desc: it?.Description || it?.description || it?.Desc || '',
+                            hsn: it?.HSNCode || it?.HSN || it?.hsn || it?.HSNSACNO || '-',
+                            uuid: it?.UUID || it?.Uuid || it?.uuid || it?.Id || it?.id || null,
+                            raw: it,
+                        }));
+                        setMasterItems(normalized);
+                    } catch (err) {
+                        console.warn('refresh master items failed on return', err);
+                    } finally {
+                        try { setMasterItemsLoading(false); } catch (e) { }
+                    }
                 const hdr = headerUUID || route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.UUID || null;
                 if (hdr) {
                     setPrefillLoading(true);
@@ -2896,7 +2917,7 @@ const AddSalesPerfomaInvoice = () => {
                                     <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm }}>
                                         <Text style={inputStyles.label}>Document</Text>
                                         {hasDocumentAvailable() && (
-                                            <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton]} onPress={() => viewDocument({ fileName: headerForm?.PerformaNo || 'Document' })}>
+                                            <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton,{ marginTop: SPACING.sm }]} onPress={() => viewDocument({ fileName: headerForm?.PerformaNo || 'Document' })}>
                                             <Text style={{ color: '#fff', fontWeight: '600', fontSize: rf(3.4) }}>View Document</Text>
                                             </TouchableOpacity>
                                         )}

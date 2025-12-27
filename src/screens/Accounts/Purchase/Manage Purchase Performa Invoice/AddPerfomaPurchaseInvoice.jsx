@@ -159,6 +159,29 @@ const AddSalesPerfomaInvoice = () => {
             try {
                 // refresh lookups so dropdown lists map UUIDs -> labels after return
                 try { await loadLookups(); } catch (e) { /* ignore */ }
+                // Ensure vendors are definitely refreshed - some clients had vendors missing after return
+                try {
+                    console.log('[AddPerfomaPurchaseInvoice] preserve return: refreshing vendors');
+                    const vresp = await getVendors().catch(err => { console.warn('getVendors failed on return', err); return null; });
+                    const extract = (resp) => {
+                        const d = resp?.Data ?? resp;
+                        if (Array.isArray(d)) return d;
+                        if (Array.isArray(d?.List)) return d.List;
+                        if (Array.isArray(d?.Records)) return d.Records;
+                        if (Array.isArray(d?.Items)) return d.Items;
+                        return [];
+                    };
+                    const vlist = extract(vresp);
+                    if (Array.isArray(vlist) && vlist.length) {
+                        const normalized = vlist.map(r => ({ UUID: r?.UUID || r?.Uuid || r?.Id || r?.CustomerUUID || r?.VendorUUID || r?.VendorName || r?.CustomerName || r?.Name || String(r), CustomerName: r?.CustomerName || r?.VendorName || r?.Name || r?.DisplayName || String(r), raw: r }));
+                        setCustomersOptions(normalized);
+                        console.log('[AddPerfomaPurchaseInvoice] vendors refreshed, count ->', normalized.length);
+                    } else {
+                        console.log('[AddPerfomaPurchaseInvoice] no vendors returned from getVendors on preserve return');
+                    }
+                } catch (e) {
+                    console.warn('explicit vendor refresh failed on return', e);
+                }
                 const hdr = headerUUID || route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.UUID || null;
                 if (hdr) {
                     setHeaderUUID(hdr);
@@ -1240,12 +1263,12 @@ const AddSalesPerfomaInvoice = () => {
                 PurchaseOrderUUID: purchaseOrderUuid || salesOrderUuid || '',
                 VendorUUID: headerForm.CustomerUUID || '',
                 VendorName: headerForm.CustomerName || '',
-                ProjectUUID: projectUUID || project || '',
+                ProjectUUID: projectUUID.UUID || project.UUID || '',
                 ProjectName: project || '',
                 PaymentTermUUID: paymentTermUuid || '',
-                PaymentTerm: paymentTerm || '',
+                PaymentTerm: paymentTermUuid || '',
                 PaymentMethodUUID: paymentMethodUUID || '',
-                PaymentMode: paymentMethod || '',
+                PaymentMode:paymentMethodUUID || '',
                 OrderDate: uiDateToApiDate(invoiceDate),
                 // DueDate: uiDateToApiDate(dueDate),
                 Note: notes || '',
@@ -1318,7 +1341,7 @@ const AddSalesPerfomaInvoice = () => {
             PurchaseInqNoUUID: salesInquiryUuid || headerForm.salesInquiry || '',
             SalesInqNoUUID: salesInquiryUuid || headerForm.salesInquiry || '',
             PurchaseOrderNo: purchaseOrderUuid || salesOrderUuid || headerForm.PurchaseOrderUUID || '',
-            SalesOrderNo: purchaseOrderUuid || salesOrderUuid || headerForm.SalesOrderNo || '',
+            PurchaseOrderNo: purchaseOrderUuid || salesOrderUuid || headerForm.SalesOrderNo || '',
             VendorUUID: headerForm.CustomerUUID || headerForm.VendorUUID || '',
             CustomerUUID: headerForm.CustomerUUID || headerForm.VendorUUID || '',
             VendorName: headerForm.CustomerName || headerForm.VendorName || '',
@@ -1780,7 +1803,7 @@ const AddSalesPerfomaInvoice = () => {
                                                 if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
                                                 console.log('Purchase Order selected:', v);
                                                 if (v && typeof v === 'object') {
-                                                    const orderUuid = v?.UUID || v?.Id || null;
+                                                    const orderUuid = v?.UUID || v?.Uuid || null;
                                                     const orderNo = v?.OrderNo || v?.PurchaseOrderNo || String(v);
                                                     console.log('Order UUID being set:', orderUuid);
                                                     setFieldValue('PurchaseOrderNumber', orderNo);
@@ -2421,7 +2444,7 @@ const AddSalesPerfomaInvoice = () => {
                                 {hasDocumentAvailable() && (
                                     <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm }}>
                                         <Text style={inputStyles.label}>Document</Text>
-                                        <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton]} onPress={() => viewDocument({ fileName: headerForm?.PerformaNo || 'Document' })}>
+                                        <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton,{ marginTop: SPACING.sm }]} onPress={() => viewDocument({ fileName: headerForm?.PerformaNo || 'Document' })}>
                                             <Text style={{ color: '#fff', fontWeight: '600', fontSize: rf(3.4) }}>View Document</Text>
                                         </TouchableOpacity>
                                     </View>
