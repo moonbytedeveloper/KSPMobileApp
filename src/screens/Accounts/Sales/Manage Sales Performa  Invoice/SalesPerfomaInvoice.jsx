@@ -10,6 +10,7 @@ import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { getSalesPerformaInvoiceHeaders, deleteSalesPerformaInvoiceHeader, getSalesPerformaInvoiceSlip, convertSalesPerformaToInvoice, getSalesProformaRelatedDocuments, getSalesOrderSlip, getSalesInvoiceSlip } from '../../../../api/authServices';
+import { getErrorMessage } from '../../../../utils/errorMessage';
 
 const SalesPerfomaInvoice = () => {
     const navigation = useNavigation();
@@ -157,7 +158,7 @@ const SalesPerfomaInvoice = () => {
                                 Alert.alert('Success', 'Performa invoice deleted');
                             } catch (err) {
                                 console.error('delete performa header error', err);
-                                Alert.alert('Error', err?.message || 'Unable to delete');
+                                Alert.alert('Error', getErrorMessage(err, 'Unable to delete'));
                             } finally {
                                 setLoading(false);
                             }
@@ -339,7 +340,7 @@ const SalesPerfomaInvoice = () => {
             navigation.navigate('FileViewerScreen', { pdfBase64, fileName });
         } catch (e) {
             console.warn('open sales order slip error', e);
-            Alert.alert('Error', e?.message || 'Unable to open sales order PDF');
+            Alert.alert('Error', getErrorMessage(e, 'Unable to open sales order PDF'));
         } finally {
             setIsGeneratingPDF(false);
         }
@@ -366,7 +367,7 @@ const SalesPerfomaInvoice = () => {
             navigation.navigate('FileViewerScreen', { pdfBase64, fileName });
         } catch (e) {
             console.warn('open sales invoice slip error', e);
-            Alert.alert('Error', e?.message || 'Unable to open sales invoice PDF');
+            Alert.alert('Error', getErrorMessage(e, 'Unable to open sales invoice PDF'));
         } finally {
             setIsGeneratingPDF(false);
         }

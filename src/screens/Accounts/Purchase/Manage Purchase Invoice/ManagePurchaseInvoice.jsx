@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal, RefreshControl } from 'react-native';
 import AppHeader from '../../../../components/common/AppHeader';
+import { getErrorMessage } from '../../../../utils/errorMessage';
 import { useNavigation } from '@react-navigation/native';
 import AccordionItem from '../../../../components/common/AccordionItem';
 import Dropdown from '../../../../components/common/Dropdown';
@@ -288,7 +289,7 @@ const ManagePurchaseInvoice = () => {
             }
         } catch (err) {
             console.error('openPurchaseOrderPDF error ->', err);
-            Alert.alert('Error', err?.message || 'Failed to open purchase order PDF');
+            Alert.alert('Error', getErrorMessage(err, 'Failed to open purchase order PDF'));
         }
     };
 
@@ -306,7 +307,7 @@ const ManagePurchaseInvoice = () => {
             }
         } catch (err) {
             console.error('openPurchasePerformaPDF error ->', err);
-            Alert.alert('Error', err?.message || 'Failed to open performa invoice PDF');
+            Alert.alert('Error', getErrorMessage(err, 'Failed to open performa invoice PDF'));
         }
     };
 

@@ -9,6 +9,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 import { getpurchaseQuotationHeaders, deletePurchaseQuotationHeader, getPurchasequotationVendor, convertPurchaseQuotationToOrder } from '../../../../api/authServices';
+import { getErrorMessage } from '../../../../utils/errorMessage';
 import { subscribe, publish } from '../../../../utils/eventBus';
 
 const SALES_ORDERS = [
@@ -402,7 +403,7 @@ const ViewPurchaseQuotation = () => {
                                 Alert.alert('Success', 'Purchase quotation deleted');
                             } catch (err) {
                                 console.error('deletePurchaseQuotationHeader error ->', err);
-                                try { Alert.alert('Error', err?.message || 'Unable to delete purchase quotation'); } catch (_) {}
+                                try { Alert.alert('Error', getErrorMessage(err, 'Unable to delete purchase quotation')); } catch (_) {}
                             } finally {
                                 setLoadingOrders(false);
                             }
@@ -447,7 +448,7 @@ const ViewPurchaseQuotation = () => {
                 }
             } catch (err) {
                 console.error('convertPurchaseQuotationToOrder error ->', err);
-                try { Alert.alert('Error', err?.message || 'Unable to convert quotation to order'); } catch (_) {}
+                try { Alert.alert('Error', getErrorMessage(err, 'Unable to convert quotation to order')); } catch (_) {}
             } finally {
                 setLoadingOrders(false);
             }
@@ -576,8 +577,8 @@ const ViewPurchaseQuotation = () => {
                                 item={{
                                     soleExpenseCode: order.id,
                                     expenseName:  order.quotationNumber || '-',
-                                    amount: order.customerName  || '-',
-                                    headerTitle: order.customerName || order.quotationTitle,
+                                    amount: order.quotationTitle  || '-',
+                                    headerTitle: order.customerName || '-',
                                 }}
                             isActive={activeOrderId === order.id}
                             onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}

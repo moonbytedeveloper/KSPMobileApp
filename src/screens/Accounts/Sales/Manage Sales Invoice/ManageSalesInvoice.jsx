@@ -562,8 +562,12 @@ const ManageSalesInvoice = () => {
 
             const resp = await updateSalesInvoicePayment(payload, { cmpUuid: cmp, envUuid: env, userUuid: user });
             console.log('updateSalesInvoicePayment resp ->', resp);
-            const payMsg = extractApiMessage(resp) || 'Payment updated successfully';
-            Alert.alert('Success', payMsg);
+            console.log('updateSalesInvoicePayment resp12 ->', );
+            const Msg = resp?.Data?.message;
+            const payMsg = extractApiMessage(Msg) ;
+            console.log(payMsg,'8888');
+            
+            Alert.alert('Success', payMsg?.Data?.message || payMsg);
             // refresh summary
             fetchSalesInvoicePayment(forwardTarget);
             closeForwardModal();
@@ -819,7 +823,7 @@ const ManageSalesInvoice = () => {
                         customRows={[
                             { label: 'Sales Order', value: order.salesOrderNumber },
                             { label: 'Customer Name', value: order.customerName },
-                            { label: 'Delivery Date', value: order.deliveryDate },
+                            { label: 'Order Date', value: order.deliveryDate },
                             { label: 'Status', value: order.status, isStatus: true },
                         ]}
                         headerLeftLabel="Sales Invoice Number"
@@ -935,11 +939,11 @@ const ManageSalesInvoice = () => {
                             <View style={[styles.twoColRow, { marginTop: hp(1) }]}>
                                 <View style={styles.colLeft}>
                                     <Text style={[styles.inputLabel, { fontWeight: '600' }]}>TDS Amount*</Text>
-                                    <TextInput style={styles.modalInput} value={forwardForm.tdsAmount} onChangeText={v => setForwardForm(f => ({ ...f, tdsAmount: v }))} placeholder="eg." keyboardType="numeric" />
+                                    <TextInput style={styles.modalInput} value={forwardForm.tdsAmount} onChangeText={v => setForwardForm(f => ({ ...f, tdsAmount: v }))} placeholderTextColor="#000000" placeholder="eg." keyboardType="numeric" />
                                 </View>
                                 <View style={styles.colRight}>
                                     <Text style={[styles.inputLabel, { fontWeight: '600' }]}>Amount After TDS*</Text>
-                                    <TextInput style={styles.modalInput} value={forwardForm.amountAfterTds} onChangeText={v => setForwardForm(f => ({ ...f, amountAfterTds: v }))} placeholder="eg." keyboardType="numeric" />
+                                    <TextInput style={styles.modalInput} value={forwardForm.amountAfterTds} onChangeText={v => setForwardForm(f => ({ ...f, amountAfterTds: v }))} placeholderTextColor="#000000" placeholder="eg." keyboardType="numeric" />
                                 </View>
                             </View>
 
@@ -960,12 +964,12 @@ const ManageSalesInvoice = () => {
 
                             <View style={{ marginTop: hp(1) }}>
                                 <Text style={[styles.inputLabel, { fontWeight: '600' }]}>Remark</Text>
-                                <TextInput style={[styles.modalInput, { height: hp(10), textAlignVertical: 'top' }]} value={forwardForm.remark} onChangeText={v => setForwardForm(f => ({ ...f, remark: v }))} multiline placeholder="eg." />
+                                <TextInput style={[styles.modalInput, { height: hp(10), textAlignVertical: 'top' }]} value={forwardForm.remark} placeholderTextColor="#000000" onChangeText={v => setForwardForm(f => ({ ...f, remark: v }))} multiline placeholder="eg." />
                             </View>
 
                             <View style={{ marginTop: hp(1) }}>
                                 <Text style={[styles.inputLabel, { fontWeight: '600' }]}>Transaction Details</Text>
-                                <TextInput style={[styles.modalInput, { height: hp(10), textAlignVertical: 'top' }]} value={forwardForm.transactionDetails} onChangeText={v => setForwardForm(f => ({ ...f, transactionDetails: v }))} multiline placeholder="eg." />
+                                <TextInput style={[styles.modalInput, { height: hp(10), textAlignVertical: 'top' }]} value={forwardForm.transactionDetails} placeholderTextColor="#000000" onChangeText={v => setForwardForm(f => ({ ...f, transactionDetails: v }))} multiline placeholder="eg." />
                             </View>
                         </View>
 
@@ -1064,20 +1068,16 @@ const ManageSalesInvoice = () => {
                                     {/* Row: Amount heading on right (show After TDS as main) */}
                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: hp(0.6) }}>
                                         <Text style={{ color: COLORS.textMuted, fontWeight: '600' }}>Amount</Text>
-                                        {/* <View style={{ alignItems: 'flex-end' }}>
-                                            <Text style={{ fontWeight: '800', fontSize: rf(3.6), color: COLORS.text }}>{p.AfterTdsAmount ?? p.AfterTDSAmount ?? p.afterTdsAmount ?? p.AfterTds ?? '0'}</Text>
-                                            <Text style={{ color: COLORS.textLight, marginTop: hp(0.2) }}>TDS: {p.TdsAmount ?? p.TDSAmount ?? p.tdsAmount ?? p.Tds ?? '0'}</Text>
-                                        </View> */}
                                     </View>
 
                                     {/* TDS and After TDS rows (label left, value right) */}
                                     <View style={{ marginTop: hp(0.6) }}>
                                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <Text style={{ color: COLORS.textMuted, fontWeight: '600' }}>TDS Amount</Text>
+                                            <Text style={{ color: COLORS.textMuted, fontWeight: '400', fontSize: rf(3.2)  }}>TDS Amount</Text>
                                             <Text style={{ color: COLORS.text }}>{p.TdsAmount ?? p.TDSAmount ?? p.tdsAmount ?? '0'}</Text>
                                         </View>
                                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: hp(0.4) }}>
-                                            <Text style={{ color: COLORS.textMuted, fontWeight: '600' }}>After TDS</Text>
+                                            <Text style={{ color: COLORS.textMuted, fontWeight: '400', fontSize: rf(3.2) }}>After TDS</Text>
                                             <Text style={{ color: COLORS.text }}>{p.AfterTdsAmount ?? p.AfterTDSAmount ?? p.afterTdsAmount ?? '0'}</Text>
                                         </View>
                                     </View>

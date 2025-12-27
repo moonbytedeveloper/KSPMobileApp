@@ -26,6 +26,7 @@ import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { addPurchaseOrder, updatePurchaseOrder, addPurchaseOrderLine, updatePurchaseOrderLine, getVendors, getCountries, getStates, getCities, getPaymentTerms, getPaymentMethods, fetchProjects, getAllPurchaseInquiryNumbers, getPurchaseOrderHeaderById, getPurchaseOrderHeaders, getItems, getPurchaseOrderLines, deletePurchaseOrderLine, uploadFiles } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
+import { getErrorMessage } from '../../../../utils/errorMessage';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 
 const COL_WIDTHS = {
@@ -290,17 +291,87 @@ const ManagePurchaseOrder = () => {
     }
   };
 
+  const viewDocument = (opts = {}) => {
+    try {
+      if (navigation && navigation.setParams) navigation.setParams({ preserveHeaderOnReturn: true });
+    } catch (e) { /* ignore */ }
+
+    const candidates = [uploadedFilePath, headerResponse?.FilePath, headerResponse?.DocumentUrl, headerResponse?.File, headerResponse?.Files, headerResponse?.Attachments, headerResponse?.Document, headerResponse?.DocumentPath, headerResponse?.FileUrl];
+    const resolveCandidate = (c) => {
+      if (!c && c !== 0) return null;
+      if (Array.isArray(c)) return c.length ? c[0] : null;
+      if (typeof c === 'object') return c.pdfBase64 || c.Url || c.url || c.FilePath || c.filePath || c.Path || c.path || c.File || c.file || c.DocumentUrl || null;
+      return c;
+    };
+
+    let rawCandidate = candidates.map(resolveCandidate).find(x => x !== null && typeof x !== 'undefined' && String(x) !== '');
+    if (!rawCandidate) {
+      const fileLikeRegex = /(data:.*;base64,)|(\.pdf(\?|$))|(\.png(\?|$))|(\.jpe?g(\?|$))|application\/pdf|https?:\/\//i;
+      const findInObjectForFile = (obj) => {
+        try {
+          if (!obj && obj !== 0) return null;
+          if (typeof obj === 'string') return fileLikeRegex.test(obj) ? obj : null;
+          if (Array.isArray(obj)) { for (const v of obj) { const r = findInObjectForFile(v); if (r) return r; } return null; }
+          if (typeof obj === 'object') { for (const k of Object.keys(obj)) { try { const v = obj[k]; const r = findInObjectForFile(v); if (r) return r; } catch (e) { } } }
+        } catch (e) { }
+        return null;
+      };
+      rawCandidate = resolveCandidate(headerResponse?.Data) || resolveCandidate(headerResponse?.data) || findInObjectForFile(headerResponse) || findInObjectForFile(headerResponse?.Data) || findInObjectForFile(uploadedFilePath);
+    }
+
+    if (!rawCandidate) { Alert.alert('No document', 'No document is available to view.'); return; }
+    let url = String(rawCandidate);
+    try { const base = 'https://erp.kspconsults.com'; if (!/^(https?:\/\/|file:|data:)/i.test(url)) { if (String(url).startsWith('/')) url = base + url; else url = base + '/' + url; } } catch (e) { }
+    const lower = url.toLowerCase();
+    if (lower.includes('base64,') && lower.includes('pdf')) { navigation.navigate('FileViewerScreen', { pdfBase64: url, fileName: opts.fileName || 'Document' }); return; }
+    if (lower.endsWith('.pdf') || lower.includes('.pdf') || lower.includes('application/pdf')) { navigation.navigate('FileViewerScreen', { pdfUrl: url, fileName: opts.fileName || 'Document' }); return; }
+    if (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.includes('image/')) { navigation.navigate('ImageViewerScreen', { imageUrl: url, opportunityTitle: opts.fileName || 'Document' }); return; }
+    navigation.navigate('FileViewerScreen', { pdfUrl: url, fileName: opts.fileName || 'Document' });
+  };
+
+  const hasDocumentAvailable = () => {
+    try {
+      if (uploadedFilePath && String(uploadedFilePath).trim() !== '') return true;
+      const resp = headerResponse || {};
+      const candidates = [resp.FilePath, resp.DocumentUrl, resp.FilePaths, resp.File, resp.files, resp.Attachments, resp.Document, resp.DocumentPath, resp.FileUrl, resp.Data && resp.Data.FilePath, resp.Data && resp.Data.files];
+      for (const c of candidates) {
+        if (!c && c !== 0) continue;
+        if (Array.isArray(c) && c.length) return true;
+        if (typeof c === 'string' && String(c).trim() !== '') return true;
+      }
+    } catch (e) { /* ignore */ }
+    return false;
+  };
+
   // Clear state when the screen is blurred (user navigates away) or when component unmounts
+  // If navigation param `preserveHeaderOnReturn` is true (set by viewDocument), do NOT clear header on return.
   React.useEffect(() => {
     const onBlur = navigation.addListener && navigation.addListener('blur', () => {
+      try {
+        const preserve = route?.params?.preserveHeaderOnReturn;
+        if (preserve) {
+          // clear the flag so future navigations behave normally
+          try { if (navigation && navigation.setParams) navigation.setParams({ preserveHeaderOnReturn: false }); } catch (e) { }
+          return; // skip resetting state when coming back from viewer
+        }
+      } catch (e) { /* ignore */ }
       resetAllState();
     });
+
     return () => {
-      // cleanup: remove listener and reset state on unmount
+      // cleanup: remove listener and reset state on unmount unless preserve flag is set
+      try {
+        const preserve = route?.params?.preserveHeaderOnReturn;
+        if (preserve) {
+          try { if (navigation && navigation.setParams) navigation.setParams({ preserveHeaderOnReturn: false }); } catch (e) { }
+          if (onBlur && typeof onBlur === 'function') onBlur();
+          return;
+        }
+      } catch (e) { /* ignore */ }
       if (onBlur && typeof onBlur === 'function') onBlur();
       resetAllState();
     };
-  }, [navigation]);
+  }, [navigation, route?.params?.preserveHeaderOnReturn]);
 
   const getUuidVal = (v) => {
     if (!v && v !== 0) return '';
@@ -511,8 +582,9 @@ const ManagePurchaseOrder = () => {
       // Also open Billing and Shipping sections for convenience
       // Bind any header-level totals if present in the payload
       try {
-        const headerTax = data?.TotalTax ?? data?.TaxAmount ?? data?.HeaderTotalTax ?? null;
-        const headerTotal = data?.TotalAmount ?? data?.NetAmount ?? data?.HeaderTotalAmount ?? null;
+        // Support multiple possible API key names (underscore variants, nested Header, etc.)
+        const headerTax = data?.TotalTax ?? data?.Total_Tax ?? data?.TaxAmount ?? data?.HeaderTotalTax ?? data?.Header?.TotalTax ?? data?.Header?.Total_Tax ?? null;
+        const headerTotal = data?.TotalAmount ?? data?.Total_Amount ?? data?.NetAmount ?? data?.HeaderTotalAmount ?? data?.Header?.TotalAmount ?? data?.Header?.Total_Amount ?? null;
         if (headerTax !== null && typeof headerTax !== 'undefined') setTotalTax(String(headerTax));
         if (headerTotal !== null && typeof headerTotal !== 'undefined') setServerTotalAmount(String(headerTotal));
         // Also bind notes, terms and discount/shipping charges so UI prefill shows them
@@ -574,6 +646,38 @@ const ManagePurchaseOrder = () => {
       }
     })();
   }, [route?.params?.headerUuid, route?.params?.cmpUuid, route?.params?.envUuid]);
+
+  // When returning from FileViewer/Image viewer, if caller set preserveHeaderOnReturn,
+  // re-fetch header-by-id (if possible) to prefill and open header for the user.
+  useEffect(() => {
+    const preserve = route?.params?.preserveHeaderOnReturn;
+    if (!preserve) return;
+
+    (async () => {
+      try {
+        setIsPrefilling(true);
+        // Refresh dropdown/lookups so returned header can map to up-to-date options
+        try { await loadLookups(); } catch (e) { console.warn('loadLookups failed on return', e); }
+        const headerUuid = headerResponse?.UUID || route?.params?.headerUuid || route?.params?.HeaderUUID || null;
+        if (!headerUuid) return;
+        const cmpUuid = route?.params?.cmpUuid || route?.params?.cmpUUID || undefined;
+        const envUuid = route?.params?.envUuid || route?.params?.envUUID || undefined;
+        const resp = await getPurchaseOrderHeaderById({ headerUuid, cmpUuid, envUuid });
+        const data = resp?.Data || resp || null;
+        if (data) {
+          setHeaderResponse(data);
+          prefillFromData(data);
+          try { await loadSalesOrderLines(data?.UUID || headerUuid); } catch (e) { /* ignore */ }
+          setExpandedIds([1, 2, 3]);
+        }
+      } catch (e) {
+        console.warn('Error reloading header on return', e?.message || e);
+      } finally {
+        setIsPrefilling(false);
+        try { if (navigation && navigation.setParams) navigation.setParams({ preserveHeaderOnReturn: false }); } catch (e) { }
+      }
+    })();
+  }, [route?.params?.preserveHeaderOnReturn]);
 
   // Current item being entered in the LINE form
   const [currentItem, setCurrentItem] = useState({
@@ -865,7 +969,7 @@ const ManagePurchaseOrder = () => {
       Alert.alert('Success', 'Header saved successfully');
     } catch (err) {
       console.error('saveHeader error ->', err);
-      Alert.alert('Error', err?.message || 'Unable to save header');
+      Alert.alert('Error', getErrorMessage(err, 'Unable to save header'));
     } finally {
       setIsSavingHeader(false);
     }
@@ -936,72 +1040,67 @@ const ManagePurchaseOrder = () => {
   };
 
   // Fetch lookups on mount
-  React.useEffect(() => {
-    (async () => {
+  const loadLookups = async () => {
+    try {
+      const [custResp, termsResp, methodsResp, countriesResp, projectsResp, inquiriesResp] = await Promise.all([
+        getVendors(),
+        getPaymentTerms(),
+        getPaymentMethods(),
+        getCountries(),
+        fetchProjects(),
+        getAllPurchaseInquiryNumbers(),
+      ]);
+
+      const custList = extractArray(custResp);
+      const termsList = extractArray(termsResp);
+      const methodsList = extractArray(methodsResp);
+      const countriesList = extractArray(countriesResp);
+      const projectsList = extractArray(projectsResp);
+      const inquiriesList = extractArray(inquiriesResp);
+
+      const normalizedInquiries = (Array.isArray(inquiriesList) ? inquiriesList : []).map((r) => ({
+        UUID: r?.UUID || r?.Uuid || r?.Id || r?.InquiryUUID || r?.SalesInquiryUUID || null,
+        InquiryNo: r?.SalesInqNo || r?.SalesInquiryNo || r?.InquiryNo || r?.SalesOrderNo || r?.SalesOrder || r?.Name || r?.Title || String(r),
+        SalesPerInvNo: r?.SalesPerInvNo || r?.PerformaNo || r?.PerformaInvoiceNo || null,
+        raw: r,
+      }));
+
+      setCustomersOptions(custList);
+      setPaymentTermsOptions(termsList);
+      setPaymentMethodsOptions(methodsList);
+      setCountriesOptions(countriesList);
+      setProjectsOptions(projectsList);
+      setSalesInquiryNosOptions(normalizedInquiries);
+
+      // Fetch and normalize purchase order headers for dropdown (small page)
       try {
-        const [custResp, termsResp, methodsResp, countriesResp, projectsResp, inquiriesResp] = await Promise.all([
-          getVendors(),
-          getPaymentTerms(),
-          getPaymentMethods(),
-          getCountries(),
-          fetchProjects(),
-          getAllPurchaseInquiryNumbers(),
-        ]);
-
-        const custList = extractArray(custResp);
-        const termsList = extractArray(termsResp);
-        const methodsList = extractArray(methodsResp);
-        const countriesList = extractArray(countriesResp);
-        console.log(countriesList, '566');
-        console.log(custList, '5656')
-        const projectsList = extractArray(projectsResp);
-        const inquiriesList = extractArray(inquiriesResp);
-
-        // Normalize inquiry entries so dropdowns/prefill mapping find display values instead of raw UUIDs
-        const normalizedInquiries = (Array.isArray(inquiriesList) ? inquiriesList : []).map((r, idx) => ({
-          UUID: r?.UUID || r?.Uuid || r?.Id || r?.Id || r?.InquiryUUID || r?.SalesInquiryUUID || null,
-          InquiryNo: r?.SalesInqNo || r?.SalesInquiryNo || r?.InquiryNo || r?.SalesOrderNo || r?.SalesOrder || r?.Name || r?.Title || String(r),
-          // include other helpful fields used elsewhere
-          SalesPerInvNo: r?.SalesPerInvNo || r?.PerformaNo || r?.PerformaInvoiceNo || null,
-          raw: r,
+        const poResp = await getPurchaseOrderHeaders({ start: 0, length: 200 });
+        const poList = extractArray(poResp);
+        const normalizedPOs = (Array.isArray(poList) ? poList : []).map(p => ({
+          UUID: p?.UUID || p?.Uuid || p?.Id || p?.PurchaseOrderUUID || p?.PurchaseOrderId || null,
+          PurchaseOrderNo: p?.PurchaseOrderNo || p?.PurchaseOrderNumber || p?.PurchaseOrder || p?.OrderNo || p?.Name || String(p),
+          raw: p,
         }));
-
-        setCustomersOptions(custList);
-        setPaymentTermsOptions(termsList);
-        setPaymentMethodsOptions(methodsList);
-        setCountriesOptions(countriesList);
-        setProjectsOptions(projectsList);
-        setSalesInquiryNosOptions(normalizedInquiries);
-        // Fetch and normalize purchase order headers for dropdown (small page)
-        try {
-          const poResp = await getPurchaseOrderHeaders({ start: 0, length: 200 });
-          const poList = extractArray(poResp);
-          const normalizedPOs = (Array.isArray(poList) ? poList : []).map(p => ({
-            UUID: p?.UUID || p?.Uuid || p?.Id || p?.PurchaseOrderUUID || p?.PurchaseOrderId || null,
-            PurchaseOrderNo: p?.PurchaseOrderNo || p?.PurchaseOrderNumber || p?.PurchaseOrder || p?.OrderNo || p?.Name || String(p),
-            raw: p,
-          }));
-          console.log(normalizedPOs, 'response purchase order');
-
-          setPurchaseOrderOptions(normalizedPOs);
-        } catch (e) {
-          console.warn('getPurchaseOrderHeaders lookup failed', e?.message || e);
-          setPurchaseOrderOptions([]);
-        }
-
-        console.log('[PurchaseSalesOrder] lookup counts ->', {
-          customers: Array.isArray(custList) ? custList.length : 0,
-          paymentTerms: Array.isArray(termsList) ? termsList.length : 0,
-          paymentMethods: Array.isArray(methodsList) ? methodsList.length : 0,
-          countries: Array.isArray(countriesList) ? countriesList.length : 0,
-          projects: Array.isArray(projectsList) ? projectsList.length : 0,
-          inquiries: Array.isArray(inquiriesList) ? inquiriesList.length : 0,
-        });
+        setPurchaseOrderOptions(normalizedPOs);
       } catch (e) {
-        console.warn('Lookup fetch error', e?.message || e);
+        console.warn('getPurchaseOrderHeaders lookup failed', e?.message || e);
+        setPurchaseOrderOptions([]);
       }
-    })();
-  }, []);
+
+      console.log('[PurchaseSalesOrder] lookup counts ->', {
+        customers: Array.isArray(custList) ? custList.length : 0,
+        paymentTerms: Array.isArray(termsList) ? termsList.length : 0,
+        paymentMethods: Array.isArray(methodsList) ? methodsList.length : 0,
+        countries: Array.isArray(countriesList) ? countriesList.length : 0,
+        projects: Array.isArray(projectsList) ? projectsList.length : 0,
+        inquiries: Array.isArray(inquiriesList) ? inquiriesList.length : 0,
+      });
+    } catch (e) {
+      console.warn('Lookup fetch error', e?.message || e);
+    }
+  };
+
+  React.useEffect(() => { loadLookups(); }, []);
 
   // Load saved sales order lines for a header and normalize them into `items`
   const loadSalesOrderLines = async (headerUuid) => {
@@ -1584,7 +1683,7 @@ const ManagePurchaseOrder = () => {
                 }
               } catch (e) {
                 console.error('deletePurchaseOrderLine error ->', e?.message || e);
-                Alert.alert('Error', e?.message || 'Unable to delete line');
+                Alert.alert('Error', getErrorMessage(e, 'Unable to delete line'));
               } finally {
                 setLinesLoading(false);
               }
@@ -1748,7 +1847,7 @@ const ManagePurchaseOrder = () => {
         } catch (e) { /* ignore */ }
       } catch (err) {
         console.error('addPurchaseOrderLine error ->', err);
-        Alert.alert('Error', err?.message || 'Unable to add line to server. Saved locally.');
+        Alert.alert('Error', getErrorMessage(err, 'Unable to add line to server. Saved locally.'));
         // fallback: still add locally so user doesn't lose work
         if (editItemId) {
           setItems(prev => prev.map(it => it.id === editItemId ? { ...it, ...newItem, id: editItemId } : it));
@@ -1917,7 +2016,7 @@ const ManagePurchaseOrder = () => {
       try { await loadSalesOrderLines(data?.UUID || data?.Id || data?.HeaderUUID || headerResponse?.UUID); } catch (e) { /* ignore */ }
     } catch (err) {
       console.error('handleCreateOrder error ->', err);
-      Alert.alert('Error', err?.message || 'Unable to submit order');
+      Alert.alert('Error', getErrorMessage(err, 'Unable to submit order'));
     } finally {
       setIsSavingHeader(false);
     }
@@ -2064,6 +2163,13 @@ const ManagePurchaseOrder = () => {
         <AppHeader
           title="Manage Purchase Order"
           onLeftPress={() => navigation.goBack()}
+          rightIconName="edit"
+          onRightPress={() => {
+            try {
+              setExpandedIds([1, 2, 3]);
+              setIsEditingHeader(true);
+            } catch (e) { /* ignore */ }
+          }}
         />
         <View style={styles.headerSeparator} />
         <ScrollView
@@ -3146,6 +3252,14 @@ const ManagePurchaseOrder = () => {
                   />
                 </View>
                 <View style={styles.attachCol}>
+                  {hasDocumentAvailable() && (
+                    <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm }}>
+                      <Text style={inputStyles.label}>Document</Text>
+                      <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton]} onPress={() => viewDocument({ fileName: headerForm?.PurchaseOrderNo || 'Document' })}>
+                        <Text style={{ color: '#fff', fontWeight: '600', fontSize: rf(3.4) }}>View Document</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                   <Text style={inputStyles.label}>Attach file</Text>
                   <View
                     style={[

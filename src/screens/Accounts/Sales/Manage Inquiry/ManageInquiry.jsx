@@ -8,6 +8,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 import { getSalesHeaderInquiries, deleteSalesHeader, convertInquiryToSalesOrder } from '../../../../api/authServices'; 
+import { getErrorMessage } from '../../../../utils/errorMessage';
 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 
@@ -125,7 +126,7 @@ const ManageInquiry = () => {
                                                 fetchInquiries();
                                             } catch (err) {
                                                 console.error('Failed to delete header', err);
-                                                Alert.alert('Error', err?.message || 'Failed to delete header');
+                                                Alert.alert('Error', getErrorMessage(err, 'Failed to delete header'));
                                             }
                                         } }
                                     ]
@@ -168,8 +169,7 @@ const ManageInquiry = () => {
                                     }
                                 } catch (err) {
                                     console.error('Failed to convert inquiry', err);
-                                    const errorMessage = err?.message || 'Unable to convert inquiry to sales order. Please try again.';
-                                    Alert.alert('Conversion Failed', errorMessage);
+                                    Alert.alert('Conversion Failed', getErrorMessage(err, 'Unable to convert inquiry to sales order. Please try again.'));
                                 }
                                 return;
                             }

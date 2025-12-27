@@ -26,6 +26,7 @@ import DatePickerBottomSheet from '../../../../components/common/CustomDatePicke
 import { pick, types, isCancel } from '@react-native-documents/picker';
 import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllPurchaseInquiryNumbers, getVendors, getCountries, getPurchaseOrderNumbers, addPurchaseInvoiceHeader, addPurchaseInvoiceLine, updatePurchaseInvoiceHeader, getPurchaseInvoiceHeaderById, getPurchaseInvoiceHeaders, getPurchaseInvoiceLines, updatePurchaseInvoiceLine, deletePurchaseInvoiceLine, getItems, uploadFiles } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
+import { getErrorMessage } from '../../../../utils/errorMessage';
 
 const COL_WIDTHS = {
     ITEM: wp(50), // 35%
@@ -165,14 +166,15 @@ const AddPurchaseInvoice = () => {
     const [headerSubmitted, setHeaderSubmitted] = useState(false);
     const [headerEditable, setHeaderEditable] = useState(true);
     const [uploadedFilePath, setUploadedFilePath] = useState(null);
+    // const [file, setFile] = useState(null);
+    const [headerResponse, setHeaderResponse] = useState(null);
     const [restrictToHeader, setRestrictToHeader] = useState(false);
     const [paymentTermUuid, setPaymentTermUuid] = useState(null);
     const [paymentMethodUUID, setPaymentMethodUUID] = useState(null);
     const [projectUUID, setProjectUUID] = useState(null);
     const [salesInquiryUuid, setSalesInquiryUuid] = useState(null);
 
-    // Fetch lookups (payment terms, methods, projects, inquiries) similar to ManageSalesOrder
-    React.useEffect(() => {
+    const loadLookups = async () => {
         const extractArray = (resp) => {
             const d = resp?.Data ?? resp;
             if (Array.isArray(d)) return d;
@@ -182,80 +184,75 @@ const AddPurchaseInvoice = () => {
             return [];
         };
 
-        (async () => {
-            try {
-                const [custResp, termsResp, methodsResp, projectsResp, inquiriesResp, salesOrdersResp] = await Promise.all([
-                    getVendors(),
-                    getPaymentTerms(),
-                    getPaymentMethods(),
-                    fetchProjects(),
-                    getAllPurchaseInquiryNumbers(),
-                    getPurchaseOrderNumbers(),
-                ]);
+        try {
+            const [custResp, termsResp, methodsResp, projectsResp, inquiriesResp, salesOrdersResp] = await Promise.all([
+                getVendors(),
+                getPaymentTerms(),
+                getPaymentMethods(),
+                fetchProjects(),
+                getAllPurchaseInquiryNumbers(),
+                getPurchaseOrderNumbers(),
+            ]);
 
+            const custList = extractArray(custResp);
+            const termsList = extractArray(termsResp);
+            const methodsList = extractArray(methodsResp);
+            const projectsList = extractArray(projectsResp);
+            const inquiriesList = extractArray(inquiriesResp);
+            const salesOrdersList = extractArray(salesOrdersResp);
 
-                const custList = extractArray(custResp);
-                const termsList = extractArray(termsResp);
-                const methodsList = extractArray(methodsResp);
-                const projectsList = extractArray(projectsResp);
-                const inquiriesList = extractArray(inquiriesResp);
-                const salesOrdersList = extractArray(salesOrdersResp);
-                console.log(salesOrdersList, 'salesordernum');
+            const normalizedInquiries = (Array.isArray(inquiriesList) ? inquiriesList : []).map((r) => ({
+                UUID: r?.UUID || r?.Uuid || r?.Id || r?.InquiryUUID || r?.SalesInquiryUUID || null,
+                InquiryNo: r?.SalesInqNo || r?.SalesInquiryNo || r?.InquiryNo || r?.Name || r?.Title || String(r),
+                raw: r,
+            }));
 
-                const normalizedInquiries = (Array.isArray(inquiriesList) ? inquiriesList : []).map((r) => ({
-                    UUID: r?.UUID || r?.Uuid || r?.Id || r?.InquiryUUID || r?.SalesInquiryUUID || null,
-                    InquiryNo: r?.SalesInqNo || r?.SalesInquiryNo || r?.InquiryNo || r?.Name || r?.Title || String(r),
-                    raw: r,
-                }));
+            setVendorsOptions(custList);
+            setPaymentTermsOptions(termsList);
+            setPaymentMethodsOptions(methodsList);
+            setProjectsOptions(projectsList);
+            setSalesInquiryNosOptions(normalizedInquiries);
+            const normalizedSalesOrders = (Array.isArray(salesOrdersList) ? salesOrdersList : []).map((r) => {
+                const uuid = r?.UUID || r?.Uuid || r?.Id || r?.SalesOrderUUID || r?.SalesOrderId || null;
 
-                setVendorsOptions(custList);
-                setPaymentTermsOptions(termsList);
-                setPaymentMethodsOptions(methodsList);
-                setProjectsOptions(projectsList);
-                setSalesInquiryNosOptions(normalizedInquiries);
-                const normalizedSalesOrders = (Array.isArray(salesOrdersList) ? salesOrdersList : []).map((r) => {
-                    const uuid = r?.UUID || r?.Uuid || r?.Id || r?.SalesOrderUUID || r?.SalesOrderId || null;
+                const extractString = (val) => {
+                    if (val === null || val === undefined) return '';
+                    if (typeof val === 'string') return val;
+                    if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+                    if (typeof val === 'object') {
+                        const sub = val?.Names || val?.Name || val?.Title || val?.OrderNo || val?.SalesOrderNo || val?.SalesOrderNumber || val?.Value || val?.Text || val?.DisplayName;
+                        if (typeof sub === 'string' && sub.trim() !== '') return sub;
+                        try {
+                            for (const k in val) {
+                                if (!Object.prototype.hasOwnProperty.call(val, k)) continue;
+                                const low = String(k).toLowerCase();
+                                if (/(uuid|^id$|id$|guid)$/.test(low)) continue;
+                                const v = val[k];
+                                if (typeof v === 'string' && v.trim() !== '') return v;
+                            }
+                        } catch (e) { }
+                        try {
+                            const s = val?.toString && val.toString();
+                            if (s && s !== '[object Object]') return s;
+                        } catch (e) { }
+                        return JSON.stringify(val);
+                    }
+                    return String(val);
+                };
 
-                    const extractString = (val) => {
-                        if (val === null || val === undefined) return '';
-                        if (typeof val === 'string') return val;
-                        if (typeof val === 'number' || typeof val === 'boolean') return String(val);
-                        if (typeof val === 'object') {
-                            // try explicit readable subfields (including 'Names')
-                            const sub = val?.Names || val?.Name || val?.Title || val?.OrderNo || val?.SalesOrderNo || val?.SalesOrderNumber || val?.Value || val?.Text || val?.DisplayName;
-                            if (typeof sub === 'string' && sub.trim() !== '') return sub;
-                            // search for first string property that isn't an id/uuid
-                            try {
-                                for (const k in val) {
-                                    if (!Object.prototype.hasOwnProperty.call(val, k)) continue;
-                                    const low = String(k).toLowerCase();
-                                    if (/(uuid|^id$|id$|guid)$/.test(low)) continue; // skip id-like keys
-                                    const v = val[k];
-                                    if (typeof v === 'string' && v.trim() !== '') return v;
-                                }
-                            } catch (e) { }
-                            // fallback to toString if informative
-                            try {
-                                const s = val?.toString && val.toString();
-                                if (s && s !== '[object Object]') return s;
-                            } catch (e) { }
-                            return JSON.stringify(val);
-                        }
-                        return String(val);
-                    };
+                const rawOrderCandidate = r?.SalesOrderNo ?? r?.SalesOrderNumber ?? r?.OrderNumber ?? r?.OrderNo ?? r?.Name ?? r?.Title ?? r;
+                const orderNoStr = extractString(rawOrderCandidate);
+                return { UUID: uuid, OrderNo: orderNoStr, raw: r };
+            });
+            setSalesOrderOptions(normalizedSalesOrders);
+            console.log(normalizedSalesOrders, 'normalizedSalesOrders');
 
-                    const rawOrderCandidate = r?.SalesOrderNo ?? r?.SalesOrderNumber ?? r?.OrderNumber ?? r?.OrderNo ?? r?.Name ?? r?.Title ?? r;
-                    const orderNoStr = extractString(rawOrderCandidate);
-                    return { UUID: uuid, OrderNo: orderNoStr, raw: r };
-                });
-                setSalesOrderOptions(normalizedSalesOrders);
-                console.log(normalizedSalesOrders, 'normalizedSalesOrders');
+        } catch (e) {
+            console.warn('Lookup fetch error', e?.message || e);
+        }
+    };
 
-            } catch (e) {
-                console.warn('Lookup fetch error', e?.message || e);
-            }
-        })();
-    }, []);
+    React.useEffect(() => { loadLookups(); }, []);
 
     // Prefill header if navigated here with `prefillHeader` param
     useEffect(() => {
@@ -329,10 +326,13 @@ const AddPurchaseInvoice = () => {
             setShippingCharges(String(data?.ShippingCharges ?? data?.ShippingCharge ?? 0));
             setAdjustments(String(data?.AdjustmentPrice ?? data?.Adjustment ?? 0));
             setTerms(data?.TermsConditions || data?.Terms || '');
-            setNotes(data?.CustomerNotes || data?.Notes || '');
+            setNotes(data?.CustomerNotes || data?.Notes || data?.Note ||'');
             const headerUuid = data?.UUID || data?.Id || data?.HeaderUUID || null;
             setHeaderUUID(headerUuid);
-            if (data?.FilePath) setFile({ uri: data.FilePath, name: data.FilePath });
+            if (data?.FilePath) {
+                setUploadedFilePath(data.FilePath);
+                setFile({ uri: data.FilePath, name: data.FilePath });
+            }
             // If headerUUID exists, it's edit mode - make it editable by default
             // Otherwise, it's view mode - make it non-editable
             setHeaderSubmitted(true);
@@ -344,6 +344,54 @@ const AddPurchaseInvoice = () => {
             setPrefillLoading(false);
         }
     }, [route?.params?.prefillHeader]);
+
+    // If returning from FileViewer (or other screen) with preserveHeaderOnReturn,
+    // re-fetch header-by-id (if UUID available) and open header section so user sees prefilled data.
+    useEffect(() => {
+        const preserve = route?.params?.preserveHeaderOnReturn;
+        if (!preserve) return;
+        (async () => {
+            try {
+                try { await loadLookups(); } catch (e) { /* ignore lookup errors */ }
+                const hdr = headerUUID || route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.UUID || null;
+                if (hdr) {
+                    setPrefillLoading(true);
+                    try {
+                        const cmp = route?.params?.cmpUuid || route?.params?.cmpUUID || route?.params?.cmp || undefined;
+                        const env = route?.params?.envUuid || route?.params?.envUUID || route?.params?.env || undefined;
+                        const resp = await getPurchaseInvoiceHeaderById({ headerUuid: hdr, cmpUuid: cmp, envUuid: env });
+                        const data = resp?.Data || resp || null;
+                        if (data) {
+                            // minimal prefill similar to existing logic
+                            try {
+                                const fetchedInvoiceNo = data?.InvoiceNo || data?.PurchaseInvoiceNo || data?.PurchaseInvNo || data?.SalesInvNo || data?.SalesInvoiceNo || '';
+                                setHeaderForm(s => ({ ...s, salesInquiryText: fetchedInvoiceNo || s.salesInquiryText || '' }));
+                                setHeaderUUID(data?.UUID || data?.Id || data?.HeaderUUID || hdr);
+                                if (data?.FilePath) {
+                                    setUploadedFilePath(data.FilePath);
+                                    setFile({ uri: data.FilePath, name: data.FilePath });
+                                }
+                                setHeaderSubmitted(true);
+                                setHeaderEditable(true);
+                                setExpandedId(1);
+                                if (typeof setHeaderResponse === 'function') setHeaderResponse(data);
+                            } catch (e) { /* ignore */ }
+                        }
+                    } finally {
+                        setPrefillLoading(false);
+                    }
+                } else if (headerResponse) {
+                    setHeaderEditable(true);
+                    setHeaderSubmitted(true);
+                    setExpandedId(1);
+                }
+            } catch (e) {
+                console.warn('preserveHeaderOnReturn handler failed', e);
+            } finally {
+                try { if (navigation && navigation.setParams) navigation.setParams({ preserveHeaderOnReturn: false }); } catch (e) { }
+            }
+        })();
+    }, [route?.params?.preserveHeaderOnReturn]);
 
     // Fetch header data by UUID when headerUuid is present in route params (edit mode)
     useEffect(() => {
@@ -566,7 +614,8 @@ const AddPurchaseInvoice = () => {
 
                 // Financial fields - comprehensive mapping
                 const shippingAmount = data?.ShippingCharges ?? data?.ShippingCharge ?? data?.Shipping ?? 0;
-                const adjustmentAmount = data?.AdjustmentPrice ?? data?.Adjustment ?? data?.Adjustments ?? data?.Discount ?? 0;
+                const adjustmentAmount = data?.AdjustmentPrice ?? data?.Adjustment ?? data?.Adjustments ?? 0;
+                const discountAmount = data?.Discount ?? data?.DiscountAmount ?? data?.DiscountValue ?? 0;
                 const taxAmount = data?.TotalTax ?? data?.TaxAmount ?? data?.HeaderTotalTax ?? data?.Tax ?? 0;
                 const totalAmount = data?.TotalAmount ?? data?.Total ?? data?.HeaderTotalAmount ?? data?.TotalPrice ?? data?.SubTotal ?? null;
 
@@ -580,6 +629,7 @@ const AddPurchaseInvoice = () => {
 
                 setShippingCharges(String(shippingAmount));
                 setAdjustments(String(adjustmentAmount));
+                setDiscount(String(discountAmount));
                 setTotalTax(String(taxAmount));
 
                 // Set server total amount if available
@@ -599,8 +649,9 @@ const AddPurchaseInvoice = () => {
                 const headerUuidFromData = data?.UUID || data?.Id || data?.HeaderUUID || resolvedHeaderUuid;
                 console.log('🔄 [AddPurchaseInvoice] Setting HeaderUUID:', headerUuidFromData);
                 setHeaderUUID(headerUuidFromData);
-
+                
                 if (data?.FilePath) {
+                    setUploadedFilePath(data.FilePath);
                     setFile({ uri: data.FilePath, name: data.FilePath });
                 }
 
@@ -645,7 +696,7 @@ const AddPurchaseInvoice = () => {
                 // Do not auto-open header here; user must click Edit to make changes
             } catch (e) {
                 console.error('Error fetching header data:', e);
-                Alert.alert('Error', e?.message || 'Unable to load header data');
+                Alert.alert('Error', getErrorMessage(e, 'Unable to load header data'));
             } finally {
                 setPrefillLoading(false);
             }
@@ -928,6 +979,7 @@ const AddPurchaseInvoice = () => {
     const [paymentMethod, setPaymentMethod] = useState('');
     const [shippingCharges, setShippingCharges] = useState('0');
     const [adjustments, setAdjustments] = useState('0');
+    const [discount, setDiscount] = useState('0');
     const [adjustmentLabel, setAdjustmentLabel] = useState('Adjustments');
     const [totalTax, setTotalTax] = useState('0');
     const [serverTotalAmount, setServerTotalAmount] = useState('');
@@ -935,6 +987,20 @@ const AddPurchaseInvoice = () => {
     const [showShippingTip, setShowShippingTip] = useState(false);
     const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
     const [prefillLoading, setPrefillLoading] = useState(false);
+
+    const hasDocumentAvailable = () => {
+        try {
+            if (uploadedFilePath && String(uploadedFilePath).trim() !== '') return true;
+            const resp = headerResponse || {};
+            const candidates = [resp.FilePath, resp.DocumentUrl, resp.FilePaths, resp.File, resp.files, resp.Attachments, resp.Document, resp.DocumentPath, resp.FileUrl, resp.Data && resp.Data.FilePath, resp.Data && resp.Data.files];
+            for (const c of candidates) {
+                if (!c && c !== 0) continue;
+                if (Array.isArray(c) && c.length) return true;
+                if (typeof c === 'string' && String(c).trim() !== '') return true;
+            }
+        } catch (e) { /* ignore */ }
+        return false;
+    };
 
     // Permission handling for Android
     const requestStoragePermissionAndroid = async () => {
@@ -956,6 +1022,43 @@ const AddPurchaseInvoice = () => {
             PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
         );
         return granted === PermissionsAndroid.RESULTS.GRANTED;
+    };
+
+    const viewDocument = (opts = {}) => {
+        // Prefer server-provided file paths; do not rely on local file.uri for viewing
+        const candidates = [uploadedFilePath, headerResponse?.FilePath, headerResponse?.DocumentUrl, headerResponse?.File, headerResponse?.Files, headerResponse?.Attachments, headerResponse?.Document, headerResponse?.DocumentPath, headerResponse?.FileUrl];
+        const resolveCandidate = (c) => {
+            if (!c && c !== 0) return null;
+            if (Array.isArray(c)) return c.length ? c[0] : null;
+            if (typeof c === 'object') return c.pdfBase64 || c.Url || c.url || c.FilePath || c.filePath || c.Path || c.path || c.File || c.file || c.DocumentUrl || null;
+            return c;
+        };
+        let rawCandidate = candidates.map(resolveCandidate).find(x => x !== null && typeof x !== 'undefined' && String(x) !== '');
+        const fileLikeRegex = /(data:.*;base64,)|(\.pdf(\?|$))|(\.png(\?|$))|(\.jpe?g(\?|$))|application\/pdf|https?:\/\//i;
+        const findInObjectForFile = (obj) => {
+            try {
+                if (!obj && obj !== 0) return null;
+                if (typeof obj === 'string') return fileLikeRegex.test(obj) ? obj : null;
+                if (Array.isArray(obj)) { for (const v of obj) { const r = findInObjectForFile(v); if (r) return r; } return null; }
+                if (typeof obj === 'object') { for (const k of Object.keys(obj)) { try { const v = obj[k]; const r = findInObjectForFile(v); if (r) return r; } catch (e) { } } }
+            } catch (e) { }
+            return null;
+        };
+        if (!rawCandidate) rawCandidate = resolveCandidate(headerResponse?.Data) || resolveCandidate(headerResponse?.data);
+        if (!rawCandidate) {
+            const deep = findInObjectForFile(headerResponse) || findInObjectForFile(headerResponse?.Data) || findInObjectForFile(uploadedFilePath) || findInObjectForFile(file);
+            if (deep) rawCandidate = deep;
+        }
+        console.log('[AddPurchaseInvoice] viewDocument candidates ->', { rawCandidate, headerResponse, uploadedFilePath });
+        if (!rawCandidate) { Alert.alert('No document', 'No document is available to view.'); return; }
+        let url = String(rawCandidate);
+        try { const base = 'https://erp.kspconsults.com'; if (!/^(https?:\/\/|file:|data:)/i.test(url)) { if (String(url).startsWith('/')) url = base + url; else url = base + '/' + url; } } catch (e) { }
+        const lower = url.toLowerCase();
+        try { if (navigation && navigation.setParams) navigation.setParams({ preserveHeaderOnReturn: true }); } catch (e) { }
+        if (lower.includes('base64,') && lower.includes('pdf')) { navigation.navigate('FileViewerScreen', { pdfBase64: url, fileName: opts.fileName || 'Document' }); return; }
+        if (lower.endsWith('.pdf') || lower.includes('.pdf') || lower.includes('application/pdf')) { navigation.navigate('FileViewerScreen', { pdfUrl: url, fileName: opts.fileName || 'Document' }); return; }
+        if (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.includes('image/')) { navigation.navigate('ImageViewerScreen', { imageUrl: url, opportunityTitle: opts.fileName || 'Document' }); return; }
+        navigation.navigate('FileViewerScreen', { pdfUrl: url, fileName: opts.fileName || 'Document' });
     };
 
     const copyBillingToShipping = () => {
@@ -1076,7 +1179,7 @@ const AddPurchaseInvoice = () => {
                 Alert.alert('Success', 'Line deleted');
             } catch (e) {
                 console.warn('Delete line error', e);
-                Alert.alert('Error', e?.message || 'Unable to delete line');
+                Alert.alert('Error', getErrorMessage(e, 'Unable to delete line'));
             }
         } else {
             // local-only line, just remove
@@ -1301,7 +1404,7 @@ const AddPurchaseInvoice = () => {
             }
         } catch (e) {
             console.warn('Add/Update line item error', e);
-            Alert.alert('Error', e?.message || 'Unable to add/update line item');
+            Alert.alert('Error', getErrorMessage(e, 'Unable to add/update line item'));
         } finally {
             setIsAddingLine(false);
         }
@@ -1337,10 +1440,11 @@ const AddPurchaseInvoice = () => {
                 ShippingCharges: parseFloat(shippingCharges) || 0,
                 AdjustmentField: adjustmentLabel || '',
                 AdjustmentPrice: parseFloat(adjustments) || 0,
+                Discount: parseFloat(discount) || 0,
                 TermsConditions: terms || '',
                 SubTotal: parseFloat(computeSubtotal()) || 0,
                 TotalTax: parseFloat(totalTax) || 0,
-                TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + (parseFloat(totalTax) || 0),
+                TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) - (parseFloat(discount) || 0) + (parseFloat(totalTax) || 0),
                 FilePath: uploadedFilePath || file?.uri || file?.name || '',
                 Notes: notes || '',
             };
@@ -1358,7 +1462,7 @@ const AddPurchaseInvoice = () => {
             setExpandedId(null);
         } catch (e) {
             console.error('Final submit error', e);
-            Alert.alert('Error', e?.message || 'Unable to update performa header');
+            Alert.alert('Error', getErrorMessage(e, 'Unable to update performa header'));
         } finally {
             setHeaderSubmitting(false);
         }
@@ -1409,11 +1513,11 @@ const AddPurchaseInvoice = () => {
                 PurchaseOrderNo: purchaseOrderNoUuidRuntime || headerForm.clientName || '',
                 VendorUUID: headerForm.CustomerUUID || '',
                 ProjectUUID: projectUUID || project || '',
-                PaymentTerm: paymentTerm || (paymentTermUuid || ''),
-                PaymentMode: paymentMethod || (paymentMethodUUID || ''),
+                PaymentTerm: paymentTermUuid || '',
+                PaymentMode:  paymentMethodUUID || '',
                 Note: notes || '',
                 TermsConditions: terms || '',
-                Discount: parseFloat(shippingCharges) || 0,
+                Discount: parseFloat(discount) || 0,
                 OrderDate: uiDateToApiDate(invoiceDate) ? new Date(uiDateToApiDate(invoiceDate)).toISOString() : '',
                 FilePath: uploadedFilePath || file?.uri || file?.name || '',
             };
@@ -1434,7 +1538,7 @@ const AddPurchaseInvoice = () => {
             Alert.alert('Success', 'Header submitted successfully');
         } catch (err) {
             console.error('submitHeader error ->', err);
-            Alert.alert('Error', err?.message || 'Unable to submit header');
+            Alert.alert('Error', getErrorMessage(err, 'Unable to submit header'));
         } finally {
             setHeaderSubmitting(false);
         }
@@ -1479,11 +1583,11 @@ const AddPurchaseInvoice = () => {
                 PurchaseOrderNo: purchaseOrderNoUuidRuntime || headerForm.clientName || '',
                 VendorUUID: headerForm.CustomerUUID || '',
                 ProjectUUID: projectUUID || project || '',
-                PaymentTerm: paymentTerm || (paymentTermUuid || ''),
-                PaymentMode: paymentMethod || (paymentMethodUUID || ''),
+                PaymentTerm:paymentTermUuid || '',
+                PaymentMode: paymentMethodUUID || '',
                 Note: notes || '',
                 TermsConditions: terms || '',
-                Discount: parseFloat(shippingCharges) || 0,
+                Discount: parseFloat(discount) || 0,
                 OrderDate: uiDateToApiDate(invoiceDate) ? new Date(uiDateToApiDate(invoiceDate)).toISOString() : '',
                 FilePath: uploadedFilePath || file?.uri || file?.name || '',
             };
@@ -1497,7 +1601,7 @@ const AddPurchaseInvoice = () => {
             setExpandedId(4);
         } catch (err) {
             console.error('updateHeader error ->', err);
-            Alert.alert('Error', err?.message || 'Unable to update header');
+            Alert.alert('Error', getErrorMessage(err, 'Unable to update header'));
         } finally {
             setHeaderSubmitting(false);
         }
@@ -2205,120 +2309,26 @@ const AddPurchaseInvoice = () => {
                                 <Text style={styles.valueBold}>₹{computeSubtotal()}</Text>
                             </View>
 
-                            {/* Shipping Charges */}
+                            
+
+                            {/* Discount */}
                             <View style={styles.rowInput}>
-                                <Text style={styles.label}>Shipping Charges :</Text>
+                                <Text style={styles.label}>Discount :</Text>
 
                                 <View style={styles.inputRightGroup}>
                                     <TextInput
-                                        value={String(shippingCharges)}
-                                        onChangeText={setShippingCharges}
+                                        value={String(discount)}
+                                        onChangeText={setDiscount}
                                         keyboardType="numeric"
                                         style={[styles.inputBox, { color: '#000000' }]}
                                     />
-
-                                    {/* Question Icon with Tooltip */}
-                                    <View style={styles.helpIconWrapper}>
-                                        <TouchableOpacity
-                                            onPress={() => {
-                                                setShowShippingTip(!showShippingTip);
-                                                setShowAdjustmentTip(false);
-                                            }}
-                                            style={styles.helpIconContainer}
-                                        >
-                                            <Text style={styles.helpIcon}>?</Text>
-                                        </TouchableOpacity>
-
-                                        {/* Tooltip */}
-                                        {showShippingTip && (
-                                            <>
-                                                <Modal
-                                                    transparent
-                                                    visible={showShippingTip}
-                                                    animationType="none"
-                                                    onRequestClose={() => setShowShippingTip(false)}
-                                                >
-                                                    <TouchableWithoutFeedback
-                                                        onPress={() => setShowShippingTip(false)}
-                                                    >
-                                                        <View style={styles.modalOverlay} />
-                                                    </TouchableWithoutFeedback>
-                                                </Modal>
-                                                <View style={styles.tooltipBox}>
-                                                    <Text style={styles.tooltipText}>
-                                                        Amount spent on shipping the goods.
-                                                    </Text>
-                                                    <View style={styles.tooltipArrow} />
-                                                </View>
-                                            </>
-                                        )}
-                                    </View>
                                 </View>
 
-                                <Text style={styles.value}>
-                                    ₹{parseFloat(shippingCharges || 0).toFixed(2)}
-                                </Text>
+                                <Text style={styles.value}>- ₹{parseFloat(discount || 0).toFixed(2)}</Text>
                             </View>
 
-                            {/* Adjustments */}
-                            <View style={styles.rowInput}>
-                                <TextInput
-                                    value={adjustmentLabel}
-                                    onChangeText={setAdjustmentLabel}
-                                    underlineColorAndroid="transparent"
-                                    style={styles.labelInput}
-                                />
+                          
 
-                                <View style={styles.inputRightGroup}>
-                                    <TextInput
-                                        value={String(adjustments)}
-                                        onChangeText={setAdjustments}
-                                        keyboardType="numeric"
-                                        style={styles.inputBox}
-                                    />
-                                    {/* Question Icon with Tooltip */}
-                                    <View style={styles.helpIconWrapper}>
-                                        <TouchableOpacity
-                                            onPress={() => {
-                                                setShowAdjustmentTip(!showAdjustmentTip);
-                                                setShowShippingTip(false);
-                                            }}
-                                            style={styles.helpIconContainer}
-                                        >
-                                            <Text style={styles.helpIcon}>?</Text>
-                                        </TouchableOpacity>
-
-                                        {/* Tooltip */}
-                                        {showAdjustmentTip && (
-                                            <>
-                                                <Modal
-                                                    transparent
-                                                    visible={showAdjustmentTip}
-                                                    animationType="none"
-                                                    onRequestClose={() => setShowAdjustmentTip(false)}
-                                                >
-                                                    <TouchableWithoutFeedback
-                                                        onPress={() => setShowAdjustmentTip(false)}
-                                                    >
-                                                        <View style={styles.modalOverlay} />
-                                                    </TouchableWithoutFeedback>
-                                                </Modal>
-                                                <View style={styles.tooltipBox}>
-                                                    <Text style={styles.tooltipText}>
-                                                        Additional charges or discounts applied to the
-                                                        order.
-                                                    </Text>
-                                                    <View style={styles.tooltipArrow} />
-                                                </View>
-                                            </>
-                                        )}
-                                    </View>
-                                </View>
-
-                                <Text style={styles.value}>
-                                    ₹{parseFloat(adjustments || 0).toFixed(2)}
-                                </Text>
-                            </View>
 
                             {/* Total Tax */}
                             <View style={styles.row}>
@@ -2336,12 +2346,13 @@ const AddPurchaseInvoice = () => {
                                     ₹
                                     {(() => {
                                         const serverNum = (serverTotalAmount !== null && serverTotalAmount !== undefined && String(serverTotalAmount).trim() !== '') ? parseFloat(serverTotalAmount) : NaN;
-                                        const shippingNum = parseFloat(shippingCharges) || 0;
-                                        const adjustmentsNum = parseFloat(adjustments) || 0;
+                                        // const shippingNum = parseFloat(shippingCharges) || 0;
+                                        // const adjustmentsNum = parseFloat(adjustments) || 0;
+                                        const discountNum = parseFloat(discount) || 0;
                                         const subtotalNum = parseFloat(computeSubtotal()) || 0;
                                         const totalTaxNum = parseFloat(totalTax) || 0;
 
-                                        const computedTotal = subtotalNum + shippingNum + adjustmentsNum + totalTaxNum;
+                                        const computedTotal = subtotalNum - discountNum + totalTaxNum;
 
                                         // Use server total only when it appears meaningful:
                                         // - serverNum is not NaN AND (serverNum is non-zero OR it closely matches computed total)
@@ -2364,7 +2375,7 @@ const AddPurchaseInvoice = () => {
                                             if (serverNum !== 0 && !serverMatches) {
                                                 // If server provided a non-zero total but it doesn't match computed total,
                                                 // prefer the server value (assuming authoritative), but ensure tax isn't double-counted.
-                                                const delta = serverNum - subtotalNum - shippingNum - adjustmentsNum;
+                                                const delta = serverNum - subtotalNum  + discountNum;
                                                 if (!isNaN(delta) && Math.abs(delta - totalTaxNum) <= Math.max(0.01, Math.abs(totalTaxNum) * 0.01)) {
                                                     return serverNum.toFixed(2);
                                                 }
@@ -2385,19 +2396,19 @@ const AddPurchaseInvoice = () => {
                             <View style={styles.notesCol}>
                                 <Text style={inputStyles.label}>Notes</Text>
                                 <TextInput
-                                    style={styles.noteBox}
+                                    style={[styles.noteBox,{color:'#000000'}]}
                                     multiline
                                     numberOfLines={4}
                                     value={notes}
                                     onChangeText={setNotes}
-                                    placeholder="Add any remarks..."
+                                    placeholder="Notes..."
                                     placeholderTextColor={COLORS.textLight}
                                 />
                             </View>
                             <View style={styles.notesCol}>
                                 <Text style={inputStyles.label}>Terms & Conditions</Text>
                                 <TextInput
-                                    style={styles.noteBox}
+                                    style={[styles.noteBox,{color:'#000000'}]}
                                     multiline
                                     numberOfLines={4}
                                     value={terms}
@@ -2407,6 +2418,14 @@ const AddPurchaseInvoice = () => {
                                 />
                             </View>
                             <View style={styles.attachCol}>
+                                {hasDocumentAvailable() && (
+                                    <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm }}>
+                                        <Text style={inputStyles.label}>Document</Text>
+                                        <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton]} onPress={() => viewDocument({ fileName: headerForm?.PurchaseInvoiceNo || 'Document' })}>
+                                            <Text style={{ color: '#fff', fontWeight: '600', fontSize: rf(3.4) }}>View Document</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
                                 <Text style={inputStyles.label}>Attach file</Text>
                                 <View
                                     style={[
@@ -2465,6 +2484,7 @@ const AddPurchaseInvoice = () => {
                     onDateSelect={handleDateSelect}
                     title="Select Date"
                 />
+                {(Array.isArray(expandedId) ? expandedId.includes(4) : expandedId === 4) && (
 
                 <View style={styles.footerBar}>
                     <View
@@ -2501,6 +2521,7 @@ const AddPurchaseInvoice = () => {
                         <Text style={styles.primaryButtonText}>Save & Send</Text>
                     </TouchableOpacity> */}
                 </View>
+                )}
             </View>
         </>
     );

@@ -7,7 +7,8 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons'; 
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
-import { getPurchaseHeaderInquiries, deletePurchaseInquiryHeader, convertInquiryToPurchaseOrder } from '../../../../api/authServices'; 
+import { getPurchaseHeaderInquiries, deletePurchaseInquiryHeader, convertInquiryToPurchaseOrder } from '../../../../api/authServices';
+import { getErrorMessage } from '../../../../utils/errorMessage';
 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 
@@ -161,7 +162,7 @@ const ViewPurchaseInquiry = () => {
                                                 fetchInquiries();
                                             } catch (err) {
                                                 console.error('Failed to delete header', err);
-                                                Alert.alert('Error', err?.message || 'Failed to delete purchase inquiry');
+                                                Alert.alert('Error', getErrorMessage(err, 'Failed to delete purchase inquiry'));
                                             }
                                         } }
                                     ]
@@ -188,7 +189,7 @@ const ViewPurchaseInquiry = () => {
                                     
                                 } catch (err) {
                                     console.error('Failed to convert inquiry', err);
-                                    Alert.alert('Error', err?.message || 'Failed to convert purchase inquiry to order');
+                                    Alert.alert('Error', getErrorMessage(err, 'Failed to convert purchase inquiry to order'));
                                 }
                                 return;
                             }

@@ -9,6 +9,7 @@ import { COLORS, TYPOGRAPHY, inputStyles } from '../../../styles/styles';
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
+import { getErrorMessage } from '../../../../utils/errorMessage';
 // Network API calls removed from this screen — local-only behavior
 import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { fetchProjects, getSalesHeader, updateSalesHeader, getCustomers, addSalesInquiry, addSalesLine, updateSalesLine, deleteSalesLine, getItemTypes, getItems, getUnits, getSalesLines } from '../../../../api/authServices';
@@ -125,13 +126,13 @@ const AddSalesInquiry = () => {
         }
     };
 
-    // Demo options for dropdowns
-    const currencyTypes = ['- Select Currency -', 'USD', 'INR', 'EUR', 'GBP'];
-    const demoItemTypes = ['- Select Item -', 'Furniture', 'Electronics', 'Office Supplies', 'Equipment'];
-    const itemNames = ['- Select Item -', 'Chair', 'Table', 'Desk', 'Cabinet'];
-    const CustomerType = ['- Select Customer -', 'Abhinav', 'Raj',];
-    const countries = ['- Select Country -', 'India', 'United States', 'United Kingdom', 'Australia', 'Germany'];
-    const units = ['- Select Unit -', 'Pcs', 'Box', 'Set', 'Unit', 'failed'];
+    // Dropdown option placeholders (real data must come from server APIs)
+    const currencyTypes = [];
+    const demoItemTypes = [];
+    const itemNames = [];
+    const CustomerType = [];
+    const countries = [];
+    const units = [];
 
     // Form state
     const [uuid, setUuid] = useState('0e073e1b-3b3f-4ae2-8f77-5');
@@ -272,6 +273,7 @@ const AddSalesInquiry = () => {
                         ItemType_UUID: currentItem.itemTypeUuid || existing.itemTypeUuid || null,
                         ItemTypeName: currentItem.itemType || existing.itemType || '',
                         ItemName_UUID: currentItem.itemNameUuid || existing.itemNameUuid || null,
+                        ItemUUID: currentItem.itemNameUuid || existing.itemNameUuid || null,
                         ItemName: currentItem.itemName || existing.itemName || '',
                         Quantity: currentItem.quantity,
                         Unit_UUID: currentItem.unitUuid || existing.unitUuid || null,
@@ -299,7 +301,7 @@ const AddSalesInquiry = () => {
                     setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
                 } catch (e) {
                     console.log('updateSalesLine error ->', e?.message || e);
-                    Alert.alert('Error', e?.message || 'Failed to update line on server. Changes saved locally.');
+                    Alert.alert('Error', getErrorMessage(e, 'Failed to update line on server. Changes saved locally.'));
                     // fallback to local update
                     setLineItems(prev => prev.map(it => it.id === editLineItemId ? {
                         ...it,
@@ -350,6 +352,7 @@ const AddSalesInquiry = () => {
                     ItemType_UUID: currentItem.itemTypeUuid || null,
                     ItemTypeName: currentItem.itemType || '',
                     ItemName_UUID: currentItem.itemNameUuid || null,
+                    ItemUUID: currentItem.itemNameUuid || existing.itemNameUuid || null,
                     ItemName: currentItem.itemName || '',
                     Quantity: currentItem.quantity,
                     Unit_UUID: currentItem.unitUuid || null,
@@ -385,7 +388,7 @@ const AddSalesInquiry = () => {
                 setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null });
             } catch (e) {
                 console.log('addSalesLine error ->', e?.message || e);
-                Alert.alert('Error', e?.message || 'Failed to add line to server. Saving locally instead.');
+                Alert.alert('Error', getErrorMessage(e, 'Failed to add line to server. Saving locally instead.'));
                 // fallback to local add if API fails
                 const newItemBase = {
                     id: lineItems.length ? Math.max(...lineItems.map(i => i.id)) + 1 : 1,
@@ -481,13 +484,14 @@ const AddSalesInquiry = () => {
     const fetchCustomers = async () => {
         try {
             const resp = await getCustomers();
-            const list = resp?.Data || resp?.Records || resp?.List || resp || [];
+            // Support APIs that return { Data: { Records: [...] } }
+            const list = resp?.Data?.Records || resp?.Data || resp?.Records || resp?.List || resp || [];
             const arr = Array.isArray(list) ? list : [];
             setCustomers(arr);
             return arr;
         } catch (e) {
             console.log('fetchCustomers error ->', e?.message || e);
-            const list = (CustomerType || []).slice(1).map((name, idx) => ({ UUID: `local-cust-${idx + 1}`, Name: name }));
+            const list = [];
             setCustomers(list);
             return list;
         }
@@ -519,8 +523,7 @@ const AddSalesInquiry = () => {
             return arr;
         } catch (e) {
             console.log('fetchItemTypes error ->', e?.message || e);
-            // Local fallback: use demoItemTypes as simple objects
-            const list = (demoItemTypes || []).slice(1).map((name, idx) => ({ UUID: `local-it-${idx + 1}`, Name: name }));
+            const list = [];
             setServerItemTypes(list);
             return list;
         } finally {
@@ -532,22 +535,37 @@ const AddSalesInquiry = () => {
         setItemMastersLoading(true);
         try {
             // Prefer API-backed item masters for the given item type
-            // Call signature: pass identifier if available (service may accept an object or raw id)
-            const resp = await getItems(itemTypeUuid ? { itemTypeUuid } : {});
+            // Always request items for Sales mode; include itemTypeUuid when provided
+            const params = { mode: 'Sales' };
+            if (itemTypeUuid) params.itemTypeUuid = itemTypeUuid;
+            const resp = await getItems(params);
+            console.log(resp,'5555');
             const list = resp?.Data || resp?.Records || resp?.List || resp || [];
-            const arr = Array.isArray(list) ? list : [];
-            setServerItemMasters(arr);
-            return arr;
+            const arr = Array.isArray(list.Records) ? list.Records : [];
+            // Normalize server item shape so UI can always read `Name` and `UUID` fields
+            const normalized = arr.map(r => ({
+                Name: r?.Name || r?.name || r?.ItemName || r?.Item || r?.Title || '',
+                UUID: r?.UUID || r?.Id || r?.Id || r?.sku || r?.SKU || r?.ItemUUID || r?.ItemId || null,
+                SKU: r?.SKU || r?.sku || r?.Sku || null,
+                HSNCode: r?.HSNCode || r?.Hsn || r?.HSN || null,
+                Rate: r?.Rate ?? r?.Price ?? null,
+                Description: r?.Description || r?.Desc || ''
+            }));
+            console.log(normalized,'5666');
+            
+            setServerItemMasters(normalized);
+            return normalized;
+            
         } catch (e) {
             console.log('fetchItemMasters error ->', e?.message || e);
-            // Local fallback: use itemNames demo list
-            const list = (itemNames || []).slice(1).map((name, idx) => ({ UUID: `local-im-${idx + 1}`, Name: name }));
+            const list = [];
             setServerItemMasters(list);
             return list;
         } finally {
             setItemMastersLoading(false);
         }
     };
+    console.log(serverItemMasters,'546');
 
     const fetchUnits = async () => {
         setUnitsLoading(true);
@@ -559,7 +577,7 @@ const AddSalesInquiry = () => {
             return arr;
         } catch (e) {
             console.log('fetchUnits error ->', e?.message || e);
-            const list = (units || []).slice(1).map((name, idx) => ({ UUID: `local-unit-${idx + 1}`, Name: name }));
+            const list = [];
             setServerUnits(list);
             return list;
         } finally {
@@ -743,7 +761,10 @@ const AddSalesInquiry = () => {
                 // a navigation.setParams({}) on every render which causes a loop).
                 try {
                     const hadHeaderIdentifier = !!headerUuidParam || !!(route?.params?.headerRaw || route?.params?.headerData);
-                    if (hadHeaderIdentifier && navigation && navigation.setParams) {
+                    const preserve = !!route?.params?.preserveHeaderOnReturn;
+                    // Only clear route params when we actually received a header identifier
+                    // and the caller hasn't requested preserving the header on return (e.g. user opened FileViewer).
+                    if (hadHeaderIdentifier && !preserve && navigation && navigation.setParams) {
                         navigation.setParams({});
                     }
                 } catch (e) {
@@ -819,7 +840,7 @@ const AddSalesInquiry = () => {
                     setLineItems(prev => prev.filter(item => item.id !== id));
                 } catch (e) {
                     console.log('deleteSalesLine error ->', e?.message || e);
-                    Alert.alert('Error', e?.message || 'Failed to delete line on server');
+                    Alert.alert('Error', getErrorMessage(e, 'Failed to delete line on server'));
                 } finally {
                     setLineAdding(false);
                 }
@@ -909,7 +930,7 @@ const AddSalesInquiry = () => {
             }
         } catch (e) {
             console.log('AddSalesHeader error ->', e?.message || e);
-            Alert.alert('Error', e?.message || 'Failed to save header');
+            Alert.alert('Error', getErrorMessage(e, 'Failed to save header'));
         } finally {
             setHeaderSubmitting(false);
         }
@@ -949,7 +970,7 @@ const AddSalesInquiry = () => {
             try { if (headerResponse?.Data?.UUID) await loadSalesLines(headerResponse.Data.UUID); } catch (e) { console.log('[AddSalesInquiry] post-update loadSalesLines error ->', e); }
         } catch (e) {
             console.log('UpdateSalesHeader error ->', e?.message || e);
-            Alert.alert('Error', e?.message || 'Failed to update header');
+            Alert.alert('Error', getErrorMessage(e, 'Failed to update header'));
         } finally {
             setHeaderSubmitting(false);
         }
@@ -1200,7 +1221,7 @@ const AddSalesInquiry = () => {
                                             onPress={submitForm}
                                             disabled={headerSubmitting}
                                         >
-                                            <Text style={styles.submitButtonText}>{headerSubmitting ? (headerEditing ? 'Updating...' : 'Saving...') : (headerEditing ? 'Update Header' : 'Save Header')}</Text>
+                                            <Text style={styles.submitButtonText}>{headerSubmitting ? (headerEditing ? 'Updating...' : 'Saving...') : (headerEditing ? 'Update' : 'Save')}</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </AccordionSection>
@@ -1218,7 +1239,7 @@ const AddSalesInquiry = () => {
                                         <Dropdown
                                             placeholder="- Select Item -"
                                             value={currentItem.itemType}
-                                            options={serverItemTypes.length ? serverItemTypes : demoItemTypes}
+                                            options={serverItemTypes}
                                             getLabel={(it) => it?.Name || it?.DisplayName || it?.name || it}
                                             getKey={(it) => it?.UUID || it?.Id || it}
                                             onSelect={(v) => {
@@ -1244,12 +1265,12 @@ const AddSalesInquiry = () => {
                                         <Dropdown
                                             placeholder="- Select Item -"
                                             value={currentItem.itemName}
-                                            options={serverItemMasters.length ? serverItemMasters : itemNames}
+                                            options={serverItemMasters}
                                             getLabel={(it) => it?.Name || it?.DisplayName || it?.name || it}
                                             getKey={(it) => it?.UUID || it?.Id || it}
                                             onSelect={(v) => {
                                                 if (v && typeof v === 'object') {
-                                                    setCurrentItem({ ...currentItem, itemName: v?.Name || v?.DisplayName || v?.name || '', itemNameUuid: v?.UUID || v?.Id || v?.id || null });
+                                                    setCurrentItem({ ...currentItem, itemName: v?.Name || v?.DisplayName || v?.name || '', itemNameUuid: v?.UUID || v?.Uuid || v?.id || null });
                                                 } else {
                                                     setCurrentItem({ ...currentItem, itemName: v, itemNameUuid: null });
                                                 }
@@ -1282,7 +1303,7 @@ const AddSalesInquiry = () => {
                                         <Dropdown
                                             placeholder="- Select Unit -"
                                             value={currentItem.unit}
-                                            options={serverUnits.length ? serverUnits : units}
+                                            options={serverUnits}
                                             getLabel={(u) => u?.Name || u?.DisplayName || u?.name || u}
                                             getKey={(u) => u?.UUID || u?.Id || u}
                                             onSelect={(v) => {
@@ -1313,69 +1334,69 @@ const AddSalesInquiry = () => {
                                     <Text style={styles.addButtonText}>{editLineItemId ? (lineAdding ? 'Updating...' : 'Update') : (lineAdding ? 'Adding...' : 'Add')}</Text>
                                 </TouchableOpacity>
                             </View>
+                            {/* Line Items Table */}
+                            {lineItems.length > 0 && (
+                                <View style={styles.tableContainer}>
+                                    <View style={styles.tableWrapper}>
+                                        <ScrollView
+                                            horizontal
+                                            showsHorizontalScrollIndicator={false}
+                                            nestedScrollEnabled={true}
+                                            keyboardShouldPersistTaps="handled"
+                                            directionalLockEnabled={true}
+                                        >
+                                            <View style={styles.table}>
+                                                {/* Table Header */}
+                                                <View style={styles.thead}>
+                                                    <View style={styles.tr}>
+                                                        <Text style={[styles.th, { width: wp(15) }]}>Sr.No</Text>
+                                                        <Text style={[styles.th, { width: wp(50) }]}>Item</Text>
+                                                        <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
+                                                        <Text style={[styles.th, { width: wp(25) }]}>Action</Text>
+                                                    </View>
+                                                </View>
+        
+        
+        
+                                                {/* Table Body */}
+                                                <View style={styles.tbody}>
+                                                    {lineItems.map((item, index) => (
+                                                        <View key={item.id} style={styles.tr}>
+                                                            <View style={[styles.td, { width: wp(15) }]}>
+                                                                <Text style={styles.tdText}>{index + 1}</Text>
+                                                            </View>
+                                                            <View style={[styles.td, { width: wp(50), alignItems: 'flex-start', paddingLeft: wp(2) }]}>
+                                                                <Text style={styles.tdText}>• Item Type: {item.itemType}</Text>
+                                                                <Text style={styles.tdText}>• Name: {item.itemName}</Text>
+                                                            </View>
+                                                            <View style={[styles.td, { width: wp(20) }]}>
+                                                                <Text style={styles.tdText}>{item.quantity}</Text>
+                                                            </View>
+                                                            <View style={[styles.tdAction, { width: wp(25) }]}>
+                                                                <TouchableOpacity
+                                                                    style={styles.actionButton}
+                                                                    onPress={() => handleEditItem(item.id)}
+                                                                >
+                                                                    <Icon name="edit" size={rf(3.6)} color="#fff" />
+                                                                </TouchableOpacity>
+                                                                <TouchableOpacity
+                                                                    style={[styles.actionButton, { marginLeft: wp(2) }]}
+                                                                    onPress={() => handleDeleteItem(item.id)}
+                                                                >
+                                                                    <Icon name="delete" size={rf(3.6)} color="#fff" />
+                                                                </TouchableOpacity>
+                                                            </View>
+                                                        </View>
+                                                    ))}
+                                                </View>
+                                            </View>
+                                        </ScrollView>
+                                    </View>
+                                </View>
+                            )}
                         </AccordionSection>
                     )}
 
-                    {/* Line Items Table */}
-                    {lineItems.length > 0 && (
-                        <View style={styles.tableContainer}>
-                            <View style={styles.tableWrapper}>
-                                <ScrollView
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    nestedScrollEnabled={true}
-                                    keyboardShouldPersistTaps="handled"
-                                    directionalLockEnabled={true}
-                                >
-                                    <View style={styles.table}>
-                                        {/* Table Header */}
-                                        <View style={styles.thead}>
-                                            <View style={styles.tr}>
-                                                <Text style={[styles.th, { width: wp(15) }]}>Sr.No</Text>
-                                                <Text style={[styles.th, { width: wp(50) }]}>Item</Text>
-                                                <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
-                                                <Text style={[styles.th, { width: wp(25) }]}>Action</Text>
-                                            </View>
-                                        </View>
-
-
-
-                                        {/* Table Body */}
-                                        <View style={styles.tbody}>
-                                            {lineItems.map((item, index) => (
-                                                <View key={item.id} style={styles.tr}>
-                                                    <View style={[styles.td, { width: wp(15) }]}>
-                                                        <Text style={styles.tdText}>{index + 1}</Text>
-                                                    </View>
-                                                    <View style={[styles.td, { width: wp(50), alignItems: 'flex-start', paddingLeft: wp(2) }]}>
-                                                        <Text style={styles.tdText}>• Item Type: {item.itemType}</Text>
-                                                        <Text style={styles.tdText}>• Name: {item.itemName}</Text>
-                                                    </View>
-                                                    <View style={[styles.td, { width: wp(20) }]}>
-                                                        <Text style={styles.tdText}>{item.quantity}</Text>
-                                                    </View>
-                                                    <View style={[styles.tdAction, { width: wp(25) }]}>
-                                                        <TouchableOpacity
-                                                            style={styles.actionButton}
-                                                            onPress={() => handleEditItem(item.id)}
-                                                        >
-                                                            <Icon name="edit" size={rf(3.6)} color="#fff" />
-                                                        </TouchableOpacity>
-                                                        <TouchableOpacity
-                                                            style={[styles.actionButton, { marginLeft: wp(2) }]}
-                                                            onPress={() => handleDeleteItem(item.id)}
-                                                        >
-                                                            <Icon name="delete" size={rf(3.6)} color="#fff" />
-                                                        </TouchableOpacity>
-                                                    </View>
-                                                </View>
-                                            ))}
-                                        </View>
-                                    </View>
-                                </ScrollView>
-                            </View>
-                        </View>
-                    )}
                 </ScrollView>
 
 

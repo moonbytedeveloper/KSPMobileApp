@@ -9,6 +9,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 import { getPurchaseOrderHeaders, deletePurchaseOrderHeader, convertPurchaseOrderToInvoice, getPurchaseOrderSlip, getPurchaseOrderRelatedDocuments, getPurchaseInvoiceSlip, getPurchasePerformaInvoiceSlip } from '../../../../api/authServices';
+import { getErrorMessage } from '../../../../utils/errorMessage';
 
 // Will be loaded from server
 
@@ -156,7 +157,7 @@ const ViewPurchaseOrder = () => {
                 } catch (err) {
                     console.warn('fetchPurchaseOrderRelatedDocuments error ->', err?.message || err);
                     setOrderRelatedModalVisible(false);
-                    Alert.alert('Error', 'Unable to fetch related documents');
+                    Alert.alert('Error', getErrorMessage(err, 'Unable to fetch related documents'));
                 }
                 return;
             case 'Delete':
@@ -179,7 +180,7 @@ const ViewPurchaseOrder = () => {
                                     Alert.alert('Deleted', 'Purchase order deleted successfully');
                                 } catch (err) {
                                     console.warn('deletePurchaseOrderHeader failed', err && (err.message || err));
-                                    Alert.alert('Error', err?.message || 'Unable to delete purchase order');
+                                    Alert.alert('Error', getErrorMessage(err, 'Unable to delete purchase order'));
                                 } finally {
                                     setLoading(false);
                                 }
@@ -227,10 +228,9 @@ const ViewPurchaseOrder = () => {
                             });
                         }
                         
-                    } catch (error) {
-                        console.log('❌ [ViewPurchaseOrder] Conversion failed:', error?.message || error);
-                        const errorMessage = error?.message || 'Unable to convert purchase order to invoice. Please try again.';
-                        Alert.alert('Conversion Failed', errorMessage);
+                    } catch (err) {
+                        console.warn('deletePurchaseOrderHeader failed', err && (err.message || err));
+                        Alert.alert('Error', getErrorMessage(err, 'Unable to delete purchase order'));
                     } finally {
                         setLoading(false);
                     }
@@ -278,7 +278,7 @@ const ViewPurchaseOrder = () => {
             navigation.navigate('FileViewerScreen', { pdfBase64, fileName: invoice?.DocumentNumber || `Invoice_${uuid}`, opportunityTitle: invoice?.DocumentNumber || 'Invoice', companyName: '' });
         } catch (err) {
             console.log('handleOpenPurchaseInvoiceSlip error ->', err?.message || err);
-            Alert.alert('Error', err?.message || 'Unable to open invoice PDF');
+            Alert.alert('Error', getErrorMessage(err, 'Unable to open invoice PDF'));
         }
     };
 
@@ -298,7 +298,7 @@ const ViewPurchaseOrder = () => {
             navigation.navigate('FileViewerScreen', { pdfBase64, fileName: pf?.DocumentNumber || `Performa_${uuid}`, opportunityTitle: pf?.DocumentNumber || 'Performa Invoice', companyName: '' });
         } catch (err) {
             console.log('handleOpenPurchasePerformaSlip error ->', err?.message || err);
-            Alert.alert('Error', err?.message || 'Unable to open performa PDF');
+            Alert.alert('Error', getErrorMessage(err, 'Unable to open performa PDF'));
         }
     };
 

@@ -27,6 +27,7 @@ import DatePickerBottomSheet from '../../../../components/common/CustomDatePicke
 import { getPurchasequotationVendor, getItems, postAddPurchaseQuotationHeader, updatePurchaseQuotationHeader, addPurchaseQuotationLine, updatePurchaseQuotationLine, deletePurchaseQuotationLine, getPurchaseQuotationLines, fetchProjects, getPurchaseQuotationHeaderById, uploadFiles } from '../../../../api/authServices';
 import { publish } from '../../../../utils/eventBus';
 import { getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
+import { getErrorMessage } from '../../../../utils/errorMessage';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 import { getAllPurchaseInquiryNumbers } from '../../../../api/authServices';
 import { getPaymentTerms, getPaymentMethods } from '../../../../api/authServices';
@@ -703,7 +704,7 @@ const AddPurchaseQuotation = () => {
           }
         } catch (err) {
           console.error('addPurchaseOrderLine error ->', err);
-          Alert.alert('Error', err?.message || 'Unable to add line to server. Saved locally.');
+          Alert.alert('Error', getErrorMessage(err, 'Unable to add line to server. Saved locally.'));
           if (editItemId) {
             setItems(prev => prev.map(it => it.id === editItemId ? { ...it, ...newItem, id: editItemId } : it));
             setEditItemId(null);
@@ -748,9 +749,11 @@ const AddPurchaseQuotation = () => {
         return c?.UUID || c?.Uuid || c?.Id || '';
       };
 
+      const resolvedInquiry = resolveOptionValue(purchaseQuotationNumbers, headerForm.companyName) || headerForm.companyName || '';
+      console.log('[AddPurchaseQuotation] resolvedInquiry ->', resolvedInquiry, 'headerForm.companyName ->', headerForm.companyName);
       const payload = {
         UUID: headerResponse?.UUID || '',
-        InquiryNo: headerForm.companyName || '',
+        InquiryNo: resolvedInquiry || '',
         VendorUUID: vendor || headerForm.clientName || '',
         ProjectUUID: projectUUID || '',
         PaymentTerm: paymentTerm || '',
@@ -814,7 +817,7 @@ const AddPurchaseQuotation = () => {
       } catch (e) { /* ignore */ }
     } catch (err) {
       console.error('handleCreateOrder error ->', err);
-      Alert.alert('Error', err?.message || 'Unable to submit order');
+      Alert.alert('Error', getErrorMessage(err, 'Unable to submit order'));
     } finally {
       setIsSavingHeader(false);
     }
@@ -837,10 +840,12 @@ const AddPurchaseQuotation = () => {
       const totalTaxNum = parseFloat(totalTax) || 0;
       const totalAmountNum = subtotalNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + totalTaxNum - (parseFloat(discount) || 0);
 
+      const resolvedInquiry = resolveOptionValue(purchaseQuotationNumbers, headerForm.companyName) || headerForm.companyName || '';
+      console.log('[AddPurchaseQuotation] submitHeader resolvedInquiry ->', resolvedInquiry, 'headerForm.companyName ->', headerForm.companyName);
       const payload = {
         UUID: headerResponse?.UUID || '',
         PurchaseOrderNo: headerForm.purchaseOrderNumber || '',
-        InquiryNo: headerForm.companyName || '',
+        InquiryNo: resolvedInquiry || '',
         VendorUUID: vendor || headerForm.clientName || '',
         ProjectUUID: projectUUID || '',
         PaymentTerm: paymentTerm || '',
@@ -893,7 +898,7 @@ const AddPurchaseQuotation = () => {
       ], { cancelable: false });
     } catch (err) {
       console.error('submitHeader error ->', err);
-      Alert.alert('Error', err?.message || 'Unable to submit header');
+      Alert.alert('Error', getErrorMessage(err, 'Unable to submit header'));
     } finally {
       setIsEditingHeader(false);
       setHeaderSubmitting(false);
@@ -917,11 +922,13 @@ const AddPurchaseQuotation = () => {
       const subtotalNum = parseFloat(computeSubtotal()) || 0;
       const totalTaxNum = parseFloat(totalTax) || 0;
       const totalAmountNum = subtotalNum + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + totalTaxNum - (parseFloat(discount) || 0);
+      const resolvedInquiry = resolveOptionValue(purchaseQuotationNumbers, headerForm.companyName) || headerForm.companyName || '';
+      console.log('[AddPurchaseQuotation] updateHeader resolvedInquiry ->', resolvedInquiry, 'headerForm.companyName ->', headerForm.companyName);
       const payload = {
         UUID: headerUuid,
         PurchaseOrderNo: headerForm.purchaseOrderNumber || '',
-        Inquiry_No: headerForm.companyName || '',
-        InquiryNo: headerForm.companyName || '',
+        // Inquiry_No: resolvedInquiry || '',
+        InquiryNo: resolvedInquiry || '',
         Vendor_UUID: vendor || headerForm.clientName || '',
         VendorUUID: vendor || headerForm.clientName || '',
         ProjectUUID: projectUUID || '',
@@ -995,7 +1002,7 @@ const AddPurchaseQuotation = () => {
       ], { cancelable: false });
     } catch (err) {
       console.error('updateHeader error ->', err);
-      Alert.alert('Error', err?.message || 'Unable to update header');
+      Alert.alert('Error', getErrorMessage(err, 'Unable to update header'));
     } finally {
       setIsEditingHeader(false);
       setHeaderSubmitting(false);
@@ -1235,13 +1242,20 @@ const AddPurchaseQuotation = () => {
         const list = resp?.Data || resp || [];
         if (!mounted) return;
         const mapped = (Array.isArray(list) ? list : []).map(it => {
-          if (!it) return '';
-          if (typeof it === 'string') return it.toString().trim();
-          // common fields containing number/label
-          const v = it.InquiryNo  || it.Value || it.Label || it.Text || '';
-          return v ? String(v).trim() : '';
+          if (!it) return null;
+          if (typeof it === 'string') return { label: it.toString().trim(), value: it.toString().trim() };
+          const label = it.InquiryNo || it.InquiryNo || it.Value || it.Label || it.Text || '';
+          const value = it.UUID || it.Uuid || it.Id || it.InquiryUUID || it.InquiryId || label || '';
+          return { label: String(label).trim(), value: String(value).trim() };
         }).filter(Boolean);
-        const unique = Array.from(new Set(mapped));
+        // de-duplicate by value
+        const seen = new Set();
+        const unique = mapped.filter(m => {
+          if (!m || !m.value) return false;
+          if (seen.has(m.value)) return false;
+          seen.add(m.value);
+          return true;
+        });
         setPurchaseQuotationNumbers(unique);
       } catch (err) {
         try { console.error('Error loading purchase inquiry numbers ->', err && (err.message || err)); } catch (_) {}
@@ -1275,11 +1289,16 @@ const AddPurchaseQuotation = () => {
       const incoming = headerResponse.Inquiry_No || headerResponse.InquiryNo || headerResponse.PurchaseRequestNumber || headerResponse.PurchaseRequestNo || headerResponse.companyName || headerResponse.InquiryNumber || headerForm.companyName || '';
       if (!incoming) return;
       const candidate = String(incoming).trim();
-      const found = purchaseQuotationNumbers.find(p => String(p).trim().toLowerCase() === candidate.toLowerCase());
+      const found = purchaseQuotationNumbers.find(p => {
+        if (!p) return false;
+        const label = (typeof p === 'string') ? String(p) : String(p.label || p.Value || p.value || p.Label || p.Text || '');
+        return label.trim().toLowerCase() === candidate.toLowerCase();
+      });
       if (found) {
-        setHeaderForm(s => ({ ...s, companyName: found }));
+        // store UUID/value in headerForm for payload, but Dropdown will display label via getLabel/getKey
+        setHeaderForm(s => ({ ...s, companyName: (found.value ?? (typeof found === 'string' ? found : found.label)) }));
       } else {
-        // keep incoming value as fallback
+        // keep incoming value as fallback (could be UUID or label)
         setHeaderForm(s => ({ ...s, companyName: incoming }));
       }
     } catch (e) {
@@ -1761,11 +1780,16 @@ const AddPurchaseQuotation = () => {
                   placeholder="select Purchase Inquiry"
                   value={headerForm.companyName}
                   options={purchaseQuotationNumbers}
-                  getLabel={s => s}
-                  getKey={s => s}
-                  onSelect={v => {
+                  getLabel={p => (p?.label ?? String(p))}
+                  getKey={p => (p?.value ?? String(p))}
+                  onSelect={opt => {
                     if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
-                    setHeaderForm(s => ({ ...s, companyName: v }));
+                    try {
+                      const selected = opt && (opt.value ?? opt);
+                      setHeaderForm(s => ({ ...s, companyName: selected }));
+                    } catch (e) {
+                      setHeaderForm(s => ({ ...s, companyName: opt || '' }));
+                    }
                   }}
                   inputBoxStyle={inputStyles.box}
                 // textStyle={inputStyles.input}
@@ -2581,11 +2605,6 @@ const AddPurchaseQuotation = () => {
                 </View>
               )}
 
-              {/* ADD ITEM */}
-              <TouchableOpacity style={styles.addBtn} onPress={addItem}>
-                <Text style={styles.addBtnText}>+ Add Item</Text>
-              </TouchableOpacity>
-
               {/* Totals / Summary area */}
               <View style={styles.billContainer}>
                 {/* Subtotal */}
@@ -2767,6 +2786,7 @@ const AddPurchaseQuotation = () => {
           onDateSelect={handleDateSelect}
           title="Select Date"
         />
+                {(Array.isArray(expandedId) ? expandedId.includes(4) : expandedId === 4) && (
 
         <View style={styles.footerBar}>
           <View
@@ -2802,7 +2822,7 @@ const AddPurchaseQuotation = () => {
                     <TouchableOpacity style={styles.primaryButton} onPress={handleCreateOrder}>
                         <Text style={styles.primaryButtonText}>Submit</Text>
                     </TouchableOpacity> */}
-        </View>
+        </View>)}
       </View>
     </>
   );

@@ -26,6 +26,7 @@ import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { addSalesOrder, updateSalesOrder, addSalesOrderLine, updateSalesOrderLine, getCustomers, getCountries, getStates, getCities, getPaymentTerms, getPaymentMethods, fetchProjects, getAllSalesInquiryNumbers, getSalesOrderHeaderById, getItems, getSalesLines, getSalesOrderLines, deleteSalesOrderLine, getSalesOrderSlip, uploadFiles } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
+import { getErrorMessage } from '../../../../utils/errorMessage';
 import { pick, types, isCancel } from '@react-native-documents/picker';
 
 const COL_WIDTHS = {
@@ -149,6 +150,20 @@ const ManageSalesOrder = () => {
     text: COLORS.text,
     textLight: COLORS.textLight,
     bg: '#fff',
+  };
+
+  const hasDocumentAvailable = () => {
+    try {
+      if (uploadedFilePath && String(uploadedFilePath).trim() !== '') return true;
+      const resp = headerResponse || {};
+      const candidates = [resp.FilePath, resp.DocumentUrl, resp.FilePaths, resp.File, resp.files, resp.Data && resp.Data.FilePath, resp.Data && resp.Data.files];
+      for (const c of candidates) {
+        if (!c && c !== 0) continue;
+        if (Array.isArray(c) && c.length) return true;
+        if (typeof c === 'string' && String(c).trim() !== '') return true;
+      }
+    } catch (e) { /* ignore */ }
+    return false;
   };
 
   // Demo options for dropdowns
@@ -928,7 +943,7 @@ const ManageSalesOrder = () => {
       Alert.alert('Success', 'Header saved successfully');
     } catch (err) {
       console.error('saveHeader error ->', err);
-      Alert.alert('Error', err?.message || 'Unable to save header');
+      Alert.alert('Error', getErrorMessage(err, 'Unable to save header'));
     } finally {
       setIsSavingHeader(false);
     }
@@ -1898,7 +1913,7 @@ const ManageSalesOrder = () => {
                 }
               } catch (e) {
                 console.error('deleteSalesOrderLine error ->', e?.message || e);
-                Alert.alert('Error', e?.message || 'Unable to delete line');
+                Alert.alert('Error', getErrorMessage(e, 'Unable to delete line'));
               } finally {
                 setLinesLoading(false);
               }
@@ -2068,7 +2083,7 @@ const ManageSalesOrder = () => {
         } catch (e) { /* ignore */ }
       } catch (err) {
         console.error('addSalesOrderLine error ->', err);
-        Alert.alert('Error', err?.message || 'Unable to add line to server. Saved locally.');
+        Alert.alert('Error', getErrorMessage(err, 'Unable to add line to server. Saved locally.'));
         // fallback: still add locally so user doesn't lose work
         if (editItemId) {
           setItems(prev => prev.map(it => it.id === editItemId ? { ...it, ...newItem, id: editItemId } : it));
@@ -2191,7 +2206,7 @@ const ManageSalesOrder = () => {
       setEditItemId(null);
     } catch (err) {
       console.error('handleCreateOrder error ->', err);
-      Alert.alert('Error', err?.message || 'Unable to submit order');
+      Alert.alert('Error', getErrorMessage(err, 'Unable to submit order'));
     } finally {
       setIsSavingHeader(false);
     }
@@ -2224,29 +2239,94 @@ const ManageSalesOrder = () => {
       });
     } catch (error) {
       console.log('[ManageSalesOrder] PDF download failed:', error?.message || error);
-      Alert.alert('Error', error?.message || 'Unable to generate the sales order PDF.');
+      Alert.alert('Error', getErrorMessage(error, 'Unable to generate the sales order PDF.'));
     } finally {
       setIsGeneratingPDF(false);
     }
   };
 
   const viewDocument = (opts = {}) => {
-    const fileUrlCandidate = (file && (file.uri || file.name))
-      || uploadedFilePath
-      || headerResponse?.FilePath
-      || headerResponse?.ProposalDocument
-      || headerResponse?.DocumentUrl
-      || headerResponse?.Document
-      || headerResponse?.File
-      || headerResponse?.FilePath;
+    // Gather many possible candidate locations (prefer server paths set in `uploadedFilePath` or header)
+    const candidates = [
+      uploadedFilePath,
+      headerResponse?.FilePath,
+      headerResponse?.DocumentUrl,
+      headerResponse?.Data?.FilePath,
+      headerResponse?.Data?.files,
+      headerResponse?.FilePaths,
+    ];
 
-    if (!fileUrlCandidate) {
+    const resolveCandidate = (c) => {
+      if (!c && c !== 0) return null;
+      if (Array.isArray(c)) return c.length ? c[0] : null;
+      if (typeof c === 'object') {
+        return c.pdfBase64 || c.Url || c.url || c.FilePath || c.filePath || c.Path || c.path || c.File || c.file || c.DocumentUrl || null;
+      }
+      return c;
+    };
+
+    let rawCandidate = candidates.map(resolveCandidate).find(x => x !== null && typeof x !== 'undefined' && String(x) !== '');
+
+    // If not found, also check nested `Data` keys and do a recursive search for file-like strings
+    const fileLikeRegex = /(data:.*;base64,)|(\.pdf(\?|$))|(\.png(\?|$))|(\.jpe?g(\?|$))|application\/pdf|https?:\/\//i;
+
+    const findInObjectForFile = (obj) => {
+      try {
+        if (!obj && obj !== 0) return null;
+        if (typeof obj === 'string') return fileLikeRegex.test(obj) ? obj : null;
+        if (Array.isArray(obj)) {
+          for (const v of obj) {
+            const r = findInObjectForFile(v);
+            if (r) return r;
+          }
+          return null;
+        }
+        if (typeof obj === 'object') {
+          for (const k of Object.keys(obj)) {
+            try {
+              const v = obj[k];
+              const r = findInObjectForFile(v);
+              if (r) return r;
+            } catch (e) { /* ignore */ }
+          }
+        }
+      } catch (e) { /* ignore */ }
+      return null;
+    };
+
+    if (!rawCandidate) {
+      // check common Data namespace
+      rawCandidate = resolveCandidate(headerResponse?.Data) || resolveCandidate(headerResponse?.data);
+    }
+
+    if (!rawCandidate) {
+      // deep search headerResponse for any file-like string
+      const deep = findInObjectForFile(headerResponse) || findInObjectForFile(headerResponse?.Data) || findInObjectForFile(uploadedFilePath) || findInObjectForFile(file);
+      if (deep) rawCandidate = deep;
+    }
+
+    console.log('[ManageSalesOrder] viewDocument candidates ->', { rawCandidate, headerResponse, uploadedFilePath, file });
+
+    if (!rawCandidate) {
       Alert.alert('No document', 'No document is available to view.');
       return;
     }
 
-    const url = String(Array.isArray(fileUrlCandidate) ? fileUrlCandidate[0] : fileUrlCandidate);
+    let url = String(rawCandidate);
+    // If URL is not absolute, prefix with base ERP URL so FileViewer can load it
+    try {
+      const base = 'https://erp.kspconsults.com';
+      if (!/^(https?:\/\/|file:|data:)/i.test(url)) {
+        if (String(url).startsWith('/')) url = base + url;
+        else url = base + '/' + url;
+      }
+    } catch (e) { /* ignore */ }
     const lower = url.toLowerCase();
+
+    try {
+      // mark current screen so any prefill cleanup doesn't remove header UUID when returning
+      if (navigation && navigation.setParams) navigation.setParams({ preserveHeaderOnReturn: true });
+    } catch (e) { /* ignore */ }
 
     if (lower.includes('base64,') && lower.includes('pdf')) {
       navigation.navigate('FileViewerScreen', { pdfBase64: url, fileName: opts.fileName || 'Document' });
@@ -3770,10 +3850,10 @@ const ManageSalesOrder = () => {
                     placeholderTextColor={COLORS.textLight}
                   />
                 </View>
-                {(isEditingHeader || headerResponse) && (
+                {hasDocumentAvailable() && (
                   <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm }}>
                     <Text style={inputStyles.label}>Document</Text>
-                    <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton]} onPress={() => viewDocument({ fileName: headerForm?.SalesOrderNo || 'Document' })}>
+                    <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton, { marginTop: SPACING.sm }]} onPress={() => viewDocument({ fileName: headerForm?.SalesOrderNo || 'Document' })}>
                       <Text style={{ color: '#fff', fontWeight: '600', fontSize: rf(3.4) }}>View Document</Text>
                     </TouchableOpacity>
                   </View>

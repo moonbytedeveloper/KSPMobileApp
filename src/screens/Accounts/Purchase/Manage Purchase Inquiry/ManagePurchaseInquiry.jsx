@@ -11,6 +11,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { addSalesInquiry, getCustomers, getItemTypes, getItems, getUnits, addSalesHeader, addPurchaseInquiryHeader, addSalesLine, addPurchaseInquiryLine, updateSalesHeader, getSalesHeader, getSalesLines, updateSalesLine, deleteSalesLine, getPurchasequotationVendor, getCurrencies, getProjects, getPurchaseInquiryHeader, getPurchaseInquiryLines, updatePurchaseInquiryHeader, updatePurchaseInquiryLine, deletePurchaseInquiryLine } from '../../../../api/authServices';
 import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
+import { getErrorMessage } from '../../../../utils/errorMessage';
 import { uiDateToApiDate } from '../../../../utils/dateUtils';
 import BottomSheetConfirm from '../../../../components/common/BottomSheetConfirm';
 
@@ -38,7 +39,13 @@ const AccordionSection = ({ id, title, expanded, onToggle, children, wrapperStyl
 
 // Validation schema for Header form
 const HeaderValidationSchema = Yup.object().shape({
-    VendorName: Yup.string().trim().required('Vendor is required'),
+    // VendorName: Yup.string().trim().required('Vendor is required'),
+    VendorName: Yup.string().test('Vendor-or-uuid', 'Vendor is required', function (val) {
+        const { VendorName } = this.parent || {};
+        const hasVal = typeof val === 'string' && val.trim() !== '';
+        const hasUuid = typeof VendorUUID === 'string' && VendorUUID.trim() !== '';
+        return !!(hasVal || hasUuid);
+    }),
     VendorUUID: Yup.string().test('vendor-uuid-or-name', 'Vendor is required', function (val) {
         const { VendorName } = this.parent || {};
         const hasUuid = typeof val === 'string' && val.trim() !== '';
@@ -51,6 +58,7 @@ const HeaderValidationSchema = Yup.object().shape({
         const hasUuid = CurrencyUUID !== null && CurrencyUUID !== undefined && String(CurrencyUUID).trim() !== '';
         return !!(hasType || hasUuid);
     }),
+
     CurrencyUUID: Yup.mixed().test('currency-uuid-or-type', 'Currency type is required', function (val) {
         const { CurrencyType } = this.parent || {};
         const hasUuid = val !== null && val !== undefined && String(val).trim() !== '';
@@ -135,6 +143,73 @@ const AddSalesInquiry = () => {
 
     // Line items state
     const [lineItems, setLineItems] = useState([]);
+    // Normalize server line objects into UI-friendly shape
+    const normalizeLine = (ln, idx) => {
+        const lineUuid = ln?.UUID || ln?.Id || ln?.LineUUID || ln?.lineUuid || ln?.id || null;
+        const itemType = ln?.ItemTypeName || ln?.ItemType || ln?.ItemType_Title || ln?.ItemTypeName || ln?.TypeName || ln?.itemType || ln?.ItemType_Display || '';
+        const itemTypeUuid = ln?.ItemType_UUID || ln?.ItemTypeUUID || ln?.ItemTypeId || ln?.ItemTypeId || ln?.ItemTypeId || ln?.itemTypeUuid || null;
+        const itemName = ln?.ItemName || ln?.Name || ln?.Item || ln?.ProductName || ln?.itemName || '';
+        const itemNameUuid = ln?.ItemName_UUID || ln?.ItemUUID || ln?.ItemId || ln?.ItemId || ln?.itemNameUuid || null;
+        const quantity = (ln?.Quantity ?? ln?.Qty ?? ln?.quantity ?? ln?.QuantityOrdered) || '';
+        const unit = ln?.UnitName || ln?.Unit || ln?.Unit_Display || ln?.unit || '';
+        const unitUuid = ln?.Unit_UUID || ln?.UnitUUID || ln?.UnitId || ln?.unitUuid || null;
+        return {
+            id: idx + 1,
+            lineUuid,
+            itemType: String(itemType || ''),
+            itemTypeUuid: itemTypeUuid || null,
+            itemName: String(itemName || ''),
+            itemNameUuid: itemNameUuid || null,
+            quantity: String(quantity || ''),
+            unit: String(unit || ''),
+            unitUuid: unitUuid || null,
+            raw: ln,
+        };
+    };
+
+    // Helper to extract array of lines from various server response shapes
+    const parseLinesFromResp = (resp) => {
+        if (!resp) return [];
+        const candidate = resp.Data || resp.List || resp.Records || resp;
+        if (!candidate) return [];
+        if (Array.isArray(candidate)) return candidate;
+        if (candidate.Records && Array.isArray(candidate.Records)) return candidate.Records;
+        if (candidate.List && Array.isArray(candidate.List)) return candidate.List;
+        // Some endpoints return Data as an object with nested arrays
+        if (resp.Data && Array.isArray(resp.Data)) return resp.Data;
+        return [];
+    };
+
+    // Helper: find matching option by uuid/id or by display/name (case-insensitive)
+    const findOptionByUuidOrName = (options = [], needle) => {
+        if (!options || !options.length || !needle) return null;
+        const s = String(needle).trim();
+        if (!s) return null;
+        const needleLower = s.toLowerCase();
+        // Try exact uuid/id match first
+        for (const opt of options) {
+            const id = opt?.UUID || opt?.Uuid || opt?.Id || opt?.id || opt?.VendorUUID || opt?.Vendor_Id || opt?.ProjectUUID || opt?.Project_Id || '';
+            if (String(id) === s) return opt;
+        }
+        // Try matching by common name/display fields
+        for (const opt of options) {
+            const name = (opt && (opt?.Name || opt?.DisplayName || opt?.VendorName || opt?.ProjectTitle || opt?.ProjectName || opt?.CurrencyName || opt?.Code || String(opt))) || '';
+            if (String(name).toLowerCase() === needleLower) return opt;
+        }
+        // Fallback: partial contains
+        for (const opt of options) {
+            const name = (opt && (opt?.Name || opt?.DisplayName || opt?.VendorName || opt?.ProjectTitle || opt?.ProjectName || opt?.CurrencyName || opt?.Code || String(opt))) || '';
+            if (String(name).toLowerCase().includes(needleLower)) return opt;
+        }
+        return null;
+    };
+
+    // Debug: log key state when lines or header state changes
+    useEffect(() => {
+        try {
+            console.log('DEBUG state -> lineItems.length:', Array.isArray(lineItems) ? lineItems.length : 0, 'headerSaved:', headerSaved, 'expandedId:', expandedId, 'currentHeaderUuid:', currentHeaderUuid);
+        } catch (e) { }
+    }, [lineItems, headerSaved, expandedId, currentHeaderUuid]);
     const [lineAdding, setLineAdding] = useState(false);
     // Map of headerUuid -> array of line items (keeps lines isolated per header)
     const [headerLinesMap, setHeaderLinesMap] = useState({});
@@ -359,13 +434,18 @@ const AddSalesInquiry = () => {
                 (async () => {
                     try {
                         setLineAdding(true);
+                        // Resolve UUIDs from available lookups if necessary
+                        const resolvedItemTypeUuid = currentItem.itemTypeUuid || existing.itemTypeUuid || (findOptionByUuidOrName(serverItemTypes, currentItem.itemType)?.UUID || findOptionByUuidOrName(serverItemTypes, currentItem.itemType)?.Uuid || null);
+                        const resolvedItemNameUuid = currentItem.itemNameUuid || existing.itemNameUuid || (findOptionByUuidOrName(serverItemMasters, currentItem.itemName)?.UUID || findOptionByUuidOrName(serverItemMasters, currentItem.itemName)?.Uuid || null);
+                        const resolvedUnitUuid = currentItem.unitUuid || existing.unitUuid || (findOptionByUuidOrName(serverUnits, currentItem.unit)?.UUID || findOptionByUuidOrName(serverUnits, currentItem.unit)?.Uuid || null);
+
                         const payload = {
                             UUID: existing.lineUuid,
                             HeaderUUID: headerUuid,
-                            ItemType_UUID: currentItem.itemTypeUuid || existing.itemTypeUuid || null,
-                            ItemName_UUID: currentItem.itemNameUuid || existing.itemNameUuid || null,
+                            ItemType_UUID: resolvedItemTypeUuid || null,
+                            ItemName_UUID: resolvedItemNameUuid || null,
                             Quantity: Number(currentItem.quantity) || Number(existing.quantity) || 0,
-                            Unit_UUID: currentItem.unitUuid || existing.unitUuid || null,
+                            Unit_UUID: resolvedUnitUuid || null,
                         };
                         console.log('UpdatePurchaseInquiryLine payload ->', payload);
                         const resp = await updatePurchaseInquiryLine(payload, { userUuid: await getUUID(), cmpUuid: await getCMPUUID(), envUuid: await getENVUUID() });
@@ -407,10 +487,10 @@ const AddSalesInquiry = () => {
                                 const msg = typeof backendMsg === 'string' ? backendMsg : JSON.stringify(backendMsg);
                                 Alert.alert('Update failed', msg);
                             } else {
-                                Alert.alert('Error', e?.message || 'Failed to update line on server');
+                                Alert.alert('Error', getErrorMessage(e, 'Failed to update line on server'));
                             }
                         } catch (_) {
-                            Alert.alert('Error', e?.message || 'Failed to update line on server');
+                            Alert.alert('Error', getErrorMessage(e, 'Failed to update line on server'));
                         }
                     } finally {
                         setEditLineItemId(null);
@@ -479,20 +559,25 @@ const AddSalesInquiry = () => {
                         Alert.alert('Error', 'Header UUID missing. Cannot add line to server.');
                         return;
                     }
+                    // Resolve UUIDs from lookups if needed
+                    const resolvedNewItemTypeUuid = newItemBase.itemTypeUuid || (findOptionByUuidOrName(serverItemTypes, newItemBase.itemType)?.UUID || findOptionByUuidOrName(serverItemTypes, newItemBase.itemType)?.Uuid || null);
+                    const resolvedNewItemNameUuid = newItemBase.itemNameUuid || (findOptionByUuidOrName(serverItemMasters, newItemBase.itemName)?.UUID || findOptionByUuidOrName(serverItemMasters, newItemBase.itemName)?.Uuid || null);
+                    const resolvedNewUnitUuid = newItemBase.unitUuid || (findOptionByUuidOrName(serverUnits, newItemBase.unit)?.UUID || findOptionByUuidOrName(serverUnits, newItemBase.unit)?.Uuid || null);
+
                     const payload = {
                         UUID: '',
                         HeaderUUID: headerUuid,
-                        ItemType_UUID: newItemBase.itemTypeUuid,
-                        ItemName_UUID: newItemBase.itemNameUuid,
+                        ItemType_UUID: resolvedNewItemTypeUuid || null,
+                        ItemName_UUID: resolvedNewItemNameUuid || null,
                         Quantity: Number(newItemBase.quantity) || 0,
-                        Unit_UUID: newItemBase.unitUuid || null,
+                        Unit_UUID: resolvedNewUnitUuid || null,
                     };
                     console.log('AddPurchaseInquiryLine payload ->', payload);
                     const resp = await addPurchaseInquiryLine(payload, { userUuid: await getUUID(), cmpUuid: await getCMPUUID(), envUuid: await getENVUUID() });
                     console.log('AddPurchaseInquiryLine resp ->', resp);
                     // Try to extract created line UUID from response
                     const createdLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || resp?.LineUUID || resp?.Data?.Id || null;
-                    const newItem = { ...newItemBase, lineUuid: createdLineUuid };
+                    const newItem = { ...newItemBase, unitUuid: resolvedNewUnitUuid || newItemBase.unitUuid || null, itemTypeUuid: resolvedNewItemTypeUuid || newItemBase.itemTypeUuid || null, itemNameUuid: resolvedNewItemNameUuid || newItemBase.itemNameUuid || null, lineUuid: createdLineUuid };
                     setLineItems(prev => {
                         const next = [...prev, newItem];
                         return next;
@@ -514,10 +599,10 @@ const AddSalesInquiry = () => {
                             const msg = typeof backendMsg === 'string' ? backendMsg : JSON.stringify(backendMsg);
                             Alert.alert('Add line failed', msg);
                         } else {
-                            Alert.alert('Error', e?.message || 'Failed to add line to server');
+                            Alert.alert('Error', getErrorMessage(e, 'Failed to add line to server'));
                         }
                     } catch (_) {
-                        Alert.alert('Error', e?.message || 'Failed to add line to server');
+                        Alert.alert('Error', getErrorMessage(e, 'Failed to add line to server'));
                     }
                 } finally {
                     setLineAdding(false);
@@ -573,10 +658,11 @@ const AddSalesInquiry = () => {
     const fetchItemMasters = async (itemTypeUuid = null) => {
         try {
             setItemMastersLoading(true);
-            const resp = await getItems({ mode:'Purchase' });
+            const resp = await getItems({ mode: 'Purchase' });
             console.log('getItems resp ->', resp);
-            const data = resp?.Data || resp || [];
-            const list = Array.isArray(data) ? data : (data?.List || []);
+            const data = resp?.Data || resp || {};
+            // Support multiple shapes: Data may contain Records, List, or be an array itself
+            const list = Array.isArray(data) ? data : (Array.isArray(data?.Records) ? data.Records : (Array.isArray(data?.List) ? data.List : []));
             setServerItemMasters(list);
             return list;
         } catch (e) {
@@ -685,7 +771,26 @@ const AddSalesInquiry = () => {
     // Helper: extract header UUID from various possible response shapes
     const extractHeaderUuid = (hr) => {
         if (!hr) return route?.params?.headerUuid || route?.params?.HeaderUUID || null;
-        return hr?.UUID || hr?.Id || hr?.IdString || hr?.HeaderUUID || hr?.HeaderId || hr?.HeaderUuid || hr?.Data?.UUID || hr?.Data?.HeaderUUID || hr?.Data?.HeaderUuid || route?.params?.headerUuid || null;
+        // direct fields
+        if (hr?.UUID) return hr.UUID;
+        if (hr?.Id) return hr.Id;
+        if (hr?.HeaderUUID) return hr.HeaderUUID;
+        if (hr?.HeaderUuid) return hr.HeaderUuid;
+        if (hr?.IdString) return hr.IdString;
+        // Data wrapper
+        if (hr?.Data) {
+            const d = hr.Data;
+            if (d.UUID) return d.UUID;
+            if (d.HeaderUUID) return d.HeaderUUID;
+            if (Array.isArray(d.Records) && d.Records.length && (d.Records[0].UUID || d.Records[0].Id)) {
+                return d.Records[0].UUID || d.Records[0].Id;
+            }
+            if (Array.isArray(d.List) && d.List.length && (d.List[0].UUID || d.List[0].Id)) {
+                return d.List[0].UUID || d.List[0].Id;
+            }
+        }
+        // fallback to route params
+        return route?.params?.headerUuid || route?.params?.HeaderUUID || null;
     };
 
     React.useEffect(() => {
@@ -709,8 +814,10 @@ const AddSalesInquiry = () => {
                     fetchCustomers(),
                     fetchItemTypes(),
                     fetchItemMasters(null),
+                    fetchVendors(),
                     fetchUnits(),
                     fetchCurrenciesFromServer(),
+                    fetchProjects(),
                 ]);
                 customersList = results[0] || [];
             } catch (e) {
@@ -725,6 +832,7 @@ const AddSalesInquiry = () => {
 
                 // Prefill known header fields (use multiple fallbacks)
                 setProjectName(headerData.ProjectName || headerData.Project_Name || headerData.Project || '');
+                setVendorName(headerData.VendorName || headerData.Vendor_Name || headerData.Vendor || '');
                 setInquiryNo(headerData.InquiryNo || headerData.Inquiry_No || headerData.InquiryNumber || '');
                 if (headerData.RequestTitle || headerData.Title) setRequestTitle(headerData.RequestTitle || headerData.Title || '');
                 // Pick Requested Date from multiple possible header keys and convert to UI format
@@ -758,7 +866,7 @@ const AddSalesInquiry = () => {
                 const currencyUuidVal = headerData.CurrencyUUID || headerData.CurrencyTypeUUID || headerData.CurrencyId || headerData.CurrencyID || null;
                 if (currencyUuidVal) {
                     setCurrencyUuid(currencyUuidVal);
-                    setCurrencyType(headerData.CurrencyName || headerData.Currency || headerData.CurrencyCode || '');
+                    setCurrencyType(headerData.CurrencyName || headerData.Name || headerData.CurrencyCode || '');
                 }
 
                 // Project
@@ -785,19 +893,31 @@ const AddSalesInquiry = () => {
                 // Track current header UUID and load only its lines (if any)
                 const resolvedHeaderUuid = extractHeaderUuid(headerDataNormalized || headerResp);
                 setCurrentHeaderUuid(resolvedHeaderUuid);
-                // Attempt to fetch lines from server for this header (preferred)
+                // Attempt to fetch lines from server for this header (preferred).
+                // If the header response doesn't include the UUID in expected keys, fall back to the route param.
                 try {
-                    if (resolvedHeaderUuid) {
-                        const linesResp = await getPurchaseInquiryLines({ headerUuid: resolvedHeaderUuid, cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
-                        const linesData = (linesResp && (linesResp.Data || linesResp.List || linesResp)) || [];
-                        const serverLines = Array.isArray(linesData) ? linesData : (linesData.List || []);
+                    const fetchUuid = resolvedHeaderUuid || headerUuidParam || null;
+                    console.log('Fetching lines for header UUIDs -> resolved:', resolvedHeaderUuid, 'routeParam:', headerUuidParam, 'using:', fetchUuid);
+                    if (fetchUuid) {
+                        const linesResp = await getPurchaseInquiryLines({ headerUuid: fetchUuid, cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
+                        try { console.log('getPurchaseInquiryLines resp ->', linesResp); } catch (_) { }
+                        const serverLines = parseLinesFromResp(linesResp);
                         if (serverLines && serverLines.length) {
-                            setLineItems(serverLines.map((ln, idx) => ({ ...ln, id: idx + 1 })));
+                            const normalized = serverLines.map((ln, idx) => normalizeLine(ln, idx));
+                            setLineItems(normalized);
                             // cache lines
-                            setHeaderLinesMap(prev => ({ ...prev, [resolvedHeaderUuid]: serverLines }));
+                            setHeaderLinesMap(prev => ({ ...prev, [fetchUuid]: serverLines }));
+                            // If there are server lines, open the Create Order section so table is visible
+                            try { setHeaderSaved(true); setExpandedId(2); } catch (_) { }
+                            // Debug: verify state after React updates
+                            setTimeout(() => {
+                                try { console.log('Post-prefill lineItems length ->', (normalized || []).length); console.log('expandedId after prefill ->', expandedId); } catch (_) { }
+                            }, 50);
                         } else {
-                            const cached = resolvedHeaderUuid ? (headerLinesMap[resolvedHeaderUuid] || []) : [];
+                            const cached = fetchUuid ? (headerLinesMap[fetchUuid] || []) : [];
                             setLineItems(cached);
+                            // keep header open for editing when no lines
+                            try { setExpandedId(1); } catch (_) { }
                         }
                     }
                 } catch (linesErr) {
@@ -844,16 +964,84 @@ const AddSalesInquiry = () => {
         }
     }, [vendorUuid, vendors]);
 
+    // Resolve vendor when only VendorName provided (match by name or uuid)
+    useEffect(() => {
+        try {
+            if ((!vendorUuid || vendorUuid === null) && vendorName && Array.isArray(vendors) && vendors.length) {
+                const found = findOptionByUuidOrName(vendors, vendorName);
+                if (found) {
+                    const uuid = found?.UUID || found?.Uuid || found?.Id || found?.id || null;
+                    setVendorUuid(uuid);
+                    // update formik
+                    if (formikSetFieldValueRef && formikSetFieldValueRef.current) {
+                        try { formikSetFieldValueRef.current('VendorUUID', uuid || ''); } catch (_) { }
+                    }
+                }
+            }
+        } catch (e) { }
+    }, [vendorName, vendors]);
+
+    // Ensure Formik sees currency values when we prefill from header data
+    useEffect(() => {
+        try {
+            if (formikSetFieldValueRef && formikSetFieldValueRef.current) {
+                formikSetFieldValueRef.current('CurrencyUUID', currencyUuid || '');
+                formikSetFieldValueRef.current('CurrencyType', currencyType || '');
+            }
+        } catch (e) {
+            // ignore
+        }
+    }, [currencyUuid, currencyType]);
+
+    // Resolve currency selection by matching label or uuid when lookups are available
+    useEffect(() => {
+        try {
+            if ((!currencyUuid || currencyUuid === null) && currencyType && Array.isArray(currencyOptions) && currencyOptions.length) {
+                const found = findOptionByUuidOrName(currencyOptions, currencyType);
+                if (found) {
+                    const uuid = found?.UUID || found?.Uuid || found?.Id || found?.id || null;
+                    setCurrencyUuid(uuid);
+                    if (formikSetFieldValueRef && formikSetFieldValueRef.current) {
+                        try { formikSetFieldValueRef.current('CurrencyUUID', uuid || ''); } catch (_) {}
+                    }
+                }
+            }
+        } catch (e) { }
+    }, [currencyType, currencyOptions]);
+
+    // Resolve selected project when only name or uuid present
+    useEffect(() => {
+        try {
+            if ((!selectedProject || typeof selectedProject !== 'object') && (selectedProjectUuid || projectName) && Array.isArray(projects) && projects.length) {
+                const needle = selectedProjectUuid || projectName;
+                const found = findOptionByUuidOrName(projects, needle);
+                if (found) {
+                    const uuid = found?.Uuid || found?.UUID || found?.ProjectUUID || found?.Project_Id || found?.Id || found?.id || null;
+                    setSelectedProject(found);
+                    setSelectedProjectUuid(uuid);
+                    if (formikSetFieldValueRef && formikSetFieldValueRef.current) {
+                        try {
+                            formikSetFieldValueRef.current('ProjectName', found?.ProjectTitle || found?.ProjectName || found?.Name || '');
+                            formikSetFieldValueRef.current('ProjectUUID', uuid || '');
+                        } catch (_) { }
+                    }
+                }
+            }
+        } catch (e) { }
+    }, [selectedProjectUuid, projectName, projects]);
+
     const handleEditItem = (id) => {
         const item = lineItems.find(i => i.id === id);
         if (item) {
             setCurrentItem({
-                itemType: item.itemType,
-                itemTypeUuid: item.itemTypeUuid || item.ItemType_UUID || null,
-                itemName: item.itemName,
-                itemNameUuid: item.itemNameUuid || item.ItemName_UUID || null,
+                itemType: item.itemType || item.raw?.ItemType || '',
+                itemTypeUuid: item.itemTypeUuid || item.ItemType_UUID || item.raw?.ItemType_UUID || item.raw?.ItemTypeId || null,
+                itemName: item.itemName || item.raw?.ItemName || '',
+                itemNameUuid: item.itemNameUuid || item.ItemName_UUID || item.raw?.ItemUUID || item.raw?.ItemId || null,
                 quantity: item.quantity,
-                unit: item.unit
+                unit: item.unit || item.raw?.Unit || '',
+                unitUuid: item.unitUuid || item.raw?.Unit_UUID || item.raw?.UnitId || null,
+                rate: item.raw?.Rate || item.rate || ''
             });
             setEditLineItemId(id);
             // Expand LINE section so editor is visible (optional)
@@ -898,10 +1086,10 @@ const AddSalesInquiry = () => {
                             const msg = typeof backendMsg === 'string' ? backendMsg : JSON.stringify(backendMsg);
                             Alert.alert('Delete failed', msg);
                         } else {
-                            Alert.alert('Error', e?.message || 'Failed to delete line on server');
+                            Alert.alert('Error', getErrorMessage(e, 'Failed to delete line on server'));
                         }
                     } catch (_) {
-                        Alert.alert('Error', e?.message || 'Failed to delete line on server');
+                        Alert.alert('Error', getErrorMessage(e, 'Failed to delete line on server'));
                     }
                 } finally {
                     setLineAdding(false);
@@ -1001,7 +1189,7 @@ const AddSalesInquiry = () => {
             setExpandedId(null);
         } catch (e) {
             console.log('AddSalesHeader error ->', e?.message || e);
-            Alert.alert('Error', e?.message || 'Failed to save header');
+            Alert.alert('Error', getErrorMessage(e, 'Failed to save header'));
         } finally {
             setHeaderSubmitting(false);
         }
@@ -1017,19 +1205,33 @@ const AddSalesInquiry = () => {
                 setHeaderSubmitting(false);
                 return;
             }
-            if (!currencyUuid) {
+            // Accept either a resolved UUID or a currency label/value from the Dropdown
+            if (!currencyUuid && !(currencyType && String(currencyType).trim() !== '')) {
                 Alert.alert('Validation', 'Please select a currency');
                 setHeaderSubmitting(false);
                 return;
+            }
+
+            // Attempt to resolve a UUID from available currency options when only label is present
+            let resolvedCurrencyUuid = currencyUuid || '';
+            if (!resolvedCurrencyUuid && currencyType) {
+                try {
+                    const found = (currencyOptions || []).find(c => {
+                        const label = (typeof c === 'string') ? String(c) : (c?.Name || c?.CurrencyName || c?.Code || c?.DisplayName || c?.Currency || '');
+                        const id = (typeof c === 'string') ? '' : (c?.UUID || c?.Uuid || c?.Id || c?.CurrencyUUID || '');
+                        return String(label).trim() === String(currencyType).trim() || String(id) === String(currencyType).trim();
+                    });
+                    if (found) resolvedCurrencyUuid = found?.UUID || found?.Uuid || found?.Id || found?.CurrencyUUID || '';
+                } catch (e) { /* ignore */ }
             }
 
             const payload = {
                 UUID: '',
                 VendorUUID: vendorUuid,
                 VendorName: vendorName || undefined,
-                // include both keys for compatibility
-                CurrencyUUID: currencyUuid,
-                CurrencyTypeUUID: currencyUuid,
+                // include both keys for compatibility; prefer resolved UUID when available
+                CurrencyUUID: resolvedCurrencyUuid || currencyUuid || '',
+                CurrencyTypeUUID: resolvedCurrencyUuid || currencyUuid || currencyType || '',
                 RequestTitle: requestTitle,
                 // Send multiple date key variants to match backend expectations
                 RequestDate: uiDateToApiDate(requestedDate) || null,
@@ -1057,11 +1259,12 @@ const AddSalesInquiry = () => {
                 if (createdHeaderUuid) {
                     setCurrentHeaderUuid(createdHeaderUuid);
                     const linesResp = await getPurchaseInquiryLines({ headerUuid: createdHeaderUuid, cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
-                    const linesData = (linesResp && (linesResp.Data || linesResp.List || linesResp)) || [];
-                    const serverLines = Array.isArray(linesData) ? linesData : (linesData.List || []);
+                    const serverLines = parseLinesFromResp(linesResp);
                     if (serverLines && serverLines.length) {
-                        setLineItems(serverLines.map((ln, idx) => ({ ...ln, id: idx + 1 })));
+                        const normalized = serverLines.map((ln, idx) => normalizeLine(ln, idx));
+                        setLineItems(normalized);
                         setHeaderLinesMap(prev => ({ ...prev, [createdHeaderUuid]: serverLines }));
+                        setTimeout(() => { try { console.log('Post-create lineItems length ->', (normalized || []).length); setExpandedId(2); } catch (_) { } }, 50);
                     }
                 }
             } catch (e) {
@@ -1077,7 +1280,7 @@ const AddSalesInquiry = () => {
                     const msg = typeof backendMsg === 'string' ? backendMsg : JSON.stringify(backendMsg);
                     Alert.alert('Save failed', msg);
                 } else {
-                    Alert.alert('Error', e?.message || 'Failed to save header');
+                    Alert.alert('Error', getErrorMessage(e, 'Failed to save header'));
                 }
             } catch (alertErr) {
                 console.log('Alert show error ->', alertErr);
@@ -1160,11 +1363,12 @@ const AddSalesInquiry = () => {
                 if (updatedHeaderUuid) {
                     setCurrentHeaderUuid(updatedHeaderUuid);
                     const linesResp = await getPurchaseInquiryLines({ headerUuid: updatedHeaderUuid, cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
-                    const linesData = (linesResp && (linesResp.Data || linesResp.List || linesResp)) || [];
-                    const serverLines = Array.isArray(linesData) ? linesData : (linesData.List || []);
+                    const serverLines = parseLinesFromResp(linesResp);
                     if (serverLines && serverLines.length) {
-                        setLineItems(serverLines.map((ln, idx) => ({ ...ln, id: idx + 1 })));
+                        const normalized = serverLines.map((ln, idx) => normalizeLine(ln, idx));
+                        setLineItems(normalized);
                         setHeaderLinesMap(prev => ({ ...prev, [updatedHeaderUuid]: serverLines }));
+                        setTimeout(() => { try { console.log('Post-update lineItems length ->', (normalized || []).length); setExpandedId(2); } catch (_) { } }, 50);
                     }
                 }
             } catch (e) {
@@ -1172,7 +1376,7 @@ const AddSalesInquiry = () => {
             }
         } catch (e) {
             console.log('UpdatePurchaseInquiryHeader error ->', e?.message || e);
-            Alert.alert('Error', e?.message || 'Failed to update header');
+            Alert.alert('Error', getErrorMessage(e, 'Failed to update header'));
         } finally {
             setHeaderSubmitting(false);
         }
@@ -1289,24 +1493,14 @@ const AddSalesInquiry = () => {
                                             <View style={{ zIndex: 9998, elevation: 20 }}>
                                                 <Dropdown
                                                     placeholder="Select Vendor"
-                                                    value={(function() {
-                                                        try {
-                                                            const list = Array.isArray(vendors) ? vendors : [];
-                                                            const vid = values.VendorUUID || vendorUuid || '';
-                                                            if (vid) {
-                                                                const found = list.find(x => String(x?.UUID || x?.Uuid || x?.Id || x?.id || x) === String(vid));
-                                                                if (found) return found;
-                                                            }
-                                                            return values.VendorName || values.VendorUUID || '';
-                                                        } catch (e) { return values.VendorName || values.VendorUUID || ''; }
-                                                    })()}
+                                                    value={values.VendorName || values.VendorUUID || ''}
                                                     options={vendors}
                                                     getLabel={(v) => (typeof v === 'string' ? v : v?.Name || v?.DisplayName || '')}
                                                     getKey={(v) => (typeof v === 'string' ? v : v?.UUID || v?.Id || v?.id || v?.Name)}
                                                     onSelect={(v) => {
                                                         if (v && typeof v === 'object') {
                                                             const name = v?.Name || v?.DisplayName || v?.name || '';
-                                                            const uuid = v?.Uuid ||v?.UUID || v?.Id || v?.id || null;
+                                                            const uuid = v?.Uuid || v?.UUID || v?.Id || v?.id || null;
                                                             setFieldValue('VendorName', name);
                                                             setFieldValue('VendorUUID', uuid || '');
                                                             setVendorName(name);
@@ -1435,17 +1629,7 @@ const AddSalesInquiry = () => {
                                             <View style={{ zIndex: 9999, elevation: 20 }}>
                                                 <Dropdown
                                                     placeholder="Select Project"
-                                                    value={(function() {
-                                                        try {
-                                                            const list = Array.isArray(projects) ? projects : [];
-                                                            const pid = values.ProjectUUID || selectedProjectUuid || '';
-                                                            if (pid) {
-                                                                const found = list.find(x => String(x?.Uuid || x?.UUID || x?.ProjectUUID || x?.Project_Id || x?.Id || x?.id || x) === String(pid));
-                                                                if (found) return found;
-                                                            }
-                                                            return values.ProjectName || values.ProjectUUID || '';
-                                                        } catch (e) { return values.ProjectName || values.ProjectUUID || ''; }
-                                                    })()}
+                                                    value={values.ProjectName || values.ProjectUUID || ''}
                                                     options={projects || []}
                                                     getLabel={(p) => {
                                                         if (typeof p === 'string') return p;
@@ -1558,7 +1742,7 @@ const AddSalesInquiry = () => {
                                             onPress={submitForm}
                                             disabled={headerSubmitting}
                                         >
-                                            <Text style={styles.submitButtonText}>{headerSubmitting ? (headerEditing ? 'Updating...' : 'Saving...') : (headerEditing ? 'Update Header' : 'Save Header')}</Text>
+                                            <Text style={styles.submitButtonText}>{headerSubmitting ? (headerEditing ? 'Updating...' : 'Saving...') : (headerEditing ? 'Update' : 'Save')}</Text>
                                         </TouchableOpacity>
 
                                     </View>
@@ -1568,8 +1752,8 @@ const AddSalesInquiry = () => {
                     </Formik>
 
                     {/* Section 2: LINE */}
-                    {headerSaved && (
-                        <AccordionSection id={2} title="Create Order" expanded={expandedId === 2} onToggle={toggleSection}>
+                    {(headerSaved || (Array.isArray(lineItems) && lineItems.length > 0)) && (
+                        <AccordionSection id={2} title="Create Order" expanded={(expandedId === 2) || (Array.isArray(lineItems) && lineItems.length > 0)} onToggle={toggleSection}>
                             <View style={styles.row}>
                                 <View style={styles.col}>
                                     <Text style={inputStyles.label}>Item Type*</Text>
@@ -1672,69 +1856,71 @@ const AddSalesInquiry = () => {
                                     <Text style={styles.addButtonText}>{editLineItemId ? (lineAdding ? 'Updating...' : 'Update') : (lineAdding ? 'Adding...' : 'Add')}</Text>
                                 </TouchableOpacity>
                             </View>
+
+                            {/* Line Items Table */}
+                            {lineItems.length > 0 && (
+                                <View style={styles.tableContainer}>
+                                    <View style={styles.tableWrapper}>
+                                        <ScrollView
+                                            horizontal
+                                            showsHorizontalScrollIndicator={false}
+                                            nestedScrollEnabled={true}
+                                            keyboardShouldPersistTaps="handled"
+                                            directionalLockEnabled={true}
+                                        >
+                                            <View style={styles.table}>
+                                                {/* Table Header */}
+                                                <View style={styles.thead}>
+                                                    <View style={styles.tr}>
+                                                        <Text style={[styles.th, { width: wp(15) }]}>Sr.No</Text>
+                                                        <Text style={[styles.th, { width: wp(50) }]}>Item</Text>
+                                                        <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
+                                                        <Text style={[styles.th, { width: wp(25) }]}>Action</Text>
+                                                    </View>
+                                                </View>
+
+
+
+                                                {/* Table Body */}
+                                                <View style={styles.tbody}>
+                                                    {lineItems.map((item, index) => (
+                                                        <View key={item.id} style={styles.tr}>
+                                                            <View style={[styles.td, { width: wp(15) }]}>
+                                                                <Text style={styles.tdText}>{index + 1}</Text>
+                                                            </View>
+                                                            <View style={[styles.td, { width: wp(50), alignItems: 'flex-start', paddingLeft: wp(2) }]}>
+                                                                <Text style={styles.tdText}>• Item Type: {item.itemType}</Text>
+                                                                <Text style={styles.tdText}>• Name: {item.itemName}</Text>
+                                                            </View>
+                                                            <View style={[styles.td, { width: wp(20) }]}>
+                                                                <Text style={styles.tdText}>{item.quantity}</Text>
+                                                            </View>
+                                                            <View style={[styles.tdAction, { width: wp(25) }]}>
+                                                                <TouchableOpacity
+                                                                    style={styles.actionButton}
+                                                                    onPress={() => handleEditItem(item.id)}
+                                                                >
+                                                                    <Icon name="edit" size={rf(3.6)} color="#fff" />
+                                                                </TouchableOpacity>
+                                                                <TouchableOpacity
+                                                                    style={[styles.actionButton, { marginLeft: wp(2) }]}
+                                                                    onPress={() => handleDeleteItem(item.id)}
+                                                                >
+                                                                    <Icon name="delete" size={rf(3.6)} color="#fff" />
+                                                                </TouchableOpacity>
+                                                            </View>
+                                                        </View>
+                                                    ))}
+                                                </View>
+                                            </View>
+                                        </ScrollView>
+                                    </View>
+                                </View>
+                            )}
                         </AccordionSection>
                     )}
 
-                    {/* Line Items Table */}
-                    {lineItems.length > 0 && (
-                        <View style={styles.tableContainer}>
-                            <View style={styles.tableWrapper}>
-                                <ScrollView
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    nestedScrollEnabled={true}
-                                    keyboardShouldPersistTaps="handled"
-                                    directionalLockEnabled={true}
-                                >
-                                    <View style={styles.table}>
-                                        {/* Table Header */}
-                                        <View style={styles.thead}>
-                                            <View style={styles.tr}>
-                                                <Text style={[styles.th, { width: wp(15) }]}>Sr.No</Text>
-                                                <Text style={[styles.th, { width: wp(50) }]}>Item</Text>
-                                                <Text style={[styles.th, { width: wp(20) }]}>Quantity</Text>
-                                                <Text style={[styles.th, { width: wp(25) }]}>Action</Text>
-                                            </View>
-                                        </View>
 
-
-
-                                        {/* Table Body */}
-                                        <View style={styles.tbody}>
-                                            {lineItems.map((item, index) => (
-                                                <View key={item.id} style={styles.tr}>
-                                                    <View style={[styles.td, { width: wp(15) }]}>
-                                                        <Text style={styles.tdText}>{index + 1}</Text>
-                                                    </View>
-                                                    <View style={[styles.td, { width: wp(50), alignItems: 'flex-start', paddingLeft: wp(2) }]}>
-                                                        <Text style={styles.tdText}>• Item Type: {item.itemType}</Text>
-                                                        <Text style={styles.tdText}>• Name: {item.itemName}</Text>
-                                                    </View>
-                                                    <View style={[styles.td, { width: wp(20) }]}>
-                                                        <Text style={styles.tdText}>{item.quantity}</Text>
-                                                    </View>
-                                                    <View style={[styles.tdAction, { width: wp(25) }]}>
-                                                        <TouchableOpacity
-                                                            style={styles.actionButton}
-                                                            onPress={() => handleEditItem(item.id)}
-                                                        >
-                                                            <Icon name="edit" size={rf(3.6)} color="#fff" />
-                                                        </TouchableOpacity>
-                                                        <TouchableOpacity
-                                                            style={[styles.actionButton, { marginLeft: wp(2) }]}
-                                                            onPress={() => handleDeleteItem(item.id)}
-                                                        >
-                                                            <Icon name="delete" size={rf(3.6)} color="#fff" />
-                                                        </TouchableOpacity>
-                                                    </View>
-                                                </View>
-                                            ))}
-                                        </View>
-                                    </View>
-                                </ScrollView>
-                            </View>
-                        </View>
-                    )}
                 </ScrollView>
 
 
@@ -1768,6 +1954,7 @@ const AddSalesInquiry = () => {
                     }}
                     onCancel={() => setSuccessSheetVisible(false)}
                 />
+                {(Array.isArray(expandedId) ? expandedId.includes(4) : expandedId === 4) && (
 
                 <View style={styles.footerBar}>
                     <View
@@ -1800,7 +1987,7 @@ const AddSalesInquiry = () => {
                         </TouchableOpacity>
                     </View>
 
-                </View>
+                </View>)}
             </View>
         </>
     );

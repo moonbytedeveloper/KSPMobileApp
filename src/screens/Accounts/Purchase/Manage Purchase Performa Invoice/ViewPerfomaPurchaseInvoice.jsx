@@ -7,6 +7,7 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { getPurchasePerformaInvoiceHeaders, deletePurchasePerformaInvoiceHeader, getPurchasePerformaInvoiceSlip, convertPurchasePerformaToInvoice, getPurchasePerformaRelatedDocuments, getPurchaseOrderSlip } from '../../../../api/authServices';
+import { getErrorMessage } from '../../../../utils/errorMessage';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 
 const SALES_ORDERS = [
@@ -246,7 +247,7 @@ const ViewPerfomaPurchaseInvoice = () => {
                                                     Alert.alert('Deleted', 'Header deleted successfully');
                                                 } catch (e) {
                                                     console.error('Delete error ->', e);
-                                                    Alert.alert('Error', e?.message || 'Unable to delete header');
+                                                    Alert.alert('Error', getErrorMessage(e, 'Unable to delete header'));
                                                 }
                                             }
                                         }
@@ -314,7 +315,7 @@ const ViewPerfomaPurchaseInvoice = () => {
                                                     
                                                 } catch (err) {
                                                     console.error('Failed to convert performa', err);
-                                                    Alert.alert('Error', err?.message || 'Failed to convert performa to invoice');
+                                                    Alert.alert('Error', getErrorMessage(err, 'Failed to convert performa to invoice'));
                                                 }
                                             }
                                         }
@@ -351,7 +352,7 @@ const ViewPerfomaPurchaseInvoice = () => {
             }
         } catch (err) {
             console.error('openPurchaseOrderPDF error ->', err);
-            Alert.alert('Error', err?.message || 'Failed to open purchase order PDF');
+            Alert.alert('Error', getErrorMessage(err, 'Failed to open purchase order PDF'));
         }
     };
 
@@ -369,7 +370,7 @@ const ViewPerfomaPurchaseInvoice = () => {
             }
         } catch (err) {
             console.error('openPurchasePerformaPDF error ->', err);
-            Alert.alert('Error', err?.message || 'Failed to open performa invoice PDF');
+            Alert.alert('Error', getErrorMessage(err, 'Failed to open performa invoice PDF'));
         }
     };
 

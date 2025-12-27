@@ -8,6 +8,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
 import { getSalesOrderHeaders, getSalesHeader, deleteSalesOrderHeader, getSalesOrderSlip, convertSalesOrderToInvoice, getSalesOrderRelatedDocuments, getSalesInvoiceSlip, getSalesPerformaInvoiceSlip } from '../../../../api/authServices';
+import { getErrorMessage } from '../../../../utils/errorMessage';
 
 // sales orders will be fetched from API
 
@@ -102,10 +103,9 @@ const ViewSalesOrder = () => {
                         }
                     ]
                 );
-            } catch (error) {
+                } catch (error) {
                 console.log('Convert error:', error?.message || error);
-                const errorMessage = error?.message || 'Unable to convert sales order to invoice. Please try again.';
-                Alert.alert('Conversion Failed', errorMessage);
+                Alert.alert('Conversion Failed', getErrorMessage(error, 'Unable to convert sales order to invoice. Please try again.'));
             }
         } else if (actionLabel === 'View') {
             try {
@@ -114,7 +114,7 @@ const ViewSalesOrder = () => {
                 await fetchSalesOrderRelatedDocuments(order);
             } catch (err) {
                 console.log('fetchSalesOrderRelatedDocuments error ->', err?.message || err);
-                Alert.alert('Error', 'Unable to fetch related documents');
+                Alert.alert('Error', getErrorMessage(err, 'Unable to fetch related documents'));
                 setOrderRelatedModalVisible(false);
             }
         } else {
@@ -158,7 +158,7 @@ const ViewSalesOrder = () => {
             navigation.navigate('FileViewerScreen', { pdfBase64, fileName: invoice?.DocumentNumber || `Invoice_${uuid}`, opportunityTitle: invoice?.DocumentNumber || 'Invoice', companyName: '' });
         } catch (err) {
             console.log('handleOpenSalesInvoiceSlip error ->', err?.message || err);
-            Alert.alert('Error', err?.message || 'Unable to open invoice PDF');
+            Alert.alert('Error', getErrorMessage(err, 'Unable to open invoice PDF'));
         }
     };
 
@@ -178,7 +178,7 @@ const ViewSalesOrder = () => {
             navigation.navigate('FileViewerScreen', { pdfBase64, fileName: pf?.DocumentNumber || `Performa_${uuid}`, opportunityTitle: pf?.DocumentNumber || 'Performa Invoice', companyName: '' });
         } catch (err) {
             console.log('handleOpenSalesPerformaSlip error ->', err?.message || err);
-            Alert.alert('Error', err?.message || 'Unable to open performa PDF');
+            Alert.alert('Error', getErrorMessage(err, 'Unable to open performa PDF'));
         }
     };
 
@@ -265,7 +265,7 @@ const ViewSalesOrder = () => {
                             fetchOrders({ start: currentPage * itemsPerPage, length: itemsPerPage, searchValue: searchQuery.trim() });
                         } catch (e) {
                             console.error('deleteSalesOrderHeader error ->', e?.message || e);
-                            Alert.alert('Error', e?.message || 'Unable to delete sales order');
+                            Alert.alert('Error', getErrorMessage(e, 'Unable to delete sales order'));
                         } finally {
                             setLoading(false);
                         }

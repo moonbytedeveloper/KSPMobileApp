@@ -29,6 +29,7 @@ import DatePickerBottomSheet from '../../../../components/common/CustomDatePicke
 import { pick, types, isCancel } from '@react-native-documents/picker';
 import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllPurchaseInquiryNumbers, getVendors, getCountries, getPurchaseOrderNumbers, addPurchasePerformaInvoiceHeader, addPurchasePerformaInvoiceLine, updatePurchasePerformaInvoiceHeader, getPurchasePerformaInvoiceHeaderById, getPurchasePerformaInvoiceLines, updatePurchasePerformaInvoiceLine, deletePurchasePerformaInvoiceLine, getItems, uploadFiles } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
+import { getErrorMessage } from '../../../../utils/errorMessage';
 
 const COL_WIDTHS = {
     ITEM: wp(50), // 35%
@@ -91,11 +92,18 @@ const HeaderValidationSchema = Yup.object().shape({
         //     const hasUuid = typeof PurchaseOrderUUID === 'string' && PurchaseOrderUUID.trim() !== '';
         //     return !!(hasVal || hasUuid);
         // }),
-    VendorName: Yup.string().trim().required('Vendor is required'),
+          // VendorName: Yup.string().trim().required('Vendor is required'),
+            VendorName: Yup.string().test('Vendor-or-uuid', 'Vendor is required', function (val) {
+                const { VendorName, VendorUUID, CustomerUUID } = this.parent || {};
+                const hasVal = typeof val === 'string' && val.trim() !== '';
+                const hasUuid = (typeof VendorUUID === 'string' && VendorUUID.trim() !== '') || (typeof CustomerUUID === 'string' && CustomerUUID.trim() !== '');
+                return !!(hasVal || hasUuid);
+            }),
+    // VendorName: Yup.string().trim().required('Vendor is required'),
     CustomerUUID: Yup.string().test('vendor-uuid-or-name', 'Vendor is required', function (val) {
-        const { VendorName } = this.parent || {};
+        const { VendorName, CustomerName } = this.parent || {};
         const hasUuid = typeof val === 'string' && val.trim() !== '';
-        const hasName = typeof VendorName === 'string' && VendorName.trim() !== '';
+        const hasName = (typeof VendorName === 'string' && VendorName.trim() !== '') || (typeof CustomerName === 'string' && CustomerName.trim() !== '');
         return !!(hasUuid || hasName);
     }),
     ProjectName: Yup.string().test('project-or-uuid', 'Project is required', function (val) {
@@ -130,16 +138,43 @@ const AddSalesPerfomaInvoice = () => {
             return; // silently ignore open attempts until Edit is clicked
         }
 
-        // If header is submitted, prevent opening other sections
-        if (typeof headerSubmitted !== 'undefined' && headerSubmitted && id !== 1) {
-            // When header is already submitted, don't allow opening other sections
-            // and do not auto-open header — user must click Edit to open header.
-            setExpandedId(null);
+        // If header is NOT yet submitted, prevent opening other sections (like Create Order)
+        // until header is saved. If header is submitted, allow opening other sections.
+        if (typeof headerSubmitted !== 'undefined' && !headerSubmitted && id !== 1) {
+            try {
+                Alert.alert('Header required', 'Please submit the header before opening this section.');
+            } catch (e) { /* ignore */ }
             return;
         }
 
         setExpandedId(prev => (prev === id ? null : id));
     };
+
+    // When returning from FileViewer (or a screen that set `preserveHeaderOnReturn`),
+    // re-fetch header-by-id (via handleEditPress) and open header section.
+    useEffect(() => {
+        const preserve = route?.params?.preserveHeaderOnReturn;
+        if (!preserve) return;
+        (async () => {
+            try {
+                // refresh lookups so dropdown lists map UUIDs -> labels after return
+                try { await loadLookups(); } catch (e) { /* ignore */ }
+                const hdr = headerUUID || route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.UUID || null;
+                if (hdr) {
+                    setHeaderUUID(hdr);
+                    await handleEditPress();
+                } else if (headerResponse) {
+                    setHeaderEditable(true);
+                    setHeaderSubmitted(true);
+                    setExpandedId(1);
+                }
+            } catch (e) {
+                console.warn('preserveHeaderOnReturn handler failed', e);
+            } finally {
+                try { if (navigation && navigation.setParams) navigation.setParams({ preserveHeaderOnReturn: false }); } catch (e) { }
+            }
+        })();
+    }, [route?.params?.preserveHeaderOnReturn]);
 
     // Demo options for dropdowns
      
@@ -172,13 +207,15 @@ const AddSalesPerfomaInvoice = () => {
         return !hasPrefill;
     });
     const [uploadedFilePath, setUploadedFilePath] = useState(null);
+    // const [file, setFile] = useState(null);
+    const [headerResponse, setHeaderResponse] = useState(null);
     const [paymentTermUuid, setPaymentTermUuid] = useState(null);
     const [paymentMethodUUID, setPaymentMethodUUID] = useState(null);
     const [projectUUID, setProjectUUID] = useState(null);
     const [salesInquiryUuid, setSalesInquiryUuid] = useState(null);
 
     // Fetch lookups (payment terms, methods, projects, inquiries) similar to ManageSalesOrder
-    React.useEffect(() => {
+    const loadLookups = async () => {
         const extractArray = (resp) => {
             const d = resp?.Data ?? resp;
             if (Array.isArray(d)) return d;
@@ -188,151 +225,87 @@ const AddSalesPerfomaInvoice = () => {
             return [];
         };
 
-        (async () => {
+        try {
+            const [custResp, termsResp, methodsResp, projectsResp, inquiriesResp, salesOrdersResp, purchaseOrdersResp] = await Promise.all([
+                getVendors(),
+                getPaymentTerms(),
+                getPaymentMethods(),
+                fetchProjects(),
+                getAllPurchaseInquiryNumbers(),
+                getPurchaseOrderNumbers(),
+                getPurchaseOrderNumbers(),
+            ]);
+
+            const custList = extractArray(custResp);
+            const termsList = extractArray(termsResp);
+            const methodsList = extractArray(methodsResp);
+            const projectsList = extractArray(projectsResp);
+            const inquiriesList = extractArray(inquiriesResp);
+            const salesOrdersList = extractArray(salesOrdersResp);
+
+            const normalizedCustomers = (Array.isArray(custList) ? custList : []).map((r) => ({
+                UUID: r?.UUID || r?.Uuid || r?.Id || r?.CustomerUUID || r?.VendorUUID || r?.VendorName || r?.CustomerName || r?.Name || String(r),
+                CustomerName: r?.CustomerName || r?.VendorName || r?.Name || r?.DisplayName || String(r),
+                raw: r,
+            }));
+
+            const normalizedPaymentTerms = (Array.isArray(termsList) ? termsList : []).map((r) => ({ UUID: r?.UUID || r?.Uuid || r?.Id || r?.PaymentTermUUID || r?.PaymentTermId || r?.Name || String(r), Name: r?.Name || r?.Title || r?.PaymentTerm || String(r), raw: r }));
+            const normalizedPaymentMethods = (Array.isArray(methodsList) ? methodsList : []).map(r => ({ UUID: r?.UUID || r?.Uuid || r?.Id || r?.PaymentMethodUUID || r?.PaymentMethodId || r?.Mode || r?.Name || String(r), Name: r?.Name || r?.PaymentMethod || r?.Mode || String(r), raw: r }));
+            const normalizedProjects = (Array.isArray(projectsList) ? projectsList : []).map(r => ({ UUID: r?.UUID || r?.Uuid || r?.Id || r?.ProjectUUID || r?.ProjectId || r?.Project || String(r), ProjectTitle: r?.ProjectTitle || r?.ProjectName || r?.Project || String(r), raw: r }));
+            const normalizedInquiries = (Array.isArray(inquiriesList) ? inquiriesList : []).map(r => ({ UUID: r?.UUID || r?.Uuid || r?.Id || r?.InquiryUUID || r?.InquiryId || r?.Inquiry || String(r), InquiryNo: r?.InquiryNo || r?.SalesInquiryNo || r?.SalesInqNo || r?.Inquiry || String(r), raw: r }));
+            const normalizedSalesOrders = (Array.isArray(salesOrdersList) ? salesOrdersList : []).map(r => ({ UUID: r?.UUID || r?.Uuid || r?.Id || r?.SalesOrderUUID || r?.SalesOrderId || String(r), SalesOrderNo: r?.SalesOrderNo || r?.SalesOrder || r?.OrderNo || String(r), raw: r }));
+
+            setCustomersOptions(normalizedCustomers);
+            setPaymentTermsOptions(normalizedPaymentTerms);
+            setPaymentMethodsOptions(normalizedPaymentMethods);
+            setProjectsOptions(normalizedProjects);
+            setSalesInquiryNosOptions(normalizedInquiries);
+            setSalesOrderOptions(normalizedSalesOrders);
+            setPurchaseOrderOptions(Array.isArray(purchaseOrdersResp?.Data || purchaseOrdersResp) ? (purchaseOrdersResp?.Data || purchaseOrdersResp) : []);
+
+        } catch (e) {
+            console.warn('Lookup fetch error', e?.message || e);
+        }
+    };
+
+    React.useEffect(() => { loadLookups(); }, []);
+
+    const viewDocument = (opts = {}) => {
+        // Prefer server-provided file paths; avoid using local file.uri for viewing
+        const candidates = [uploadedFilePath, headerResponse?.FilePath, headerResponse?.DocumentUrl, headerResponse?.File, headerResponse?.Files, headerResponse?.Attachments, headerResponse?.Document, headerResponse?.DocumentPath, headerResponse?.FileUrl];
+        const resolveCandidate = (c) => {
+            if (!c && c !== 0) return null;
+            if (Array.isArray(c)) return c.length ? c[0] : null;
+            if (typeof c === 'object') return c.pdfBase64 || c.Url || c.url || c.FilePath || c.filePath || c.Path || c.path || c.File || c.file || c.DocumentUrl || null;
+            return c;
+        };
+        let rawCandidate = candidates.map(resolveCandidate).find(x => x !== null && typeof x !== 'undefined' && String(x) !== '');
+        const fileLikeRegex = /(data:.*;base64,)|(\.pdf(\?|$))|(\.png(\?|$))|(\.jpe?g(\?|$))|application\/pdf|https?:\/\//i;
+        const findInObjectForFile = (obj) => {
             try {
-                const [custResp, termsResp, methodsResp, projectsResp, inquiriesResp, salesOrdersResp, purchaseOrdersResp] = await Promise.all([
-                    getVendors(),
-                    getPaymentTerms(),
-                    getPaymentMethods(),
-                    fetchProjects(),
-                    getAllPurchaseInquiryNumbers(),
-                    getPurchaseOrderNumbers(),
-                    getPurchaseOrderNumbers(),
-                ]);
-
-                const custList = extractArray(custResp);
-                const termsList = extractArray(termsResp);
-                const methodsList = extractArray(methodsResp);
-                const projectsList = extractArray(projectsResp);
-                const inquiriesList = extractArray(inquiriesResp);
-                const salesOrdersList = extractArray(salesOrdersResp);
-                console.log(salesOrdersList, 'salesordernum');
-
-                // Normalize vendors/customers
-                const normalizedCustomers = (Array.isArray(custList) ? custList : []).map((r) => {
-                    console.log('Raw vendor data:', r);
-                    const customerName = r?.CustomerName || r?.VendorName || r?.Name || r?.DisplayName || String(r);
-                    return {
-                        UUID: r?.UUID || r?.Uuid || r?.Id || r?.CustomerUUID || r?.VendorUUID || customerName,
-                        CustomerName: customerName,
-                        raw: r,
-                    };
-                });
-
-                // Normalize payment terms
-                const normalizedPaymentTerms = (Array.isArray(termsList) ? termsList : []).map((r) => {
-                    console.log('Raw payment term data:', r);
-                    const name = r?.Name || r?.Title || r?.PaymentTerm || String(r);
-                    return {
-                        UUID: r?.UUID || r?.Uuid || r?.Id || r?.PaymentTermUUID || name,
-                        Name: name,
-                        raw: r,
-                    };
-                });
-
-                // Normalize payment methods
-                const normalizedPaymentMethods = (Array.isArray(methodsList) ? methodsList : []).map((r) => {
-                    console.log('Raw payment method data:', r);
-                    const name = r?.Name || r?.Title || r?.PaymentMethod || String(r);
-                    return {
-                        UUID: r?.UUID || r?.Uuid || r?.Id || r?.PaymentMethodUUID || name,
-                        Name: name,
-                        raw: r,
-                    };
-                });
-
-                const normalizedInquiries = (Array.isArray(inquiriesList) ? inquiriesList : []).map((r) => {
-                    const inquiryNo = r?.SalesInqNo || r?.SalesInquiryNo || r?.InquiryNo || r?.Name || r?.Title || String(r);
-                    return {
-                        UUID: r?.UUID || r?.Uuid || r?.Id || r?.InquiryUUID || r?.SalesInquiryUUID || inquiryNo,
-                        InquiryNo: inquiryNo,
-                        raw: r,
-                    };
-                });
-
-                setCustomersOptions(normalizedCustomers);
-                setPaymentTermsOptions(normalizedPaymentTerms);
-                setPaymentMethodsOptions(normalizedPaymentMethods);
-                setProjectsOptions(projectsList);
-                setSalesInquiryNosOptions(normalizedInquiries);
-                const normalizedSalesOrders = (Array.isArray(salesOrdersList) ? salesOrdersList : []).map((r) => {
-                    const uuid = r?.UUID || r?.Uuid || r?.Id || r?.SalesOrderUUID || r?.SalesOrderId || null;
-
-                    const extractString = (val) => {
-                        if (val === null || val === undefined) return '';
-                        if (typeof val === 'string') return val;
-                        if (typeof val === 'number' || typeof val === 'boolean') return String(val);
-                        if (typeof val === 'object') {
-                            // try explicit readable subfields (including 'Names')
-                            const sub = val?.Names || val?.Name || val?.Title || val?.OrderNo || val?.SalesOrderNo || val?.SalesOrderNumber || val?.Value || val?.Text || val?.DisplayName;
-                            if (typeof sub === 'string' && sub.trim() !== '') return sub;
-                            // search for first string property that isn't an id/uuid
-                            try {
-                                for (const k in val) {
-                                    if (!Object.prototype.hasOwnProperty.call(val, k)) continue;
-                                    const low = String(k).toLowerCase();
-                                    if (/(uuid|^id$|id$|guid)$/.test(low)) continue; // skip id-like keys
-                                    const v = val[k];
-                                    if (typeof v === 'string' && v.trim() !== '') return v;
-                                }
-                            } catch (e) { }
-                            // fallback to toString if informative
-                            try {
-                                const s = val?.toString && val.toString();
-                                if (s && s !== '[object Object]') return s;
-                            } catch (e) { }
-                            return JSON.stringify(val);
-                        }
-                        return String(val);
-                    };
-
-                    const rawOrderCandidate = r?.SalesOrderNo ?? r?.SalesOrderNumber ?? r?.OrderNumber ?? r?.OrderNo ?? r?.Name ?? r?.Title ?? r;
-                    const orderNoStr = extractString(rawOrderCandidate);
-                    return { UUID: uuid, OrderNo: orderNoStr, raw: r };
-                });
-                setSalesOrderOptions(normalizedSalesOrders);
-                console.log(normalizedSalesOrders, 'normalizedSalesOrders');
-
-                // Normalize Purchase Orders
-                const purchaseOrdersList = extractArray(purchaseOrdersResp);
-                const normalizedPurchaseOrders = (Array.isArray(purchaseOrdersList) ? purchaseOrdersList : []).map((r) => {
-                    // console.log('Raw purchase order data:', r);
-                    const uuid = r?.UUID || r?.Uuid || r?.Id || r?.PurchaseOrderUUID || r?.PurchaseOrderId || null;
-                    // Prefer explicit readable fields; handle shapes like { Uuid: '...', Number: '1-003' }
-                    const orderNoCandidates = [
-                        r?.PurchaseOrderNo,
-                        r?.PurchaseOrderNumber,
-                        r?.OrderNumber,
-                        r?.OrderNo,
-                        r?.Number,
-                        r?.DocumentNumber,
-                        r?.Name,
-                        r?.Title,
-                    ];
-                    let orderNoStr = '';
-                    for (const c of orderNoCandidates) {
-                        if (c === null || c === undefined) continue;
-                        if (typeof c === 'string' && c.trim() !== '') { orderNoStr = c; break; }
-                        if (typeof c === 'number' || typeof c === 'boolean') { orderNoStr = String(c); break; }
-                    }
-                    // Fallback: if r itself is a small object with a Number field, try that
-                    if (!orderNoStr && r && typeof r === 'object') {
-                        if (r?.Number && typeof r.Number === 'string') orderNoStr = r.Number;
-                        else if (r?.DocumentNumber && typeof r.DocumentNumber === 'string') orderNoStr = r.DocumentNumber;
-                    }
-                    // Final fallback: prefer UUID if present, otherwise a short placeholder
-                    if (!orderNoStr) {
-                        orderNoStr = uuid || 'Unknown Purchase Order';
-                    }
-                    return { UUID: uuid || null, OrderNo: orderNoStr, raw: r };
-                });
-                setPurchaseOrderOptions(normalizedPurchaseOrders);
-
-            } catch (e) {
-                console.warn('Lookup fetch error', e?.message || e);
-            }
-        })();
-    }, []);
+                if (!obj && obj !== 0) return null;
+                if (typeof obj === 'string') return fileLikeRegex.test(obj) ? obj : null;
+                if (Array.isArray(obj)) { for (const v of obj) { const r = findInObjectForFile(v); if (r) return r; } return null; }
+                if (typeof obj === 'object') { for (const k of Object.keys(obj)) { try { const v = obj[k]; const r = findInObjectForFile(v); if (r) return r; } catch (e) { } } }
+            } catch (e) { }
+            return null;
+        };
+        if (!rawCandidate) rawCandidate = resolveCandidate(headerResponse?.Data) || resolveCandidate(headerResponse?.data);
+        if (!rawCandidate) {
+            const deep = findInObjectForFile(headerResponse) || findInObjectForFile(headerResponse?.Data) || findInObjectForFile(uploadedFilePath) || findInObjectForFile(file);
+            if (deep) rawCandidate = deep;
+        }
+        console.log('[AddPerfomaPurchaseInvoice] viewDocument candidates ->', { rawCandidate, headerResponse, uploadedFilePath });
+        if (!rawCandidate) { Alert.alert('No document', 'No document is available to view.'); return; }
+        let url = String(rawCandidate);
+        try { const base = 'https://erp.kspconsults.com'; if (!/^(https?:\/\/|file:|data:)/i.test(url)) { if (String(url).startsWith('/')) url = base + url; else url = base + '/' + url; } } catch (e) { }
+        const lower = url.toLowerCase();
+        try { if (navigation && navigation.setParams) navigation.setParams({ preserveHeaderOnReturn: true }); } catch (e) { }
+        if (lower.includes('base64,') && lower.includes('pdf')) { navigation.navigate('FileViewerScreen', { pdfBase64: url, fileName: opts.fileName || 'Document' }); return; }
+        if (lower.endsWith('.pdf') || lower.includes('.pdf') || lower.includes('application/pdf')) { navigation.navigate('FileViewerScreen', { pdfUrl: url, fileName: opts.fileName || 'Document' }); return; }
+        if (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.includes('image/')) { navigation.navigate('ImageViewerScreen', { imageUrl: url, opportunityTitle: opts.fileName || 'Document' }); return; }
+        navigation.navigate('FileViewerScreen', { pdfUrl: url, fileName: opts.fileName || 'Document' });
+    };
 
     // Prefill header if navigated here with `prefillHeader` param
     useEffect(() => {
@@ -356,7 +329,7 @@ const AddSalesPerfomaInvoice = () => {
             // Check if inquiryNo is actually a UUID - if so, don't use it
             const isInquiryNoUuid = inquiryNo && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(inquiryNo);
 
-            setHeaderForm(s => ({
+                setHeaderForm(s => ({
                 ...s,
                 salesInquiryText: data?.SalesPerInvNo || data?.PerformaInvoiceNumber || data?.PerformaInvoiceNo || data?.PerformaInvoice || data?.PerformaNo || data?.SalesPerformaNo || data?.SalesPerInvNo || data?.InvoiceNo || data?.InvoiceNumber || s.salesInquiryText || '',
                 // Also store common variants explicitly so UI can read a stable key
@@ -368,6 +341,10 @@ const AddSalesPerfomaInvoice = () => {
                 clientName: data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || s.clientName || '',
                 CustomerUUID: data?.CustomerUUID || data?.CustomerId || s.CustomerUUID || null,
                 CustomerName: data?.CustomerName || s.CustomerName || '',
+                // Ensure header form contains note variants so UI bindings find them
+                Note: data?.Note || data?.CustomerNotes || data?.Notes || s.Note || '',
+                Notes: data?.Notes || data?.CustomerNotes || data?.Note || s.Notes || '',
+                CustomerNotes: data?.CustomerNotes || data?.Notes || data?.Note || s.CustomerNotes || '',
             }));
             // Extract Purchase Order / Sales Order UUID if present so payload uses UUID
             const poUuid = data?.PurchaseOrderUUID || data?.PurchaseOrderId || data?.PurchaseOrderNo || data?.SalesOrderUUID || data?.SalesOrderId || data?.SalesOrderNo || null;
@@ -387,14 +364,20 @@ const AddSalesPerfomaInvoice = () => {
             setShippingCharges(String(data?.ShippingCharges ?? data?.ShippingCharge ?? 0));
             setAdjustments(String(data?.AdjustmentPrice ?? data?.Adjustment ?? 0));
             setTerms(data?.TermsConditions || data?.Terms || '');
-            setNotes(data?.CustomerNotes || data?.Notes || '');
+            setNotes(data?.Note || data?.CustomerNotes || data?.Notes || '');
             const headerUuid = data?.UUID || data?.Id || data?.HeaderUUID || null;
             setHeaderUUID(headerUuid);
             if (data?.FilePath) setFile({ uri: data.FilePath, name: data.FilePath });
+            // ensure uploadedFilePath and headerResponse are set so View Document shows for prefills
+            try {
+                const fp = data?.FilePath || (Array.isArray(data?.FilePaths) && data.FilePaths[0]) || (Array.isArray(data?.Files) && data.Files[0]) || data?.files || null;
+                if (fp) setUploadedFilePath(fp);
+            } catch (e) { /* ignore */ }
             // If headerUUID exists, treat this as edit mode: open header and enable editing
             setHeaderSubmitted(true);
             setHeaderEditable(true);
             setExpandedId(1);
+            if (typeof setHeaderResponse === 'function') setHeaderResponse(data);
         } catch (e) {
             console.warn('prefill header failed', e);
         } finally {
@@ -472,6 +455,10 @@ const AddSalesPerfomaInvoice = () => {
                     clientName: data?.SalesOrderNo || data?.OrderNo || data?.SalesOrderNumber || s.clientName || '',
                     CustomerUUID: data?.CustomerUUID || data?.CustomerId || s.CustomerUUID || null,
                     CustomerName: data?.CustomerName || data?.Customer || s.CustomerName || '',
+                    // Ensure header form contains note variants so UI bindings find them
+                    Note: data?.Note || data?.CustomerNotes || data?.Notes || s.Note || '',
+                    Notes: data?.Notes || data?.CustomerNotes || data?.Note || s.Notes || '',
+                    CustomerNotes: data?.CustomerNotes || data?.Notes || data?.Note || s.CustomerNotes || '',
                 }));
 
                 // Prefill other fields
@@ -502,7 +489,7 @@ const AddSalesPerfomaInvoice = () => {
                 setShippingCharges(String(data?.ShippingCharges ?? data?.ShippingCharge ?? 0));
                 setAdjustments(String(data?.AdjustmentPrice ?? data?.Adjustment ?? 0));
                 setTerms(data?.TermsConditions || data?.Terms || '');
-                setNotes(data?.CustomerNotes || data?.Notes || '');
+                setNotes(data?.Note || data?.CustomerNotes || data?.Notes || '');
                 setHeaderUUID(data?.UUID || data?.Id || data?.HeaderUUID || headerUuid);
 
                 // Populate tax and server total if provided by API
@@ -572,7 +559,7 @@ const AddSalesPerfomaInvoice = () => {
                 setExpandedId(1);
             } catch (e) {
                 console.error('Error fetching header data:', e);
-                Alert.alert('Error', e?.message || 'Unable to load header data');
+                Alert.alert('Error', getErrorMessage(e, 'Unable to load header data'));
             } finally {
                 setPrefillLoading(false);
             }
@@ -721,6 +708,9 @@ const AddSalesPerfomaInvoice = () => {
         clientName: '',
         phone: '',
         email: '',
+        Note: '',
+        Notes: '',
+        CustomerNotes: '',
     });
     const [billingForm, setBillingForm] = useState({
         buildingNo: '',
@@ -767,6 +757,20 @@ const AddSalesPerfomaInvoice = () => {
     const [showShippingTip, setShowShippingTip] = useState(false);
     const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
     const [prefillLoading, setPrefillLoading] = useState(false);
+
+    const hasDocumentAvailable = () => {
+        try {
+            if (uploadedFilePath && String(uploadedFilePath).trim() !== '') return true;
+            const resp = headerResponse || {};
+            const candidates = [resp.FilePath, resp.DocumentUrl, resp.FilePaths, resp.File, resp.files, resp.Attachments, resp.Document, resp.DocumentPath, resp.FileUrl, resp.Data && resp.Data.FilePath, resp.Data && resp.Data.files];
+            for (const c of candidates) {
+                if (!c && c !== 0) continue;
+                if (Array.isArray(c) && c.length) return true;
+                if (typeof c === 'string' && String(c).trim() !== '') return true;
+            }
+        } catch (e) { /* ignore */ }
+        return false;
+    };
     const formikSetFieldValueRef = useRef(null);
     // Show Proforma Invoice Number only when editing / prefilling an existing header
     const [showProformaInvoiceNoField, setShowProformaInvoiceNoField] = useState(false);
@@ -938,7 +942,7 @@ const AddSalesPerfomaInvoice = () => {
                 Alert.alert('Success', 'Line deleted');
             } catch (e) {
                 console.warn('Delete line error', e);
-                Alert.alert('Error', e?.message || 'Unable to delete line');
+                Alert.alert('Error', getErrorMessage(e, 'Unable to delete line'));
             }
         } else {
             // local-only line, just remove
@@ -1162,7 +1166,7 @@ const AddSalesPerfomaInvoice = () => {
             }
         } catch (e) {
             console.warn('Add/Update line item error', e);
-            Alert.alert('Error', e?.message || 'Unable to add/update line item');
+            Alert.alert('Error', getErrorMessage(e, 'Unable to add/update line item'));
         } finally {
             setIsAddingLine(false);
         }
@@ -1194,7 +1198,7 @@ const AddSalesPerfomaInvoice = () => {
             setExpandedId(null);
         } catch (e) {
             console.error('Final submit error', e);
-            Alert.alert('Error', e?.message || 'Unable to update performa header');
+            Alert.alert('Error', getErrorMessage(e, 'Unable to update performa header'));
         } finally {
             setHeaderSubmitting(false);
         }
@@ -1251,7 +1255,7 @@ const AddSalesPerfomaInvoice = () => {
                 TermsConditions: terms || '',
                 Discount: parseFloat(discount) || 0,
                 OrderDate: uiDateToApiDate(invoiceDate),
-                FilePath: uploadedFilePath || file?.uri || file?.name || '',
+                FilePath: uploadedFilePath ||  file?.name || '',
                 SubTotal: parseFloat(computeSubtotal()) || 0,
                 TotalTax: parseFloat(totalTax) || 0,
                 TotalAmount: (parseFloat(computeSubtotal()) || 0) + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) - (parseFloat(discount) || 0) + (parseFloat(totalTax) || 0),
@@ -1275,7 +1279,7 @@ const AddSalesPerfomaInvoice = () => {
             Alert.alert('Success', 'Header submitted successfully');
         } catch (err) {
             console.error('submitHeader error ->', err);
-            Alert.alert('Error', err?.message || 'Unable to submit header');
+            Alert.alert('Error', getErrorMessage(err, 'Unable to submit header'));
         } finally {
             setHeaderSubmitting(false);
         }
@@ -1330,7 +1334,7 @@ const AddSalesPerfomaInvoice = () => {
             Note: notes || headerForm.Note || headerForm.Notes || '',
             CustomerNotes: notes || headerForm.CustomerNotes || '',
             TermsConditions: terms || headerForm.TermsConditions || '',
-            FilePath: uploadedFilePath || file?.uri || file?.name || headerForm.FilePath || '',
+            FilePath: uploadedFilePath ||file?.name || headerForm.FilePath || '',
             SubTotal: subtotal,
             TotalTax: totalTaxNum,
             TotalAmount: totalAmount,
@@ -1365,7 +1369,7 @@ const AddSalesPerfomaInvoice = () => {
             setExpandedId(4);
         } catch (err) {
             console.error('updateHeader error ->', err);
-            Alert.alert('Error', err?.message || 'Unable to update header');
+            Alert.alert('Error', getErrorMessage(err, 'Unable to update header'));
         } finally {
             setHeaderSubmitting(false);
         }
@@ -1561,6 +1565,16 @@ const AddSalesPerfomaInvoice = () => {
             setNotes(data?.CustomerNotes || data?.Notes || '');
             setHeaderUUID(data?.UUID || data?.Id || data?.HeaderUUID || headerUuid);
             if (data?.FilePath) setFile({ uri: data.FilePath, name: data.FilePath });
+            // ensure uploadedFilePath is set when loading header by id
+            try {
+                const fp = data?.FilePath || (Array.isArray(data?.FilePaths) && data.FilePaths[0]) || (Array.isArray(data?.Files) && data.Files[0]) || data?.files || null;
+                if (fp) setUploadedFilePath(fp);
+            } catch (e) { /* ignore */ }
+            // ensure uploadedFilePath is set when loading header by id
+            try {
+                const fp = data?.FilePath || (Array.isArray(data?.FilePaths) && data.FilePaths[0]) || (Array.isArray(data?.Files) && data.Files[0]) || data?.files || null;
+                if (fp) setUploadedFilePath(fp);
+            } catch (e) { /* ignore */ }
             setHeaderSubmitted(true);
             if (typeof setHeaderResponse === 'function') setHeaderResponse(data);
         } catch (e) {
@@ -1739,9 +1753,28 @@ const AddSalesPerfomaInvoice = () => {
                                     <View style={{ zIndex: 9999, elevation: 20 }}>
                                         <Dropdown
                                             placeholder="Select Purchase Order"
-                                            value={values.PurchaseOrderNumber || values.PurchaseOrderUUID || ''}
+                                            value={(
+                                                Array.isArray(purchaseOrderOptions) && purchaseOrderOptions.find(p => (
+                                                    String(p?.UUID) === String(values.PurchaseOrderUUID) || String(p?.Uuid) === String(values.PurchaseOrderUUID) || String(p?.OrderNo) === String(values.PurchaseOrderNumber) || String(p?.PurchaseOrderNo) === String(values.PurchaseOrderNumber)
+                                                ))
+                                            ) || values.PurchaseOrderNumber || values.PurchaseOrderUUID || ''}
                                             options={purchaseOrderOptions}
-                                            getLabel={p => (p?.OrderNo || String(p))}
+                                            getLabel={p => {
+                                                try {
+                                                    if (!p && p !== 0) return '';
+                                                    if (typeof p === 'string') return p;
+                                                    const candidates = [p?.OrderNo, p?.PurchaseOrderNo, p?.PurchaseOrderNumber, p?.OrderNumber, p?.Number, p?.Name, p?.Title, p?.DocumentNumber];
+                                                    for (const c of candidates) {
+                                                        if (c === null || c === undefined) continue;
+                                                        if (typeof c === 'string' && c.trim() !== '') return c;
+                                                        if (typeof c === 'number' || typeof c === 'boolean') return String(c);
+                                                    }
+                                                    if (p?.raw) return String(p.raw?.PurchaseOrderNo || p.raw?.OrderNo || p.raw?.Name || JSON.stringify(p.raw));
+                                                    return JSON.stringify(p);
+                                                } catch (e) {
+                                                    return String(p);
+                                                }
+                                            }}
                                             getKey={p => (p?.UUID || p)}
                                             onSelect={v => {
                                                 if (!headerEditable) { Alert.alert('Read only', 'Header is saved. Click edit to modify.'); return; }
@@ -2155,7 +2188,7 @@ const AddSalesPerfomaInvoice = () => {
                             <View>
                                 <View style={styles.tableControlsRow}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                        <Text style={{ marginRight: wp(2) }}>Show</Text>
+                                        <Text style={{ marginRight: wp(2), color:'#000000' }}>Show</Text>
                                         <Dropdown
                                             placeholder={String(pageSize)}
                                             value={String(pageSize)}
@@ -2166,12 +2199,12 @@ const AddSalesPerfomaInvoice = () => {
                                             inputBoxStyle={{ width: wp(18) }}
                                             textStyle={inputStyles.input}
                                         />
-                                        <Text style={{ marginLeft: wp(2) }}>entries</Text>
+                                        <Text style={{ marginLeft: wp(2) ,color:'#000000',}}>entries</Text>
                                     </View>
 
                                     <View style={{ flex: 1, alignItems: 'flex-end' }}>
                                         <TextInput
-                                            style={[inputStyles.box, { width: wp(40), height: hp(5), paddingHorizontal: wp(2) }]}
+                                            style={[inputStyles.box, {color:'#000000', width: wp(40), height: hp(5), paddingHorizontal: wp(2) }]}
                                             placeholder="Search..."
                                             value={tableSearch}
                                             onChangeText={t => { setTableSearch(t); setPage(1); }}
@@ -2385,6 +2418,14 @@ const AddSalesPerfomaInvoice = () => {
                                 />
                             </View>
                             <View style={styles.attachCol}>
+                                {hasDocumentAvailable() && (
+                                    <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm }}>
+                                        <Text style={inputStyles.label}>Document</Text>
+                                        <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton]} onPress={() => viewDocument({ fileName: headerForm?.PerformaNo || 'Document' })}>
+                                            <Text style={{ color: '#fff', fontWeight: '600', fontSize: rf(3.4) }}>View Document</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
                                 <Text style={inputStyles.label}>Attach file</Text>
                                 <View
                                     style={[
@@ -2443,6 +2484,7 @@ const AddSalesPerfomaInvoice = () => {
                     onDateSelect={handleDateSelect}
                     title="Select Date"
                 />
+                {(Array.isArray(expandedId) ? expandedId.includes(4) : expandedId === 4) && (
 
                 <View style={styles.footerBar}>
                     <View
@@ -2478,7 +2520,7 @@ const AddSalesPerfomaInvoice = () => {
                     <TouchableOpacity style={styles.primaryButton} onPress={handleCreateOrder}>
                         <Text style={styles.primaryButtonText}>Save & Send</Text>
                     </TouchableOpacity> */}
-                </View>
+                </View>)}
             </View>
         </>
     );
