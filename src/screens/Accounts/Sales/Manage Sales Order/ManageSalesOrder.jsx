@@ -129,7 +129,7 @@ const HeaderValidationSchema = Yup.object().shape({
   ShippingPostalCode: Yup.string().transform(_safeTrim).required('Postal Code is required'),
   ShippingCountryUUID: Yup.string().transform(_safeTrim).required('Country is required'),
   ShippingStateUUID: Yup.string().transform(_safeTrim).required('State is required'),
-  ShippingCityUUID: Yup.string().transform(_safeTrim).required('City is required'),
+  // ShippingCityUUID: Yup.string().transform(_safeTrim).required('City is required'),
 });
 
 const ManageSalesOrder = () => {
@@ -2815,7 +2815,7 @@ const ManageSalesOrder = () => {
                                 setHeaderForm(s => ({ ...s, DueDays: cleanValue }));
                                 try { if (setFieldValue) setFieldValue('DueDays', cleanValue); } catch (e) { }
                               }}
-                              placeholder="-Days-"
+                              placeholder="Days"
                               placeholderTextColor={screenTheme.textLight}
                               keyboardType="number-pad"
                               returnKeyType="done"
@@ -3152,6 +3152,7 @@ const ManageSalesOrder = () => {
                       title="Shipping Address"
                       expanded={Array.isArray(expandedIds) ? expandedIds.includes(3) : expandedIds === 3}
                       onToggle={toggleSection}
+                      style={{ marginBottom: hp(4) }}
                     >
                       <View style={styles.row}>
                         <View style={styles.col}>
@@ -3903,12 +3904,7 @@ const ManageSalesOrder = () => {
               </View>
             </AccordionSection>
           )}
-
-          {/* Section 5: Notes (full width) */}
-          {/* <AccordionSection id={5} title="Notes" expanded={expandedId === 5} onToggle={toggleSection}>
-                            <Text style={inputStyles.label}>Notes</Text>
-                            <TextInput style={styles.noteBox} multiline numberOfLines={4} value={notes} onChangeText={setNotes} placeholder="Add any remarks..." placeholderTextColor={COLORS.textLight} />
-                        </AccordionSection> */}
+ 
         </ScrollView>
 
         {(Array.isArray(expandedIds) ? expandedIds.includes(4) : expandedIds === 4) && (

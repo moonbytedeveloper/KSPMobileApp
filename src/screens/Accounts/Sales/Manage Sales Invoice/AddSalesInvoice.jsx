@@ -801,6 +801,8 @@ const AddSalesInvoice = () => {
                             const cmp2 = await getCMPUUID();
                             const env2 = await getENVUUID();
                             const linesResp = await getSalesInvoiceLines({ headerUuid: data?.UUID || hdr, cmpUuid: cmp2, envUuid: env2, start: 0, length: 1000 });
+                           console.log(linesResp,'54545');
+                           
                             const rawLines = linesResp?.Data?.Records || linesResp?.Data || linesResp || [];
                             const list = Array.isArray(rawLines) ? rawLines : [];
                             const normalized = list.map((l, idx) => ({
@@ -868,7 +870,7 @@ const AddSalesInvoice = () => {
                 const possibleMsg = extractApiMessage(linesResp, null);
                 const isErrorResp = !!(linesResp && (linesResp?.Success === false || linesResp?.IsSuccess === false || linesResp?.Status === 'Error' || linesResp?.Status === 'error' || linesResp?.Error || linesResp?.error || (possibleMsg && !linesResp?.Data)));
                 if (isErrorResp && possibleMsg) {
-                    Alert.alert('Error', possibleMsg);
+                    // Alert.alert('Success', possibleMsg);
                     if (mounted) setLinesLoading(false);
                     return;
                 }
@@ -900,6 +902,7 @@ const AddSalesInvoice = () => {
             } catch (e) {
                 const errMsg = extractApiMessage(null, e) || 'Failed to fetch invoice lines';
                 Alert.alert('Error', errMsg);
+                
                 console.warn('Failed to fetch sales invoice lines for headerUUID', errMsg);
             } finally {
                 if (mounted) setLinesLoading(false);

@@ -374,11 +374,16 @@ const LoginScreen = ({ navigation }) => {
               // Reload stored auth/env data so dashboards get allowed/selected environment immediately
               try { await checkAuthStatus(); } catch (_e) {}
               
-              // Determine user role and navigate
-              const role = user?.Data?.Roles?.[0]?.UserRoleName?.toLowerCase();
-              console.log('[LOGIN] User role:', role);
-              
-              if (role === 'super admin' || role === 'super_admin' || role === 'superadmin') {
+              // Determine user role and navigate — scan all roles for admin flags
+              const roles = user?.Data?.Roles || [];
+              const isSuperAdmin = Array.isArray(roles) && roles.some(r => {
+                const name = (r?.UserRoleName || r?.RoleName || r?.roleName || r?.name || '').toString().toLowerCase();
+                return ['super admin', 'super_admin', 'superadmin'].includes(name);
+              });
+              console.log('[LOGIN] Roles array:', roles);
+              console.log('[LOGIN] isSuperAdmin:', isSuperAdmin);
+
+              if (isSuperAdmin) {
                 setUserRole('admin');
                 navigation.replace('AdminDashboard');
               } else {

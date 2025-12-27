@@ -2738,7 +2738,7 @@ const AddSalesPerfomaInvoice = () => {
                                 <View style={styles.inputRightGroup}>
                                     <TextInput
                                         value={String(shippingCharges)}
-                                        onChangeText={setShippingCharges}
+                                        onChangeText={t => { setShippingCharges(t); setServerTotalAmount(''); }}
                                         keyboardType="numeric"
                                         style={[styles.inputBox, { color: '#000000' }]}
                                     />
@@ -2798,7 +2798,7 @@ const AddSalesPerfomaInvoice = () => {
                                 <View style={styles.inputRightGroup}>
                                     <TextInput
                                         value={String(adjustments)}
-                                        onChangeText={setAdjustments}
+                                        onChangeText={t => { setAdjustments(t); setServerTotalAmount(''); }}
                                         keyboardType="numeric"
                                         style={styles.inputBox}
                                     />

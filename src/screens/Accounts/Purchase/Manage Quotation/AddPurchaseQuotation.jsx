@@ -830,10 +830,10 @@ const AddPurchaseQuotation = () => {
   const submitHeader = async () => {
     // Validate required header fields before submitting
     const isValid = validateHeaderFields();
-    if (!isValid) {
-      Alert.alert('Validation', 'Please fill all required header fields before submitting.');
-      return;
-    }
+    // if (!isValid) {
+    //   Alert.alert('Validation', 'Please fill all required header fields before submitting.');
+    //   return;
+    // }
     setHeaderSubmitting(true);
     try {
       const subtotalNum = parseFloat(computeSubtotal()) || 0;

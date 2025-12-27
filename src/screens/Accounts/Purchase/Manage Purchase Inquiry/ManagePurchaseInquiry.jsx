@@ -143,6 +143,25 @@ const AddSalesInquiry = () => {
 
     // Line items state
     const [lineItems, setLineItems] = useState([]);
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+    const pageSizes = [5, 10, 25, 50];
+    const [searchQuery, setSearchQuery] = useState('');
+    const filteredLineItems = lineItems.filter(li => {
+        if (!searchQuery) return true;
+        const q = searchQuery.toLowerCase();
+        return (
+            (li.itemType || '').toString().toLowerCase().includes(q) ||
+            (li.itemName || '').toString().toLowerCase().includes(q) ||
+            (li.quantity || '').toString().toLowerCase().includes(q)
+        );
+    });
+
+    const totalLineItems = filteredLineItems.length;
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, totalLineItems);
+    const pagedLineItems = filteredLineItems.slice(startIndex, endIndex);
+    const totalPages = Math.max(1, Math.ceil(totalLineItems / pageSize));
     // Normalize server line objects into UI-friendly shape
     const normalizeLine = (ln, idx) => {
         const lineUuid = ln?.UUID || ln?.Id || ln?.LineUUID || ln?.lineUuid || ln?.id || null;
@@ -1860,7 +1879,32 @@ const AddSalesInquiry = () => {
                             {/* Line Items Table */}
                             {lineItems.length > 0 && (
                                 <View style={styles.tableContainer}>
-                                    <View style={styles.tableWrapper}>
+                                    {/* Top controls: show page size and search */}
+                                    <View style={styles.tableControlsRow}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <Text style={[styles.tdText, { marginRight: wp(2) }]}>Show</Text>
+                                            <Dropdown
+                                                placeholder={String(pageSize)}
+                                                value={String(pageSize)}
+                                                options={pageSizes}
+                                                onSelect={v => { setPageSize(Number(v)); setPage(1); }}
+                                                renderInModal={true}
+                                                inputBoxStyle={[inputStyles.box, { width: wp(20), paddingVertical: hp(0.6) }]}
+                                            />
+                                            <Text style={[styles.tdText, { marginLeft: wp(2) }]}>entries</Text>
+                                        </View>
+
+                                        <View style={{ width: wp(55) }}>
+                                            <TextInput
+                                                placeholder="Search by item, name"
+                                                placeholderTextColor={COLORS.textLight}
+                                                value={searchQuery}
+                                                onChangeText={t => { setSearchQuery(t); setPage(1); }}
+                                                style={[inputStyles.box, { paddingVertical: hp(0.8) }]}
+                                            />
+                                        </View>
+                                            </View>
+                                            <View style={styles.tableWrapper}>
                                         <ScrollView
                                             horizontal
                                             showsHorizontalScrollIndicator={false}
@@ -1883,10 +1927,10 @@ const AddSalesInquiry = () => {
 
                                                 {/* Table Body */}
                                                 <View style={styles.tbody}>
-                                                    {lineItems.map((item, index) => (
+                                                    {pagedLineItems.map((item, idx) => (
                                                         <View key={item.id} style={styles.tr}>
                                                             <View style={[styles.td, { width: wp(15) }]}>
-                                                                <Text style={styles.tdText}>{index + 1}</Text>
+                                                                <Text style={styles.tdText}>{startIndex + idx + 1}</Text>
                                                             </View>
                                                             <View style={[styles.td, { width: wp(50), alignItems: 'flex-start', paddingLeft: wp(2) }]}>
                                                                 <Text style={styles.tdText}>• Item Type: {item.itemType}</Text>
@@ -1914,6 +1958,42 @@ const AddSalesInquiry = () => {
                                                 </View>
                                             </View>
                                         </ScrollView>
+                                                {/* Bottom pagination controls */}
+                                                <View style={styles.paginationContainer}>
+                                                    <View style={{ flex: 1 }}>
+                                                        <Text style={styles.smallText}>
+                                                            Showing {totalLineItems === 0 ? 0 : startIndex + 1} to {endIndex} of {totalLineItems} entries
+                                                        </Text>
+                                                    </View>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                        <TouchableOpacity
+                                                            style={[styles.paginationButton, page === 1 && styles.paginationButtonDisabled]}
+                                                            disabled={page === 1}
+                                                            onPress={() => setPage(prev => Math.max(1, prev - 1))}
+                                                        >
+                                                            <Text style={styles.paginationButtonText}>{'<'}</Text>
+                                                        </TouchableOpacity>
+                                                        {Array.from({ length: totalPages }).map((_, i) => {
+                                                            const p = i + 1;
+                                                            return (
+                                                                <TouchableOpacity
+                                                                    key={p}
+                                                                    style={[styles.paginationButton, page === p && styles.paginationButtonActive]}
+                                                                    onPress={() => setPage(p)}
+                                                                >
+                                                                    <Text style={[styles.paginationButtonText, page === p && styles.paginationButtonTextActive]}>{p}</Text>
+                                                                </TouchableOpacity>
+                                                            );
+                                                        })}
+                                                        <TouchableOpacity
+                                                            style={[styles.paginationButton, page === totalPages && styles.paginationButtonDisabled]}
+                                                            disabled={page === totalPages}
+                                                            onPress={() => setPage(prev => Math.min(totalPages, prev + 1))}
+                                                        >
+                                                            <Text style={styles.paginationButtonText}>{'>'}</Text>
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                </View>
                                     </View>
                                 </View>
                             )}
@@ -2208,4 +2288,47 @@ const styles = StyleSheet.create({
         fontSize: rf(3.6),
         fontWeight: '600',
     },
+        tableControlsRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: hp(1),
+        },
+        tableTopControls: {
+            flexDirection: 'row',
+            alignItems: 'center',
+        },
+        paginationContainer: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingVertical: hp(1),
+        },
+        paginationButton: {
+            paddingHorizontal: wp(3),
+            paddingVertical: hp(0.6),
+            borderRadius: 6,
+            borderWidth: 1,
+            borderColor: '#d0d0d0',
+            marginLeft: wp(1),
+            backgroundColor: '#fff',
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        paginationButtonActive: {
+            backgroundColor: '#e4572e',
+            borderColor: '#e4572e',
+            borderRadius: 6,
+        },
+        paginationButtonDisabled: {
+            backgroundColor: '#e9ecef',
+            borderColor: '#d0d0d0',
+        },
+        paginationButtonText: {
+            color: '#4a4a4a',
+            fontSize: rf(3.6),
+        },
+        paginationButtonTextActive: {
+            color: '#fff',
+        },
 });

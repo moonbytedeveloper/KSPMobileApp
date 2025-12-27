@@ -64,22 +64,11 @@ export const UserProvider = ({ children }) => {
         
         // Set user role based on stored data (mirror LoginScreen logic)
         if (Array.isArray(roles) && roles.length > 0) {
-          const primaryRole = roles[0] || {};
-          const roleName = (
-            primaryRole?.UserRoleName ||
-            primaryRole?.RoleName ||
-            primaryRole?.roleName ||
-            primaryRole?.name ||
-            primaryRole?.Name ||
-            ''
-          ).toString().toLowerCase();
-
-          const isSuperAdmin = (
-            roleName === 'super admin' ||
-            roleName === 'super_admin' ||
-            roleName === 'superadmin'
-          );
-
+          const isSuperAdmin = roles.some(r => {
+            const name = (r?.UserRoleName || r?.RoleName || r?.roleName || r?.name || r?.Name || '').toString().toLowerCase();
+            return ['super admin', 'super_admin', 'superadmin'].includes(name);
+          });
+          console.log('[AUTH_CHECK] Resolved role from storage:', isSuperAdmin ? 'admin' : 'employee');
           setUserRole(isSuperAdmin ? 'admin' : 'employee');
         }
       } else {
