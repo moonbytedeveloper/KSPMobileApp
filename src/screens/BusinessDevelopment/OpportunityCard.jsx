@@ -383,7 +383,7 @@ const OpportunityCard = ({
         <Dropdown
           placeholder="Select Status"
           value={selected}
-          options={['Won', 'Pending', 'Lost']}
+          options={['Won', 'Lost', 'Cancelled','On Hold']}
           getLabel={(s) => s}
           getKey={(s) => s}
           hint="Select Status"

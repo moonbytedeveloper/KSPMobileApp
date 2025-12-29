@@ -1185,7 +1185,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
       Document_Date: dateOnly(documentDate || form.documentDate),
       BillUrl: billFilePath || '',
       Expense_Remarks: form.purpose,
-      documentFile: selectedAttachment ? { uri: selectedAttachment.uri, name: selectedAttachment.name || 'bill', type: selectedAttachment.type || 'application/octet-stream' } : undefined,
+      // documentFile: selectedAttachment ? { uri: selectedAttachment.uri, name: selectedAttachment.name || 'bill', type: selectedAttachment.type || 'application/octet-stream' } : undefined,
     };
 
     try {
@@ -1227,7 +1227,7 @@ const AddExpenseScreen = ({ navigation, route }) => {
       Document_Date: dateOnly(documentDate || form.documentDate),
       BillUrl: billFilePath || '',
       Expense_Remarks: form.purpose,
-      documentFile: selectedAttachment ? { uri: selectedAttachment.uri, name: selectedAttachment.name || 'bill', type: selectedAttachment.type || 'application/octet-stream' } : undefined,
+      // documentFile: selectedAttachment ? { uri: selectedAttachment.uri, name: selectedAttachment.name || 'bill', type: selectedAttachment.type || 'application/octet-stream' } : undefined,
     };
 
     try {

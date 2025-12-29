@@ -10,10 +10,10 @@ import { getUUID } from "../../api/tokenStorage";
 
 const TABS = [
   { key: "All", label: "All" },
-  { key: "BD", label: "B.D" },
-  { key: "Expense", label: "Expense" },
-  { key: "HR", label: "HR" },
-  { key: "Profile", label: "Project" },
+  // { key: "BD", label: "B.D" },
+  // { key: "Expense", label: "Expense" },
+  // { key: "HR", label: "HR" },
+  // { key: "Profile", label: "Project" },
 ];
 
 // Helper function to format time ago

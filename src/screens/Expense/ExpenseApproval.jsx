@@ -907,8 +907,10 @@ const ExpenseApproval = ({ navigation }) => {
 
       console.log('Approval response:', response);
       setApproveMode('success');
+      // clear the processing flag immediately so the button label updates
+      setProcessingApproval(false);
 
-      // Refresh the data after successful approval
+      // Refresh the data after successful approval (run after UI updated)
       if (activeTab === 'expenseToApprove') {
         await fetchExpenseToApproveData();
       } else if (activeTab === 'approvedByMe') {

@@ -739,6 +739,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonPositive: {
+    flex: 1,
     paddingVertical: hp(1.2),
     paddingHorizontal: wp(3),
     borderRadius: wp(2.5),
@@ -747,8 +748,6 @@ const styles = StyleSheet.create({
     marginHorizontal: wp(1),
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: wp(20),
-    maxWidth: wp(30),
   },
   buttonNegative: {
     flex: 1,

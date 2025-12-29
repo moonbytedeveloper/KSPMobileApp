@@ -1421,7 +1421,16 @@ const ProposalCard = ({ data, onEdit, onDelete, opportunityTitle, isOpen = false
   const [local, setLocal] = useState(data);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const handleFileViewer = () => {
-    const fileUrl = data.documentUri;
+    let fileUrl = data?.documentUri || '';
+    try {
+      const base = 'https://erp.kspconsults.com';
+      if (!/^(https?:\/\/|file:|data:)/i.test(String(fileUrl))) {
+        if (String(fileUrl).startsWith('/')) fileUrl = base + fileUrl;
+        else if (fileUrl) fileUrl = base + '/' + fileUrl;
+      }
+    } catch (e) { /* ignore */ }
+    console.log('Opening file viewer for URL:', fileUrl);
+
     const isNonEmptyString = typeof fileUrl === 'string' && fileUrl.trim().length > 0;
     if (!isNonEmptyString) {
       Alert.alert('File not available', 'No document found to preview.');
@@ -1434,9 +1443,9 @@ const ProposalCard = ({ data, onEdit, onDelete, opportunityTitle, isOpen = false
     }
     const extension = fileUrl.slice(dotIdx + 1).toLowerCase();
     if (extension === 'pdf') {
-      navigation.navigate('FileViewerScreen', { pdfUrl: fileUrl, opportunityTitle: opportunityTitle });
+      navigation.navigate('FileViewerScreen', { pdfUrl: fileUrl, opportunityTitle });
     } else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension)) {
-      navigation.navigate('ImageViewerScreen', { imageUrl: fileUrl, opportunityTitle: opportunityTitle });
+      navigation.navigate('ImageViewerScreen', { imageUrl: fileUrl, opportunityTitle });
     } else {
       Alert.alert('Unsupported file type', 'This file type cannot be opened.');
     }
