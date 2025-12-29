@@ -801,8 +801,8 @@ const AddSalesInvoice = () => {
                             const cmp2 = await getCMPUUID();
                             const env2 = await getENVUUID();
                             const linesResp = await getSalesInvoiceLines({ headerUuid: data?.UUID || hdr, cmpUuid: cmp2, envUuid: env2, start: 0, length: 1000 });
-                           console.log(linesResp,'54545');
-                           
+                            console.log(linesResp, '54545');
+
                             const rawLines = linesResp?.Data?.Records || linesResp?.Data || linesResp || [];
                             const list = Array.isArray(rawLines) ? rawLines : [];
                             const normalized = list.map((l, idx) => ({
@@ -902,7 +902,7 @@ const AddSalesInvoice = () => {
             } catch (e) {
                 const errMsg = extractApiMessage(null, e) || 'Failed to fetch invoice lines';
                 Alert.alert('Error', errMsg);
-                
+
                 console.warn('Failed to fetch sales invoice lines for headerUUID', errMsg);
             } finally {
                 if (mounted) setLinesLoading(false);
@@ -2915,15 +2915,53 @@ const AddSalesInvoice = () => {
                                                                     disabled={currentPage <= 1}
                                                                     onPress={() => setPage(p => Math.max(1, p - 1))}
                                                                 >
-                                                                    <Text style={styles.pageButtonText}>Previous</Text>
+                                                                    <Text style={{ color: COLORS.textMuted }}>Previous</Text>
                                                                 </TouchableOpacity>
-                                                                <Text style={{ marginHorizontal: wp(2) }}>{currentPage}</Text>
+                                                                {(() => {
+                                                                    const pages = [];
+                                                                    const delta = 2;
+                                                                    const left = Math.max(1, currentPage - delta);
+                                                                    const right = Math.min(totalPages, currentPage + delta);
+
+                                                                    if (left > 1) {
+                                                                        pages.push(1);
+                                                                        if (left > 2) pages.push('left-ellipsis');
+                                                                    }
+
+                                                                    for (let i = left; i <= right; i++) pages.push(i);
+
+                                                                    if (right < totalPages) {
+                                                                        if (right < totalPages - 1) pages.push('right-ellipsis');
+                                                                        pages.push(totalPages);
+                                                                    }
+
+                                                                    return pages.map((pidx, i) => {
+                                                                        if (pidx === 'left-ellipsis' || pidx === 'right-ellipsis') {
+                                                                            return (
+                                                                                <Text key={`e-${i}`} style={{ marginHorizontal: wp(1), color: COLORS.textMuted }}>...</Text>
+                                                                            );
+                                                                        }
+
+                                                                        const isActive = Number(pidx) === currentPage;
+
+                                                                        return (
+                                                                            <TouchableOpacity
+                                                                                key={`p-${pidx}-${i}`}
+                                                                                onPress={() => setPage(Number(pidx))}
+                                                                                style={[styles.pageButton, isActive && styles.pageButtonActive, { marginHorizontal: wp(0.6) }]}
+                                                                            >
+                                                                                <Text style={[styles.pageButtonText, isActive && styles.pageButtonTextActive]}>{currentPage}</Text>
+                                                                            </TouchableOpacity>
+                                                                        );
+                                                                    });
+                                                                })()}
+                                                                {/* <Text style={{ marginHorizontal: wp(2) }}>{currentPage}</Text> */}
                                                                 <TouchableOpacity
-                                                                    style={styles.pageButton}
+                                                                    style={[styles.pageButton, { marginLeft: wp(2) }]}
                                                                     disabled={currentPage >= totalPages}
                                                                     onPress={() => setPage(p => Math.min(totalPages, p + 1))}
                                                                 >
-                                                                    <Text style={styles.pageButtonText}>Next</Text>
+                                                                    <Text style={{ color: COLORS.textMuted }}>Next</Text>
                                                                 </TouchableOpacity>
                                                             </View>
                                                         </View>
@@ -3143,10 +3181,10 @@ const AddSalesInvoice = () => {
                                 />
                             </View>
                             <View style={styles.attachCol}>
-                                        {hasDocumentAvailable() && (
+                                {hasDocumentAvailable() && (
                                     <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm }}>
                                         <Text style={inputStyles.label}>Document</Text>
-                                            <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton,{ marginTop: SPACING.sm }]} onPress={() => viewDocument({ fileName: headerForm?.SalesInvoiceNo || 'Document' })}>
+                                        <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton, { marginTop: SPACING.sm }]} onPress={() => viewDocument({ fileName: headerForm?.SalesInvoiceNo || 'Document' })}>
                                             <Text style={{ color: '#fff', fontWeight: '600', fontSize: rf(3.4) }}>View Document</Text>
                                         </TouchableOpacity>
                                     </View>
@@ -3825,6 +3863,12 @@ const styles = StyleSheet.create({
         paddingVertical: hp(0.6),
         paddingHorizontal: wp(3),
         borderRadius: wp(0.8),
+    },
+    pageButtonActive: {
+        backgroundColor: COLORS.primary,
+    },
+    pageButtonTextActive: {
+        color: '#fff',
     },
     pageButtonText: {
         color: COLORS.text,

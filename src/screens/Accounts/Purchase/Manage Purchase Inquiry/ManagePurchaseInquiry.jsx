@@ -9,7 +9,7 @@ import { COLORS, TYPOGRAPHY, inputStyles, formStyles } from '../../../styles/sty
 import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
-import { addSalesInquiry, getCustomers, getItemTypes, getItems, getUnits, addSalesHeader, addPurchaseInquiryHeader, addSalesLine, addPurchaseInquiryLine, updateSalesHeader, getSalesHeader, getSalesLines, updateSalesLine, deleteSalesLine, getPurchasequotationVendor, getCurrencies, getProjects, getPurchaseInquiryHeader, getPurchaseInquiryLines, updatePurchaseInquiryHeader, updatePurchaseInquiryLine, deletePurchaseInquiryLine } from '../../../../api/authServices';
+import { addSalesInquiry, getCustomers, getItemTypes, getItems, getUnits, addSalesHeader, addPurchaseInquiryHeader, addPurchaseInquiryLine, getPurchasequotationVendor, getCurrencies, getProjects, getPurchaseInquiryHeader, getPurchaseInquiryLines, updatePurchaseInquiryHeader, updatePurchaseInquiryLine, deletePurchaseInquiryLine } from '../../../../api/authServices';
 import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { getErrorMessage } from '../../../../utils/errorMessage';
 import { uiDateToApiDate } from '../../../../utils/dateUtils';
@@ -296,6 +296,48 @@ const AddSalesInquiry = () => {
         } catch (e) {
             console.warn('resetAllState error', e);
         }
+    };
+    // Render numbered page buttons (with simple ellipses for long ranges)
+    const renderPageButtons = (currentPage, totalPages) => {
+        // if (!totalPages || totalPages <= 1) return null;
+        const buttons = [];
+        const pushPage = (p) => {
+            buttons.push(
+                <TouchableOpacity
+                    key={`p-${p}`}
+                    style={[styles.pageButton, currentPage === p && styles.pageButtonActive, { marginHorizontal: wp(0.8) }]}
+                    onPress={() => setPage(p)}
+                    disabled={currentPage === p}
+                >
+                    <Text style={[styles.pageButtonText, currentPage === p && styles.pageButtonTextActive]}>{String(p)}</Text>
+                </TouchableOpacity>
+            );
+        };
+
+        // If few pages, show all
+        if (totalPages <= 7) {
+            for (let i = 1; i <= totalPages; i++) pushPage(i);
+            return buttons;
+        }
+
+        // Always show first
+        pushPage(1);
+        let left = Math.max(2, currentPage - 1);
+        let right = Math.min(totalPages - 1, currentPage + 1);
+
+        if (left > 2) {
+            buttons.push(<Text key="ell-left" style={{ marginHorizontal: wp(1) }}>...</Text>);
+        }
+
+        for (let i = left; i <= right; i++) pushPage(i);
+
+        if (right < totalPages - 1) {
+            buttons.push(<Text key="ell-right" style={{ marginHorizontal: wp(1) }}>...</Text>);
+        }
+
+        // Always show last
+        pushPage(totalPages);
+        return buttons;
     };
 
     // Clear local state when this screen loses focus so next open is fresh
@@ -1021,7 +1063,7 @@ const AddSalesInquiry = () => {
                     const uuid = found?.UUID || found?.Uuid || found?.Id || found?.id || null;
                     setCurrencyUuid(uuid);
                     if (formikSetFieldValueRef && formikSetFieldValueRef.current) {
-                        try { formikSetFieldValueRef.current('CurrencyUUID', uuid || ''); } catch (_) {}
+                        try { formikSetFieldValueRef.current('CurrencyUUID', uuid || ''); } catch (_) { }
                     }
                 }
             }
@@ -1882,7 +1924,7 @@ const AddSalesInquiry = () => {
                                     {/* Top controls: show page size and search */}
                                     <View style={styles.tableControlsRow}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                            <Text style={[styles.tdText, { marginRight: wp(2) }]}>Show</Text>
+                                            <Text style={[{ color: '#000000', marginRight: wp(2) }]}>Show</Text>
                                             <Dropdown
                                                 placeholder={String(pageSize)}
                                                 value={String(pageSize)}
@@ -1891,20 +1933,20 @@ const AddSalesInquiry = () => {
                                                 renderInModal={true}
                                                 inputBoxStyle={[inputStyles.box, { width: wp(20), paddingVertical: hp(0.6) }]}
                                             />
-                                            <Text style={[styles.tdText, { marginLeft: wp(2) }]}>entries</Text>
                                         </View>
 
-                                        <View style={{ width: wp(55) }}>
+                                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
+                                            <Text style={[{ color: '#000000', marginRight: wp(1) }]}>entries</Text>
                                             <TextInput
-                                                placeholder="Search by item, name"
+                                                placeholder="Search..."
                                                 placeholderTextColor={COLORS.textLight}
                                                 value={searchQuery}
                                                 onChangeText={t => { setSearchQuery(t); setPage(1); }}
-                                                style={[inputStyles.box, { paddingVertical: hp(0.8) }]}
+                                                style={[inputStyles.box, { color: '#000000', width: wp(40), paddingHorizontal: wp(2) }]}
                                             />
                                         </View>
-                                            </View>
-                                            <View style={styles.tableWrapper}>
+                                    </View>
+                                    <View style={styles.tableWrapper}>
                                         <ScrollView
                                             horizontal
                                             showsHorizontalScrollIndicator={false}
@@ -1927,73 +1969,85 @@ const AddSalesInquiry = () => {
 
                                                 {/* Table Body */}
                                                 <View style={styles.tbody}>
-                                                    {pagedLineItems.map((item, idx) => (
-                                                        <View key={item.id} style={styles.tr}>
-                                                            <View style={[styles.td, { width: wp(15) }]}>
-                                                                <Text style={styles.tdText}>{startIndex + idx + 1}</Text>
-                                                            </View>
-                                                            <View style={[styles.td, { width: wp(50), alignItems: 'flex-start', paddingLeft: wp(2) }]}>
-                                                                <Text style={styles.tdText}>• Item Type: {item.itemType}</Text>
-                                                                <Text style={styles.tdText}>• Name: {item.itemName}</Text>
-                                                            </View>
-                                                            <View style={[styles.td, { width: wp(20) }]}>
-                                                                <Text style={styles.tdText}>{item.quantity}</Text>
-                                                            </View>
-                                                            <View style={[styles.tdAction, { width: wp(25) }]}>
-                                                                <TouchableOpacity
-                                                                    style={styles.actionButton}
-                                                                    onPress={() => handleEditItem(item.id)}
-                                                                >
-                                                                    <Icon name="edit" size={rf(3.6)} color="#fff" />
-                                                                </TouchableOpacity>
-                                                                <TouchableOpacity
-                                                                    style={[styles.actionButton, { marginLeft: wp(2) }]}
-                                                                    onPress={() => handleDeleteItem(item.id)}
-                                                                >
-                                                                    <Icon name="delete" size={rf(3.6)} color="#fff" />
-                                                                </TouchableOpacity>
-                                                            </View>
-                                                        </View>
-                                                    ))}
+                                                    {(() => {
+                                                        const q = String(searchQuery || '').trim().toLowerCase();
+                                                        const filtered = q ? lineItems.filter(it => {
+                                                            return (
+                                                                String(it.name || '').toLowerCase().includes(q) ||
+                                                                String(it.itemType || '').toLowerCase().includes(q) ||
+                                                                String(it.desc || '').toLowerCase().includes(q) ||
+                                                                String(it.hsn || '').toLowerCase().includes(q)
+                                                            );
+                                                        }) : lineItems;
+                                                        const total = filtered.length;
+                                                        const ps = Number(pageSize) || 10;
+                                                        const totalPages = Math.max(1, Math.ceil(total / ps));
+                                                        const currentPage = Math.min(Math.max(1, page), totalPages);
+                                                        const start = (currentPage - 1) * ps;
+                                                        const end = Math.min(start + ps, total);
+                                                        const visible = filtered.slice(start, end);
+
+                                                        return (
+                                                            <>
+                                                                {pagedLineItems.map((item, idx) => (
+                                                                    <View key={item.id} style={styles.tr}>
+                                                                        <View style={[styles.td, { width: wp(15) }]}>
+                                                                            <Text style={styles.tdText}>{startIndex + idx + 1}</Text>
+                                                                        </View>
+                                                                        <View style={[styles.td, { width: wp(50), alignItems: 'flex-start', paddingLeft: wp(2) }]}>
+                                                                            <Text style={styles.tdText}>• Item Type: {item.itemType}</Text>
+                                                                            <Text style={styles.tdText}>• Name: {item.itemName}</Text>
+                                                                        </View>
+                                                                        <View style={[styles.td, { width: wp(20) }]}>
+                                                                            <Text style={styles.tdText}>{item.quantity}</Text>
+                                                                        </View>
+                                                                        <View style={[styles.tdAction, { width: wp(25) }]}>
+                                                                            <TouchableOpacity
+                                                                                style={styles.actionButton}
+                                                                                onPress={() => handleEditItem(item.id)}
+                                                                            >
+                                                                                <Icon name="edit" size={rf(3.6)} color="#fff" />
+                                                                            </TouchableOpacity>
+                                                                            <TouchableOpacity
+                                                                                style={[styles.actionButton, { marginLeft: wp(2) }]}
+                                                                                onPress={() => handleDeleteItem(item.id)}
+                                                                            >
+                                                                                <Icon name="delete" size={rf(3.6)} color="#fff" />
+                                                                            </TouchableOpacity>
+                                                                        </View>
+                                                                    </View>
+                                                                ))}
+                                                                <View style={styles.paginationContainer}>
+                                                                    <View style={{ flex: 1 }}>
+                                                                        <Text style={[{ color: COLORS.textMuted }]}>
+                                                                            Showing {totalLineItems === 0 ? 0 : startIndex + 1} to {endIndex} of {totalLineItems} entries
+                                                                        </Text>
+                                                                    </View>
+                                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                                        <TouchableOpacity
+                                                                            style={[styles.pageButton, { marginRight: wp(2) }]}
+                                                                            disabled={currentPage <= 1}
+                                                                            onPress={() => setPage(p => Math.max(1, p - 1))}
+                                                                        >
+                                                                            <Text style={styles.pageButtonText}>Previous</Text>
+                                                                        </TouchableOpacity>
+                                                                        {renderPageButtons(currentPage, totalPages)}
+
+                                                                        <TouchableOpacity
+                                                                            style={[styles.pageButton, { marginLeft: wp(2) }]}
+                                                                            disabled={currentPage >= totalPages}
+                                                                            onPress={() => setPage(p => Math.min(totalPages, p + 1))}
+                                                                        >
+                                                                            <Text style={styles.pageButtonText}>Next</Text>
+                                                                        </TouchableOpacity>
+                                                                    </View>
+                                                                </View>
+                                                            </>);
+                                                    })()}
                                                 </View>
                                             </View>
                                         </ScrollView>
-                                                {/* Bottom pagination controls */}
-                                                <View style={styles.paginationContainer}>
-                                                    <View style={{ flex: 1 }}>
-                                                        <Text style={styles.smallText}>
-                                                            Showing {totalLineItems === 0 ? 0 : startIndex + 1} to {endIndex} of {totalLineItems} entries
-                                                        </Text>
-                                                    </View>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                        <TouchableOpacity
-                                                            style={[styles.paginationButton, page === 1 && styles.paginationButtonDisabled]}
-                                                            disabled={page === 1}
-                                                            onPress={() => setPage(prev => Math.max(1, prev - 1))}
-                                                        >
-                                                            <Text style={styles.paginationButtonText}>{'<'}</Text>
-                                                        </TouchableOpacity>
-                                                        {Array.from({ length: totalPages }).map((_, i) => {
-                                                            const p = i + 1;
-                                                            return (
-                                                                <TouchableOpacity
-                                                                    key={p}
-                                                                    style={[styles.paginationButton, page === p && styles.paginationButtonActive]}
-                                                                    onPress={() => setPage(p)}
-                                                                >
-                                                                    <Text style={[styles.paginationButtonText, page === p && styles.paginationButtonTextActive]}>{p}</Text>
-                                                                </TouchableOpacity>
-                                                            );
-                                                        })}
-                                                        <TouchableOpacity
-                                                            style={[styles.paginationButton, page === totalPages && styles.paginationButtonDisabled]}
-                                                            disabled={page === totalPages}
-                                                            onPress={() => setPage(prev => Math.min(totalPages, prev + 1))}
-                                                        >
-                                                            <Text style={styles.paginationButtonText}>{'>'}</Text>
-                                                        </TouchableOpacity>
-                                                    </View>
-                                                </View>
+
                                     </View>
                                 </View>
                             )}
@@ -2036,38 +2090,38 @@ const AddSalesInquiry = () => {
                 />
                 {(Array.isArray(expandedId) ? expandedId.includes(4) : expandedId === 4) && (
 
-                <View style={styles.footerBar}>
-                    <View
-                        style={[
-                            formStyles.actionsRow,
-                            {
-                                justifyContent: 'space-between',
-                                paddingHorizontal: wp(3.5),
-                                paddingVertical: hp(1),
-                            },
-                        ]}
-                    >
-                        <TouchableOpacity
-                            activeOpacity={0.85}
-                            style={[formStyles.primaryBtn, { paddingVertical: hp(1.4) }]}
-                            onPress={handleCreateOrder}
-                            disabled={false}
+                    <View style={styles.footerBar}>
+                        <View
+                            style={[
+                                formStyles.actionsRow,
+                                {
+                                    justifyContent: 'space-between',
+                                    paddingHorizontal: wp(3.5),
+                                    paddingVertical: hp(1),
+                                },
+                            ]}
                         >
-                            <Text style={formStyles.primaryBtnText}>
-                                Submit
-                                {/* {isSubmitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Submit')} */}
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            activeOpacity={0.85}
-                            style={formStyles.cancelBtn}
-                            onPress={handleCancel}
-                        >
-                            <Text style={formStyles.cancelBtnText}>Cancel</Text>
-                        </TouchableOpacity>
-                    </View>
+                            <TouchableOpacity
+                                activeOpacity={0.85}
+                                style={[formStyles.primaryBtn, { paddingVertical: hp(1.4) }]}
+                                onPress={handleCreateOrder}
+                                disabled={false}
+                            >
+                                <Text style={formStyles.primaryBtnText}>
+                                    Submit
+                                    {/* {isSubmitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Submit')} */}
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                activeOpacity={0.85}
+                                style={formStyles.cancelBtn}
+                                onPress={handleCancel}
+                            >
+                                <Text style={formStyles.cancelBtnText}>Cancel</Text>
+                            </TouchableOpacity>
+                        </View>
 
-                </View>)}
+                    </View>)}
             </View>
         </>
     );
@@ -2085,6 +2139,23 @@ const styles = StyleSheet.create({
     line: {
         borderBottomColor: COLORS.border,
         borderBottomWidth: hp(0.2),
+    },
+
+    pageButton: {
+        backgroundColor: '#e5e7eb',
+        paddingVertical: hp(0.6),
+        paddingHorizontal: wp(3),
+        borderRadius: wp(0.8),
+    },
+    pageButtonText: {
+        color: COLORS.text,
+        fontWeight: '600',
+    },
+    pageButtonActive: {
+        backgroundColor: COLORS.primary,
+    },
+    pageButtonTextActive: {
+        color: '#fff',
     },
     headerSeparator: {
         height: 1,
@@ -2288,47 +2359,47 @@ const styles = StyleSheet.create({
         fontSize: rf(3.6),
         fontWeight: '600',
     },
-        tableControlsRow: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: hp(1),
-        },
-        tableTopControls: {
-            flexDirection: 'row',
-            alignItems: 'center',
-        },
-        paginationContainer: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            paddingVertical: hp(1),
-        },
-        paginationButton: {
-            paddingHorizontal: wp(3),
-            paddingVertical: hp(0.6),
-            borderRadius: 6,
-            borderWidth: 1,
-            borderColor: '#d0d0d0',
-            marginLeft: wp(1),
-            backgroundColor: '#fff',
-            alignItems: 'center',
-            justifyContent: 'center',
-        },
-        paginationButtonActive: {
-            backgroundColor: '#e4572e',
-            borderColor: '#e4572e',
-            borderRadius: 6,
-        },
-        paginationButtonDisabled: {
-            backgroundColor: '#e9ecef',
-            borderColor: '#d0d0d0',
-        },
-        paginationButtonText: {
-            color: '#4a4a4a',
-            fontSize: rf(3.6),
-        },
-        paginationButtonTextActive: {
-            color: '#fff',
-        },
+    tableControlsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: wp(1.8),
+    },
+    tableTopControls: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    paginationContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: wp(2),
+    },
+    paginationButton: {
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(0.6),
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#d0d0d0',
+        marginLeft: wp(1),
+        backgroundColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    paginationButtonActive: {
+        backgroundColor: '#e4572e',
+        borderColor: '#e4572e',
+        borderRadius: 6,
+    },
+    paginationButtonDisabled: {
+        backgroundColor: '#e9ecef',
+        borderColor: '#d0d0d0',
+    },
+    paginationButtonText: {
+        color: '#4a4a4a',
+        fontSize: rf(3.6),
+    },
+    paginationButtonTextActive: {
+        color: '#fff',
+    },
 });

@@ -2619,12 +2619,18 @@ const ManageSalesOrder = () => {
                     onToggle={() => { if (headerSaved && !isEditingHeader) return; toggleSection(1); }}
                     rightActions={headerSaved ? (
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: wp(2) }}>
-                        <TouchableOpacity onPress={() => { /* no-op check */ }} style={{ marginRight: wp(3) }}>
+                        {/* <TouchableOpacity onPress={() => {   }} style={{ marginRight: wp(3) }}>
                           <Icon name="check-circle" size={rf(4)} />
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => { setIsEditingHeader(true); setHeaderSaved(false); setExpandedIds([1]); }}>
                           <Icon name="edit" size={rf(4)} color={themeColors.success} />
-                        </TouchableOpacity>
+                        </TouchableOpacity> */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
+                          <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
+                          <TouchableOpacity >
+                            <Icon name="edit" size={rf(5)} onPress={() => { setIsEditingHeader(true); setHeaderSaved(false); setExpandedIds([1]); }} color={COLORS.primary} />
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     ) : null}
                   >
@@ -3649,9 +3655,11 @@ const ManageSalesOrder = () => {
                                 ))}
 
                                 <View style={styles.paginationRow}>
-                                  <Text style={{ color: COLORS.textMuted }}>
-                                    Showing {total === 0 ? 0 : start + 1} to {end} of {total} entries
-                                  </Text>
+                                  <View>
+                                    <Text style={{ color: COLORS.textMuted }}>
+                                      Showing {total === 0 ? 0 : start + 1} to {end} of {total} entries
+                                    </Text>
+                                  </View>
                                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                     <TouchableOpacity
                                       style={[styles.pageButton, { marginRight: wp(2) }]}
@@ -3662,7 +3670,7 @@ const ManageSalesOrder = () => {
                                     </TouchableOpacity>
                                     {renderPageButtons(currentPage, totalPages)}
                                     <TouchableOpacity
-                                      style={[styles.pageButton,{ marginLeft: wp(2) }]}
+                                      style={[styles.pageButton, { marginLeft: wp(2) }]}
                                       disabled={currentPage >= totalPages}
                                       onPress={() => setPage(p => Math.min(totalPages, p + 1))}
                                     >
@@ -3904,7 +3912,7 @@ const ManageSalesOrder = () => {
               </View>
             </AccordionSection>
           )}
- 
+
         </ScrollView>
 
         {(Array.isArray(expandedIds) ? expandedIds.includes(4) : expandedIds === 4) && (

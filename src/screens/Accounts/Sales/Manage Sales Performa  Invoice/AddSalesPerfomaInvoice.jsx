@@ -387,29 +387,29 @@ const AddSalesPerfomaInvoice = () => {
             try {
                 // Refresh lookups first so mappings (UUID->display) work correctly
                 try { await loadLookups(); } catch (e) { console.warn('loadLookups failed on return', e); }
-                    // Also refresh master items list (item dropdowns) so item fields don't appear blank
-                    try {
-                        setMasterItemsLoading(true);
-                        const c = await getCMPUUID();
-                        const e = await getENVUUID();
-                        const resp = await getItems({ cmpUuid: c, envUuid: e, mode: "Sales" }).catch(err => { console.warn('getItems failed on return', err); return null; });
-                        const rawList = resp?.Data?.Records || resp?.Data || resp || [];
-                        const list = Array.isArray(rawList) ? rawList : [];
-                        const normalized = list.map(it => ({
-                            name: it?.Name || it?.name || it?.ItemName || '',
-                            sku: it?.SKU || it?.sku || it?.Sku || it?.ItemCode || '',
-                            rate: (it?.Rate ?? it?.rate ?? it?.Price) || 0,
-                            desc: it?.Description || it?.description || it?.Desc || '',
-                            hsn: it?.HSNCode || it?.HSN || it?.hsn || it?.HSNSACNO || '-',
-                            uuid: it?.UUID || it?.Uuid || it?.uuid || it?.Id || it?.id || null,
-                            raw: it,
-                        }));
-                        setMasterItems(normalized);
-                    } catch (err) {
-                        console.warn('refresh master items failed on return', err);
-                    } finally {
-                        try { setMasterItemsLoading(false); } catch (e) { }
-                    }
+                // Also refresh master items list (item dropdowns) so item fields don't appear blank
+                try {
+                    setMasterItemsLoading(true);
+                    const c = await getCMPUUID();
+                    const e = await getENVUUID();
+                    const resp = await getItems({ cmpUuid: c, envUuid: e, mode: "Sales" }).catch(err => { console.warn('getItems failed on return', err); return null; });
+                    const rawList = resp?.Data?.Records || resp?.Data || resp || [];
+                    const list = Array.isArray(rawList) ? rawList : [];
+                    const normalized = list.map(it => ({
+                        name: it?.Name || it?.name || it?.ItemName || '',
+                        sku: it?.SKU || it?.sku || it?.Sku || it?.ItemCode || '',
+                        rate: (it?.Rate ?? it?.rate ?? it?.Price) || 0,
+                        desc: it?.Description || it?.description || it?.Desc || '',
+                        hsn: it?.HSNCode || it?.HSN || it?.hsn || it?.HSNSACNO || '-',
+                        uuid: it?.UUID || it?.Uuid || it?.uuid || it?.Id || it?.id || null,
+                        raw: it,
+                    }));
+                    setMasterItems(normalized);
+                } catch (err) {
+                    console.warn('refresh master items failed on return', err);
+                } finally {
+                    try { setMasterItemsLoading(false); } catch (e) { }
+                }
                 const hdr = headerUUID || route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.UUID || null;
                 if (hdr) {
                     setPrefillLoading(true);
@@ -2545,7 +2545,7 @@ const AddSalesPerfomaInvoice = () => {
                             <View>
                                 <View style={styles.tableControlsRow}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                        <Text style={{ marginRight: wp(2) }}>Show</Text>
+                                        <Text style={{ marginRight: wp(2), color: '#000000' }}>Show</Text>
                                         <Dropdown
                                             placeholder={String(pageSize)}
                                             value={String(pageSize)}
@@ -2556,12 +2556,12 @@ const AddSalesPerfomaInvoice = () => {
                                             inputBoxStyle={{ width: wp(18) }}
                                             textStyle={inputStyles.input}
                                         />
-                                        <Text style={{ marginLeft: wp(2) }}>entries</Text>
+                                        <Text style={{ marginLeft: wp(2), color: '#000000' }}>entries</Text>
                                     </View>
 
                                     <View style={{ flex: 1, alignItems: 'flex-end' }}>
                                         <TextInput
-                                            style={[inputStyles.box, { width: wp(40), height: hp(5), paddingHorizontal: wp(2) }]}
+                                            style={[inputStyles.box, { width: wp(40), height: hp(5), paddingHorizontal: wp(2), color: '#000000' }]}
                                             placeholder="Search..."
                                             value={tableSearch}
                                             onChangeText={t => { setTableSearch(t); setPage(1); }}
@@ -2654,7 +2654,7 @@ const AddSalesPerfomaInvoice = () => {
                                                             </Text>
                                                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                                                 <TouchableOpacity
-                                                                    style={{ paddingHorizontal: wp(3), paddingVertical: hp(0.6), borderRadius: 6, borderWidth: 1, borderColor: COLORS.border, marginRight: wp(2), backgroundColor: currentPage <= 1 ? '#f3f4f6' : 'transparent' }}
+                                                                    style={[styles.pageButton, { marginRight: wp(2) }]}
                                                                     disabled={currentPage <= 1}
                                                                     onPress={() => setPage(p => Math.max(1, p - 1))}
                                                                 >
@@ -2692,24 +2692,16 @@ const AddSalesPerfomaInvoice = () => {
                                                                             <TouchableOpacity
                                                                                 key={`p-${pidx}-${i}`}
                                                                                 onPress={() => setPage(Number(pidx))}
-                                                                                style={{
-                                                                                    paddingHorizontal: wp(3),
-                                                                                    paddingVertical: hp(0.6),
-                                                                                    borderRadius: 6,
-                                                                                    borderWidth: 1,
-                                                                                    borderColor: isActive ? COLORS.primary : COLORS.border,
-                                                                                    backgroundColor: isActive ? COLORS.primary : 'transparent',
-                                                                                    marginHorizontal: wp(0.5),
-                                                                                }}
+                                                                                style={[styles.pageButton, isActive && styles.pageButtonActive, { marginHorizontal: wp(0.6) }]}
                                                                             >
-                                                                                <Text style={{ color: isActive ? '#fff' : COLORS.text }}>{String(pidx)}</Text>
+                                                                                <Text style={[styles.pageButtonText, isActive && styles.pageButtonTextActive]}>{String(pidx)}</Text>
                                                                             </TouchableOpacity>
                                                                         );
                                                                     });
                                                                 })()}
 
                                                                 <TouchableOpacity
-                                                                    style={{ paddingHorizontal: wp(3), paddingVertical: hp(0.6), borderRadius: 6, borderWidth: 1, borderColor: COLORS.border, marginLeft: wp(2), backgroundColor: currentPage >= totalPages ? '#f3f4f6' : 'transparent' }}
+                                                                    style={[styles.pageButton, { marginLeft: wp(2) }]}
                                                                     disabled={currentPage >= totalPages}
                                                                     onPress={() => setPage(p => Math.min(totalPages, p + 1))}
                                                                 >
@@ -2917,8 +2909,8 @@ const AddSalesPerfomaInvoice = () => {
                                     <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm }}>
                                         <Text style={inputStyles.label}>Document</Text>
                                         {hasDocumentAvailable() && (
-                                            <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton,{ marginTop: SPACING.sm }]} onPress={() => viewDocument({ fileName: headerForm?.PerformaNo || 'Document' })}>
-                                            <Text style={{ color: '#fff', fontWeight: '600', fontSize: rf(3.4) }}>View Document</Text>
+                                            <TouchableOpacity activeOpacity={0.6} style={[styles.uploadButton, { marginTop: SPACING.sm }]} onPress={() => viewDocument({ fileName: headerForm?.PerformaNo || 'Document' })}>
+                                                <Text style={{ color: '#fff', fontWeight: '600', fontSize: rf(3.4) }}>View Document</Text>
                                             </TouchableOpacity>
                                         )}
                                     </View>
@@ -3596,6 +3588,12 @@ const styles = StyleSheet.create({
         paddingVertical: hp(0.6),
         paddingHorizontal: wp(3),
         borderRadius: wp(0.8),
+    },
+    pageButtonActive: {
+        backgroundColor: COLORS.primary,
+    },
+      pageButtonTextActive: {
+        color: '#fff',
     },
     pageButtonText: {
         color: COLORS.text,

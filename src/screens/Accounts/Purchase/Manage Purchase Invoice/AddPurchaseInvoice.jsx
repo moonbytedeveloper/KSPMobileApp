@@ -1275,7 +1275,48 @@ const AddPurchaseInvoice = () => {
             console.warn('refreshHeaderTotals error', e?.message || e);
         }
     };
+    // Render numbered page buttons (with simple ellipses for long ranges)
+    const renderPageButtons = (currentPage, totalPages) => {
+        // if (!totalPages || totalPages <= 1) return null;
+        const buttons = [];
+        const pushPage = (p) => {
+            buttons.push(
+                <TouchableOpacity
+                    key={`p-${p}`}
+                    style={[styles.pageButton, currentPage === p && styles.pageButtonActive, { marginHorizontal: wp(0.8) }]}
+                    onPress={() => setPage(p)}
+                    disabled={currentPage === p}
+                >
+                    <Text style={[styles.pageButtonText, currentPage === p && styles.pageButtonTextActive]}>{String(p)}</Text>
+                </TouchableOpacity>
+            );
+        };
 
+        // If few pages, show all
+        if (totalPages <= 7) {
+            for (let i = 1; i <= totalPages; i++) pushPage(i);
+            return buttons;
+        }
+
+        // Always show first
+        pushPage(1);
+        let left = Math.max(2, currentPage - 1);
+        let right = Math.min(totalPages - 1, currentPage + 1);
+
+        if (left > 2) {
+            buttons.push(<Text key="ell-left" style={{ marginHorizontal: wp(1) }}>...</Text>);
+        }
+
+        for (let i = left; i <= right; i++) pushPage(i);
+
+        if (right < totalPages - 1) {
+            buttons.push(<Text key="ell-right" style={{ marginHorizontal: wp(1) }}>...</Text>);
+        }
+
+        // Always show last
+        pushPage(totalPages);
+        return buttons;
+    };
     // State & handlers used by the Item Details form (Section 4)
     const [currentItem, setCurrentItem] = useState({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
     const [editItemId, setEditItemId] = useState(null);
@@ -1538,10 +1579,10 @@ const AddPurchaseInvoice = () => {
             if (!s.city || String(s.city).trim() === '') missing.push('Shipping City');
         }
 
-        if (missing.length) {
-            Alert.alert('Validation', 'Please fill required fields:\n' + missing.join('\n'));
-            return false;
-        }
+        // if (missing.length) {
+        //     Alert.alert('Validation', 'Please fill required fields:\n' + missing.join('\n'));
+        //     return false;
+        // }
         return true;
     };
     const submitHeader = async () => {
@@ -2049,9 +2090,9 @@ const AddPurchaseInvoice = () => {
                                             disabled={headerSubmitting || (headerSubmitted && !headerEditable)}
                                         >
                                             {/* Submit button */}
-                                            <View style={{ marginTop: hp(1.5), flexDirection: 'row', justifyContent: 'flex-end' }}>
-                                                <TouchableOpacity activeOpacity={0.8} onPress={handleSubmit} style={{ backgroundColor: COLORS.primary, paddingVertical: hp(1), paddingHorizontal: wp(4), borderRadius: 6 }} disabled={isSubmitting || !headerEditable}>
-                                                    {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontFamily: TYPOGRAPHY.fontFamilyMedium, fontSize: rf(3.2) }}>Save Header</Text>}
+                                            <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+                                                <TouchableOpacity activeOpacity={0.8} onPress={handleSubmit} style={{ backgroundColor: COLORS.primary, paddingHorizontal: wp(2), borderRadius: 6 }} disabled={isSubmitting || !headerEditable}>
+                                                    {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontFamily: TYPOGRAPHY.fontFamilyMedium, fontSize: rf(3.2) }}>Submit</Text>}
                                                 </TouchableOpacity>
                                             </View>
                                         </TouchableOpacity>
@@ -2337,9 +2378,9 @@ const AddPurchaseInvoice = () => {
                                                                             >
                                                                                 <Text style={styles.pageButtonText}>Previous</Text>
                                                                             </TouchableOpacity>
-                                                                            <Text style={{ marginHorizontal: wp(2) }}>{currentPage}</Text>
+                                                                            {renderPageButtons(currentPage, totalPages)}
                                                                             <TouchableOpacity
-                                                                                style={styles.pageButton}
+                                                                                style={[styles.pageButton, { marginLeft: wp(2) }]}
                                                                                 disabled={currentPage >= totalPages}
                                                                                 onPress={() => setPage(p => Math.min(totalPages, p + 1))}
                                                                             >
@@ -3165,6 +3206,12 @@ const styles = StyleSheet.create({
         color: COLORS.text,
         fontWeight: '600',
     },
+     pageButtonActive: {
+    backgroundColor: COLORS.primary,
+  },
+  pageButtonTextActive: {
+    color: '#fff',
+  },
     tdAction: {
         justifyContent: 'center',
         alignItems: 'center',

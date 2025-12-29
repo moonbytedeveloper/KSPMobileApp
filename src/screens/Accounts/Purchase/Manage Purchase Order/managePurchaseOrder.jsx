@@ -2198,12 +2198,6 @@ const ManagePurchaseOrder = () => {
           title="Manage Purchase Order"
           onLeftPress={() => navigation.goBack()}
           rightIconName="edit"
-          onRightPress={() => {
-            try {
-              setExpandedIds([1, 2, 3]);
-              setIsEditingHeader(true);
-            } catch (e) { /* ignore */ }
-          }}
         />
         <View style={styles.headerSeparator} />
         <ScrollView
@@ -2269,14 +2263,20 @@ const ManagePurchaseOrder = () => {
                     expanded={Array.isArray(expandedIds) ? expandedIds.includes(1) : expandedIds === 1}
                     onToggle={() => { if (headerSaved && !isEditingHeader) return; toggleSection(1); }}
                     rightActions={headerSaved ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: wp(2) }}>
-                        <TouchableOpacity onPress={() => { /* no-op check */ }} style={{ marginRight: wp(3) }}>
-                          <Icon name="check-circle" size={rf(4)} color={COLORS.primary} />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => { setIsEditingHeader(true); setHeaderSaved(false); setExpandedIds([1]); }}>
-                          <Icon name="edit" size={rf(4)} color={COLORS.text} />
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
+                        <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
+                        <TouchableOpacity >
+                          <Icon name="edit" size={rf(5)} onPress={() => { setIsEditingHeader(true); setHeaderSaved(false); setExpandedIds([1]); }} color={COLORS.primary} />
                         </TouchableOpacity>
                       </View>
+                      // <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: wp(2) }}>
+                      //   <TouchableOpacity onPress={() => { /* no-op check */ }} style={{ marginRight: wp(3) }}>
+                      //     <Icon name="check-circle" size={rf(4)} color={COLORS.primary} />
+                      //   </TouchableOpacity>
+                      //   <TouchableOpacity onPress={() => { setIsEditingHeader(true); setHeaderSaved(false); setExpandedIds([1]); }}>
+                      //     <Icon name="edit" size={rf(4)} color={COLORS.text} />
+                      //   </TouchableOpacity>
+                      // </View>
                     ) : null}
                   >
                     <View style={styles.row}>
@@ -3084,7 +3084,7 @@ const ManagePurchaseOrder = () => {
                 <View>
                   <View style={styles.tableControlsRow}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={{ marginRight: wp(2), color: screenTheme.text }}>Show</Text>
+                      <Text style={{ marginRight: wp(2), color: screenTheme.text,fontSize: rf(2.2) }}>Show</Text>
                       <Dropdown
                         placeholder={String(pageSize)}
                         value={String(pageSize)}
@@ -3092,10 +3092,10 @@ const ManagePurchaseOrder = () => {
                         getLabel={p => String(p)}
                         getKey={p => String(p)}
                         onSelect={v => { setPageSize(Number(v)); setPage(1); }}
-                        inputBoxStyle={{ width: wp(18) }}
+                        inputBoxStyle={{ width: wp(20) }}
                       // textStyle={inputStyles.input}
                       />
-                      <Text style={{ marginLeft: wp(2), color: screenTheme.text }}>entries</Text>
+                      <Text style={{ marginLeft: wp(2), color: screenTheme.text,fontSize: rf(2.2)  }}>entries</Text>
                     </View>
 
                     <View style={{ flex: 1, alignItems: 'flex-end' }}>
@@ -4236,3 +4236,12 @@ const styles = StyleSheet.create({
     borderTopColor: '#1e2530',
   },
 });
+
+
+
+
+
+
+
+
+

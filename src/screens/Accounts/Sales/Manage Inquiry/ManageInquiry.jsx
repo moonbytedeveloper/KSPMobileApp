@@ -271,6 +271,7 @@ const ManageInquiry = () => {
                         isActive={activeOrderId === order.id}
                         onToggle={() => setActiveOrderId(prev => prev === order.id ? null : order.id)}
 
+                
                         customRows={[
                             { label: "Inquiry No.", value: order.inquiryNo },
                             { label: "Customer Name", value: order.customerName },

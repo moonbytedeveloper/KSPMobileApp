@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
@@ -94,15 +94,24 @@ const AddSalesInquiry = () => {
             // Prefer fresh server data when entering edit mode. Determine header UUID
             const headerUuidParam = headerResponse?.Data?.UUID || headerResponse?.Data?.HeaderUUID || headerResponse?.Data?.Id ||
                 route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.headerUUID || route?.params?.uuid || route?.params?.headerRaw?.UUID || route?.params?.headerRaw?.Id;
+            console.log(headerUuidParam, 'HeaderId');
 
             if (headerUuidParam) {
                 try {
                     const resp = await getSalesHeader({ headerUuid: headerUuidParam });
                     const hd = resp?.Data || resp || {};
-                    setProjectName(hd.ProjectName || '');
-                    setInquiryNo(hd.InquiryNo || '');
-                    if (hd.OrderDate) setRequestedDate(hd.OrderDate);
-                    if (hd.RequestedDeliveryDate) setExpectedPurchaseDate(hd.RequestedDeliveryDate);
+                    console.log('enterHeaderEditMode getSalesHeader resp ->', resp);
+                    setProjectName(hd.ProjectName || (hd.Header && hd.Header.ProjectName) || '');
+                    setInquiryNo(hd.InquiryNo || (hd.Header && hd.Header.InquiryNo) || '');
+                    // Extract OrderDate and RequestedDeliveryDate from various shapes
+                    const od = extractDateValue(hd) || extractDateValue(resp) || '';
+                    // prefer OrderDate if present specifically
+                    const orderCandidate = hd.OrderDate || (hd.Header && hd.Header.OrderDate) || (resp?.Data?.OrderDate) || '';
+                    const requestedVal = orderCandidate || od;
+                    const requestedDeliveryVal = hd.RequestedDeliveryDate || (hd.Header && hd.Header.RequestedDeliveryDate) || (resp?.Data?.RequestedDeliveryDate) || od;
+                    if (requestedVal) setRequestedDate(safeFormatIfDate(requestedVal));
+                    if (requestedDeliveryVal) setExpectedPurchaseDate(safeFormatIfDate(requestedDeliveryVal));
+
                     const custUuid = hd.CustomerUUID || hd.CustomerId || hd.CustomerID;
                     if (custUuid) {
                         setCustomerUuid(custUuid);
@@ -124,6 +133,9 @@ const AddSalesInquiry = () => {
             console.log('enterHeaderEditMode error ->', e?.message || e);
         }
     };
+    if (headerEditing || headerSaved) {
+        enterHeaderEditMode();
+    }
 
     // Dropdown option placeholders (real data must come from server APIs)
     const currencyTypes = [];
@@ -208,7 +220,42 @@ const AddSalesInquiry = () => {
             return '';
         }
     };
+    // otherwise keep existing UI string (prevents double-formatting).
+    const safeFormatIfDate = (val) => {
+        if (!val) return '';
+        const d = new Date(val);
+        if (!isNaN(d.getTime())) return formatUiDate(d);
+        return String(val);
+    };
 
+    // Robustly extract a date value from various possible API shapes
+    const extractDateValue = (obj) => {
+        if (!obj) return '';
+        // common keys we may encounter
+        const candidates = [
+            'RequestedDeliveryDate', 'RequestedDelivery_Date', 'RequestedDelivery',
+            'RequestedDeliveryDateUTC', 'RequestedDeliveryDateUtc',
+            'OrderDate', 'Order_Date', 'OrderDateUTC', 'OrderDateUtc', 'DeliveryDate', 'ExpectedDeliveryDate'
+        ];
+        // if obj.Header exists, search inside it first
+        const search = (src) => {
+            for (const k of candidates) {
+                if (src && src[k]) return src[k];
+            }
+            return null;
+        };
+        const fromTop = search(obj);
+        if (fromTop) return fromTop;
+        if (obj.Header) {
+            const fromHeader = search(obj.Header);
+            if (fromHeader) return fromHeader;
+        }
+        if (obj.Data) {
+            const fromData = search(obj.Data) || (obj.Data.Header && search(obj.Data.Header));
+            if (fromData) return fromData;
+        }
+        return '';
+    };
 
     const openDatePickerFor = (field) => {
         let initial = new Date();
@@ -267,7 +314,7 @@ const AddSalesInquiry = () => {
             if (existingLineUuid) {
                 setLineAdding(true);
                 try {
-                   
+
                     const payload = {
                         HeaderUUID: headerUuid,
                         UUID: existingLineUuid,
@@ -434,10 +481,12 @@ const AddSalesInquiry = () => {
     // Load sales lines from server for a header UUID and set local lineItems
     const loadSalesLines = async (headerUuidParam) => {
         if (!headerUuidParam) return;
+        console.log('[AddSalesInquiry] loadSalesLines start ->', headerUuidParam);
         try {
             const c = await getCMPUUID();
             const e = await getENVUUID();
             const resp = await getSalesLines({ headerUuid: headerUuidParam, cmpUuid: c, envUuid: e });
+            console.log('[AddSalesInquiry] getSalesLines resp ->', resp);
             // Normalize response like other screens do
             const raw = resp?.Data?.Records || resp?.Data || resp || [];
             const list = Array.isArray(raw) ? raw : [];
@@ -475,7 +524,7 @@ const AddSalesInquiry = () => {
                 };
             });
             setLineItems(mapped);
-            console.log('[AddSalesInquiry] loadSalesLines -> loaded', mapped.length);
+            console.log('[AddSalesInquiry] loadSalesLines -> loaded', mapped.length, mapped.slice(0, 5));
             return mapped;
         } catch (e) {
             console.log('[AddSalesInquiry] loadSalesLines error ->', e?.message || e);
@@ -542,7 +591,7 @@ const AddSalesInquiry = () => {
             const params = { mode: 'Sales' };
             if (itemTypeUuid) params.itemTypeUuid = itemTypeUuid;
             const resp = await getItems(params);
-            console.log(resp,'5555');
+            console.log(resp, '5555');
             const list = resp?.Data || resp?.Records || resp?.List || resp || [];
             const arr = Array.isArray(list.Records) ? list.Records : [];
             // Normalize server item shape so UI can always read `Name` and `UUID` fields
@@ -554,11 +603,11 @@ const AddSalesInquiry = () => {
                 Rate: r?.Rate ?? r?.Price ?? null,
                 Description: r?.Description || r?.Desc || ''
             }));
-            console.log(normalized,'5666');
-            
+            console.log(normalized, '5666');
+
             setServerItemMasters(normalized);
             return normalized;
-            
+
         } catch (e) {
             console.log('fetchItemMasters error ->', e?.message || e);
             const list = [];
@@ -568,7 +617,7 @@ const AddSalesInquiry = () => {
             setItemMastersLoading(false);
         }
     };
-    console.log(serverItemMasters,'546');
+    console.log(serverItemMasters, '546');
 
     const fetchUnits = async () => {
         setUnitsLoading(true);
@@ -665,8 +714,10 @@ const AddSalesInquiry = () => {
                             setProjectUuid(headerRaw.ProjectUUID || headerRaw.ProjectId || headerRaw.Project || null);
                         }
                         setInquiryNo(headerRaw.InquiryNo || '');
-                        if (headerRaw.OrderDate && !userEditedRef.current.requestedDate) setRequestedDate(headerRaw.OrderDate);
-                        if (headerRaw.RequestedDeliveryDate && !userEditedRef.current.expectedDate) setExpectedPurchaseDate(headerRaw.RequestedDeliveryDate);
+                        const headerOrder = headerRaw.OrderDate || (headerRaw.Header && headerRaw.Header.OrderDate) || '';
+                        const headerRequestedDelivery = headerRaw.RequestedDeliveryDate || (headerRaw.Header && headerRaw.Header.RequestedDeliveryDate) || '';
+                        if (headerOrder && !userEditedRef.current.requestedDate) setRequestedDate(safeFormatIfDate(headerOrder));
+                        if (headerRequestedDelivery && !userEditedRef.current.expectedDate) setExpectedPurchaseDate(safeFormatIfDate(headerRequestedDelivery));
                     } else {
                         if (!inquiryNo) setInquiryNo(headerRaw.InquiryNo || '');
                     }
@@ -680,33 +731,33 @@ const AddSalesInquiry = () => {
                             else if (headerRaw.CustomerName || headerRaw.Customer) setCustomerName(headerRaw.CustomerName || headerRaw.Customer);
                         }
                     }
-                        else if (headerUuidParam) {
-                            // No headerRaw provided — fetch header from server for edit
-                            try {
-                                const resp = await getSalesHeader({ headerUuid: headerUuidParam });
-                                const hd = resp?.Data || resp || {};
-                                // populate header fields into state and enter edit mode
-                                setProjectName(hd.ProjectName || '');
-                                setInquiryNo(hd.InquiryNo || '');
-                                if (hd.OrderDate) setRequestedDate(hd.OrderDate);
-                                if (hd.RequestedDeliveryDate) setExpectedPurchaseDate(hd.RequestedDeliveryDate);
-                                const custUuid = hd.CustomerUUID || hd.CustomerId || hd.CustomerID;
-                                if (custUuid) {
-                                    setCustomerUuid(custUuid);
-                                    const found = (customersList || customers || []).find(c => (c.UUID || c.Id || c.id) === custUuid) || null;
-                                    if (found) setCustomerName(found?.Name || found?.DisplayName || found?.name || '');
-                                    else if (hd.CustomerName || hd.Customer) setCustomerName(hd.CustomerName || hd.Customer);
-                                }
-                                setHeaderResponse(resp);
-                                setHeaderSaved(true);
-                                setHeaderEditing(true);
-                                setExpandedId(1);
-                                // load server lines
-                                try { await loadSalesLines(headerUuidParam); } catch (e) { console.log('[AddSalesInquiry] loadSalesLines error ->', e); }
-                            } catch (e) {
-                                console.log('[AddSalesInquiry] getSalesHeader fetch error ->', e?.message || e);
+                    else if (headerUuidParam) {
+                        // No headerRaw provided — fetch header from server for edit
+                        try {
+                            const resp = await getSalesHeader({ headerUuid: headerUuidParam });
+                            const hd = resp?.Data || resp || {};
+                            // populate header fields into state and enter edit mode
+                            setProjectName(hd.ProjectName || '');
+                            setInquiryNo(hd.InquiryNo || '');
+                            if (hd.OrderDate) setRequestedDate(safeFormatIfDate(hd.OrderDate));
+                            if (hd.RequestedDeliveryDate) setExpectedPurchaseDate(safeFormatIfDate(hd.RequestedDeliveryDate));
+                            const custUuid = hd.CustomerUUID || hd.CustomerId || hd.CustomerID;
+                            if (custUuid) {
+                                setCustomerUuid(custUuid);
+                                const found = (customersList || customers || []).find(c => (c.UUID || c.Id || c.id) === custUuid) || null;
+                                if (found) setCustomerName(found?.Name || found?.DisplayName || found?.name || '');
+                                else if (hd.CustomerName || hd.Customer) setCustomerName(hd.CustomerName || hd.Customer);
                             }
+                            setHeaderResponse(resp);
+                            setHeaderSaved(true);
+                            setHeaderEditing(true);
+                            setExpandedId(1);
+                            // load server lines
+                            try { await loadSalesLines(headerUuidParam); } catch (e) { console.log('[AddSalesInquiry] loadSalesLines error ->', e); }
+                        } catch (e) {
+                            console.log('[AddSalesInquiry] getSalesHeader fetch error ->', e?.message || e);
                         }
+                    }
 
                     // store local header response and mark saved
                     setHeaderResponse({ Data: headerRaw });
@@ -745,6 +796,9 @@ const AddSalesInquiry = () => {
                     try {
                         const currentJson = JSON.stringify(lineItems || []);
                         const mappedJson = JSON.stringify(mapped || []);
+                        console.log('[AddSalesInquiry] prefill compare currentJson length ->', (lineItems || []).length, 'mapped ->', mapped.length);
+                        console.log('[AddSalesInquiry] prefill compare currentJson ->', currentJson.slice(0, 200));
+                        console.log('[AddSalesInquiry] prefill compare mappedJson ->', mappedJson.slice(0, 200));
                         if (mappedJson !== currentJson) {
                             setLineItems(mapped);
                             console.log('[AddSalesInquiry] prefill applied, lines ->', mapped.length);
@@ -864,12 +918,12 @@ const AddSalesInquiry = () => {
                 setLoading(false);
                 return;
             }
-             //  "UUID": "string",
-                    //   "CustomerUUID": "string",
-                    //   "OrderDate": "2025-12-23T12:28:23.849Z",
-                    //   "RequestedDeliveryDate": "2025-12-23T12:28:23.849Z",
-                    //   "ProjectName": "string",
-                    //   "InquiryNo": "string"
+            //  "UUID": "string",
+            //   "CustomerUUID": "string",
+            //   "OrderDate": "2025-12-23T12:28:23.849Z",
+            //   "RequestedDeliveryDate": "2025-12-23T12:28:23.849Z",
+            //   "ProjectName": "string",
+            //   "InquiryNo": "string"
             const payload = {
                 ProjectName: projectName || '',
                 // projectUUID: projectUuid || '',
@@ -901,12 +955,12 @@ const AddSalesInquiry = () => {
                 return;
             }
             const payload = {
-                UUID:"",
-                ProjectName: projectUuid|| '',
+                UUID: "",
+                ProjectName: projectUuid || '',
                 CustomerUUID: customerUuid,
                 OrderDate: uiDateToApiDate(requestedDate) || null,
                 RequestedDeliveryDate: uiDateToApiDate(expectedPurchaseDate) || null,
-                InquiryNo: inquiryNo || '', 
+                InquiryNo: inquiryNo || '',
 
             };
             console.log('addSalesInquiry payload ->', payload);
@@ -960,17 +1014,34 @@ const AddSalesInquiry = () => {
                 ProjectUUID: projectUuid || '',
                 OrderDate: uiDateToApiDate(requestedDate) || null,
                 RequestedDeliveryDate: uiDateToApiDate(expectedPurchaseDate) || null,
-                ProjectName: projectUuid || '',
+                ProjectName: projectName || projectUuid || '',
                 InquiryNo: inquiryNo || ''
             };
-            console.log('Local update header payload ->', payload);
-            setHeaderResponse({ Data: payload });
-            setHeaderSaved(true);
-            setHeaderEditing(false);
-            userEditedRef.current = { project: false, customer: false, requestedDate: false, expectedDate: false };
-            setExpandedId(null);
-            // refresh lines
-            try { if (headerResponse?.Data?.UUID) await loadSalesLines(headerResponse.Data.UUID); } catch (e) { console.log('[AddSalesInquiry] post-update loadSalesLines error ->', e); }
+            console.log('updateSalesHeader payload ->', payload);
+            try {
+                const resp = await updateSalesHeader(payload);
+                console.log('updateSalesHeader resp ->', resp);
+                const headerResp = resp?.Data ? resp : { Data: resp?.Data || resp };
+                setHeaderResponse(headerResp);
+                setHeaderSaved(true);
+                setHeaderEditing(false);
+                userEditedRef.current = { project: false, customer: false, requestedDate: false, expectedDate: false };
+                setExpandedId(null);
+                const msg = resp?.Message || resp?.message || 'Header updated successfully';
+                setSuccessMessage(String(msg));
+                setSuccessSheetVisible(true);
+                // refresh lines using returned UUID when available
+                const newHeaderUuid = headerResp?.Data?.UUID || headerResp?.Data?.HeaderUUID || headerResp?.Data?.Id || headerUuid;
+                try { if (newHeaderUuid) await loadSalesLines(newHeaderUuid); } catch (e) { console.log('[AddSalesInquiry] post-update loadSalesLines error ->', e); }
+            } catch (e) {
+                console.log('updateSalesHeader error ->', e?.message || e);
+                Alert.alert('Error', getErrorMessage(e, 'Failed to update header on server. Changes saved locally.'));
+                // fallback to local update so UI still reflects user's edit
+                setHeaderResponse({ Data: payload });
+                setHeaderSaved(true);
+                setHeaderEditing(false);
+                setExpandedId(null);
+            }
         } catch (e) {
             console.log('UpdateSalesHeader error ->', e?.message || e);
             Alert.alert('Error', getErrorMessage(e, 'Failed to update header'));
@@ -1040,7 +1111,7 @@ const AddSalesInquiry = () => {
                             setCustomerUuid(values.CustomerUUID || null);
                             setRequestedDate(values.OrderDate || '');
                             setExpectedPurchaseDate(values.RequestedDeliveryDate || '');
-                            
+
                             // Call the appropriate submit handler
                             try {
                                 if (headerEditing) {
@@ -1066,29 +1137,29 @@ const AddSalesInquiry = () => {
                                         headerSaved ? (
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: wp(2) }}>
                                                 <Icon name="check-circle" size={rf(5)} color={COLORS.success || '#28a755'} />
-                                                <TouchableOpacity onPress={() => enterHeaderEditMode()}>
-                                                    <Icon name="edit" size={rf(5)} color={COLORS.primary} />
+                                                <TouchableOpacity >
+                                                    <Icon name="edit" size={rf(5)} onPress={() => enterHeaderEditMode()} color={COLORS.primary} />
                                                 </TouchableOpacity>
                                             </View>
                                         ) : null
                                     }
                                 >
-                        {showInquiryNoField && (
-                            <View style={[styles.row, { marginBottom: hp(1.2) }]}>
-                                <View style={styles.col}>
-                                    <Text style={inputStyles.label}>Inquiry No</Text>
-                                    <View style={[inputStyles.box, { marginTop: hp(0.5) }]}>
-                                        <TextInput
-                                            style={[inputStyles.input, { color: COLORS.text }]}
-                                            value={inquiryNo}
-                                            placeholder="Inquiry No"
-                                            placeholderTextColor={COLORS.textLight}
-                                            editable={false}
-                                        />
-                                    </View>
-                                </View>
-                            </View>
-                        )}
+                                    {showInquiryNoField && (
+                                        <View style={[styles.row, { marginBottom: hp(1.2) }]}>
+                                            <View style={styles.col}>
+                                                <Text style={inputStyles.label}>Inquiry No</Text>
+                                                <View style={[inputStyles.box, { marginTop: hp(0.5) }]}>
+                                                    <TextInput
+                                                        style={[inputStyles.input, { color: COLORS.text }]}
+                                                        value={inquiryNo}
+                                                        placeholder="Inquiry No"
+                                                        placeholderTextColor={COLORS.textLight}
+                                                        editable={false}
+                                                    />
+                                                </View>
+                                            </View>
+                                        </View>
+                                    )}
 
                                     <View style={styles.row}>
                                         <View style={styles.col}>
@@ -1399,9 +1470,9 @@ const AddSalesInquiry = () => {
                                                         <Text style={[styles.th, { width: wp(25) }]}>Action</Text>
                                                     </View>
                                                 </View>
-        
-        
-        
+
+
+
                                                 {/* Table Body */}
                                                 <View style={styles.tbody}>
                                                     {pagedLineItems.map((item, idx) => (
@@ -1433,47 +1504,49 @@ const AddSalesInquiry = () => {
                                                         </View>
                                                     ))}
                                                 </View>
+                                                {/* Pagination summary + controls under table */}
+                                                <View style={styles.tableControlsRow}>
+                                                    <View>
+                                                        <Text style={styles.tdText}>Showing {totalLineItems === 0 ? 0 : startIndex + 1} to {endIndex} of {totalLineItems} entries</Text>
+                                                    </View>
+
+                                                    <View style={styles.paginationContainer}>
+                                                        <TouchableOpacity
+                                                            style={[styles.pageButton, { marginRight: wp(2) }]}
+                                                            disabled={page <= 1}
+                                                            onPress={() => setPage(Math.max(1, page - 1))}
+                                                        >
+                                                            <Text style={styles.paginationButtonText}>Previous</Text>
+                                                        </TouchableOpacity>
+
+                                                        {Array.from({ length: totalPages }).map((_, i) => {
+                                                            const p = i + 1;
+                                                            const isActive = p === page;
+                                                            return (
+                                                                <TouchableOpacity
+                                                                    key={`pg-${p}`}
+                                                                    style={[styles.pageButton, isActive && styles.pageButtonActive, { marginHorizontal: wp(0.6) }]}
+                                                                    onPress={() => setPage(p)}
+                                                                >
+                                                                    <Text style={[styles.pageButtonText, isActive && styles.pageButtonTextActive]}>{p}</Text>
+
+                                                                </TouchableOpacity>
+                                                            );
+                                                        })}
+
+                                                        <TouchableOpacity
+                                                            style={[styles.pageButton, { marginLeft: wp(2) }]}
+                                                            disabled={page >= totalPages}
+                                                            onPress={() => setPage(Math.min(totalPages, page + 1))}
+                                                        >
+                                                            <Text style={styles.paginationButtonText}>Next</Text>
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                </View>
                                             </View>
                                         </ScrollView>
                                     </View>
-                                    {/* Pagination summary + controls under table */}
-                                    <View style={styles.tableControlsRow}>
-                                        <View>
-                                            <Text style={styles.tdText}>Showing {totalLineItems === 0 ? 0 : startIndex + 1} to {endIndex} of {totalLineItems} entries</Text>
-                                        </View>
 
-                                        <View style={styles.paginationContainer}>
-                                            <TouchableOpacity
-                                                style={[styles.paginationButton, page <= 1 && styles.paginationButtonDisabled]}
-                                                disabled={page <= 1}
-                                                onPress={() => setPage(Math.max(1, page - 1))}
-                                            >
-                                                <Text style={styles.paginationButtonText}>Previous</Text>
-                                            </TouchableOpacity>
-
-                                            {Array.from({ length: totalPages }).map((_, i) => {
-                                                const p = i + 1;
-                                                const isActive = p === page;
-                                                return (
-                                                    <TouchableOpacity
-                                                        key={`pg-${p}`}
-                                                        style={[styles.paginationButton, isActive && styles.paginationButtonActive]}
-                                                        onPress={() => setPage(p)}
-                                                    >
-                                                        <Text style={[styles.paginationButtonText, isActive && styles.paginationButtonTextActive]}>{p}</Text>
-                                                    </TouchableOpacity>
-                                                );
-                                            })}
-
-                                            <TouchableOpacity
-                                                style={[styles.paginationButton, page >= totalPages && styles.paginationButtonDisabled]}
-                                                disabled={page >= totalPages}
-                                                onPress={() => setPage(Math.min(totalPages, page + 1))}
-                                            >
-                                                <Text style={styles.paginationButtonText}>Next</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
                                 </View>
                             )}
                         </AccordionSection>
@@ -1547,9 +1620,25 @@ const styles = StyleSheet.create({
         paddingBottom: hp(6),
         backgroundColor: '#fff'
     },
+    pageButtonText: {
+        color: COLORS.text,
+        fontWeight: '600',
+    },
+    pageButtonTextActive: {
+        color: '#fff',
+    },
+    pageButtonActive:{
+         backgroundColor: COLORS.primary, 
+    },
     line: {
         borderBottomColor: COLORS.border,
         borderBottomWidth: hp(0.2),
+    },
+    pageButton: {
+        backgroundColor: '#e5e7eb',
+        paddingVertical: hp(0.6),
+        paddingHorizontal: wp(3),
+        borderRadius: wp(0.8),
     },
     headerSeparator: {
         height: 1,
@@ -1656,8 +1745,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: wp(2),
-        paddingVertical: hp(1),
+        padding: wp(2),
+        width: '100%',
     },
     tableTopControls: {
         marginBottom: hp(1),
