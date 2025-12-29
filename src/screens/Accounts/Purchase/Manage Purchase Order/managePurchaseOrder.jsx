@@ -2046,6 +2046,7 @@ const ManagePurchaseOrder = () => {
       try { prefillFromData(data); } catch (e) { /* ignore */ }
       setHeaderSaved(true);
       Alert.alert('Success', 'Order submitted successfully');
+      navigation.goBack();
       // reload lines to ensure totals reflect server
       try { await loadSalesOrderLines(data?.UUID || data?.Id || data?.HeaderUUID || headerResponse?.UUID); } catch (e) { /* ignore */ }
     } catch (err) {

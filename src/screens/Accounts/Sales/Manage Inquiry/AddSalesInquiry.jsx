@@ -83,59 +83,59 @@ const AddSalesInquiry = () => {
     // Ensure the header fields are populated into component state so the
     // user sees the full, editable form. We reset the userEdited flags so
     // the prefill will apply in this explicit-edit scenario.
-    const enterHeaderEditMode = async () => {
-        try {
-            setHeaderEditing(true);
-            setExpandedId(1);
-            // Reset user-edited marks so prefill applies now
-            userEditedRef.current = { project: false, customer: false, requestedDate: false, expectedDate: false };
+        const enterHeaderEditMode = async () => {
+            try {
+                setHeaderEditing(true);
+                setExpandedId(1);
+                // Reset user-edited marks so prefill applies now
+                userEditedRef.current = { project: false, customer: false, requestedDate: false, expectedDate: false };
 
-            // If we already have headerResponse from a previous prefill, use it
-            // Prefer fresh server data when entering edit mode. Determine header UUID
-            const headerUuidParam = headerResponse?.Data?.UUID || headerResponse?.Data?.HeaderUUID || headerResponse?.Data?.Id ||
-                route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.headerUUID || route?.params?.uuid || route?.params?.headerRaw?.UUID || route?.params?.headerRaw?.Id;
-            console.log(headerUuidParam, 'HeaderId');
+                // If we already have headerResponse from a previous prefill, use it
+                // Prefer fresh server data when entering edit mode. Determine header UUID
+                const headerUuidParam = headerResponse?.Data?.UUID || headerResponse?.Data?.HeaderUUID || headerResponse?.Data?.Id ||
+                    route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.headerUUID || route?.params?.uuid || route?.params?.headerRaw?.UUID || route?.params?.headerRaw?.Id;
+                console.log(headerUuidParam, 'HeaderId');
 
-            if (headerUuidParam) {
-                try {
-                    const resp = await getSalesHeader({ headerUuid: headerUuidParam });
-                    const hd = resp?.Data || resp || {};
-                    console.log('enterHeaderEditMode getSalesHeader resp ->', resp);
-                    setProjectName(hd.ProjectName || (hd.Header && hd.Header.ProjectName) || '');
-                    setInquiryNo(hd.InquiryNo || (hd.Header && hd.Header.InquiryNo) || '');
-                    // Extract OrderDate and RequestedDeliveryDate from various shapes
-                    const od = extractDateValue(hd) || extractDateValue(resp) || '';
-                    // prefer OrderDate if present specifically
-                    const orderCandidate = hd.OrderDate || (hd.Header && hd.Header.OrderDate) || (resp?.Data?.OrderDate) || '';
-                    const requestedVal = orderCandidate || od;
-                    const requestedDeliveryVal = hd.RequestedDeliveryDate || (hd.Header && hd.Header.RequestedDeliveryDate) || (resp?.Data?.RequestedDeliveryDate) || od;
-                    if (requestedVal) setRequestedDate(safeFormatIfDate(requestedVal));
-                    if (requestedDeliveryVal) setExpectedPurchaseDate(safeFormatIfDate(requestedDeliveryVal));
+                if (headerUuidParam) {
+                    try {
+                        const resp = await getSalesHeader({ headerUuid: headerUuidParam });
+                        const hd = resp?.Data || resp || {};
+                        console.log('enterHeaderEditMode getSalesHeader resp ->', resp);
+                        setProjectName(hd.ProjectName || (hd.Header && hd.Header.ProjectName) || '');
+                        setInquiryNo(hd.InquiryNo || (hd.Header && hd.Header.InquiryNo) || '');
+                        // Extract OrderDate and RequestedDeliveryDate from various shapes
+                        const od = extractDateValue(hd) || extractDateValue(resp) || '';
+                        // prefer OrderDate if present specifically
+                        const orderCandidate = hd.OrderDate || (hd.Header && hd.Header.OrderDate) || (resp?.Data?.OrderDate) || '';
+                        const requestedVal = orderCandidate || od;
+                        const requestedDeliveryVal = hd.RequestedDeliveryDate || (hd.Header && hd.Header.RequestedDeliveryDate) || (resp?.Data?.RequestedDeliveryDate) || od;
+                        if (requestedVal) setRequestedDate(safeFormatIfDate(requestedVal));
+                        if (requestedDeliveryVal) setExpectedPurchaseDate(safeFormatIfDate(requestedDeliveryVal));
 
-                    const custUuid = hd.CustomerUUID || hd.CustomerId || hd.CustomerID;
-                    if (custUuid) {
-                        setCustomerUuid(custUuid);
-                        const found = (customers || []).find(c => (c.UUID || c.Id || c.id) === custUuid) || null;
-                        if (found) setCustomerName(found?.Name || found?.DisplayName || found?.name || '');
-                        else if (hd.CustomerName || hd.Customer) setCustomerName(hd.CustomerName || hd.Customer);
+                        const custUuid = hd.CustomerUUID || hd.CustomerId || hd.CustomerID;
+                        if (custUuid) {
+                            setCustomerUuid(custUuid);
+                            const found = (customers || []).find(c => (c.UUID || c.Id || c.id) === custUuid) || null;
+                            if (found) setCustomerName(found?.Name || found?.DisplayName || found?.name || '');
+                            else if (hd.CustomerName || hd.Customer) setCustomerName(hd.CustomerName || hd.Customer);
+                        }
+                        // store response for later
+                        setHeaderResponse(resp);
+                        setHeaderSaved(true);
+                    } catch (e) {
+                        console.log('enterHeaderEditMode fetch error ->', e?.message || e);
                     }
-                    // store response for later
-                    setHeaderResponse(resp);
-                    setHeaderSaved(true);
-                } catch (e) {
-                    console.log('enterHeaderEditMode fetch error ->', e?.message || e);
+                } else {
+                    // no header identifier — nothing to prefill
+                    console.warn('enterHeaderEditMode: no header UUID available to fetch');
                 }
-            } else {
-                // no header identifier — nothing to prefill
-                console.warn('enterHeaderEditMode: no header UUID available to fetch');
+            } catch (e) {
+                console.log('enterHeaderEditMode error ->', e?.message || e);
             }
-        } catch (e) {
-            console.log('enterHeaderEditMode error ->', e?.message || e);
+        };
+        if (headerEditing || headerSaved) {
+            enterHeaderEditMode();
         }
-    };
-    if (headerEditing || headerSaved) {
-        enterHeaderEditMode();
-    }
 
     // Dropdown option placeholders (real data must come from server APIs)
     const currencyTypes = [];
@@ -524,7 +524,7 @@ const AddSalesInquiry = () => {
                 };
             });
             setLineItems(mapped);
-            console.log('[AddSalesInquiry] loadSalesLines -> loaded', mapped.length, mapped.slice(0, 5));
+            console.log('[AddSalesInquiry] loadSalesLines -> loaded', mapped.length, mapped.slice(0,5));
             return mapped;
         } catch (e) {
             console.log('[AddSalesInquiry] loadSalesLines error ->', e?.message || e);
@@ -797,8 +797,8 @@ const AddSalesInquiry = () => {
                         const currentJson = JSON.stringify(lineItems || []);
                         const mappedJson = JSON.stringify(mapped || []);
                         console.log('[AddSalesInquiry] prefill compare currentJson length ->', (lineItems || []).length, 'mapped ->', mapped.length);
-                        console.log('[AddSalesInquiry] prefill compare currentJson ->', currentJson.slice(0, 200));
-                        console.log('[AddSalesInquiry] prefill compare mappedJson ->', mappedJson.slice(0, 200));
+                        console.log('[AddSalesInquiry] prefill compare currentJson ->', currentJson.slice(0,200));
+                        console.log('[AddSalesInquiry] prefill compare mappedJson ->', mappedJson.slice(0,200));
                         if (mappedJson !== currentJson) {
                             setLineItems(mapped);
                             console.log('[AddSalesInquiry] prefill applied, lines ->', mapped.length);
@@ -1504,49 +1504,47 @@ const AddSalesInquiry = () => {
                                                         </View>
                                                     ))}
                                                 </View>
-                                                {/* Pagination summary + controls under table */}
-                                                <View style={styles.tableControlsRow}>
-                                                    <View>
-                                                        <Text style={styles.tdText}>Showing {totalLineItems === 0 ? 0 : startIndex + 1} to {endIndex} of {totalLineItems} entries</Text>
-                                                    </View>
-
-                                                    <View style={styles.paginationContainer}>
-                                                        <TouchableOpacity
-                                                            style={[styles.pageButton, { marginRight: wp(2) }]}
-                                                            disabled={page <= 1}
-                                                            onPress={() => setPage(Math.max(1, page - 1))}
-                                                        >
-                                                            <Text style={styles.paginationButtonText}>Previous</Text>
-                                                        </TouchableOpacity>
-
-                                                        {Array.from({ length: totalPages }).map((_, i) => {
-                                                            const p = i + 1;
-                                                            const isActive = p === page;
-                                                            return (
-                                                                <TouchableOpacity
-                                                                    key={`pg-${p}`}
-                                                                    style={[styles.pageButton, isActive && styles.pageButtonActive, { marginHorizontal: wp(0.6) }]}
-                                                                    onPress={() => setPage(p)}
-                                                                >
-                                                                    <Text style={[styles.pageButtonText, isActive && styles.pageButtonTextActive]}>{p}</Text>
-
-                                                                </TouchableOpacity>
-                                                            );
-                                                        })}
-
-                                                        <TouchableOpacity
-                                                            style={[styles.pageButton, { marginLeft: wp(2) }]}
-                                                            disabled={page >= totalPages}
-                                                            onPress={() => setPage(Math.min(totalPages, page + 1))}
-                                                        >
-                                                            <Text style={styles.paginationButtonText}>Next</Text>
-                                                        </TouchableOpacity>
-                                                    </View>
-                                                </View>
                                             </View>
                                         </ScrollView>
                                     </View>
+                                    {/* Pagination summary + controls under table */}
+                                    <View style={styles.tableControlsRow}>
+                                        <View>
+                                            <Text style={styles.tdText}>Showing {totalLineItems === 0 ? 0 : startIndex + 1} to {endIndex} of {totalLineItems} entries</Text>
+                                        </View>
 
+                                        <View style={styles.paginationContainer}>
+                                            <TouchableOpacity
+                                                style={[styles.paginationButton, page <= 1 && styles.paginationButtonDisabled]}
+                                                disabled={page <= 1}
+                                                onPress={() => setPage(Math.max(1, page - 1))}
+                                            >
+                                                <Text style={styles.paginationButtonText}>Previous</Text>
+                                            </TouchableOpacity>
+
+                                            {Array.from({ length: totalPages }).map((_, i) => {
+                                                const p = i + 1;
+                                                const isActive = p === page;
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={`pg-${p}`}
+                                                        style={[styles.paginationButton, isActive && styles.paginationButtonActive]}
+                                                        onPress={() => setPage(p)}
+                                                    >
+                                                        <Text style={[styles.paginationButtonText, isActive && styles.paginationButtonTextActive]}>{p}</Text>
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
+
+                                            <TouchableOpacity
+                                                style={[styles.paginationButton, page >= totalPages && styles.paginationButtonDisabled]}
+                                                disabled={page >= totalPages}
+                                                onPress={() => setPage(Math.min(totalPages, page + 1))}
+                                            >
+                                                <Text style={styles.paginationButtonText}>Next</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
                                 </View>
                             )}
                         </AccordionSection>
@@ -1620,25 +1618,9 @@ const styles = StyleSheet.create({
         paddingBottom: hp(6),
         backgroundColor: '#fff'
     },
-    pageButtonText: {
-        color: COLORS.text,
-        fontWeight: '600',
-    },
-    pageButtonTextActive: {
-        color: '#fff',
-    },
-    pageButtonActive:{
-         backgroundColor: COLORS.primary, 
-    },
     line: {
         borderBottomColor: COLORS.border,
         borderBottomWidth: hp(0.2),
-    },
-    pageButton: {
-        backgroundColor: '#e5e7eb',
-        paddingVertical: hp(0.6),
-        paddingHorizontal: wp(3),
-        borderRadius: wp(0.8),
     },
     headerSeparator: {
         height: 1,
@@ -1745,8 +1727,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: wp(2),
-        width: '100%',
+        paddingHorizontal: wp(2),
+        paddingVertical: hp(1),
     },
     tableTopControls: {
         marginBottom: hp(1),

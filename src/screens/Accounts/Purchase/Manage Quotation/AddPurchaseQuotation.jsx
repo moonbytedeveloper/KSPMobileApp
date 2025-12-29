@@ -799,6 +799,7 @@ const AddPurchaseQuotation = () => {
       setHeaderEditable(false);
       setExpandedId(4);
       Alert.alert('Success', 'Order submitted successfully');
+      navigation.goBack();
       try { await loadPurchaseOrderLines(data?.UUID || data?.Id || data?.HeaderUUID || headerResponse?.UUID); } catch (e) { /* ignore */ }
       try {
         // publish added event so list screen can update quickly

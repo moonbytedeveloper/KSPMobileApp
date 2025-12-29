@@ -1527,6 +1527,7 @@ const AddPurchaseInvoice = () => {
             const resp = await updatePurchaseInvoiceHeader(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
             console.log('UpdatePurchaseInvoiceHeader resp ->', resp);
             Alert.alert('Success', 'Performa header updated successfully');
+            navigation.goBack();
             // Refresh header totals from server after update
             await refreshHeaderTotals(headerUUID);
             // Mark as submitted and collapse sections
@@ -1541,7 +1542,9 @@ const AddPurchaseInvoice = () => {
             setHeaderSubmitting(false);
         }
     };
-    const onCancel = () => { };
+    const onCancel = () => { 
+        navigation.goBack();
+    };
 
     const uiDateToApiDate = uiDateStr => {
         if (!uiDateStr) return '';

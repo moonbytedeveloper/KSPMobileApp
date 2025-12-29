@@ -1341,6 +1341,7 @@ const AddSalesPerfomaInvoice = () => {
                 console.log('Saved header UUID ->', gotHeaderUuid);
             }
             Alert.alert('Success', 'Header submitted successfully');
+            navigation.goBack();
         } catch (err) {
             console.error('submitHeader error ->', err);
             Alert.alert('Error', getErrorMessage(err, 'Unable to submit header'));

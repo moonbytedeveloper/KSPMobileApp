@@ -2197,6 +2197,7 @@ const ManageSalesOrder = () => {
       setHeaderResponse(data);
       setHeaderSaved(true);
       Alert.alert('Success', 'Order submitted successfully');
+      navigation.navigate('ViewSalesOrder');
       // reload lines to ensure totals reflect server
       try { await loadSalesOrderLines(data?.UUID || data?.Id || data?.HeaderUUID || headerResponse?.UUID); } catch (e) { /* ignore */ }
 
@@ -2540,9 +2541,9 @@ const ManageSalesOrder = () => {
           title="Manage Sales Order"
           onLeftPress={() => {
             try {
-              navigation.navigate('ViewSalesOrder');
-            } catch (e) {
               navigation.goBack();
+            } catch (e) {
+              navigation.navigate('ViewSalesOrder');
             }
           }}
         />
