@@ -21,7 +21,7 @@ export const COLORS = {
   edit: '#16a34a',
   delete: '#EF4444',
   view: '#22c55e',
-  TextWarning:'#6b7280',
+  TextWarning: '#6b7280',
 
   // Neutral
   text: '#111827',
@@ -96,7 +96,6 @@ export const TYPOGRAPHY = {
   h1: rf(4.6),
   h2: rf(4.0),
   h3: rf(3.6),
-  // label: rf(3.2),
   subtitle: rf(3.2),
   body: rf(3.0),
   small: rf(2.7),
@@ -140,11 +139,11 @@ export const text = StyleSheet.create({
     fontWeight: '400',
   },
 });
- const screenTheme = { 
-    text: COLORS.text,
-    textLight: COLORS.textLight,
-    bg: '#fff',
-  };
+const screenTheme = {
+  text: COLORS.text,
+  textLight: COLORS.textLight,
+  bg: '#fff',
+};
 
 // Reusable input styles (label + container + input + helper/error)
 export const inputStyles = StyleSheet.create({
@@ -174,9 +173,9 @@ export const inputStyles = StyleSheet.create({
     paddingVertical: hp(2.2),
     minHeight: 'auto',
   },
-  input: { 
+  input: {
     color: screenTheme.text,
-    paddingVertical: 0, 
+    paddingVertical: 0,
     fontFamily: 'Nunito-Regular',
     flex: 1,
     // Note: color should be set dynamically by components for dark mode support
@@ -247,7 +246,7 @@ export const formStyles = StyleSheet.create({
   container: {
     paddingHorizontal: SPACING.lg,
     paddingBottom: wp(1),
-  }, 
+  },
   title: {
     fontSize: TYPOGRAPHY.h1,
     fontWeight: '700',
@@ -357,10 +356,10 @@ export const buttonStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  UpdateStatusBtn:{
-    color:  '#fb923c',
+  UpdateStatusBtn: {
+    color: '#fb923c',
   },
-  UpdateBtns:{
+  UpdateBtns: {
     borderColor: '#fb923c',
   },
   // Variant placements (compose with buttonNeutralFill)
@@ -385,7 +384,7 @@ export const buttonStyles = StyleSheet.create({
     color: COLORS.info,
   },
   iconSchedule: {
-    color:   '#6b7280',
+    color: '#6b7280',
   },
   iconDelete: {
     color: COLORS.delete,
