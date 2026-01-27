@@ -1542,7 +1542,7 @@ const AddPurchaseInvoice = () => {
             setHeaderSubmitting(false);
         }
     };
-    const onCancel = () => { 
+    const onCancel = () => {
         navigation.goBack();
     };
 
@@ -2056,7 +2056,7 @@ const AddPurchaseInvoice = () => {
                                         </View>
 
                                         <View style={styles.col}>
-                                            <TouchableOpacity activeOpacity={0.7} onPress={() => onOpenDatePicker && onOpenDatePicker('invoice')}>
+                                            <TouchableOpacity activeOpacity={0.7} onPress={() => openDatePickerFor('invoice')}>
                                                 <Text style={inputStyles.label}>Order Date*</Text>
                                                 <View style={[inputStyles.box, styles.innerFieldBox, styles.datePickerBox, { alignItems: 'center' }]}>
                                                     <Text style={[inputStyles.input, styles.datePickerText, !values.OrderDate && { color: COLORS.textLight }]}>{values.OrderDate || 'Order Date*'}</Text>
@@ -2267,7 +2267,7 @@ const AddPurchaseInvoice = () => {
                                         <View>
                                             <View style={styles.tableControlsRow}>
                                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                    <Text style={{ marginRight: wp(2) }}>Show</Text>
+                                                    <Text style={{ marginRight: wp(2), color: COLORS.text, fontSize: rf(3.2) }}>Show</Text>
                                                     <Dropdown
                                                         placeholder={String(pageSize)}
                                                         value={String(pageSize)}
@@ -2278,7 +2278,7 @@ const AddPurchaseInvoice = () => {
                                                         inputBoxStyle={{ width: wp(18) }}
                                                         textStyle={inputStyles.input}
                                                     />
-                                                    <Text style={{ marginLeft: wp(2) }}>entries</Text>
+                                                    <Text style={{ marginLeft: wp(2), color: COLORS.text, fontSize: rf(3.2) }}>entries</Text>
                                                 </View>
 
                                                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
@@ -3209,12 +3209,12 @@ const styles = StyleSheet.create({
         color: COLORS.text,
         fontWeight: '600',
     },
-     pageButtonActive: {
-    backgroundColor: COLORS.primary,
-  },
-  pageButtonTextActive: {
-    color: '#fff',
-  },
+    pageButtonActive: {
+        backgroundColor: COLORS.primary,
+    },
+    pageButtonTextActive: {
+        color: '#fff',
+    },
     tdAction: {
         justifyContent: 'center',
         alignItems: 'center',

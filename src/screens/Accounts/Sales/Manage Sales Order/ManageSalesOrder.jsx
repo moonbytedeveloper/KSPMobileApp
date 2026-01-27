@@ -1276,6 +1276,7 @@ const ManageSalesOrder = () => {
         ]);
 
         const custList = extractArray(custResp);
+        console.log('getCustomers resp ->', custResp);
         console.log(custList, '001');
 
         const termsList = extractArray(termsResp);

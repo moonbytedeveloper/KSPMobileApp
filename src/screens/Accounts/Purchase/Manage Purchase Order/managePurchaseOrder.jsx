@@ -3085,7 +3085,7 @@ const ManagePurchaseOrder = () => {
                 <View>
                   <View style={styles.tableControlsRow}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={{ marginRight: wp(2), color: screenTheme.text,fontSize: rf(2.2) }}>Show</Text>
+                      <Text style={{ marginRight: wp(2), color: screenTheme.text,fontSize: rf(3.2) }}>Show</Text>
                       <Dropdown
                         placeholder={String(pageSize)}
                         value={String(pageSize)}
@@ -3096,7 +3096,7 @@ const ManagePurchaseOrder = () => {
                         inputBoxStyle={{ width: wp(20) }}
                       // textStyle={inputStyles.input}
                       />
-                      <Text style={{ marginLeft: wp(2), color: screenTheme.text,fontSize: rf(2.2)  }}>entries</Text>
+                      <Text style={{ marginLeft: wp(2), color: screenTheme.text,fontSize: rf(3.2)  }}>entries</Text>
                     </View>
 
                     <View style={{ flex: 1, alignItems: 'flex-end' }}>
