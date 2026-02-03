@@ -393,6 +393,7 @@ const AddSalesInvoice = () => {
                     setToDate(String(prefillTo));
                 }
             } else setToDate('');
+
             setShippingCharges(String(data?.ShippingCharges ?? data?.ShippingCharge ?? 0));
             setAdjustments(String(data?.AdjustmentPrice ?? data?.Adjustment ?? 0));
             setTerms(data?.TermsConditions || data?.Terms || '');
@@ -672,7 +673,10 @@ const AddSalesInvoice = () => {
                         setToDate(String(fetchedTo));
                     }
                 }
-
+                console.log(data, 501);
+                if (data?.currency|| data?.Currency !== undefined) {
+                    setCurrency(data?.currency || data?.Currency || '');
+                }
                 setShippingCharges(String(data?.ShippingCharges ?? data?.ShippingCharge ?? 0));
                 setAdjustments(String(data?.AdjustmentPrice ?? data?.Adjustment ?? 0));
                 setTerms(data?.TermsConditions || data?.Terms || '');
@@ -738,6 +742,7 @@ const AddSalesInvoice = () => {
                             tax: l?.TaxType || l?.Tax || 'IGST',
                             amount: String(Number(amount || 0).toFixed(2)),
                             serverLineUuid: l?.UUID || l?.Id || l?.LineUUID || null,
+                            currency: l?.currency || l?.Currency || ''
                         };
                     });
                     if (normalizedLines.length > 0) setItems(normalizedLines);
@@ -818,6 +823,7 @@ const AddSalesInvoice = () => {
                                 tax: l?.TaxType || l?.Tax || 'IGST',
                                 amount: String(Number(l?.Amount ?? l?.Total ?? 0).toFixed(2)),
                                 serverLineUuid: l?.UUID || l?.Id || l?.LineUUID || null,
+                                currency: l?.Currency || l?.currency || '',
                             }));
                             if (normalized.length > 0) setItems(normalized);
                         } catch (le) {
@@ -894,10 +900,16 @@ const AddSalesInvoice = () => {
                         tax: l?.TaxType || l?.Tax || 'IGST',
                         amount: String(Number(amount || 0).toFixed(2)),
                         serverLineUuid: l?.UUID || l?.Id || l?.LineUUID || null,
+                        currency: l?.currency || l?.Currency || ''
                     };
                 });
                 if (mounted) {
                     if (normalizedLines.length > 0) setItems(normalizedLines);
+                                        // bind header-level currency if provided with the lines response
+                                        try {
+                                            const hdrCurrency = linesResp?.Data?.Currency || linesResp?.Data?.currency || linesResp?.Currency || linesResp?.currency || (normalizedLines && normalizedLines.length ? normalizedLines[0]?.currency : '') || '';
+                                            if (hdrCurrency && String(hdrCurrency).trim() !== '') setCurrency(hdrCurrency);
+                                        } catch (e) { /* ignore */ }
                 }
             } catch (e) {
                 const errMsg = extractApiMessage(null, e) || 'Failed to fetch invoice lines';
@@ -1198,6 +1210,7 @@ const AddSalesInvoice = () => {
     const [project, setProject] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('');
     const [shippingCharges, setShippingCharges] = useState('0');
+    const [currency, setCurrency] = useState('');
     const [adjustments, setAdjustments] = useState('0');
     const [adjustmentLabel, setAdjustmentLabel] = useState('Adjustments');
     const [totalTax, setTotalTax] = useState('0');
@@ -1732,6 +1745,11 @@ const AddSalesInvoice = () => {
                 if (existing.serverLineUuid) {
                     const resp = await updateSalesInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
                     console.log('update line resp ->', resp);
+                                        // bind header currency if returned by line update
+                                        try {
+                                            const hdrCurrency = resp?.Data?.Currency || resp?.Data?.currency || resp?.Currency || resp?.currency || resp?.Data?.Header?.Currency || resp?.Header?.Currency || '';
+                                            if (hdrCurrency && String(hdrCurrency).trim() !== '') setCurrency(hdrCurrency);
+                                        } catch (e) { /* ignore */ }
                     const updatedLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || existing.serverLineUuid;
                     setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, employeeName: currentItem.employeeName || '', sku: currentItem.itemNameUuid || currentItem.employeeUuid || null, itemUuid: currentItem.itemNameUuid || currentItem.employeeUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid }) : it));
                     // refresh header totals from server after update
@@ -1761,6 +1779,12 @@ const AddSalesInvoice = () => {
                 console.log('Posting line payload ->', payload);
                 const resp = await addSalesInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
                 console.log('add line resp ->', resp);
+
+                                // bind header currency if returned by line add
+                                try {
+                                    const hdrCurrency = resp?.Data?.Currency || resp?.Data?.currency || resp?.Currency || resp?.currency || resp?.Data?.Header?.Currency || resp?.Header?.Currency || '';
+                                    if (hdrCurrency && String(hdrCurrency).trim() !== '') setCurrency(hdrCurrency);
+                                } catch (e) { /* ignore */ }
 
                 // on success, update local items list (assign local id and keep server uuid if returned)
                 const nextId = items.length ? (items[items.length - 1].id + 1) : 1;
@@ -2759,7 +2783,7 @@ const AddSalesInvoice = () => {
                                     <View style={{ width: '40%' }}>
                                         <Text style={inputStyles.label}>Amount</Text>
                                         <View style={[inputStyles.box, { marginTop: hp(0.5), width: '60%' }]}>
-                                            <Text style={[inputStyles.input, { textAlign: 'center', fontWeight: '600' }]}>₹{computeAmount(currentItem.quantity || 0, currentItem.rate || 0)}</Text>
+                                            <Text style={[inputStyles.input, { textAlign: 'center', fontWeight: '600' }]}>{computeAmount(currentItem.quantity || 0, currentItem.rate || 0)}</Text>
                                         </View>
                                     </View>
 
@@ -2780,15 +2804,7 @@ const AddSalesInvoice = () => {
                                                 <Text style={[styles.addBtnText, { color: '#fff' }]}>{editItemId ? 'Update' : 'Add'}</Text>
                                             )}
                                         </TouchableOpacity>
-                                        {editItemId ? (
-                                            <TouchableOpacity
-                                                activeOpacity={0.8}
-                                                style={[styles.addBtn, { backgroundColor: '#6c757d', marginLeft: wp(3) }]}
-                                                onPress={() => { setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '', unit: '', unitUuid: null, desc: '', hsn: '', rate: '', employeeName: '', employeeUuid: null }); setEditItemId(null); }}
-                                            >
-                                                <Text style={styles.addBtnText}>Cancel</Text>
-                                            </TouchableOpacity>
-                                        ) : null}
+
                                     </View>
                                 </View>
                             </View>
@@ -2890,10 +2906,10 @@ const AddSalesInvoice = () => {
                                                                     <Text style={styles.tdText}>{item.qty}</Text>
                                                                 </View>
                                                                 <View style={[styles.td, { width: wp(20) }]}>
-                                                                    <Text style={styles.tdText}>₹{item.rate}</Text>
+                                                                    <Text style={styles.tdText}>{item.currency}{item.rate}</Text>
                                                                 </View>
                                                                 <View style={[styles.td, { width: wp(20) }]}>
-                                                                    <Text style={[styles.tdText, { fontWeight: '600' }]}>₹{item.amount}</Text>
+                                                                    <Text style={[styles.tdText, { fontWeight: '600' }]}>{item.currency}{item.amount}</Text>
                                                                 </View>
                                                                 <View style={[styles.tdAction, { width: wp(40) }, { flexDirection: 'row', paddingLeft: wp(2) }]}>
                                                                     <TouchableOpacity style={styles.actionButton} onPress={() => handleEditItem(item.id)}>
@@ -2977,7 +2993,7 @@ const AddSalesInvoice = () => {
                             {/* Subtotal */}
                             <View style={styles.row}>
                                 <Text style={styles.labelBold}>Subtotal:</Text>
-                                <Text style={styles.valueBold}>₹{computeSubtotal()}</Text>
+                                <Text style={styles.valueBold}>{currency}{computeSubtotal()}</Text>
                             </View>
 
                             {/* Shipping Charges */}
@@ -3031,7 +3047,7 @@ const AddSalesInvoice = () => {
                                 </View>
 
                                 <Text style={styles.value}>
-                                    ₹{parseFloat(shippingCharges || 0).toFixed(2)}
+                                    {currency}{parseFloat(shippingCharges || 0).toFixed(2)}
                                 </Text>
                             </View>
 
@@ -3091,14 +3107,14 @@ const AddSalesInvoice = () => {
                                 </View>
 
                                 <Text style={styles.value}>
-                                    ₹{parseFloat(adjustments || 0).toFixed(2)}
+                                    {currency}{parseFloat(adjustments || 0).toFixed(2)}
                                 </Text>
                             </View>
 
                             {/* Total Tax */}
                             <View style={styles.row}>
                                 <Text style={styles.label}>Total Tax:</Text>
-                                <Text style={styles.value}>₹{(parseFloat(totalTax) || 0).toFixed(2)}</Text>
+                                <Text style={styles.value}>{currency}{(parseFloat(totalTax) || 0).toFixed(2)}</Text>
                             </View>
 
                             {/* Divider */}
@@ -3108,7 +3124,7 @@ const AddSalesInvoice = () => {
                             <View style={styles.row}>
                                 <Text style={styles.labelBold}>Total Amount:</Text>
                                 <Text style={styles.valueBold}>
-                                    ₹
+                                    {currency}
                                     {(() => {
                                         const serverNum = (serverTotalAmount !== null && serverTotalAmount !== undefined && String(serverTotalAmount).trim() !== '') ? parseFloat(serverTotalAmount) : NaN;
                                         const shippingNum = parseFloat(shippingCharges) || 0;
@@ -3973,7 +3989,7 @@ const styles = StyleSheet.create({
     value: {
         fontSize: 14,
         color: '#333',
-        width: '20%',
+        width: '30%',
         textAlign: 'right',
     },
 

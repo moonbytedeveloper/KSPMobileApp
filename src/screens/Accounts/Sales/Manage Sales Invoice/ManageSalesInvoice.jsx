@@ -73,6 +73,7 @@ const ManageSalesInvoice = () => {
                 contactPerson: r?.ContactPerson || r?.Contact || '',
                 status: r?.Status || r?.State || 'Draft',
                 raw: r,
+                currency : r?.currency || r?.Currency
             }));
             // Prefer Data.TotalCount, then common total keys
             const total = Number(data?.TotalCount ?? data?.TotalRecords ?? data?.Total ?? resp?.TotalRecords ?? resp?.Total ?? records.length) || records.length;
@@ -101,6 +102,7 @@ const ManageSalesInvoice = () => {
                                 contactPerson: r?.ContactPerson || r?.Contact || '',
                                 status: r?.Status || r?.State || 'Draft',
                                 raw: r,
+                                currency : r?.currency || r?.Currency
                             }));
                             setInvoices(altNormalized);
                             setTotalRecords(altTotal);
@@ -816,7 +818,7 @@ const ManageSalesInvoice = () => {
                             // show Sales Invoice No on the left header
                             expenseName: order.salesInvoiceNumber,
                             // show amount on the right header; fall back to '0.00' when missing
-                            amount: order.amount != null ? order.amount : '0.00',
+                            amount:   (order.currency)+(order.amount != null ? order.amount : '0.00'),
                         }}
                         isActive={activeOrderId === order.id}
                         onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}

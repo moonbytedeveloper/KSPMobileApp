@@ -458,7 +458,7 @@ const ViewPerfomaPurchaseInvoice = () => {
                     const PurchaseOrderNo = order.PurchaseOrderNo || order.PurchaseOrderNo || order.PurchaseOrderNo  || '';
                     const orderDate = order.OrderDate || order.Order_On || order.OrderedDate || order.Ordered_On || '';
                     const projectName = order.ProjectName || order.ProjectTitle || order.Project || order.Project_Name || order.ProjectTitleName || '';
-
+                    const currency = order.currency || order.Currency || order.CurrencyName || order.Currency_Code || '';
                     return (
                         <AccordionItem
                             key={id || JSON.stringify(order)}
@@ -466,7 +466,7 @@ const ViewPerfomaPurchaseInvoice = () => {
                                 soleExpenseCode: id,
                                 // Show project name in the left header; fallback to purchase order no.
                                 expenseName: invoiceNo ,
-                                amount: order.TotalAmount || order.GrandTotal || order.Amount || order.Total || amount || '0',
+                                amount: `${currency}${order.TotalAmount || order.GrandTotal || order.Amount || order.Total || amount || '0'}`,
                             }}
                             isActive={activeOrderId === id}
                             onToggle={() => setActiveOrderId((prev) => (prev === id ? null : id))}

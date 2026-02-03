@@ -262,8 +262,12 @@ const AddSalesPerfomaInvoice = () => {
     // Prefill header if navigated here with `prefillHeader` param
     useEffect(() => {
         const p = route?.params?.prefillHeader;
+        console.log(p,222);
+        
         if (!p) return;
         const data = p?.Data || p;
+        console.log(data,502);
+        
         (async () => {
             try {
                 setPrefillLoading(true);
@@ -319,7 +323,10 @@ const AddSalesPerfomaInvoice = () => {
                 if (daysValue) {
                     setDueDays(String(daysValue));
                 }
-
+                console.log(data,'501')
+                if (data?.currency || data?.Currency !== undefined) {
+                    setCurrency(data.currency || data.Currency);
+                }
                 // Prefill financial fields
                 setShippingCharges(String(data?.ShippingCharges ?? data?.ShippingCharge ?? 0));
                 setAdjustments(String(data?.AdjustmentPrice ?? data?.Adjustment ?? 0));
@@ -556,7 +563,9 @@ const AddSalesPerfomaInvoice = () => {
                 };
                 setStartDate(toUi(rawFrom));
                 setEndDate(toUi(rawTo));
-
+                if (data?.currency || data?.Currency !== undefined) {
+                    setCurrency(data.currency || data.Currency);
+                }
                 setShippingCharges(String(data?.ShippingCharges ?? data?.ShippingCharge ?? 0));
                 setAdjustments(String(data?.AdjustmentPrice ?? data?.Adjustment ?? 0));
                 if (data?.AdjustmentField) {
@@ -641,9 +650,16 @@ const AddSalesPerfomaInvoice = () => {
                             tax: l?.TaxType || l?.Tax || 'IGST',
                             amount: String(Number(amount || 0).toFixed(2)),
                             serverLineUuid: l?.UUID || l?.Id || l?.LineUUID || null,
+                            currency: l?.Currency || l?.currency || null,
+
                         };
                     });
                     if (normalizedLines.length > 0) setItems(normalizedLines);
+                                        // bind header-level currency if provided with the lines response
+                                        try {
+                                            const hdrCurrency = linesResp?.Data?.Currency || linesResp?.Data?.currency || linesResp?.Currency || linesResp?.currency || (normalizedLines && normalizedLines.length ? normalizedLines[0]?.currency : '') || '';
+                                            if (hdrCurrency && String(hdrCurrency).trim() !== '') setCurrency(hdrCurrency);
+                                        } catch (e) { /* ignore */ }
                     console.log('Fetched and normalized performa lines ->', normalizedLines);
                 } catch (le) {
                     console.warn('Failed to fetch performa lines', le?.message || le);
@@ -796,9 +812,15 @@ const AddSalesPerfomaInvoice = () => {
                         tax: l?.TaxType || l?.Tax || 'IGST',
                         amount: String(Number(amount || 0).toFixed(2)),
                         serverLineUuid: l?.UUID || l?.Id || l?.LineUUID || null,
+                        currency: l?.Currency || l?.currency || null,
                     };
                 });
                 if (normalizedLines.length > 0) setItems(normalizedLines);
+                                // bind header-level currency if provided with the lines response
+                                try {
+                                    const hdrCurrency = linesResp?.Data?.Currency || linesResp?.Data?.currency || linesResp?.Currency || linesResp?.currency || (normalizedLines && normalizedLines.length ? normalizedLines[0]?.currency : '') || '';
+                                    if (hdrCurrency && String(hdrCurrency).trim() !== '') setCurrency(hdrCurrency);
+                                } catch (e) { /* ignore */ }
                 console.log('[AddSalesPerfomaInvoice] fetched lines for headerUUID ->', headerUUID, normalizedLines);
             } catch (e) {
                 console.warn('[AddSalesPerfomaInvoice] Failed to fetch performa lines for headerUUID', headerUUID, e?.message || e);
@@ -894,6 +916,7 @@ const AddSalesPerfomaInvoice = () => {
     const [project, setProject] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('');
     const [shippingCharges, setShippingCharges] = useState('0');
+    const [currency, setCurrency] = useState('');
     const [adjustments, setAdjustments] = useState('0');
     const [adjustmentLabel, setAdjustmentLabel] = useState('Adjustments');
     const [totalTax, setTotalTax] = useState('0');
@@ -1453,6 +1476,11 @@ const AddSalesPerfomaInvoice = () => {
                 if (existing.serverLineUuid) {
                     const resp = await updateSalesPerformaInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
                     console.log('update line resp ->', resp);
+                                        // bind header currency if returned by line update
+                                        try {
+                                            const hdrCurrency = resp?.Data?.Currency || resp?.Data?.currency || resp?.Currency || resp?.currency || resp?.Data?.Header?.Currency || resp?.Header?.Currency || '';
+                                            if (hdrCurrency && String(hdrCurrency).trim() !== '') setCurrency(hdrCurrency);
+                                        } catch (e) { /* ignore */ }
                     const updatedLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || existing.serverLineUuid;
                     const nameVal = selectedProjectData?.IsTimesheetBased ? (currentItem.employeeName || currentItem.itemName || '') : (currentItem.itemName || '');
                     const uuidVal = selectedProjectData?.IsTimesheetBased ? (currentItem.employeeUuid || currentItem.itemNameUuid || null) : (currentItem.itemNameUuid || null);
@@ -1489,6 +1517,12 @@ const AddSalesPerfomaInvoice = () => {
                 console.log('Posting line payload ->', payload);
                 const resp = await addSalesPerformaInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
                 console.log('add line resp ->', resp);
+
+                                // bind header currency if returned by line add
+                                try {
+                                    const hdrCurrency = resp?.Data?.Currency || resp?.Data?.currency || resp?.Currency || resp?.currency || resp?.Data?.Header?.Currency || resp?.Header?.Currency || '';
+                                    if (hdrCurrency && String(hdrCurrency).trim() !== '') setCurrency(hdrCurrency);
+                                } catch (e) { /* ignore */ }
 
                 // on success, update local items list (assign local id and keep server uuid if returned)
                 const nextId = items.length ? (items[items.length - 1].id + 1) : 1;
@@ -2502,7 +2536,7 @@ const AddSalesPerfomaInvoice = () => {
                                     <View style={{ width: '40%' }}>
                                         <Text style={inputStyles.label}>Amount</Text>
                                         <View style={[inputStyles.box, { marginTop: hp(0.5), width: '60%' }]}>
-                                            <Text style={[inputStyles.input, { textAlign: 'center', fontWeight: '600' }]}>₹{computeAmount(currentItem.quantity || 0, currentItem.rate || 0)}</Text>
+                                            <Text style={[inputStyles.input, { textAlign: 'center', fontWeight: '600' }]}>{computeAmount(currentItem.quantity || 0, currentItem.rate || 0)}</Text>
                                         </View>
                                     </View>
 
@@ -2633,10 +2667,10 @@ const AddSalesPerfomaInvoice = () => {
                                                                     <Text style={styles.tdText}>{item.qty}</Text>
                                                                 </View>
                                                                 <View style={[styles.td, { width: wp(20) }]}>
-                                                                    <Text style={styles.tdText}>₹{item.rate}</Text>
+                                                                    <Text style={styles.tdText}>{item.currency}{item.rate}</Text>
                                                                 </View>
                                                                 <View style={[styles.td, { width: wp(20) }]}>
-                                                                    <Text style={[styles.tdText, { fontWeight: '600' }]}>₹{item.amount}</Text>
+                                                                    <Text style={[styles.tdText, { fontWeight: '600' }]}>{item.currency}{item.amount}</Text>
                                                                 </View>
                                                                 <View style={[styles.tdAction, { width: wp(40) }, { flexDirection: 'row', paddingLeft: wp(2) }]}>
                                                                     <TouchableOpacity style={styles.actionButton} onPress={() => handleEditItem(item.id)}>
@@ -2721,7 +2755,7 @@ const AddSalesPerfomaInvoice = () => {
                             {/* Subtotal */}
                             <View style={styles.row}>
                                 <Text style={styles.labelBold}>Subtotal:</Text>
-                                <Text style={styles.valueBold}>₹{computeSubtotal()}</Text>
+                                <Text style={styles.valueBold}>{currency}{computeSubtotal()}</Text>
                             </View>
 
                             {/* Shipping Charges */}
@@ -2775,7 +2809,7 @@ const AddSalesPerfomaInvoice = () => {
                                 </View>
 
                                 <Text style={styles.value}>
-                                    ₹{parseFloat(shippingCharges || 0).toFixed(2)}
+                                    {currency}{parseFloat(shippingCharges || 0).toFixed(2)}
                                 </Text>
                             </View>
 
@@ -2835,14 +2869,14 @@ const AddSalesPerfomaInvoice = () => {
                                 </View>
 
                                 <Text style={styles.value}>
-                                    ₹{parseFloat(adjustments || 0).toFixed(2)}
+                                    {currency}{parseFloat(adjustments || 0).toFixed(2)}
                                 </Text>
                             </View>
 
                             {/* Total Tax */}
                             <View style={styles.row}>
                                 <Text style={styles.label}>Total Tax:</Text>
-                                <Text style={styles.value}>₹{(parseFloat(totalTax) || 0).toFixed(2)}</Text>
+                                <Text style={styles.value}>{currency}{(parseFloat(totalTax) || 0).toFixed(2)}</Text>
                             </View>
 
                             {/* Divider */}
@@ -2852,7 +2886,7 @@ const AddSalesPerfomaInvoice = () => {
                             <View style={styles.row}>
                                 <Text style={styles.labelBold}>Total Amount:</Text>
                                 <Text style={styles.valueBold}>
-                                    ₹
+                                    {currency}
                                     {(() => {
                                         const serverNum = (serverTotalAmount !== null && serverTotalAmount !== undefined && String(serverTotalAmount).trim() !== '') ? parseFloat(serverTotalAmount) : NaN;
                                         const shippingNum = parseFloat(shippingCharges) || 0;
@@ -3593,7 +3627,7 @@ const styles = StyleSheet.create({
     pageButtonActive: {
         backgroundColor: COLORS.primary,
     },
-      pageButtonTextActive: {
+    pageButtonTextActive: {
         color: '#fff',
     },
     pageButtonText: {
@@ -3698,7 +3732,7 @@ const styles = StyleSheet.create({
     value: {
         fontSize: 14,
         color: '#333',
-        width: '20%',
+        width: '30%',
         textAlign: 'right',
     },
 

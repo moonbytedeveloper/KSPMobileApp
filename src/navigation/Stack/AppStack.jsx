@@ -1240,13 +1240,10 @@ const styles = StyleSheet.create({
   },
   salesSection: {
     marginBottom: hp(0.6),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e6e6e6',
     borderRadius: wp(2),
     overflow: 'hidden',
   },
   salesSectionOpen: {
-    backgroundColor: '#f3f4f6',
     paddingVertical: hp(0.6),
   },
   loadingContainer: {

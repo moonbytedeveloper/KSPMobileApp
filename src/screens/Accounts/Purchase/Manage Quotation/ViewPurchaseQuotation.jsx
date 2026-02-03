@@ -12,62 +12,6 @@ import { getpurchaseQuotationHeaders, deletePurchaseQuotationHeader, getPurchase
 import { getErrorMessage } from '../../../../utils/errorMessage';
 import { subscribe, publish } from '../../../../utils/eventBus';
 
-const SALES_ORDERS = [
-    {
-        id: 'KP1524',
-        salesOrderNumber: 'KP1524',
-        customerName: 'Moonbyte',
-        deliveryDate: '15-12-24',
-        dueDate: '15-12-24',
-        salesInvoiceNumber: 'OR.002',
-
-    },
-    {
-        id: 'KP1525',
-        salesOrderNumber: 'KP1525',
-        customerName: 'Northwind Retail',
-        deliveryDate: '04-01-25',
-        dueDate: '20-12-24',
-        salesInvoiceNumber: 'OR.002',
-
-    },
-    {
-        id: 'KP1526',
-        salesOrderNumber: 'KP1526',
-        customerName: 'Creative Labs',
-        deliveryDate: '22-12-24',
-        dueDate: '18-12-24',
-        salesInvoiceNumber: 'OR.002',
-
-    },
-    {
-        id: 'KP1527',
-        salesOrderNumber: 'KP1527',
-        customerName: 'BlueStone Pvt Ltd',
-        deliveryDate: '11-01-25',
-        dueDate: '28-12-24',
-        salesInvoiceNumber: 'OR.002',
-
-    },
-    {
-        id: 'KP1528',
-        salesOrderNumber: 'KP1528',
-        customerName: 'Aero Technologies',
-        deliveryDate: '29-12-24',
-        dueDate: '24-12-24',
-        salesInvoiceNumber: 'OR.002',
-
-    },
-    {
-        id: 'KP1529',
-        salesOrderNumber: 'KP1529',
-        customerName: 'UrbanNest Homes',
-        deliveryDate: '05-02-25',
-        dueDate: '12-01-25',
-        salesInvoiceNumber: '₹1,85,300',
-
-    },
-];
 
 const ITEMS_PER_PAGE_OPTIONS = ['5', '10', '20', '50'];
 
@@ -117,6 +61,7 @@ const ViewPurchaseQuotation = () => {
                 deliveryDate: it?.DeliveryDate || it?.RequiredDate || '',
                 dueDate: it?.DueDate || it?.ExpectedDate || '',
                 _raw: it,
+                currency : it?.currency || it?.Currency || '',
             }));
             setOrders(mapped);
             setCurrentPage(0);
@@ -129,7 +74,7 @@ const ViewPurchaseQuotation = () => {
     };
 
     const filteredOrders = useMemo(() => {
-        const source = (orders && orders.length) ? orders : SALES_ORDERS;
+        const source = (orders && orders.length) ? orders : [];
         const query = searchQuery.trim().toLowerCase();
         if (!query) return source;
         return source.filter((order) => {
@@ -181,6 +126,7 @@ const ViewPurchaseQuotation = () => {
                     deliveryDate: it?.DeliveryDate || it?.RequiredDate || '',
                     dueDate: it?.DueDate || it?.ExpectedDate || '',
                     _raw: it,
+                    currency: it?.Currency || it?.currency || '',
                 }));
                 console.log('Mapped purchase quotation headers ->', mapped);
                 if (mounted) setOrders(mapped);
@@ -520,7 +466,8 @@ const ViewPurchaseQuotation = () => {
         const nextPage = Math.max(0, Math.min(pageIndex, Math.max(totalPages - 1, 0)));
         setCurrentPage(nextPage);
     };
-
+ console.log(orders,5011);
+ 
     return (
         <View style={styles.screen}>
             <AppHeader
@@ -582,7 +529,7 @@ const ViewPurchaseQuotation = () => {
                             item={{
                                 soleExpenseCode: order.id,
                                 expenseName: order.quotationNumber || '-',
-                                amount: order.amount || '-',
+                                amount: (order.currency)+(order.amount || '0'),
                                 headerTitle: order.quotationNumber || '-',
                             }}
                             isActive={activeOrderId === order.id}

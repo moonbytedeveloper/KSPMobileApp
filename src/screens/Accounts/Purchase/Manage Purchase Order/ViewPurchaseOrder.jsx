@@ -75,6 +75,7 @@ const ViewPurchaseOrder = () => {
                 item: { itemType: '', name: '' },
                 quantity: it?.LineCount || it?.TotalLines || 0,
                 raw: it,
+                currency: it?.Currency || it?.currency || '',
             }));
             setOrders(normalized);
             const total = data?.TotalRecords ?? data?.total ?? data?.Total ?? list.length;
@@ -408,7 +409,7 @@ const ViewPurchaseOrder = () => {
                         key={order.id}
                         item={{
                             headerTitle: order.purchaseOrderNumber || order.vendorName || order.raw?.PurchaseOrderNo || '',
-                            headerValue: order.amount || order.quantity || '',
+                            headerValue: `${order.currency || order.raw?.Currency || ''}${order.amount || order.quantity || ''} `,
                             // keep raw for downstream actions
                             ...order,
                         }}
@@ -420,7 +421,6 @@ const ViewPurchaseOrder = () => {
                             { label: "Vendor Name", value: order.vendorName || order.raw?.VendorName || '-' },
                             { label: "Project Name", value: order.projectName || order.raw?.ProjectTitle || '-' },
                             { label: "Delivery Date", value: order.deliveryDate || '-' },
-                            { label: "Total Amount", value: order.amount || '-' }
                         ]}
 
                         headerLeftLabel="Purchase Order No"

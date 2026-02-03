@@ -7,7 +7,7 @@ import Dropdown from '../../../../components/common/Dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../../../utils/responsive';
 import { COLORS, TYPOGRAPHY, RADIUS } from '../../../styles/styles';
-import { getSalesOrderHeaders, getSalesHeader, deleteSalesOrderHeader, getSalesOrderSlip, convertSalesOrderToInvoice, getSalesOrderRelatedDocuments, getSalesInvoiceSlip, getSalesPerformaInvoiceSlip } from '../../../../api/authServices';
+import { getSalesOrderHeaders,  deleteSalesOrderHeader, getSalesOrderSlip, convertSalesOrderToInvoice, getSalesOrderRelatedDocuments, getSalesInvoiceSlip, getSalesPerformaInvoiceSlip } from '../../../../api/authServices';
 import { getErrorMessage } from '../../../../utils/errorMessage';
 
 // sales orders will be fetched from API
@@ -103,7 +103,7 @@ const ViewSalesOrder = () => {
                         }
                     ]
                 );
-                } catch (error) {
+            } catch (error) {
                 console.log('Convert error:', error?.message || error);
                 Alert.alert('Conversion Failed', getErrorMessage(error, 'Unable to convert sales order to invoice. Please try again.'));
             }
@@ -197,9 +197,11 @@ const ViewSalesOrder = () => {
                 deliveryDate: r?.DeliveryDate || r?.OrderDate || r?.ExpectedDeliveryDate || '',
                 dueDate: r?.DueDate || r?.PaymentDueDate || '',
                 amount: r?.Amount || r?.TotalAmount || r?.NetAmount || '',
+                currency: r?.Currency || r?.currency || '',
                 raw: r,
             }));
             setOrders(normalized);
+            console.log('Normalized Orders ->', normalized.map(o => o.currency));
             const total = typeof resp?.Data?.TotalCount === 'number' ? resp.Data.TotalCount : normalized.length;
             setTotalRecords(total);
         } catch (e) {
@@ -222,7 +224,7 @@ const ViewSalesOrder = () => {
             fetchOrders({ start: currentPage * itemsPerPage, length: itemsPerPage, searchValue: searchQuery.trim() });
         }, [currentPage, itemsPerPage, searchQuery])
     );
-    
+
     const onRefresh = async () => {
         try {
             setRefreshing(true);
@@ -449,13 +451,13 @@ const ViewSalesOrder = () => {
                         item={{
                             soleExpenseCode: order.id,
                             expenseName: order.salesOrderNumber,
-                            amount: order.amount,
+                            amount: `${order.currency}${order.amount}`,
                         }}
                         isActive={activeOrderId === order.id}
                         onToggle={() => setActiveOrderId((prev) => (prev === order.id ? null : order.id))}
                         customRows={[
                             { label: 'Customer Name', value: order.customerName },
-                            { label: 'Amount', value: order.amount },
+                            { label: 'Amount', value: `${order.currency}${order.amount}` },
                             { label: 'Delivery Date', value: order.deliveryDate },
                             { label: 'Due Date', value: order.dueDate },
                         ]}
@@ -503,7 +505,7 @@ const ViewSalesOrder = () => {
                                                 </TouchableOpacity>
                                             ))
                                         ) : (
-                                            <View style={{ paddingVertical: hp(1    ), }}>
+                                            <View style={{ paddingVertical: hp(1), }}>
                                                 <Text style={{ fontSize: rf(3), color: COLORS.textLight, }}>No sales invoice records found.</Text>
                                             </View>
                                         )}

@@ -189,6 +189,7 @@ const AddPurchaseQuotation = () => {
     desc: '',
     hsn: '',
     rate: '',
+    currency: '',
   });
   const [editItemId, setEditItemId] = useState(null);
   const [isAddingLine, setIsAddingLine] = useState(false);
@@ -215,7 +216,8 @@ const AddPurchaseQuotation = () => {
   const [projectUUID, setProjectUUID] = useState('');
   const [vendor, setVendor] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
-  const [shippingCharges, setShippingCharges] = useState('0');
+  const [currency, setCurrency] = useState('');
+  const [shippingCharges, setShippingCharges] = useState('0'); 
   const [discount, setDiscount] = useState('0');
   const [adjustments, setAdjustments] = useState('0');
   const [adjustmentLabel, setAdjustmentLabel] = useState('Adjustments');
@@ -436,6 +438,7 @@ const AddPurchaseQuotation = () => {
         const amount = amtNum.toFixed(2);
         const tax = r?.TaxType || r?.Tax || 'IGST';
         const unit = r?.Unit || '';
+        const currency = r?.currency || r?.Currency || ''
         return {
           id: idx + 1,
           serverUuid,
@@ -450,6 +453,8 @@ const AddPurchaseQuotation = () => {
           tax,
           amount,
           unit,
+          currency,          
+
         };
       });
 
@@ -758,6 +763,7 @@ const AddPurchaseQuotation = () => {
         ProjectUUID: projectUUID || '',
         PaymentTerm: paymentTerm || '',
         PaymentMode: paymentMethod || '',
+        Currency: currency || headerForm.currency || headerResponse?.Currency || headerResponse?.currency || '',
         Note: terms || '',
         QuotationTitle: headerForm.quotationTitle || '',
         QuotationNo: headerForm.purchaseOrderNumber || '',
@@ -851,6 +857,7 @@ const AddPurchaseQuotation = () => {
         ProjectUUID: projectUUID || '',
         PaymentTerm: paymentTerm || '',
         PaymentMode: paymentMethod || '',
+        Currency: currency || headerForm.currency || headerResponse?.Currency || headerResponse?.currency || '',
         Note: notes || '',
         QuotationNo: headerForm.purchaseOrderNumber || '',
         QuotationTitle: headerForm.quotationTitle || '',
@@ -937,6 +944,7 @@ const AddPurchaseQuotation = () => {
         PaymentMethodUUID: paymentMethod || '',
         PaymentTerm: paymentTerm || '',
         PaymentMode: paymentMethod || '',
+        Currency: currency || headerForm.currency || headerResponse?.Currency || headerResponse?.currency || '',
         OrderDate: uiDateToApiDate(invoiceDate),
         DueDate: uiDateToApiDate(dueDate),
         Notes: notes || '',
@@ -1582,6 +1590,12 @@ const AddPurchaseQuotation = () => {
         setPaymentTerm(hdr.PaymentTermUUID || hdr.PaymentTerm || hdr.PaymentTermUUID || '');
         setPaymentMethod(hdr.PaymentMethodUUID || hdr.PaymentMethod || hdr.PaymentMethodUUID || '');
 
+        // Bind currency from incoming header where present (normalize multiple server key variants)
+        try {
+          const hdrCurrency = hdr?.Currency || hdr?.currency || hdr?.CurrencyName || hdr?.Currency_Code || '';
+          if (hdrCurrency) setCurrency(hdrCurrency);
+        } catch (e) { /* ignore */ }
+
         // Dates: convert server date to UI format if present
         try {
           const od = hdr.OrderDate || hdr.Order_Date || hdr.OrderedAt || hdr.OrderDateString || hdr.Order_Date_String || hdr.OrderDateTime || hdr.OrderedDate;
@@ -1686,6 +1700,11 @@ const AddPurchaseQuotation = () => {
         const projectId = data.ProjectUUID || data.Project_Id || data.ProjectId || data.UUID || data.Uuid || '';
         setProjectName(projectDisplayName);
         setProjectUUID(projectId);
+        // Bind currency from fetched header where present
+        try {
+          const fetchedCurrency = data?.Currency || data?.currency || data?.CurrencyName || data?.Currency_Code || '';
+          if (fetchedCurrency) setCurrency(fetchedCurrency);
+        } catch (e) { /* ignore */ }
         try {
           if (formikSetFieldValueRef.current) {
             formikSetFieldValueRef.current('ProjectName', projectDisplayName || '');
@@ -2471,7 +2490,7 @@ const AddPurchaseQuotation = () => {
                   <View style={{ width: '40%' }}>
                     <Text style={inputStyles.label}>Amount</Text>
                     <View style={[inputStyles.box, { marginTop: hp(0.5), width: '60%' }]}>
-                      <Text style={[inputStyles.input, { textAlign: 'center', fontWeight: '600' }]}>₹{computeAmount(currentItem.quantity || 0, currentItem.rate || 0)}</Text>
+                      <Text style={[inputStyles.input, { textAlign: 'center', fontWeight: '600' }]}>{computeAmount(currentItem.quantity || 0, currentItem.rate || 0)}</Text>
                     </View>
                   </View>
 
@@ -2599,10 +2618,10 @@ const AddPurchaseQuotation = () => {
                                       <Text style={styles.tdText}>{item.qty}</Text>
                                     </View>
                                     <View style={[styles.td, { width: wp(20) }]}>
-                                      <Text style={styles.tdText}>₹{item.rate}</Text>
+                                      <Text style={styles.tdText}>{item.currency}{item.rate}</Text>
                                     </View>
                                     <View style={[styles.td, { width: wp(20) }]}>
-                                      <Text style={[styles.tdText, { fontWeight: '600' }]}>₹{item.amount}</Text>
+                                      <Text style={[styles.tdText, { fontWeight: '600' }]}>{item.currency}{item.amount}</Text>
                                     </View>
                                     <View style={[styles.tdAction, { width: wp(40) }, { flexDirection: 'row', paddingLeft: wp(2) }]}>
                                       <TouchableOpacity style={styles.actionButton} onPress={() => handleEditItem(item.id)}>
@@ -2652,7 +2671,7 @@ const AddPurchaseQuotation = () => {
                 {/* Subtotal */}
                 <View style={styles.row}>
                   <Text style={styles.labelBold}>Subtotal:</Text>
-                  <Text style={styles.valueBold}>₹{computeSubtotal()}</Text>
+                  <Text style={styles.valueBold}>{currency}{computeSubtotal()}</Text>
                 </View>
 
                 {/* Shipping Charges */}
@@ -2684,7 +2703,7 @@ const AddPurchaseQuotation = () => {
                   </View>
 
                   <Text style={styles.value}>
-                    -₹{parseFloat(discount || 0).toFixed(2)}
+                    {currency}{parseFloat(discount || 0).toFixed(2)}
                   </Text>
                 </View>
 
@@ -2693,7 +2712,7 @@ const AddPurchaseQuotation = () => {
                 {/* Total Tax */}
                 <View style={styles.row}>
                   <Text style={styles.label}>Total Tax:</Text>
-                  <Text style={styles.value}>₹0.00</Text>
+                  <Text style={styles.value}>{currency}0.00</Text>
                 </View>
 
                 {/* Divider */}
@@ -2703,7 +2722,7 @@ const AddPurchaseQuotation = () => {
                 <View style={styles.row}>
                   <Text style={styles.labelBold}>Total Amount:</Text>
                   <Text style={styles.valueBold}>
-                    ₹
+                    {currency}
                     {(
                       parseFloat(computeSubtotal()) +
                       parseFloat(shippingCharges || 0) +
@@ -3545,7 +3564,7 @@ const styles = StyleSheet.create({
   value: {
     fontSize: 14,
     color: '#333',
-    width: '20%',
+    width: '30%',
     textAlign: 'right',
   },
 

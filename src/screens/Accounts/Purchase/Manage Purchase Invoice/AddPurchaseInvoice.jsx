@@ -657,9 +657,10 @@ const AddPurchaseInvoice = () => {
                     adjustment: adjustmentAmount,
                     tax: taxAmount,
                     total: totalAmount,
-                    subTotal: data?.SubTotal
+                    subTotal: data?.SubTotal,
+                    currency: data?.currency || data?.Currency || '',
                 });
-
+                setCurrency(data?.currency || data?.Currency || '');
                 setShippingCharges(String(shippingAmount));
                 setAdjustments(String(adjustmentAmount));
                 setDiscount(String(discountAmount));
@@ -694,8 +695,12 @@ const AddPurchaseInvoice = () => {
                     const cmp = cmpUuid || (await getCMPUUID());
                     const env = envUuid || (await getENVUUID());
                     const linesResp = await getPurchaseInvoiceLines({ headerUuid: data?.UUID || headerUuid, cmpUuid: cmp, envUuid: env, start: 0, length: 1000 });
+                    console.log(linesResp, 5222);
+
                     const rawLines = linesResp?.Data?.Records || linesResp?.Data || linesResp || [];
                     const list = Array.isArray(rawLines) ? rawLines : [];
+                    console.log(list, 5656);
+
                     const normalizedLines = list.map((l, idx) => {
                         const qty = (l?.Quantity ?? l?.Qty ?? l?.quantity ?? 1);
                         const rate = (l?.Rate ?? l?.RateAmount ?? l?.Price ?? 0);
@@ -713,9 +718,15 @@ const AddPurchaseInvoice = () => {
                             tax: l?.TaxType || l?.Tax || 'IGST',
                             amount: String(Number(amount || 0).toFixed(2)),
                             serverLineUuid: l?.UUID || l?.Id || l?.LineUUID || null,
+                            currency: linesResp?.Data?.MetaData?.currency || linesResp?.Data?.MetaData?.Currency || '',
                         };
                     });
                     if (normalizedLines.length > 0) setItems(normalizedLines);
+                    // bind header-level currency if provided with the lines response
+                    try {
+                        const hdrCurrency = linesResp?.Data?.Currency || linesResp?.Data?.currency || linesResp?.Data?.MetaData?.currency || linesResp?.Data?.MetaData?.Currency || linesResp?.Currency || linesResp?.currency || (normalizedLines && normalizedLines.length ? normalizedLines[0]?.currency : '') || '';
+                        if (hdrCurrency && String(hdrCurrency).trim() !== '') setCurrency(hdrCurrency);
+                    } catch (e) { /* ignore */ }
                     console.log('Fetched and normalized performa lines ->', normalizedLines);
                 } catch (le) {
                     console.warn('Failed to fetch performa lines', le?.message || le);
@@ -1011,6 +1022,7 @@ const AddPurchaseInvoice = () => {
     const [project, setProject] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('');
     const [shippingCharges, setShippingCharges] = useState('0');
+    const [currency, setCurrency] = useState('0');
     const [adjustments, setAdjustments] = useState('0');
     const [discount, setDiscount] = useState('0');
     const [adjustmentLabel, setAdjustmentLabel] = useState('Adjustments');
@@ -1237,6 +1249,7 @@ const AddPurchaseInvoice = () => {
                     desc: item.desc || '',
                     hsn: item.hsn || '',
                     amount: computeAmount(qty, item.rate),
+                    currency: item.currency || '',
                 };
             }),
         );
@@ -1437,7 +1450,12 @@ const AddPurchaseInvoice = () => {
                     const resp = await updatePurchaseInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
                     console.log('update line resp ->', resp);
                     const updatedLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || existing.serverLineUuid;
-                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: hsnSacNo || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid }) : it));
+                    // bind currency from response if backend returned header-level or line-level currency
+                    try {
+                        const hdrCurrency = resp?.Data?.Currency || resp?.Data?.currency || resp?.Currency || resp?.currency || existing?.currency || '';
+                        if (hdrCurrency && String(hdrCurrency).trim() !== '') setCurrency(hdrCurrency);
+                    } catch (e) { /* ignore */ }
+                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: hsnSacNo || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid, currency: resp?.Data?.currency || resp?.Data?.Currency || it?.currency || '' }) : it));
                     // refresh header totals from server after update
                     await refreshHeaderTotals(headerUUID);
                 } else {
@@ -1469,7 +1487,12 @@ const AddPurchaseInvoice = () => {
                 // on success, update local items list (assign local id and keep server uuid if returned)
                 const nextId = items.length ? (items[items.length - 1].id + 1) : 1;
                 const serverLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || null;
-                setItems(prev => ([...prev, { id: nextId, selectedItem: null, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: hsnSacNo || '', qty: String(qty), tax: 'IGST', amount: computeAmount(qty, rate), serverLineUuid }]));
+                // bind header currency if returned with line creation
+                try {
+                    const hdrCurrency = resp?.Data?.Currency || resp?.Data?.currency || resp?.Currency || resp?.currency || '';
+                    if (hdrCurrency && String(hdrCurrency).trim() !== '') setCurrency(hdrCurrency);
+                } catch (e) { /* ignore */ }
+                setItems(prev => ([...prev, { id: nextId, selectedItem: null, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: hsnSacNo || '', qty: String(qty), tax: 'IGST', amount: computeAmount(qty, rate), serverLineUuid, currency: resp?.Data?.currency || resp?.Data?.Currency || '' }]));
 
                 // reset line form
                 setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
@@ -1617,6 +1640,7 @@ const AddPurchaseInvoice = () => {
                 PurchaseInqNoUUID: salesInquiryUuid || headerForm.salesInquiryUUID || '',
                 PurchaseOrderNo: purchaseOrderNoUuidRuntime || headerForm.clientName || '',
                 VendorUUID: headerForm.CustomerUUID || '',
+                Currency: currency || headerForm.Currency || headerForm.currency || headerResponse?.Currency || headerResponse?.currency || '',
                 ProjectUUID: projectUUID || project || '',
                 PaymentTerm: paymentTermUuid || '',
                 PaymentMode: paymentMethodUUID || '',
@@ -1687,6 +1711,7 @@ const AddPurchaseInvoice = () => {
                 PurchaseInqNoUUID: salesInquiryUuid || headerForm.salesInquiryUUID || '',
                 PurchaseOrderNo: purchaseOrderNoUuidRuntime || headerForm.clientName || '',
                 VendorUUID: headerForm.CustomerUUID || '',
+                Currency: currency || headerForm.Currency || headerForm.currency || headerResponse?.Currency || headerResponse?.currency || '',
                 ProjectUUID: projectUUID || project || '',
                 PaymentTerm: paymentTermUuid || '',
                 PaymentMode: paymentMethodUUID || '',
@@ -2223,7 +2248,7 @@ const AddPurchaseInvoice = () => {
                                                 <View style={{ width: '40%' }}>
                                                     <Text style={inputStyles.label}>Amount</Text>
                                                     <View style={[inputStyles.box, { marginTop: hp(0.5), width: '60%' }]}>
-                                                        <Text style={[inputStyles.input, { textAlign: 'center', fontWeight: '600' }]}>₹{computeAmount(currentItem.quantity || 0, currentItem.rate || 0)}</Text>
+                                                        <Text style={[inputStyles.input, { textAlign: 'center', fontWeight: '600' }]}>{computeAmount(currentItem.quantity || 0, currentItem.rate || 0)}</Text>
                                                     </View>
                                                 </View>
 
@@ -2353,10 +2378,10 @@ const AddPurchaseInvoice = () => {
                                                                                 <Text style={styles.tdText}>{item.qty}</Text>
                                                                             </View>
                                                                             <View style={[styles.td, { width: wp(20) }]}>
-                                                                                <Text style={styles.tdText}>₹{item.rate}</Text>
+                                                                                <Text style={styles.tdText}>{item.currency}{item.rate}</Text>
                                                                             </View>
                                                                             <View style={[styles.td, { width: wp(20) }]}>
-                                                                                <Text style={[styles.tdText, { fontWeight: '600' }]}>₹{item.amount}</Text>
+                                                                                <Text style={[styles.tdText, { fontWeight: '600' }]}>{item.currency}{item.amount}</Text>
                                                                             </View>
                                                                             <View style={[styles.tdAction, { width: wp(40) }, { flexDirection: 'row', paddingLeft: wp(2) }]}>
                                                                                 <TouchableOpacity style={styles.actionButton} onPress={() => handleEditItem(item.id)}>
@@ -2402,7 +2427,7 @@ const AddPurchaseInvoice = () => {
                                         {/* Subtotal */}
                                         <View style={styles.row}>
                                             <Text style={styles.labelBold}>Subtotal:</Text>
-                                            <Text style={styles.valueBold}>₹{computeSubtotal()}</Text>
+                                            <Text style={styles.valueBold}>{currency}{computeSubtotal()}</Text>
                                         </View>
 
 
@@ -2420,7 +2445,7 @@ const AddPurchaseInvoice = () => {
                                                 />
                                             </View>
 
-                                            <Text style={styles.value}>- ₹{parseFloat(discount || 0).toFixed(2)}</Text>
+                                            <Text style={styles.value}>- {currency}{parseFloat(discount || 0).toFixed(2)}</Text>
                                         </View>
 
 
@@ -2429,7 +2454,7 @@ const AddPurchaseInvoice = () => {
                                         {/* Total Tax */}
                                         <View style={styles.row}>
                                             <Text style={styles.label}>Total Tax:</Text>
-                                            <Text style={styles.value}>₹{(parseFloat(totalTax) || 0).toFixed(2)}</Text>
+                                            <Text style={styles.value}>{currency}{(parseFloat(totalTax) || 0).toFixed(2)}</Text>
                                         </View>
 
                                         {/* Divider */}
@@ -2439,7 +2464,7 @@ const AddPurchaseInvoice = () => {
                                         <View style={styles.row}>
                                             <Text style={styles.labelBold}>Total Amount:</Text>
                                             <Text style={styles.valueBold}>
-                                                ₹
+                                                {currency}
                                                 {(() => {
                                                     const serverNum = (serverTotalAmount !== null && serverTotalAmount !== undefined && String(serverTotalAmount).trim() !== '') ? parseFloat(serverTotalAmount) : NaN;
                                                     // const shippingNum = parseFloat(shippingCharges) || 0;
@@ -3313,7 +3338,7 @@ const styles = StyleSheet.create({
     value: {
         fontSize: 14,
         color: '#333',
-        width: '20%',
+        width: '30%',
         textAlign: 'right',
     },
 

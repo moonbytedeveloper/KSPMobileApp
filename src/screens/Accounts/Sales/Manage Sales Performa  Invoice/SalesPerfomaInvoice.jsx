@@ -65,6 +65,7 @@ const SalesPerfomaInvoice = () => {
                 customerName: r?.CustomerName || r?.Customer || r?.CustomerDisplayName || r?.CustomerNameDisplay || '',
                 status: r?.Status || r?.State || 'Draft',
                 raw: r,
+                currency: r?.Currency || r?.currency || '',
             }));
 
             setInquiries(normalized);
@@ -456,7 +457,7 @@ const SalesPerfomaInvoice = () => {
                             expenseName: item.title,
                             // Show amount on the right header; prefer numeric amount if available
                             // Use a dummy amount '0.00' when the backend doesn't provide one
-                            amount: item.amount != null ? item.amount : '0.00',
+                            amount: item.currency + (item.amount != null ? item.amount : '0.00'),
                             status: item.status,
                         }}
 

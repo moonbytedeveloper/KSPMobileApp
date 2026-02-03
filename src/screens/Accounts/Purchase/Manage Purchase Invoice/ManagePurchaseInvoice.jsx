@@ -406,14 +406,14 @@ const ManagePurchaseInvoice = () => {
                     const vendorName = order.VendorName || order.Vendor || order.customerName || '';
                     const PurchaseOrderNo = order.PurchaseOrderNo || order.PurchaseOrderNumber || '';
                     const projectName = order.ProjectName || order.Project || order.ProjectTitle || '';
-
+                    const currency = order.currency || order.Currency || '';
                     return (
                         <AccordionItem
                             key={key}
                             item={{
                                 soleExpenseCode: key,
                                 expenseName:  invoiceNo ,
-                                amount:  order.TotalAmount || order.Total || order.Amount || '0',
+                                amount: `${currency}${order.TotalAmount || order.Total || order.Amount || '0'}`,
                             }}
                             isActive={activeOrderId === key}
                             onToggle={() => setActiveOrderId((prev) => (prev === key ? null : key))}

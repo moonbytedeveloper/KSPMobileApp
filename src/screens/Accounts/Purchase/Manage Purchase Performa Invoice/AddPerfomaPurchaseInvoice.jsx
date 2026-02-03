@@ -382,6 +382,8 @@ const AddSalesPerfomaInvoice = () => {
                 setSalesInquiryUuid(pInqUuid);
                 setHeaderForm(s => ({ ...s, salesInquiryUUID: pInqUuid }));
             }
+            console.log(data,5111);
+            setCurrency(data?.Currency || data?.currency);
             setInvoiceDate(data?.OrderDate || data?.PerformaDate || '');
             setDueDate(data?.DueDate || '');
             setShippingCharges(String(data?.ShippingCharges ?? data?.ShippingCharge ?? 0));
@@ -606,10 +608,16 @@ const AddSalesPerfomaInvoice = () => {
                             tax: l?.TaxType || l?.Tax || 'IGST',
                             amount: String(Number(amount || 0).toFixed(2)),
                             serverLineUuid: l?.UUID || l?.Id || l?.LineUUID || null,
+                                                        currency: l?.currency || l?.Currency || '',
                         };
                     });
-                    if (normalizedLines.length > 0) setItems(normalizedLines);
-                    console.log('Fetched and normalized performa lines ->', normalizedLines);
+                                        if (normalizedLines.length > 0) setItems(normalizedLines);
+                                        // bind header-level currency if provided with the lines response
+                                        try {
+                                            const hdrCurrency = linesResp?.Data?.Currency || linesResp?.Data?.currency || linesResp?.Currency || linesResp?.currency || (normalizedLines && normalizedLines.length ? normalizedLines[0]?.currency : '') || '';
+                                            if (hdrCurrency && String(hdrCurrency).trim() !== '') setCurrency(hdrCurrency);
+                                        } catch (e) { /* ignore */ }
+                                        console.log('Fetched and normalized performa lines ->', normalizedLines);
                 } catch (le) {
                     console.warn('Failed to fetch performa lines', le?.message || le);
                 } finally {
@@ -821,6 +829,7 @@ const AddSalesPerfomaInvoice = () => {
     const [showShippingTip, setShowShippingTip] = useState(false);
     const [showAdjustmentTip, setShowAdjustmentTip] = useState(false);
     const [prefillLoading, setPrefillLoading] = useState(false);
+    const [currency, setCurrency] = useState('');
 
     const hasDocumentAvailable = () => {
         try {
@@ -1189,7 +1198,12 @@ const AddSalesPerfomaInvoice = () => {
                     const resp = await updatePurchasePerformaInvoiceLine(payload, { cmpUuid: await getCMPUUID(), envUuid: await getENVUUID(), userUuid: await getUUID() });
                     console.log('update line resp ->', resp);
                     const updatedLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || existing.serverLineUuid;
-                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid }) : it));
+                    // bind currency from response if backend returned header-level or line-level currency
+                    try {
+                        const hdrCurrency = resp?.Data?.Currency || resp?.Data?.currency || resp?.Currency || resp?.currency || existing?.currency || '';
+                        if (hdrCurrency && String(hdrCurrency).trim() !== '') setCurrency(hdrCurrency);
+                    } catch (e) { /* ignore */ }
+                    setItems(prev => prev.map(it => it.id === editItemId ? ({ ...it, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), amount: computeAmount(qty, rate), serverLineUuid: updatedLineUuid, currency: resp?.Data?.currency || resp?.Data?.Currency || it?.currency || '' }) : it));
                     // refresh header totals from server after update
                     await refreshHeaderTotals(headerUUID);
                 } else {
@@ -1221,7 +1235,12 @@ const AddSalesPerfomaInvoice = () => {
                 // on success, update local items list (assign local id and keep server uuid if returned)
                 const nextId = items.length ? (items[items.length - 1].id + 1) : 1;
                 const serverLineUuid = resp?.Data?.UUID || resp?.UUID || resp?.Data?.LineUUID || null;
-                setItems(prev => ([...prev, { id: nextId, selectedItem: null, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), tax: 'IGST', amount: computeAmount(qty, rate), serverLineUuid }]));
+                // bind header currency if returned with line creation
+                try {
+                    const hdrCurrency = resp?.Data?.Currency || resp?.Data?.currency || resp?.Currency || resp?.currency || '';
+                    if (hdrCurrency && String(hdrCurrency).trim() !== '') setCurrency(hdrCurrency);
+                } catch (e) { /* ignore */ }
+                setItems(prev => ([...prev, { id: nextId, selectedItem: null, name: currentItem.itemName, sku: currentItem.itemNameUuid || null, itemUuid: currentItem.itemNameUuid || null, rate: String(rate), desc: description || '', hsn: currentItem.hsn || '', qty: String(qty), tax: 'IGST', amount: computeAmount(qty, rate), serverLineUuid, currency: resp?.Data?.currency || resp?.Data?.Currency || '' }]));
 
                 // reset line form
                 setCurrentItem({ itemType: '', itemTypeUuid: null, itemName: '', itemNameUuid: null, quantity: '1', unit: '', unitUuid: null, desc: '', hsn: '', rate: '' });
@@ -1306,6 +1325,7 @@ const AddSalesPerfomaInvoice = () => {
                 VendorName: headerForm.CustomerName || '',
                 ProjectUUID: projectUUID.UUID || project.UUID || '',
                 ProjectName: project || '',
+                Currency: currency || headerForm.Currency || headerForm.currency || headerResponse?.Currency || headerResponse?.currency || '',
                 PaymentTermUUID: paymentTermUuid || '',
                 PaymentTerm: paymentTermUuid || '',
                 PaymentMethodUUID: paymentMethodUUID || '',
@@ -1394,6 +1414,7 @@ const AddSalesPerfomaInvoice = () => {
             PaymentTerm: resolvedPaymentTermUuid || paymentTerm || headerForm.PaymentTerm || '',
             PaymentMethodUUID: paymentMethodUUID || headerForm.PaymentMethodUUID || (looksLikeUuid(headerForm.PaymentMode) ? headerForm.PaymentMode : (looksLikeUuid(headerForm.PaymentMethod) ? headerForm.PaymentMethod : '')),
             PaymentMode: paymentMethodUUID || headerForm.PaymentMethodUUID || paymentMethod || headerForm.PaymentMode || headerForm.PaymentMethod || '',
+            Currency: currency || headerForm.Currency || headerForm.currency || headerResponse?.Currency || headerResponse?.currency || '',
             OrderDate: uiDateToApiDate(invoiceDate),
             DueDate: uiDateToApiDate(dueDate),
             Note: notes || headerForm.Note || headerForm.Notes || '',
@@ -2209,7 +2230,7 @@ const AddSalesPerfomaInvoice = () => {
                                     <View style={{ width: '40%' }}>
                                         <Text style={inputStyles.label}>Amount</Text>
                                         <View style={[inputStyles.box, { marginTop: hp(0.5), width: '60%' }]}>
-                                            <Text style={[inputStyles.input, { textAlign: 'center', fontWeight: '600' }]}>₹{computeAmount(currentItem.quantity || 0, currentItem.rate || 0)}</Text>
+                                            <Text style={[inputStyles.input, { textAlign: 'center', fontWeight: '600' }]}>{computeAmount(currentItem.quantity || 0, currentItem.rate || 0)}</Text>
                                         </View>
                                     </View>
 
@@ -2339,10 +2360,10 @@ const AddSalesPerfomaInvoice = () => {
                                                                     <Text style={styles.tdText}>{item.qty}</Text>
                                                                 </View>
                                                                 <View style={[styles.td, { width: wp(15) }]}>
-                                                                    <Text style={styles.tdText}>₹{item.rate}</Text>
+                                                                    <Text style={styles.tdText}>{item.currency}{item.rate}</Text>
                                                                 </View>
                                                                 <View style={[styles.td, { width: wp(15) }]}>
-                                                                    <Text style={[styles.tdText, { fontWeight: '600' }]}>₹{item.amount}</Text>
+                                                                    <Text style={[styles.tdText, { fontWeight: '600' }]}>{item.currency}{item.amount}</Text>
                                                                 </View>
                                                                 <View style={[styles.tdAction, { width: wp(35) }, { flexDirection: 'row', paddingLeft: wp(2) }]}>
                                                                     <TouchableOpacity style={styles.actionButton} onPress={() => handleEditItem(item.id)}>
@@ -2389,7 +2410,7 @@ const AddSalesPerfomaInvoice = () => {
                             {/* Subtotal */}
                             <View style={styles.row}>
                                 <Text style={styles.labelBold}>Subtotal:</Text>
-                                <Text style={styles.valueBold}>₹{computeSubtotal()}</Text>
+                                <Text style={styles.valueBold}>{currency}{computeSubtotal()}</Text>
                             </View>
 
                             {/* Discount */}
@@ -2413,13 +2434,13 @@ const AddSalesPerfomaInvoice = () => {
                                     />
                                 </View>
 
-                                <Text style={styles.value}>- ₹{parseFloat(discount || 0).toFixed(2)}</Text>
+                                <Text style={styles.value}>-{currency}{parseFloat(discount || 0).toFixed(2)}</Text>
                             </View>
 
                             {/* Total Tax */}
                             <View style={styles.row}>
                                 <Text style={styles.label}>Total Tax:</Text>
-                                <Text style={styles.value}>₹{(parseFloat(totalTax) || 0).toFixed(2)}</Text>
+                                <Text style={styles.value}>{currency}{(parseFloat(totalTax) || 0).toFixed(2)}</Text>
                             </View>
 
                             {/* Divider */}
@@ -2429,7 +2450,7 @@ const AddSalesPerfomaInvoice = () => {
                             <View style={styles.row}>
                                 <Text style={styles.labelBold}>Total Amount:</Text>
                                 <Text style={styles.valueBold}>
-                                    ₹
+                                    {currency}
                                     {(() => {
                                         const serverNum = (serverTotalAmount !== null && serverTotalAmount !== undefined && String(serverTotalAmount).trim() !== '') ? parseFloat(serverTotalAmount) : NaN;
                                         const shippingNum = parseFloat(shippingCharges) || 0;
@@ -3275,7 +3296,7 @@ const styles = StyleSheet.create({
     value: {
         fontSize: 14,
         color: '#333',
-        width: '20%',
+        width: '30%',
         textAlign: 'right',
     },
 

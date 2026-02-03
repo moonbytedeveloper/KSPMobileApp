@@ -329,7 +329,11 @@ const ManageSalesOrder = () => {
         if (headerTax !== null && typeof headerTax !== 'undefined') setTotalTax(String(headerTax));
         if (headerTotal !== null && typeof headerTotal !== 'undefined') setServerTotalAmount(String(headerTotal));
       } catch (e) { /* ignore */ }
-
+      console.log(data.Currency,'501');
+      
+      if(data?.currency ||data?.Currency !== undefined) {
+            setCurrency(data.Currency || data?.currency || '');
+      }
       // Prefill notes, terms, shipping charges, adjustments
       if (data?.Notes || data?.CustomerNotes || data?.Note) {
         setNotes(data.Notes || data.CustomerNotes || data.Note || '');
@@ -560,7 +564,7 @@ const ManageSalesOrder = () => {
     } catch (e) { /* ignore */ }
   }, [expandedIds, headerSaved]);
 
-  // Current item being entered in the LINE form
+  // Current item being entered in the line form
   const [currentItem, setCurrentItem] = useState({
     itemType: '',
     itemTypeUuid: null,
@@ -572,6 +576,7 @@ const ManageSalesOrder = () => {
     desc: '',
     hsn: '',
     rate: '',
+    currency: '',
   });
   const [editItemId, setEditItemId] = useState(null);
   // Common form state (some declarations were accidentally removed earlier)
@@ -593,6 +598,7 @@ const ManageSalesOrder = () => {
   const [project, setProject] = useState('');
   const [projectUUID, setProjectUUID] = useState('');
   const [shippingCharges, setShippingCharges] = useState('0');
+  const [currency, setCurrency] = useState('');
   const [adjustments, setAdjustments] = useState('0');
   const [adjustmentLabel, setAdjustmentLabel] = useState('Adjustments');
   const [totalTax, setTotalTax] = useState('0');
@@ -1357,6 +1363,7 @@ const ManageSalesOrder = () => {
         const amount = amtNum.toFixed(2);
         const tax = r?.TaxType || r?.Tax || 'IGST';
         const unit = r?.Unit || '';
+        const currency = r?.Currency || r?.currency || r?.CurrencyName || r?.Currency_Code || '';
         return {
           id: idx + 1,
           serverUuid,
@@ -1371,6 +1378,7 @@ const ManageSalesOrder = () => {
           tax,
           amount,
           unit,
+          currency,
         };
       });
 
@@ -1382,6 +1390,11 @@ const ManageSalesOrder = () => {
         const tTax = resp?.Data?.TotalTax ?? resp?.TotalTax ?? null;
         if (tTax !== null && typeof tTax !== 'undefined') setTotalTax(String(tTax));
         if (tot !== null && typeof tot !== 'undefined') setServerTotalAmount(String(tot));
+      } catch (e) { /* ignore */ }
+      // bind header-level currency if provided with the lines response
+      try {
+        const hdrCurrency = resp?.Data?.Currency || resp?.Data?.currency || resp?.Currency || resp?.currency || (normalized && normalized.length ? normalized[0]?.currency : '') || '';
+        if (hdrCurrency && String(hdrCurrency).trim() !== '') setCurrency(hdrCurrency);
       } catch (e) { /* ignore */ }
     } catch (err) {
       console.warn('loadSalesOrderLines error', err?.message || err);
@@ -1873,6 +1886,7 @@ const ManageSalesOrder = () => {
           hsn: '',
           qty: '1',
           tax: 'IGST',
+          currency: '',
           amount: '0.00',
         },
       ];
@@ -1943,6 +1957,7 @@ const ManageSalesOrder = () => {
           desc: item.desc || '',
           hsn: item.hsn || '',
           amount: computeAmount(qty, item.rate),
+          currency: item.currency || item.Currency || '',
         };
       }),
     );
@@ -1994,6 +2009,7 @@ const ManageSalesOrder = () => {
       qty: qty,
       tax: 'IGST',
       amount: amount,
+      currency: currentItem.currency || (master ? master.currency || '' : ''),
       unit: currentItem.unit || '',
     };
 
@@ -2062,6 +2078,11 @@ const ManageSalesOrder = () => {
         } catch (e) {
           // ignore parsing errors
         }
+        // If API returned header-level currency with the line response, bind it
+        try {
+          const hdrCurrency = data?.Currency || data?.currency || data?.Header?.Currency || data?.Header?.currency || serverItem?.Currency || serverItem?.currency || resp?.Currency || resp?.currency || '';
+          if (hdrCurrency && String(hdrCurrency).trim() !== '') setCurrency(hdrCurrency);
+        } catch (e) { /* ignore */ }
         const itemToPush = {
           ...newItem,
           id: editItemId ? editItemId : nextId,
@@ -2071,6 +2092,7 @@ const ManageSalesOrder = () => {
           rate: (serverItem && (serverItem?.Rate ?? serverItem?.rate)) ?? newItem.rate,
           desc: serverItem?.Description ?? newItem.desc,
           hsn: serverItem?.HSNCode || serverItem?.HSN || serverItem?.hsn || newItem.hsn,
+          currency: serverItem?.Currency || serverItem?.currency || newItem.currency || '',
         };
         if (editItemId) {
           setItems(prev => prev.map(it => it.id === editItemId ? { ...it, ...itemToPush, id: editItemId } : it));
@@ -2126,11 +2148,13 @@ const ManageSalesOrder = () => {
       desc: it.desc || it.desc || '',
       hsn: it.hsn || '',
       rate: it.rate || '',
+      currency: it.currency || '',
     });
     setEditItemId(id);
     // scroll to top of create order section if needed by expanding it
     setExpandedIds([4]);
   };
+  console.log(currentItem,101);
 
   const handleCreateOrder = async () => {
     setIsSavingHeader(true);
@@ -3433,13 +3457,14 @@ const ManageSalesOrder = () => {
                                 desc: resolveDesc(found, ci?.desc ?? ''),
                                 hsn: resolveHsn(found, ci?.hsn ?? ''),
                                 quantity: (ci?.quantity && String(ci.quantity).trim() !== '') ? ci.quantity : '1',
+                                currency: found?.currency || found?.Currency || ci?.currency || '',
                               }));
                               return;
                             }
                           }
 
                           // Fallback: set the primitive as the name and default qty
-                          setCurrentItem(ci => ({ ...ci, itemName: v, itemNameUuid: null, quantity: (ci?.quantity && String(ci.quantity).trim() !== '') ? ci.quantity : '1' }));
+                          setCurrentItem(ci => ({ ...ci, itemName: v, itemNameUuid: null, quantity: (ci?.quantity && String(ci.quantity).trim() !== '') ? ci.quantity : '1'}));
                         }}
                         renderInModal={true}
                         inputBoxStyle={[inputStyles.box, { width: '100%' }]}
@@ -3512,7 +3537,7 @@ const ManageSalesOrder = () => {
                     <View style={{ width: '40%' }}>
                       <Text style={inputStyles.label}>Amount</Text>
                       <View style={[inputStyles.box, { marginTop: hp(0.5), width: '60%' }]}>
-                        <Text style={[inputStyles.input, { textAlign: 'center', fontWeight: '600' }]}>₹{computeAmount(currentItem.quantity || 0, currentItem.rate || 0)}</Text>
+                        <Text style={[inputStyles.input, { textAlign: 'center', fontWeight: '600' }]}>{computeAmount(currentItem.quantity || 0, currentItem.rate || 0)}</Text>
                       </View>
                     </View>
 
@@ -3609,7 +3634,8 @@ const ManageSalesOrder = () => {
                                 String(it.name || '').toLowerCase().includes(q) ||
                                 String(it.itemType || '').toLowerCase().includes(q) ||
                                 String(it.hsn || '').toLowerCase().includes(q) ||
-                                String(it.desc || '').toLowerCase().includes(q)
+                                String(it.desc || '').toLowerCase().includes(q) ||
+                                String(it.currency || '').toLowerCase().includes(q)
                               );
                             }) : items;
                             const total = filtered.length;
@@ -3640,10 +3666,10 @@ const ManageSalesOrder = () => {
                                       <Text style={styles.tdText}>{item.qty}</Text>
                                     </View>
                                     <View style={[styles.td, { width: wp(20) }]}>
-                                      <Text style={styles.tdText}>₹{item.rate}</Text>
+                                      <Text style={styles.tdText}>{item.currency} {item.rate}</Text>
                                     </View>
                                     <View style={[styles.td, { width: wp(20) }]}>
-                                      <Text style={[styles.tdText, { fontWeight: '600' }]}>₹{item.amount}</Text>
+                                      <Text style={[styles.tdText, { fontWeight: '600' }]}>{item.currency} {item.amount}</Text>
                                     </View>
                                     <View style={[styles.tdAction, { width: wp(40) }, { flexDirection: 'row', paddingLeft: wp(2) }]}>
                                       <TouchableOpacity style={styles.actionButton} onPress={() => handleEditItem(item.id)}>
@@ -3693,7 +3719,7 @@ const ManageSalesOrder = () => {
                 {/* Subtotal */}
                 <View style={styles.row}>
                   <Text style={styles.labelBold}>Subtotal:</Text>
-                  <Text style={styles.valueBold}>₹{computeSubtotal()}</Text>
+                  <Text style={styles.valueBold}>{currency}{computeSubtotal()}</Text>
                 </View>
 
                 {/* Shipping Charges */}
@@ -3702,7 +3728,7 @@ const ManageSalesOrder = () => {
 
                   <View style={styles.inputRightGroup}>
                     <TextInput
-                      value={String(shippingCharges)}
+                      value={`${String(shippingCharges)}`}
                       onChangeText={setShippingCharges}
                       keyboardType="numeric"
                       style={[styles.inputBox, { color: screenTheme.text }]}
@@ -3747,7 +3773,7 @@ const ManageSalesOrder = () => {
                   </View>
 
                   <Text style={styles.value}>
-                    ₹{parseFloat(shippingCharges || 0).toFixed(2)}
+                    {currency}{parseFloat(shippingCharges || 0).toFixed(2)}
                   </Text>
                 </View>
 
@@ -3807,14 +3833,14 @@ const ManageSalesOrder = () => {
                   </View>
 
                   <Text style={styles.value}>
-                    ₹{parseFloat(adjustments || 0).toFixed(2)}
+                     {currency}{parseFloat(adjustments || 0).toFixed(2)}
                   </Text>
                 </View>
 
                 {/* Total Tax */}
                 <View style={styles.row}>
                   <Text style={styles.label}>Total Tax:</Text>
-                  <Text style={styles.value}>₹{(parseFloat(totalTax) || 0).toFixed(2)}</Text>
+                  <Text style={styles.value}> {currency}{(parseFloat(totalTax) || 0).toFixed(2)}</Text>
                 </View>
 
                 {/* Divider */}
@@ -3824,12 +3850,12 @@ const ManageSalesOrder = () => {
                 <View style={styles.row}>
                   <Text style={styles.labelBold}>Total Amount:</Text>
                   <Text style={styles.valueBold}>
-                    ₹
+                    {/* {`${prefillFromData.Currency}`}       Trial */}
                     {(() => {
                       const subtotal = parseFloat(computeSubtotal()) || 0;
                       const tax = parseFloat(totalTax) || 0;
                       const displayed = subtotal + (parseFloat(shippingCharges) || 0) + (parseFloat(adjustments) || 0) + tax;
-                      return displayed.toFixed(2);
+                      return  `${currency}${displayed.toFixed(2)}`;
                     })()}
                   </Text>
                 </View>
@@ -4627,7 +4653,7 @@ const styles = StyleSheet.create({
   value: {
     fontSize: 14,
     color: '#333',
-    width: '20%',
+    width: '30%',
     textAlign: 'right',
   },
 

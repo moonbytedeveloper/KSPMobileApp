@@ -222,6 +222,7 @@ const ManagePurchaseOrder = () => {
   const [paymentMethod, setPaymentMethod] = useState('');
   const [paymentMethodUUID, setPaymentMethodUUID] = useState('');
   const [shippingCharges, setShippingCharges] = useState('0');
+  const [currency, setCurrency] = useState('');
   const [adjustments, setAdjustments] = useState('0');
   const [adjustmentLabel, setAdjustmentLabel] = useState('Adjustments');
   const [totalTax, setTotalTax] = useState('0');
@@ -628,6 +629,8 @@ const ManagePurchaseOrder = () => {
         if (noteVal) setNotes(noteVal);
         if (typeof termsVal === 'string' && termsVal.trim() !== '') setTerms(termsVal);
         if (discountVal !== null && typeof discountVal !== 'undefined') setShippingCharges(String(discountVal));
+        const currencyVal = data?.Currency || data?.currency || '';
+        if (currencyVal) setCurrency(currencyVal);
       } catch (e) { /* ignore */ }
 
       setIsEditingHeader(true);
@@ -1171,6 +1174,7 @@ const ManagePurchaseOrder = () => {
         const amount = amtNum.toFixed(2);
         const tax = r?.TaxType || r?.Tax || 'IGST';
         const unit = r?.Unit || '';
+        const currency = r?.Currency || r?.currency || '';
         return {
           id: idx + 1,
           serverUuid,
@@ -1185,6 +1189,7 @@ const ManagePurchaseOrder = () => {
           tax,
           amount,
           unit,
+          currency,
         };
       });
 
@@ -3039,7 +3044,7 @@ const ManagePurchaseOrder = () => {
                     <View style={{ width: '40%' }}>
                       <Text style={inputStyles.label}>Amount</Text>
                       <View style={[inputStyles.box, { marginTop: hp(0.5), width: '60%' }]}>
-                        <Text style={[inputStyles.input, { textAlign: 'center', fontWeight: '600' }]}>₹{computeAmount(currentItem.quantity || 0, currentItem.rate || 0)}</Text>
+                        <Text style={[inputStyles.input, { textAlign: 'center', fontWeight: '600' }]}>{computeAmount(currentItem.quantity || 0, currentItem.rate || 0)}</Text>
                       </View>
                     </View>
 
@@ -3171,10 +3176,10 @@ const ManagePurchaseOrder = () => {
                                       <Text style={styles.tdText}>{item.qty}</Text>
                                     </View>
                                     <View style={[styles.td, { width: wp(20) }]}>
-                                      <Text style={styles.tdText}>₹{item.rate}</Text>
+                                      <Text style={styles.tdText}>{item.currency}{item.rate}</Text>
                                     </View>
                                     <View style={[styles.td, { width: wp(20) }]}>
-                                      <Text style={[styles.tdText, { fontWeight: '600' }]}>₹{item.amount}</Text>
+                                      <Text style={[styles.tdText, { fontWeight: '600' }]}>{item.currency}{item.amount}</Text>
                                     </View>
                                     <View style={[styles.tdAction, { width: wp(40) }, { flexDirection: 'row', paddingLeft: wp(2) }]}>
                                       <TouchableOpacity style={styles.actionButton} onPress={() => handleEditItem(item.id)}>
@@ -3224,7 +3229,7 @@ const ManagePurchaseOrder = () => {
                 {/* Subtotal */}
                 <View style={styles.row}>
                   <Text style={styles.labelBold}>Subtotal:</Text>
-                  <Text style={styles.valueBold}>₹{computeSubtotal()}</Text>
+                  <Text style={styles.valueBold}>{currency}{computeSubtotal()}</Text>
                 </View>
 
                 {/* Shipping Charges */}
@@ -3244,7 +3249,7 @@ const ManagePurchaseOrder = () => {
                   </View>
 
                   <Text style={styles.value}>
-                    - ₹{parseFloat(shippingCharges || 0).toFixed(2)}
+                    - {currency}{parseFloat(shippingCharges || 0).toFixed(2)}
                   </Text>
                 </View>
 
@@ -3302,14 +3307,14 @@ const ManagePurchaseOrder = () => {
                   </View>
 
                   <Text style={styles.value}>
-                    ₹{parseFloat(adjustments || 0).toFixed(2)}
+                    {currency}{parseFloat(adjustments || 0).toFixed(2)}
                   </Text>
                 </View> */}
 
                 {/* Total Tax */}
                 <View style={styles.row}>
                   <Text style={styles.label}>Total Tax:</Text>
-                  <Text style={styles.value}>₹{(parseFloat(totalTax) || 0).toFixed(2)}</Text>
+                  <Text style={styles.value}>{currency}{(parseFloat(totalTax) || 0).toFixed(2)}</Text>
                 </View>
 
                 {/* Divider */}
@@ -3319,7 +3324,7 @@ const ManagePurchaseOrder = () => {
                 <View style={styles.row}>
                   <Text style={styles.labelBold}>Total Amount:</Text>
                   <Text style={styles.valueBold}>
-                    ₹
+                    {currency}
                     {(() => {
                       const serverNum = (serverTotalAmount !== null && serverTotalAmount !== undefined && String(serverTotalAmount).trim() !== '') ? parseFloat(serverTotalAmount) : NaN;
                       const displayed = (!isNaN(serverNum))
@@ -4125,7 +4130,7 @@ const styles = StyleSheet.create({
   value: {
     fontSize: 14,
     color: '#333',
-    width: '20%',
+    width: '30%',
     textAlign: 'right',
   },
 
