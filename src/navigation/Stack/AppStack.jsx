@@ -780,7 +780,7 @@ const CustomDrawerContent = ({ navigation }) => {
           </View>
         </View>
 
-        {/* {can('Accounts') && ( */}
+        {can('Accounts') && (
         <>
           <Text style={styles.sectionTitle}>Accounts</Text>
           {/* Sales item now expands a small submenu instead of navigating directly */}
@@ -973,7 +973,7 @@ const CustomDrawerContent = ({ navigation }) => {
             <Icon name="chevron-right" size={rf(5)} color="#999" />
           </TouchableOpacity> */}
         </>
-        {/* )} */}
+        )}
         {can('Business Development') && (
           <>
             <Text style={styles.sectionTitle}>Business Development</Text>
