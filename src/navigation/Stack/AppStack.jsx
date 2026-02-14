@@ -779,187 +779,199 @@ const CustomDrawerContent = ({ navigation }) => {
             </View>
           </View>
         </View>
-
-        {/* {can('Accounts') && ( */}
-        <>
-          <Text style={styles.sectionTitle}>Accounts</Text>
-          {/* Sales item now expands a small submenu instead of navigating directly */}
-          <View style={[styles.salesSection, salesOpen && styles.salesSectionOpen]}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setSalesOpen((s) => !s)}
-              style={styles.cardItem}
-            >
-              <View style={styles.itemLeft}>
-                <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
-                  <Icon name="leaderboard" size={rf(4)} color={COLORS.primary} />
-                </View>
-                <Text style={styles.itemLabel}>Sales</Text>
-              </View>
-              <Icon name={salesOpen ? 'expand-less' : 'chevron-right'} size={rf(5)} color="#999" />
-            </TouchableOpacity>
-
-            <Animated.View
-              style={[
-                styles.subMenuWrap,
-                {
-                  height: salesAnim.interpolate({ inputRange: [0, 1], outputRange: [0, hp(20)] }),
-                  opacity: salesAnim,
-                },
-              ]}
-              pointerEvents={salesOpen ? 'auto' : 'none'}
-            >
+        {/* Manage Inquiry
+Manage Sales Order
+Manage Sales Proforma Invoice
+Manage Sales Invoice
+Manage Purchase Inquiry
+Manage Quotation
+Manage Purchase Order
+Manage Purchase Proforma Invoice
+Manage Purchase Invoice */}
+        {(can('Accounts') || can('Manage Inquiry') || can('Manage Purchase Invoice') || can('Manage Purchase Proforma Invoice') || can('Manage Purchase Order') || can('Manage Quotation') || can('Manage Purchase Inquiry') || can('Manage Sales Invoice') || can('Manage Sales Order') || can('Manage Sales Proforma Invoice') || can('Manage Sales Invoice') || can('Manage Purchase Inquiry') || can('Manage Quotation') || can('Manage Purchase Order') || can('Manage Purchase Proforma Invoice') || can('Manage Purchase Invoice')) && (
+          <>
+            <Text style={styles.sectionTitle}>Accounts</Text>
+            {/* Sales item now expands a small submenu instead of navigating directly */}
+            <View style={[styles.salesSection, salesOpen && styles.salesSectionOpen]}>
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() => navigateFromDrawer('ViewSalesOrder')}
-                style={[styles.cardItem, styles.subItem]}
+                onPress={() => setSalesOpen((s) => !s)}
+                style={styles.cardItem}
               >
                 <View style={styles.itemLeft}>
-                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
-                    <Icon name="receipt-long" size={rf(3.2)} color={COLORS.primary} />
+                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
+                    <Icon name="leaderboard" size={rf(4)} color={COLORS.primary} />
                   </View>
-                  <Text style={styles.itemLabel}>Manage Sales Order</Text>
+                  <Text style={styles.itemLabel}>Sales</Text>
                 </View>
-                <Icon name="chevron-right" size={rf(5)} color="#999" />
+                <Icon name={salesOpen ? 'expand-less' : 'chevron-right'} size={rf(5)} color="#999" />
               </TouchableOpacity>
 
+              <Animated.View
+                style={[
+                  styles.subMenuWrap,
+                  {
+                    height: salesAnim.interpolate({ inputRange: [0, 1], outputRange: [0, hp(18)] }),
+                    opacity: salesAnim,
+                  },
+                ]}
+                pointerEvents={salesOpen ? 'auto' : 'none'}
+              >
+                {can('Manage Sales Order') && (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => navigateFromDrawer('ViewSalesOrder')}
+                    style={[styles.cardItem, styles.subItem]}
+                  >
+                    <View style={styles.itemLeft}>
+                      <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                        <Icon name="receipt-long" size={rf(3.2)} color={COLORS.primary} />
+                      </View>
+                      <Text style={styles.itemLabel}>Manage Sales Order</Text>
+                    </View>
+                    <Icon name="chevron-right" size={rf(5)} color="#999" />
+                  </TouchableOpacity>
+                )}
+                {can('Manage Inquiry') && (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => navigateFromDrawer('ManageInquiry')}
+                    style={[styles.cardItem, styles.subItem]}
+                  >
+                    <View style={styles.itemLeft}>
+                      <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                        <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
+                      </View>
+                      <Text style={styles.itemLabel}>Manage Sales Inquiry</Text>
+                    </View>
+                    <Icon name="chevron-right" size={rf(5)} color="#999" />
+                  </TouchableOpacity>)}
+                {can('Manage Sales Proforma Invoice') && (<TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => navigateFromDrawer('SalesPerfomaInvoice')}
+                  style={[styles.cardItem, styles.subItem]}
+                >
+                  <View style={styles.itemLeft}>
+                    <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                      <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
+                    </View>
+                    <Text style={styles.itemLabel}>Sales Proforma Invoice</Text>
+                  </View>
+                  <Icon name="chevron-right" size={rf(5)} color="#999" />
+                </TouchableOpacity>)}
+                {can('Manage Sales Invoice') && (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => navigateFromDrawer('ManageSalesInvoice')}
+                    style={[styles.cardItem, styles.subItem]}
+                  >
+                    <View style={styles.itemLeft}>
+                      <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                        <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
+                      </View>
+                      <Text style={styles.itemLabel}>Manage Sales Invoice</Text>
+                    </View>
+                    <Icon name="chevron-right" size={rf(5)} color="#999" />
+                  </TouchableOpacity>)}
+              </Animated.View>
+            </View>
+            {/* Sales item now expands a small submenu instead of navigating directly */}
+            <View style={[styles.purchaseSection, purchaseOpen && styles.purchaseSectionOpen]}>
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() => navigateFromDrawer('ManageInquiry')}
-                style={[styles.cardItem, styles.subItem]}
+                onPress={() => setPurchaseOpen((s) => !s)}
+                style={styles.cardItem}
               >
                 <View style={styles.itemLeft}>
-                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
-                    <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
+                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
+                    <Icon name="leaderboard" size={rf(4)} color={COLORS.primary} />
                   </View>
-                  <Text style={styles.itemLabel}>Manage Sales Inquiry</Text>
+                  <Text style={styles.itemLabel}>Purchase</Text>
                 </View>
-                <Icon name="chevron-right" size={rf(5)} color="#999" />
+                <Icon name={purchaseOpen ? 'expand-less' : 'chevron-right'} size={rf(5)} color="#999" />
               </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => navigateFromDrawer('SalesPerfomaInvoice')}
-                style={[styles.cardItem, styles.subItem]}
-              >
-                <View style={styles.itemLeft}>
-                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
-                    <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
-                  </View>
-                  <Text style={styles.itemLabel}>Sales Proforma Invoice</Text>
-                </View>
-                <Icon name="chevron-right" size={rf(5)} color="#999" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => navigateFromDrawer('ManageSalesInvoice')}
-                style={[styles.cardItem, styles.subItem]}
-              >
-                <View style={styles.itemLeft}>
-                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
-                    <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
-                  </View>
-                  <Text style={styles.itemLabel}>Manage Sales Invoice</Text>
-                </View>
-                <Icon name="chevron-right" size={rf(5)} color="#999" />
-              </TouchableOpacity>
-            </Animated.View>
-          </View>
-          {/* Sales item now expands a small submenu instead of navigating directly */}
-          <View style={[styles.purchaseSection, purchaseOpen && styles.purchaseSectionOpen]}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setPurchaseOpen((s) => !s)}
-              style={styles.cardItem}
-            >
-              <View style={styles.itemLeft}>
-                <View style={[styles.iconBadge, { backgroundColor: '#fff5f2' }]}>
-                  <Icon name="leaderboard" size={rf(4)} color={COLORS.primary} />
-                </View>
-                <Text style={styles.itemLabel}>Purchase</Text>
-              </View>
-              <Icon name={purchaseOpen ? 'expand-less' : 'chevron-right'} size={rf(5)} color="#999" />
-            </TouchableOpacity>
 
-            <Animated.View
-              style={[
-                styles.subMenuWrap,
-                {
-                  height: purchaseAnim.interpolate({ inputRange: [0, 1], outputRange: [0, hp(25)] }),
-                  opacity: purchaseAnim,
-                },
-              ]}
-              pointerEvents={purchaseOpen ? 'auto' : 'none'}
-            >
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => navigateFromDrawer('ViewPurchaseOrder')}
-                style={[styles.cardItem, styles.subItem]}
+              <Animated.View
+                style={[
+                  styles.subMenuWrap,
+                  {
+                    height: purchaseAnim.interpolate({ inputRange: [0, 1], outputRange: [0, hp(25)] }),
+                    opacity: purchaseAnim,
+                  },
+                ]}
+                pointerEvents={purchaseOpen ? 'auto' : 'none'}
               >
-                <View style={styles.itemLeft}>
-                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
-                    <Icon name="receipt-long" size={rf(3.2)} color={COLORS.primary} />
+                {can('Manage Purchase Order') && (<TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => navigateFromDrawer('ViewPurchaseOrder')}
+                  style={[styles.cardItem, styles.subItem]}
+                >
+                  <View style={styles.itemLeft}>
+                    <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                      <Icon name="receipt-long" size={rf(3.2)} color={COLORS.primary} />
+                    </View>
+                    <Text style={styles.itemLabel}>Manage Purchase Order</Text>
                   </View>
-                  <Text style={styles.itemLabel}>Manage Purchase Order</Text>
-                </View>
-                <Icon name="chevron-right" size={rf(5)} color="#999" />
-              </TouchableOpacity>
+                  <Icon name="chevron-right" size={rf(5)} color="#999" />
+                </TouchableOpacity>)}
 
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => navigateFromDrawer('ViewPurchaseInquiry')}
-                style={[styles.cardItem, styles.subItem]}
-              >
-                <View style={styles.itemLeft}>
-                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
-                    <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
+                {can('Manage Purchase Inquiry') && (<TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => navigateFromDrawer('ViewPurchaseInquiry')}
+                  style={[styles.cardItem, styles.subItem]}
+                >
+                  <View style={styles.itemLeft}>
+                    <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                      <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
+                    </View>
+                    <Text style={styles.itemLabel}>Manage Purchase Inquiry</Text>
                   </View>
-                  <Text style={styles.itemLabel}>Manage Purchase Inquiry</Text>
-                </View>
-                <Icon name="chevron-right" size={rf(5)} color="#999" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => navigateFromDrawer('ViewPurchaseQuotation')}
-                style={[styles.cardItem, styles.subItem]}
-              >
-                <View style={styles.itemLeft}>
-                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
-                    <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
-                  </View>
-                  <Text style={styles.itemLabel}>Manage Purchase Quotation</Text>
-                </View>
-                <Icon name="chevron-right" size={rf(5)} color="#999" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => navigateFromDrawer('ViewPerfomaPurchaseInvoice')}
-                style={[styles.cardItem, styles.subItem]}
-              >
-                <View style={styles.itemLeft}>
-                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
-                    <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
-                  </View>
-                  <Text style={styles.itemLabel}>Purchase Proforma Invoice</Text>
-                </View>
-                <Icon name="chevron-right" size={rf(5)} color="#999" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => navigateFromDrawer('ManagePurchaseInvoice')}
-                style={[styles.cardItem, styles.subItem]}
-              >
-                <View style={styles.itemLeft}>
-                  <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
-                    <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
-                  </View>
-                  <Text style={styles.itemLabel}>Manage Purchase Invoice</Text>
-                </View>
-                <Icon name="chevron-right" size={rf(5)} color="#999" />
-              </TouchableOpacity>
-            </Animated.View>
-          </View>
+                  <Icon name="chevron-right" size={rf(5)} color="#999" />
+                </TouchableOpacity>)}
 
-          {/* <TouchableOpacity
+                {can('Manage Quotation') && (<TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => navigateFromDrawer('ViewPurchaseQuotation')}
+                  style={[styles.cardItem, styles.subItem]}
+                >
+                  <View style={styles.itemLeft}>
+                    <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                      <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
+                    </View>
+                    <Text style={styles.itemLabel}>Manage Purchase Quotation</Text>
+                  </View>
+                  <Icon name="chevron-right" size={rf(5)} color="#999" />
+                </TouchableOpacity>)}
+                {can('Manage Purchase Proforma Invoice') && (<TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => navigateFromDrawer('ViewPerfomaPurchaseInvoice')}
+                  style={[styles.cardItem, styles.subItem]}
+                >
+                  <View style={styles.itemLeft}>
+                    <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                      <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
+                    </View>
+                    <Text style={styles.itemLabel}>Purchase Proforma Invoice</Text>
+                  </View>
+                  <Icon name="chevron-right" size={rf(5)} color="#999" />
+                </TouchableOpacity>)}
+                {can('Manage Purchase Invoice') && (<TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => navigateFromDrawer('ManagePurchaseInvoice')}
+                  style={[styles.cardItem, styles.subItem]}
+                >
+                  <View style={styles.itemLeft}>
+                    <View style={[styles.iconBadge, { backgroundColor: '#fff5f2', width: wp(6), height: wp(6) }]}>
+                      <Icon name="description" size={rf(3.2)} color={COLORS.primary} />
+                    </View>
+                    <Text style={styles.itemLabel}>Manage Purchase Invoice</Text>
+                  </View>
+                  <Icon name="chevron-right" size={rf(5)} color="#999" />
+                </TouchableOpacity>)}
+              </Animated.View>
+            </View>
+
+            {/* <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => navigateFromDrawer('ManagePurchaseOrder')}
             style={styles.cardItem}
@@ -972,7 +984,7 @@ const CustomDrawerContent = ({ navigation }) => {
             </View>
             <Icon name="chevron-right" size={rf(5)} color="#999" />
           </TouchableOpacity> */}
-        </>
+          </>)}
         {/* )} */}
         {can('Business Development') && (
           <>
