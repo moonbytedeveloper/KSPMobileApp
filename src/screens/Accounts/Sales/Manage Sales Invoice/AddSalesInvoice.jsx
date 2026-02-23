@@ -27,7 +27,7 @@ import { useNavigation } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
-import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllSalesInquiryNumbers, getCustomers, getCountries, getSalesOrderNumbers, addSalesInvoiceHeader, addSalesInvoiceLine, updateSalesInvoiceHeader, getSalesInvoiceHeaderById, getSalesInvoiceHeaders, getSalesInvoiceLines, updateSalesInvoiceLine, deleteSalesInvoiceLine, getItems, getEmployees, uploadFiles } from '../../../../api/authServices';
+import { getPaymentTerms, getPaymentMethods, getProjectsByCustomer, getAllSalesInquiryNumbers, getCustomers, getCountries, getSalesOrderNumbers, addSalesInvoiceHeader, addSalesInvoiceLine, updateSalesInvoiceHeader, getSalesInvoiceHeaderById, getSalesInvoiceHeaders, getSalesInvoiceLines, updateSalesInvoiceLine, deleteSalesInvoiceLine, getItems, getEmployees, uploadFiles } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
 import { getErrorMessage } from '../../../../utils/errorMessage';
 
@@ -235,11 +235,10 @@ const AddSalesInvoice = () => {
         };
 
         try {
-            const [custResp, termsResp, methodsResp, projectsResp, inquiriesResp, salesOrdersResp] = await Promise.all([
+            const [custResp, termsResp, methodsResp, inquiriesResp, salesOrdersResp] = await Promise.all([
                 getCustomers(),
                 getPaymentTerms(),
                 getPaymentMethods(),
-                fetchProjects(),
                 getAllSalesInquiryNumbers(),
                 getSalesOrderNumbers(),
             ]);
@@ -247,7 +246,7 @@ const AddSalesInvoice = () => {
             const custList = extractArray(custResp);
             const termsList = extractArray(termsResp);
             const methodsList = extractArray(methodsResp);
-            const projectsList = extractArray(projectsResp);
+            const projectsList = [];
             const inquiriesList = extractArray(inquiriesResp);
             const salesOrdersList = extractArray(salesOrdersResp);
 
@@ -260,6 +259,7 @@ const AddSalesInvoice = () => {
             setCustomersOptions(custList);
             setPaymentTermsOptions(termsList);
             setPaymentMethodsOptions(methodsList);
+            // Projects will be loaded per-customer selection via `getProjectsByCustomer`
             setProjectsOptions(projectsList);
             setSalesInquiryNosOptions(normalizedInquiries);
 
@@ -2233,10 +2233,27 @@ const AddSalesInvoice = () => {
                                                             setFieldValue('CustomerName', custName);
                                                             setFieldValue('CustomerUUID', custUuid || '');
                                                             setHeaderForm(s => ({ ...s, CustomerName: custName, CustomerUUID: custUuid }));
+                                                            // Load projects for selected customer
+                                                            (async () => {
+                                                                try {
+                                                                    if (custUuid) {
+                                                                        const resp = await getProjectsByCustomer({ customerUuid: custUuid });
+                                                                        const d = resp?.Data ?? resp;
+                                                                        const list = Array.isArray(d) ? d : (Array.isArray(d?.List) ? d.List : (Array.isArray(d?.Records) ? d.Records : []));
+                                                                        setProjectsOptions(list || []);
+                                                                    } else {
+                                                                        setProjectsOptions([]);
+                                                                    }
+                                                                } catch (e) {
+                                                                    console.warn('Get projects by customer error', e?.message || e);
+                                                                    setProjectsOptions([]);
+                                                                }
+                                                            })();
                                                         } else {
                                                             setFieldValue('CustomerName', v || '');
                                                             setFieldValue('CustomerUUID', '');
                                                             setHeaderForm(s => ({ ...s, CustomerName: v, CustomerUUID: null }));
+                                                            setProjectsOptions([]);
                                                         }
                                                     }}
                                                     renderInModal={true}

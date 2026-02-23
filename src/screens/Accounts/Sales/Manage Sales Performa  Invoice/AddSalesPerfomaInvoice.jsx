@@ -26,7 +26,7 @@ import { useNavigation } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
 import { pick, types, isCancel } from '@react-native-documents/picker';
-import { getPaymentTerms, getPaymentMethods, fetchProjects, getAllSalesInquiryNumbers, getCustomers, getEmployees, getCountries, getSalesOrderNumbers, addSalesPerformaInvoiceHeader, addSalesPerformaInvoiceLine, updateSalesPerformaInvoiceHeader, updateSalesInvoiceHeader, getSalesPerformaInvoiceHeaderById, getSalesPerformaInvoiceLines, updateSalesPerformaInvoiceLine, deleteSalesPerformaInvoiceLine, getItems, uploadFiles } from '../../../../api/authServices';
+import { getPaymentTerms, getPaymentMethods, getProjectsByCustomer, getAllSalesInquiryNumbers, getCustomers, getEmployees, getCountries, getSalesOrderNumbers, addSalesPerformaInvoiceHeader, addSalesPerformaInvoiceLine, updateSalesPerformaInvoiceHeader, updateSalesInvoiceHeader, getSalesPerformaInvoiceHeaderById, getSalesPerformaInvoiceLines, updateSalesPerformaInvoiceLine, deleteSalesPerformaInvoiceLine, getItems, uploadFiles } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID, getUUID } from '../../../../api/tokenStorage';
 import { getErrorMessage } from '../../../../utils/errorMessage';
 
@@ -185,12 +185,11 @@ const AddSalesPerfomaInvoice = () => {
 
         try {
             setIsInitialLoading(true);
-            const [custResp, termsResp, methodsResp, employeesResp, projectsResp, inquiriesResp, salesOrdersResp] = await Promise.all([
+            const [custResp, termsResp, methodsResp, employeesResp, inquiriesResp, salesOrdersResp] = await Promise.all([
                 getCustomers(),
                 getPaymentTerms(),
                 getPaymentMethods(),
                 getEmployees(),
-                fetchProjects(),
                 getAllSalesInquiryNumbers(),
                 getSalesOrderNumbers(),
             ]);
@@ -198,7 +197,7 @@ const AddSalesPerfomaInvoice = () => {
             const custList = extractArray(custResp);
             const termsList = extractArray(termsResp);
             const methodsList = extractArray(methodsResp);
-            const projectsList = extractArray(projectsResp);
+            // projects will be loaded per-customer selection via `getProjectsByCustomer`
             const inquiriesList = extractArray(inquiriesResp);
             const salesOrdersList = extractArray(salesOrdersResp);
 

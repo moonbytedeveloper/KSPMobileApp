@@ -12,7 +12,7 @@ import DatePickerBottomSheet from '../../../../components/common/CustomDatePicke
 import { getErrorMessage } from '../../../../utils/errorMessage';
 // Network API calls removed from this screen — local-only behavior
 import { getUUID, getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
-import { fetchProjects, getSalesHeader, updateSalesHeader, getCustomers, addSalesInquiry, addSalesLine, updateSalesLine, deleteSalesLine, getItemTypes, getItems, getUnits, getSalesLines } from '../../../../api/authServices';
+import { getProjectsByCustomer, getSalesHeader, updateSalesHeader, getCustomers, addSalesInquiry, addSalesLine, updateSalesLine, deleteSalesLine, getItemTypes, getItems, getUnits, getSalesLines } from '../../../../api/authServices';
 import { uiDateToApiDate } from '../../../../utils/dateUtils';
 import BottomSheetConfirm from '../../../../components/common/BottomSheetConfirm';
 
@@ -83,59 +83,59 @@ const AddSalesInquiry = () => {
     // Ensure the header fields are populated into component state so the
     // user sees the full, editable form. We reset the userEdited flags so
     // the prefill will apply in this explicit-edit scenario.
-        const enterHeaderEditMode = async () => {
-            try {
-                setHeaderEditing(true);
-                setExpandedId(1);
-                // Reset user-edited marks so prefill applies now
-                userEditedRef.current = { project: false, customer: false, requestedDate: false, expectedDate: false };
+    const enterHeaderEditMode = async () => {
+        try {
+            setHeaderEditing(true);
+            setExpandedId(1);
+            // Reset user-edited marks so prefill applies now
+            userEditedRef.current = { project: false, customer: false, requestedDate: false, expectedDate: false };
 
-                // If we already have headerResponse from a previous prefill, use it
-                // Prefer fresh server data when entering edit mode. Determine header UUID
-                const headerUuidParam = headerResponse?.Data?.UUID || headerResponse?.Data?.HeaderUUID || headerResponse?.Data?.Id ||
-                    route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.headerUUID || route?.params?.uuid || route?.params?.headerRaw?.UUID || route?.params?.headerRaw?.Id;
-                console.log(headerUuidParam, 'HeaderId');
+            // If we already have headerResponse from a previous prefill, use it
+            // Prefer fresh server data when entering edit mode. Determine header UUID
+            const headerUuidParam = headerResponse?.Data?.UUID || headerResponse?.Data?.HeaderUUID || headerResponse?.Data?.Id ||
+                route?.params?.headerUuid || route?.params?.HeaderUUID || route?.params?.headerUUID || route?.params?.uuid || route?.params?.headerRaw?.UUID || route?.params?.headerRaw?.Id;
+            console.log(headerUuidParam, 'HeaderId');
 
-                if (headerUuidParam) {
-                    try {
-                        const resp = await getSalesHeader({ headerUuid: headerUuidParam });
-                        const hd = resp?.Data || resp || {};
-                        console.log('enterHeaderEditMode getSalesHeader resp ->', resp);
-                        setProjectName(hd.ProjectName || (hd.Header && hd.Header.ProjectName) || '');
-                        setInquiryNo(hd.InquiryNo || (hd.Header && hd.Header.InquiryNo) || '');
-                        // Extract OrderDate and RequestedDeliveryDate from various shapes
-                        const od = extractDateValue(hd) || extractDateValue(resp) || '';
-                        // prefer OrderDate if present specifically
-                        const orderCandidate = hd.OrderDate || (hd.Header && hd.Header.OrderDate) || (resp?.Data?.OrderDate) || '';
-                        const requestedVal = orderCandidate || od;
-                        const requestedDeliveryVal = hd.RequestedDeliveryDate || (hd.Header && hd.Header.RequestedDeliveryDate) || (resp?.Data?.RequestedDeliveryDate) || od;
-                        if (requestedVal) setRequestedDate(safeFormatIfDate(requestedVal));
-                        if (requestedDeliveryVal) setExpectedPurchaseDate(safeFormatIfDate(requestedDeliveryVal));
+            if (headerUuidParam) {
+                try {
+                    const resp = await getSalesHeader({ headerUuid: headerUuidParam });
+                    const hd = resp?.Data || resp || {};
+                    console.log('enterHeaderEditMode getSalesHeader resp ->', resp);
+                    setProjectName(hd.ProjectName || (hd.Header && hd.Header.ProjectName) || '');
+                    setInquiryNo(hd.InquiryNo || (hd.Header && hd.Header.InquiryNo) || '');
+                    // Extract OrderDate and RequestedDeliveryDate from various shapes
+                    const od = extractDateValue(hd) || extractDateValue(resp) || '';
+                    // prefer OrderDate if present specifically
+                    const orderCandidate = hd.OrderDate || (hd.Header && hd.Header.OrderDate) || (resp?.Data?.OrderDate) || '';
+                    const requestedVal = orderCandidate || od;
+                    const requestedDeliveryVal = hd.RequestedDeliveryDate || (hd.Header && hd.Header.RequestedDeliveryDate) || (resp?.Data?.RequestedDeliveryDate) || od;
+                    if (requestedVal) setRequestedDate(safeFormatIfDate(requestedVal));
+                    if (requestedDeliveryVal) setExpectedPurchaseDate(safeFormatIfDate(requestedDeliveryVal));
 
-                        const custUuid = hd.CustomerUUID || hd.CustomerId || hd.CustomerID;
-                        if (custUuid) {
-                            setCustomerUuid(custUuid);
-                            const found = (customers || []).find(c => (c.UUID || c.Id || c.id) === custUuid) || null;
-                            if (found) setCustomerName(found?.Name || found?.DisplayName || found?.name || '');
-                            else if (hd.CustomerName || hd.Customer) setCustomerName(hd.CustomerName || hd.Customer);
-                        }
-                        // store response for later
-                        setHeaderResponse(resp);
-                        setHeaderSaved(true);
-                    } catch (e) {
-                        console.log('enterHeaderEditMode fetch error ->', e?.message || e);
+                    const custUuid = hd.CustomerUUID || hd.CustomerId || hd.CustomerID;
+                    if (custUuid) {
+                        setCustomerUuid(custUuid);
+                        const found = (customers || []).find(c => (c.UUID || c.Id || c.id) === custUuid) || null;
+                        if (found) setCustomerName(found?.Name || found?.DisplayName || found?.name || '');
+                        else if (hd.CustomerName || hd.Customer) setCustomerName(hd.CustomerName || hd.Customer);
                     }
-                } else {
-                    // no header identifier — nothing to prefill
-                    console.warn('enterHeaderEditMode: no header UUID available to fetch');
+                    // store response for later
+                    setHeaderResponse(resp);
+                    setHeaderSaved(true);
+                } catch (e) {
+                    console.log('enterHeaderEditMode fetch error ->', e?.message || e);
                 }
-            } catch (e) {
-                console.log('enterHeaderEditMode error ->', e?.message || e);
+            } else {
+                // no header identifier — nothing to prefill
+                console.warn('enterHeaderEditMode: no header UUID available to fetch');
             }
-        };
-        if (headerEditing || headerSaved) {
-            enterHeaderEditMode();
+        } catch (e) {
+            console.log('enterHeaderEditMode error ->', e?.message || e);
         }
+    };
+    if (headerEditing || headerSaved) {
+        enterHeaderEditMode();
+    }
 
     // Dropdown option placeholders (real data must come from server APIs)
     const currencyTypes = [];
@@ -524,7 +524,7 @@ const AddSalesInquiry = () => {
                 };
             });
             setLineItems(mapped);
-            console.log('[AddSalesInquiry] loadSalesLines -> loaded', mapped.length, mapped.slice(0,5));
+            console.log('[AddSalesInquiry] loadSalesLines -> loaded', mapped.length, mapped.slice(0, 5));
             return mapped;
         } catch (e) {
             console.log('[AddSalesInquiry] loadSalesLines error ->', e?.message || e);
@@ -644,7 +644,6 @@ const AddSalesInquiry = () => {
             try {
                 await Promise.all([
                     fetchCustomers(),
-                    fetchProjectsList(),
                     fetchItemTypes(),
                     fetchItemMasters(null),
                     fetchUnits(),
@@ -797,8 +796,8 @@ const AddSalesInquiry = () => {
                         const currentJson = JSON.stringify(lineItems || []);
                         const mappedJson = JSON.stringify(mapped || []);
                         console.log('[AddSalesInquiry] prefill compare currentJson length ->', (lineItems || []).length, 'mapped ->', mapped.length);
-                        console.log('[AddSalesInquiry] prefill compare currentJson ->', currentJson.slice(0,200));
-                        console.log('[AddSalesInquiry] prefill compare mappedJson ->', mappedJson.slice(0,200));
+                        console.log('[AddSalesInquiry] prefill compare currentJson ->', currentJson.slice(0, 200));
+                        console.log('[AddSalesInquiry] prefill compare mappedJson ->', mappedJson.slice(0, 200));
                         if (mappedJson !== currentJson) {
                             setLineItems(mapped);
                             console.log('[AddSalesInquiry] prefill applied, lines ->', mapped.length);
@@ -1163,6 +1162,58 @@ const AddSalesInquiry = () => {
 
                                     <View style={styles.row}>
                                         <View style={styles.col}>
+                                            <Text style={inputStyles.label}>Customer Name*</Text>
+                                            <View style={{ zIndex: 9999, elevation: 20 }}>
+                                                <Dropdown
+                                                    placeholder="- Select Customer -"
+                                                    value={values.CustomerUUID || values.CustomerName || ''}
+                                                    options={customers}
+                                                    getLabel={(c) => c?.Name || c?.DisplayName || c?.name || ''}
+                                                    getKey={(c) => c?.UUID || c?.Id || c?.id || (c?.Name ?? c)}
+                                                    onSelect={(v) => {
+                                                        // Dropdown returns the selected item (object)
+                                                        if (v && typeof v === 'object') {
+                                                            const custName = v?.Name || v?.DisplayName || v?.name || '';
+                                                            const custUuid = v?.UUID || v?.Id || v?.id || null;
+                                                            setFieldValue('CustomerName', custName);
+                                                            setFieldValue('CustomerUUID', custUuid || '');
+                                                            setCustomerName(custName);
+                                                            setCustomerUuid(custUuid);
+                                                            userEditedRef.current.customer = true;
+
+                                                            (async () => {
+                                                                try {
+                                                                    const cmp = await getCMPUUID();
+                                                                    const env = await getENVUUID();
+                                                                    const resp = await getProjectsByCustomer({ customerUuid: custUuid, cmpUuid: cmp, envUuid: env });
+                                                                    const list = resp?.Data || resp?.Records || resp?.List || resp || [];
+                                                                    const arr = Array.isArray(list) ? list : (list?.Records || []);
+                                                                    setProjects(arr);
+                                                                } catch (e) {
+                                                                    console.log('getProjectsByCustomer error ->', e?.message || e);
+                                                                    setProjects([]);
+                                                                }
+                                                            })();
+
+                                                        } else {
+                                                            // fallback for string values
+                                                            setFieldValue('CustomerName', v || '');
+                                                            setFieldValue('CustomerUUID', '');
+                                                            setCustomerName(v);
+                                                            setCustomerUuid(null);
+                                                            userEditedRef.current.customer = true;
+                                                            setProjects([]);
+                                                        }
+                                                    }}
+                                                    renderInModal={true}
+                                                    inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
+                                                />
+                                            </View>
+                                            {errors.CustomerName && (touched.CustomerName || submitCount > 0) ? (
+                                                <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.CustomerName}</Text>
+                                            ) : null}
+                                        </View>
+                                        <View style={styles.col}>
                                             <Text style={inputStyles.label}>Project Name*</Text>
                                             <View style={{ zIndex: 9998, elevation: 20 }}>
                                                 <Dropdown
@@ -1196,42 +1247,7 @@ const AddSalesInquiry = () => {
                                                 <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.ProjectName}</Text>
                                             ) : null}
                                         </View>
-                                        <View style={styles.col}>
-                                            <Text style={inputStyles.label}>Customer Name*</Text>
-                                            <View style={{ zIndex: 9999, elevation: 20 }}>
-                                                <Dropdown
-                                                    placeholder="- Select Customer -"
-                                                    value={values.CustomerUUID || values.CustomerName || ''}
-                                                    options={customers}
-                                                    getLabel={(c) => c?.Name || c?.DisplayName || c?.name || ''}
-                                                    getKey={(c) => c?.UUID || c?.Id || c?.id || (c?.Name ?? c)}
-                                                    onSelect={(v) => {
-                                                        // Dropdown returns the selected item (object)
-                                                        if (v && typeof v === 'object') {
-                                                            const custName = v?.Name || v?.DisplayName || v?.name || '';
-                                                            const custUuid = v?.UUID || v?.Id || v?.id || null;
-                                                            setFieldValue('CustomerName', custName);
-                                                            setFieldValue('CustomerUUID', custUuid || '');
-                                                            setCustomerName(custName);
-                                                            setCustomerUuid(custUuid);
-                                                            userEditedRef.current.customer = true;
-                                                        } else {
-                                                            // fallback for string values
-                                                            setFieldValue('CustomerName', v || '');
-                                                            setFieldValue('CustomerUUID', '');
-                                                            setCustomerName(v);
-                                                            setCustomerUuid(null);
-                                                            userEditedRef.current.customer = true;
-                                                        }
-                                                    }}
-                                                    renderInModal={true}
-                                                    inputBoxStyle={[inputStyles.box, { marginTop: -hp(-0.1) }]}
-                                                />
-                                            </View>
-                                            {errors.CustomerName && (touched.CustomerName || submitCount > 0) ? (
-                                                <Text style={{ color: '#ef4444', marginTop: hp(0.4), fontSize: rf(2.6) }}>{errors.CustomerName}</Text>
-                                            ) : null}
-                                        </View>
+
                                     </View>
 
                                     <View style={[styles.row, { marginTop: hp(1.5) }]}>

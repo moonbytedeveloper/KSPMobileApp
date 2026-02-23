@@ -123,6 +123,7 @@ const PATHS = {
     getPurchaseHeaderInquiries: Config.API_GET_PURCHASE_HEADER_INQUIRIES_PATH || '/api/Account/GetPurchaseHeaderInquiries',
     addSalesInquiry: Config.ADD_SALES_INQUIRY || '/api/Account/AddSalesHeader',
     getCustomers: Config.API_GET_CUSTOMERS_PATH || '/api/Account/GetCustomers',
+    getProjectsByCustomer: Config.API_GET_PROJECTS_BY_CUSTOMER_PATH || '/api/Account/GetProjectsByCustomer',
     getVendors: Config.API_GET_VENDORS_PATH || '/api/Account/PurchasequotationVendors',
     getItemTypes: Config.API_GET_ITEM_TYPES_PATH || '/api/Account/ItemTypes',
     // getItemMasters: Config.API_GET_ITEM_MASTERS_PATH || '/api/Account/ItemMasters',
@@ -2807,7 +2808,7 @@ export async function getWonLeads({ cmpUuid, envUuid, userUuid, start = 0, lengt
 }
 
 // Business Development: Update Lead Status
-export async function updateLeadStatus({ leadUuid, status, nextAction, actionDueDate }, overrides = {}) {
+export async function updateLeadStatus({ leadUuid, status, nextAction, actionDueDate ,Remark}, overrides = {}) {
     if (!leadUuid) throw new Error('Missing leadUuid');
     if (!status) throw new Error('Missing status');
 
@@ -2829,6 +2830,7 @@ export async function updateLeadStatus({ leadUuid, status, nextAction, actionDue
         Status: status, // 'won' | 'lost'
         NextAction: nextAction || '',
         ActionDueDate: "2025-09-30",
+        Remark: Remark || '',
     };
     console.log('Update Lead Status payload:', payload);
 
@@ -3219,6 +3221,29 @@ export async function fetchProjects() {
         params: {
             cmpUuid: cmpUuid || '',
             envUuid: envUuid || '',
+        },
+    });
+    return resp.data;
+}
+
+// Get projects filtered by customer (expects customerUuid param)
+export async function getProjectsByCustomer({ customerUuid, cmpUuid, envUuid } = {}) {
+    if (!customerUuid) throw new Error('Missing customerUuid');
+    const [selectedCmpUuid, selectedEnvUuid, userCmpUuid, userEnvUuid] = await Promise.all([
+        getSelectedCompanyUUID(),
+        getSelectedEnvironmentUUID(),
+        getCMPUUID(),
+        getENVUUID(),
+    ]);
+
+    const useCmp = cmpUuid || selectedCmpUuid || userCmpUuid;
+    const useEnv = envUuid || selectedEnvUuid || userEnvUuid;
+
+    const resp = await api.get(PATHS.getProjectsByCustomer, {
+        params: {
+            cmpUuid: useCmp || '',
+            envUuid: useEnv || '',
+            customerUuid: customerUuid || '',
         },
     });
     return resp.data;

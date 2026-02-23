@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { wp, hp, rf } from '../../utils/responsive';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
@@ -55,11 +55,11 @@ const StatusBadge = ({ label = 'Pending' }) => {
     Won: { bg: COLORS.successBg, color: COLORS.success, border: COLORS.success },
     Closed: { bg: COLORS.dangerBg, color: COLORS.danger, border: COLORS.danger },
   };
-  
+
   const theme = palette[label] || palette.Pending;
 
   return (
-    <View style={[styles.badge, { backgroundColor: theme.bg, borderColor: theme.border }]}> 
+    <View style={[styles.badge, { backgroundColor: theme.bg, borderColor: theme.border }]}>
       <Text style={[styles.badgeText, { color: theme.color }]}>{label}</Text>
     </View>
   );
@@ -72,6 +72,7 @@ const OpportunityCard = ({
   totalHours,
   fromLabel,
   toLabel,
+  Remark,
   // Table data props (preferred for your use case)
   srNo,
   uuid,
@@ -89,6 +90,8 @@ const OpportunityCard = ({
   expanded: expandedProp,
   onToggle,
 }) => {
+  console.log(Remark,'Remark');
+  
   const [expandedUncontrolled, setExpandedUncontrolled] = useState(false);
   const isControlled = typeof expandedProp === 'boolean';
   const expanded = isControlled ? expandedProp : expandedUncontrolled;
@@ -107,9 +110,11 @@ const OpportunityCard = ({
   const snapPoints = useMemo(() => [hp(60), hp(75)], []);
   const deleteSnapPoints = useMemo(() => [hp(40)], []);
   const [selected, setSelected] = useState(status || null);
+  const [remark, setRemark] = useState('');
+  const [remarkError, setRemarkError] = useState('');
   const [mode, setMode] = useState('pick'); // 'pick' | 'success' | 'error'
   const [errorMessage, setErrorMessage] = useState('');
-  
+
   const [currentSnapIndex, setCurrentSnapIndex] = useState(0);
 
   // Check if status is 'Won' to disable certain actions
@@ -130,6 +135,14 @@ const OpportunityCard = ({
       deleteSheetRef.current?.dismiss();
     }
   }, [deleteConfirmVisible]);
+
+  useEffect(() => {
+    // Clear remark when status is not Lost
+    if (selected !== 'Lost') {
+      setRemark('');
+      setRemarkError('');
+    }
+  }, [selected]);
 
   const handleDeletePress = useCallback(() => {
     setDeleteConfirmVisible(true);
@@ -154,402 +167,445 @@ const OpportunityCard = ({
 
   return (
     <>
-    <View style={styles.card}>
-      <TouchableOpacity activeOpacity={0.8} onPress={toggle}>
-        <View style={styles.rowHeader}>
-          <View style={styles.headerLeft}>
-            <View style={[styles.dot, { backgroundColor: (status === 'Won' ? COLORS.success : 
-              status === 'Pending' ? COLORS.warning :status === 'Not Updated' ?   'grey' : COLORS.info) }]} />
-            <View style={styles.headerLeftContent}>
-              <Text style={[text.caption, styles.caption]}>Opportunity Title</Text>
-              <Text style={[text.title, styles.title]} numberOfLines={1}>{OpportunityTitle}</Text>
+      <View style={styles.card}>
+        <TouchableOpacity activeOpacity={0.8} onPress={toggle}>
+          <View style={styles.rowHeader}>
+            <View style={styles.headerLeft}>
+              <View style={[styles.dot, {
+                backgroundColor: (status === 'Won' ? COLORS.success :
+                  status === 'Pending' ? COLORS.warning : status === 'Not Updated' ? 'grey' : COLORS.info)
+              }]} />
+              <View style={styles.headerLeftContent}>
+                <Text style={[text.caption, styles.caption]}>Opportunity Title</Text>
+                <Text style={[text.title, styles.title]} numberOfLines={1}>{OpportunityTitle}</Text>
+              </View>
+            </View>
+            <View style={styles.headerRight}>
+              <View>
+                <Text style={[text.caption, styles.caption, { textAlign: 'right' }]}> Action Due Date </Text>
+                <Text style={[text.title, styles.hours]}>{formatDMY(actionDueDate)}</Text>
+              </View>
+              <Icon name={expanded ? 'expand-less' : 'expand-more'} size={rf(4.2)} color={COLORS.textMuted} />
             </View>
           </View>
-          <View style={styles.headerRight}>
-            <View>
-              <Text style={[text.caption, styles.caption, { textAlign: 'right' }]}> Action Due Date </Text>
-              <Text style={[text.title, styles.hours]}>{formatDMY(actionDueDate)}</Text>
-            </View>
-            <Icon name={expanded ? 'expand-less' : 'expand-more'} size={rf(4.2)} color={COLORS.textMuted} />
-          </View>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
 
-      {expanded && (
-        <View style={styles.detailArea}>
-          {/* When table-like props are provided, show that format */}
-          {srNo !== undefined && (
-            <> 
-              {/* {uuid ? (
+        {expanded && (
+          <View style={styles.detailArea}>
+            {/* When table-like props are provided, show that format */}
+            {srNo !== undefined && (
+              <>
+                {/* {uuid ? (
                 <View style={styles.detailRow}> 
                   <Text style={styles.detailLabel}>UUID</Text>
                   <Text style={styles.linkText}>{uuid}</Text>
                 </View>
               ) : null} */}
-              {companyDetail ? (
-                <View style={{ marginBottom: hp(1) }}>
-                  <Text style={[text.caption, styles.detailLabel]}>Company Detail</Text>
-                  <View style={styles.companyGroup}>
-                    {companyDetail.name ? (
-                      <View style={styles.detailRow}>
-                        <Text style={[text.caption, styles.detailLabel]}>Company</Text>
-                        <Text style={[text.body, styles.companyValue]}>{companyDetail.name}</Text>
-                      </View>
-                    ) : null}
-                    {companyDetail.email ? (
-                      <View style={styles.detailRow}>
-                        <Text style={[text.caption, styles.detailLabel]}>Email</Text>
-                        <Text style={[text.body, styles.companyValue]}>{companyDetail.email}</Text>
-                      </View>
-                    ) : null}
-                    {companyDetail.phone ? (
-                      <View style={styles.detailRow}>
-                        <Text style={[text.caption, styles.detailLabel]}>Phone</Text>
-                        <Text style={[text.body, styles.companyValue]}>{companyDetail.phone}</Text>
-                      </View>
-                    ) : null}
-                    {companyDetail.client ? (
-                      <View style={styles.detailRow}>
-                        <Text style={[text.caption, styles.detailLabel]}>Client</Text>
-                        <Text style={[text.body, styles.companyValue]}>{companyDetail.client}</Text>
-                      </View>
-                    ) : null}
+                {companyDetail ? (
+                  <View style={{ marginBottom: hp(1) }}>
+                    <Text style={[text.caption, styles.detailLabel]}>Company Detail</Text>
+                    <View style={styles.companyGroup}>
+                      {companyDetail.name ? (
+                        <View style={styles.detailRow}>
+                          <Text style={[text.caption, styles.detailLabel]}>Company</Text>
+                          <Text style={[text.body, styles.companyValue]}>{companyDetail.name}</Text>
+                        </View>
+                      ) : null}
+                      {companyDetail.email ? (
+                        <View style={styles.detailRow}>
+                          <Text style={[text.caption, styles.detailLabel]}>Email</Text>
+                          <Text style={[text.body, styles.companyValue]}>{companyDetail.email}</Text>
+                        </View>
+                      ) : null}
+                      {companyDetail.phone ? (
+                        <View style={styles.detailRow}>
+                          <Text style={[text.caption, styles.detailLabel]}>Phone</Text>
+                          <Text style={[text.body, styles.companyValue]}>{companyDetail.phone}</Text>
+                        </View>
+                      ) : null}
+                      {companyDetail.client ? (
+                        <View style={styles.detailRow}>
+                          <Text style={[text.caption, styles.detailLabel]}>Client</Text>
+                          <Text style={[text.body, styles.companyValue]}>{companyDetail.client}</Text>
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
-                </View>
-              ) : null}
-              {nextAction ? (
-                <View style={styles.detailRow}> 
-                  <Text style={[text.caption, styles.detailLabel]}>Next Action</Text>
-                  <Text style={[text.body, styles.detailValue,{maxWidth: wp(60)}]}>{nextAction}</Text>
-                </View>
-              ) : null}
-              {actionDueDate ? (
-                <View style={styles.detailRow}> 
-                  <Text style={[text.caption, styles.detailLabel]}>Action Due Date</Text>
-                  <Text style={[text.body, styles.detailValue]}>{formatDMY(actionDueDate)}</Text>
-                </View>
-              ) : null}
-              {OppOwner ? (
-                <View style={styles.detailRow}> 
-                  <Text style={[text.caption, styles.detailLabel]}>Opportunity Owner</Text>
-                  <Text style={[text.body, styles.detailValue]}>{OppOwner}</Text>
-                </View>
-              ) : null}
-            </>
-          )}
+                ) : null}
+                {nextAction ? (
+                  <View style={styles.detailRow}>
+                    <Text style={[text.caption, styles.detailLabel]}>Next Action</Text>
+                    <Text style={[text.body, styles.detailValue, { maxWidth: wp(60) }]}>{nextAction}</Text>
+                  </View>
+                ) : null}
+                {actionDueDate ? (
+                  <View style={styles.detailRow}>
+                    <Text style={[text.caption, styles.detailLabel]}>Action Due Date</Text>
+                    <Text style={[text.body, styles.detailValue]}>{formatDMY(actionDueDate)}</Text>
+                  </View>
+                ) : null}
+                {OppOwner ? (
+                  <View style={styles.detailRow}>
+                    <Text style={[text.caption, styles.detailLabel]}>Opportunity Owner</Text>
+                    <Text style={[text.body, styles.detailValue]}>{OppOwner}</Text>
+                  </View>
+                ) : null}
+              </>
+            )}
 
-          {/* Fallback to original fields if table-like props not given */}
-          {srNo === undefined && (
-            <>
-              {fromLabel ? (
-                <View style={styles.detailRow}> 
-                  <Text style={[text.caption, styles.detailLabel]}>From</Text>
-                  <Text style={[text.body, styles.detailValue]}>{fromLabel}</Text>
-                </View>
-              ) : null}
-              {toLabel ? (
-                <View style={styles.detailRow}> 
-                  <Text style={[text.caption, styles.detailLabel]}>To</Text>
-                  <Text style={[text.body, styles.detailValue]}>{toLabel}</Text>
-                </View>
-              ) : null}
-            </>
-          )}
+            {/* Fallback to original fields if table-like props not given */}
+            {srNo === undefined && (
+              <>
+                {fromLabel ? (
+                  <View style={styles.detailRow}>
+                    <Text style={[text.caption, styles.detailLabel]}>From</Text>
+                    <Text style={[text.body, styles.detailValue]}>{fromLabel}</Text>
+                  </View>
+                ) : null}
+                {toLabel ? (
+                  <View style={styles.detailRow}>
+                    <Text style={[text.caption, styles.detailLabel]}>To</Text>
+                    <Text style={[text.body, styles.detailValue]}>{toLabel}</Text>
+                  </View>
+                ) : null}
+              </>
+            )}
 
-          <TouchableOpacity 
-            activeOpacity={isWonStatus ? 1 : 0.8} 
-            onPress={() => !isWonStatus && setPickerVisible(true)}
-            disabled={isWonStatus}
-          >
-            <View style={styles.detailRow}> 
-              <Text style={[text.caption, styles.detailLabel]}>Status</Text>
-              <StatusBadge  label={status} />
+            <TouchableOpacity
+              activeOpacity={isWonStatus ? 1 : 0.8}
+              onPress={() => !isWonStatus && setPickerVisible(true)}
+              disabled={isWonStatus}
+            >
+              <View style={styles.detailRow}>
+                <Text style={[text.caption, styles.detailLabel]}>Status</Text>
+                <StatusBadge label={status} />
+              </View>
+            </TouchableOpacity>
+          {Remark && status==="Lost" &&  <TouchableOpacity >
+              <View style={styles.detailRow}>
+                <Text style={[text.caption, styles.detailLabel]}>Remark</Text>
+                <Text >{Remark}</Text>
+              </View>
+            </TouchableOpacity>}
+
+            {/* Primary filled actions */}
+            <View style={styles.actionsRowPrimary}>
+              <TouchableOpacity
+                onPress={() => { setSelected(status); handlePickerOpen(); }}
+                activeOpacity={isWonStatus ? 1 : 0.85}
+                style={[
+                  buttonStyles.buttonNeutralFill,
+                  buttonStyles.UpdateBtns,
+                  isWonStatus && styles.disabledButton
+                ]}
+                disabled={isWonStatus}
+              >
+                <Icon
+                  name="fact-check"
+                  size={rf(5)}
+                  style={[
+                    buttonStyles.UpdateStatusBtn,
+                    isWonStatus && styles.disabledIcon
+                  ]}
+                />
+                {/* <Text style={styles.buttonFillText}>Update Status</Text> */}
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={onView} activeOpacity={0.8} style={[buttonStyles.buttonNeutralFill, buttonStyles.viewBtn]}>
+                <Icon name="description" size={rf(5)} style={buttonStyles.iconView} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={onEdit} activeOpacity={0.8} style={[buttonStyles.buttonNeutralFill, buttonStyles.scheduleBtn]}>
+                <Icon name="schedule" size={rf(5)} style={buttonStyles.iconSchedule} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={onEditLead}
+                activeOpacity={isWonStatus ? 1 : 0.8}
+                style={[
+                  buttonStyles.buttonNeutralFill,
+                  buttonStyles.editBtn,
+                  isWonStatus && styles.disabledButton
+                ]}
+                disabled={isWonStatus}
+              >
+                <Icon
+                  name="edit"
+                  size={rf(5)}
+                  style={[
+                    buttonStyles.iconEdit,
+                    isWonStatus && styles.disabledIcon
+                  ]}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleDeletePress}
+                activeOpacity={isWonStatus ? 1 : 0.85}
+                style={[
+                  buttonStyles.buttonNeutralFill,
+                  buttonStyles.deleteBtn,
+                  isWonStatus && styles.disabledButton
+                ]}
+                disabled={isWonStatus}
+              >
+                <Icon
+                  name="delete"
+                  size={rf(5)}
+                  style={[
+                    buttonStyles.iconDelete,
+                    isWonStatus && styles.disabledIcon
+                  ]}
+                />
+                {/* <Text style={styles.buttonFillText}>Delete</Text> */}
+              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
-
-          {/* Primary filled actions */}
-          <View style={styles.actionsRowPrimary}>
-            <TouchableOpacity 
-              onPress={() => { setSelected(status); handlePickerOpen(); }} 
-              activeOpacity={isWonStatus ? 1 : 0.85} 
-              style={[
-                buttonStyles.buttonNeutralFill, 
-                buttonStyles.UpdateBtns,
-                isWonStatus && styles.disabledButton
-              ]}
-              disabled={isWonStatus}
-            >
-              <Icon 
-                name="fact-check" 
-                size={rf(5)} 
-                style={[
-                  buttonStyles.UpdateStatusBtn,
-                  isWonStatus && styles.disabledIcon
-                ]} 
-              />
-              {/* <Text style={styles.buttonFillText}>Update Status</Text> */}
-            </TouchableOpacity>
-         
-            <TouchableOpacity onPress={onView} activeOpacity={0.8} style={[buttonStyles.buttonNeutralFill, buttonStyles.viewBtn]}> 
-              <Icon name="description" size={rf(5)} style={buttonStyles.iconView}  />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={onEdit} activeOpacity={0.8} style={[buttonStyles.buttonNeutralFill, buttonStyles.scheduleBtn]}> 
-              <Icon name="schedule" size={rf(5)} style={buttonStyles.iconSchedule} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              onPress={onEditLead} 
-              activeOpacity={isWonStatus ? 1 : 0.8} 
-              style={[
-                buttonStyles.buttonNeutralFill, 
-                buttonStyles.editBtn,
-                isWonStatus && styles.disabledButton
-              ]}
-              disabled={isWonStatus}
-            > 
-              <Icon 
-                name="edit" 
-                size={rf(5)} 
-                style={[
-                  buttonStyles.iconEdit,
-                  isWonStatus && styles.disabledIcon
-                ]} 
-              />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              onPress={handleDeletePress} 
-              activeOpacity={isWonStatus ? 1 : 0.85} 
-              style={[
-                buttonStyles.buttonNeutralFill, 
-                buttonStyles.deleteBtn,
-                isWonStatus && styles.disabledButton
-              ]}
-              disabled={isWonStatus}
-            >
-              <Icon 
-                name="delete" 
-                size={rf(5)} 
-                style={[
-                  buttonStyles.iconDelete,
-                  isWonStatus && styles.disabledIcon
-                ]} 
-              />
-              {/* <Text style={styles.buttonFillText}>Delete</Text> */}
+          </View>
+        )}
+      </View>
+      {/* Inline Bottom Sheet for Update Status */}
+      <BottomSheetModal
+        ref={sheetRef}
+        snapPoints={snapPoints}
+        enablePanDownToClose
+        enableContentPanningGesture={false}
+        onDismiss={() => setPickerVisible(false)}
+        onChange={(index) => setCurrentSnapIndex(index)}
+        handleIndicatorStyle={styles.bsHandle}
+        handleStyle={{ backgroundColor: 'transparent' }}
+        backgroundStyle={styles.bsBackground}
+        backdropComponent={(props) => (
+          <BottomSheetBackdrop
+            {...props}
+            appearsOnIndex={0}
+            disappearsOnIndex={-1}
+            opacity={0.45}
+            pressBehavior="close"
+          />
+        )}
+      >
+        <BottomSheetView style={styles.bsContent}>
+          {/* Header */}
+          <View style={styles.bsHeaderRow}>
+            <Text style={[text.title, styles.bsTitle]}>Update Lead Status</Text>
+            <TouchableOpacity onPress={() => setPickerVisible(false)} activeOpacity={0.8}>
+              <Icon name="close" size={rf(4)} color={COLORS.text} />
             </TouchableOpacity>
           </View>
-        </View>
-      )}
-    </View>
-    {/* Inline Bottom Sheet for Update Status */}
-    <BottomSheetModal
-  ref={sheetRef}
-  snapPoints={snapPoints}
-  enablePanDownToClose
-  enableContentPanningGesture={false}
-  onDismiss={() => setPickerVisible(false)}
-  onChange={(index) => setCurrentSnapIndex(index)}
-  handleIndicatorStyle={styles.bsHandle}
-  handleStyle={{ backgroundColor: 'transparent' }}
-  backgroundStyle={styles.bsBackground}
-  backdropComponent={(props) => (
-    <BottomSheetBackdrop
-      {...props}
-      appearsOnIndex={0}
-      disappearsOnIndex={-1}
-      opacity={0.45}
-      pressBehavior="close"
-    />
-  )}
->
-  <BottomSheetView style={styles.bsContent}>
-    {/* Header */}
-    <View style={styles.bsHeaderRow}>
-      <Text style={[text.title, styles.bsTitle]}>Update Lead Status</Text>
-      <TouchableOpacity onPress={() => setPickerVisible(false)} activeOpacity={0.8}>
-        <Icon name="close" size={rf(4)} color={COLORS.text} />
-      </TouchableOpacity>
-    </View>
 
-    {mode === 'pick' ? (
-      <>
-        {/* Icon + Helper */}
-        <View style={styles.iconCircle}> 
-          <Text style={styles.iconCircleMark}>?</Text>
-        </View>
-        <Text style={[text.title, styles.modalTitlebottom]}>Update Lead Status</Text>
+          {mode === 'pick' ? (
+            <>
+              {/* Icon + Helper */}
+              <View style={styles.iconCircle}>
+                <Text style={styles.iconCircleMark}>?</Text>
+              </View>
+              <Text style={[text.title, styles.modalTitlebottom]}>Update Lead Status</Text>
 
-        <Text style={[text.body, styles.helperText]}>Please select a new status for this lead:</Text>
+              <Text style={[text.body, styles.helperText]}>Please select a new status for this lead:</Text>
 
-        {/* Dropdown with same snap logic as Project/Task */}
-        <Dropdown
-          placeholder="Select Status"
-          value={selected}
-          options={['Won', 'Lost', 'Cancelled','On Hold']}
-          getLabel={(s) => s}
-          getKey={(s) => s}
-          hint="Select Status"
-          onSelect={(s) => {
-            setSelected(s);
-            sheetRef.current?.snapToIndex(0);
-          }}
-          onOpenChange={(open) => {
-            if (open) {
-              setCurrentSnapIndex(1);
-              sheetRef.current?.snapToIndex(1);
-            } else {
-              setCurrentSnapIndex(0);
-              sheetRef.current?.snapToIndex(0);
-            }
-          }}
-          inputBoxStyle={{
-            marginTop: 0,
-            borderWidth: 1,
-            borderColor: COLORS.border,
-            borderRadius: RADIUS.lg,
-            paddingHorizontal: SPACING.lg,
-            paddingVertical: hp(0.8),
-            minHeight: hp(6.5),
-          }}
-        />
+              {/* Dropdown with same snap logic as Project/Task */}
+              <Dropdown
+                placeholder="Select Status"
+                value={selected}
+                options={['Won', 'Lost', 'Cancelled', 'On Hold']}
+                getLabel={(s) => s}
+                getKey={(s) => s}
+                hint="Select Status"
+                onSelect={(s) => {
+                  setSelected(s);
+                  sheetRef.current?.snapToIndex(0);
+                }}
+                onOpenChange={(open) => {
+                  if (open) {
+                    setCurrentSnapIndex(1);
+                    sheetRef.current?.snapToIndex(1);
+                  } else {
+                    setCurrentSnapIndex(0);
+                    sheetRef.current?.snapToIndex(0);
+                  }
+                }}
+                inputBoxStyle={{
+                  marginTop: 0,
+                  borderWidth: 1,
+                  borderColor: COLORS.border,
+                  borderRadius: RADIUS.lg,
+                  paddingHorizontal: SPACING.lg,
+                  paddingVertical: hp(0.8),
+                  minHeight: hp(6.5),
+                }}
+              />
 
-        {/* CTA buttons */}
-        <View style={styles.ctaRow}>
-          <TouchableOpacity
-            activeOpacity={0.9}
-            style={[styles.primaryBtn, styles.Primarybtn, (!selected || updating) && { opacity: 0.6 }]}
-            disabled={!selected || updating}
-            onPress={async () => {
-              if (!selected || updating) return;
-              try {
-                setUpdating(true);
-                setErrorMessage(''); // Clear any previous error
-                const response = await updateLeadStatus({
-                  leadUuid: uuid,
-                  status: selected,
-                  nextAction: nextAction || '',
-                  actionDueDate: actionDueDate || undefined,
-                });
-                
-                // Check if the response indicates success
-                if (response?.Success === false) {
-                  setErrorMessage(response?.Message || 'Update failed');
-                  setMode('error');
-                } else {
-                  setMode('success');
-                }
-              } catch (e) {
-                const errorMsg = e?.response?.data?.Message || e?.response?.data?.message || e?.message || 'Update failed';
-                setErrorMessage(errorMsg);
-                setMode('error');
-              } finally {
-                setUpdating(false);
-              }
-            }}
-          >
-            <Text style={[text.subtitle, styles.primaryBtnText]}>{updating ? 'Updating...' : 'Update'}</Text>
-          </TouchableOpacity>
+              {/* Remark for Lost status (required) */}
+              {selected === 'Lost' && (
+                <View style={{ marginTop: hp(1) }}>
+                  <Text style={[text.caption, { marginBottom: hp(0.5) }]}>Remark (required)</Text>
+                  <TextInput
+                    value={remark}
+                    onChangeText={(t) => {
+                      setRemark(t);
+                      if (t && t.trim()) setRemarkError('');
+                    }}
+                    placeholder="Enter remark"
+                    multiline
+                    style={[styles.selectBox, { minHeight: hp(8), textAlignVertical: 'top' }]}
+                  />
+                  {remarkError ? <Text style={[text.body, styles.errorText, { marginTop: hp(0.5) }]}>{remarkError}</Text> : null}
+                </View>
+              )}
 
-          <TouchableOpacity
-            activeOpacity={0.9}
-            style={[styles.secondaryBtn, styles.Primarybtn]}
-            onPress={() => setPickerVisible(false)}
-          >
-            <Text style={[text.subtitle, styles.secondaryBtnText]}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      </>
-    ) : mode === 'success' ? (
-      <>
-        {/* Success State */}
-        <View style={[styles.iconCircle, { borderColor: COLORS.success }]}> 
-          <Text style={[styles.iconCircleMark, { color: COLORS.success }]}>✓</Text>
-        </View>
-        <Text style={[text.title, styles.modalTitle, { color: COLORS.success }]}>Done</Text>
-        <Text style={[text.body, styles.successText]}>Lead status has been updated successfully!</Text>
+              {/* CTA buttons */}
+              <View style={styles.ctaRow}>
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  style={[
+                    styles.primaryBtn,
+                    styles.Primarybtn,
+                    (!selected || updating || (selected === 'Lost' && !remark.trim())) && { opacity: 0.6 },
+                  ]}
+                  disabled={!selected || updating || (selected === 'Lost' && !remark.trim())}
+                  onPress={async () => {
+                    if (!selected || updating) return;
+                    if (selected === 'Lost' && !remark.trim()) {
+                      setRemarkError('Remark is required for Lost status');
+                      return;
+                    }
+                    try {
+                      setUpdating(true);
+                      setErrorMessage(''); // Clear any previous error
+                      console.log('console', {
+                        leadUuid: uuid,
+                        status: selected,
+                        nextAction: nextAction || '',
+                        actionDueDate: actionDueDate || undefined,
+                        Remark: selected === 'Lost' ? remark : '',
+                      })
+                      const response = await updateLeadStatus({
+                        leadUuid: uuid,
+                        status: selected,
+                        nextAction: nextAction || '',
+                        actionDueDate: actionDueDate || undefined,
+                        Remark: selected === 'Lost' ? remark : '',
+                      });
 
-        <TouchableOpacity
-          activeOpacity={0.9}
-          style={styles.primaryBtn}
-          onPress={() => setPickerVisible(false)}
-        >
-          <Text style={[text.subtitle, styles.primaryBtnText]}>Ok</Text>
-        </TouchableOpacity>
-      </>
-    ) : (
-      <>
-        {/* Error State */}
-        <View style={[styles.iconCircle, { borderColor: COLORS.warning }]}> 
-          <Text style={[styles.iconCircleMark, { color: COLORS.warning }]}>!</Text>
-        </View>
-        <Text style={[text.title, styles.modalTitle, { color: COLORS.warning }]}>Error</Text>
-        <Text style={[text.body, styles.errorText]}>{errorMessage}</Text>
+                      // Check if the response indicates success
+                      if (response?.Success === false) {
+                        setErrorMessage(response?.Message || 'Update failed');
+                        setMode('error');
+                      } else {
+                        setMode('success');
+                      }
+                    } catch (e) {
+                      const errorMsg = e?.response?.data?.Message || e?.response?.data?.message || e?.message || 'Update failed';
+                      setErrorMessage(errorMsg);
+                      setMode('error');
+                    } finally {
+                      setUpdating(false);
+                    }
+                  }}
+                >
+                  <Text style={[text.subtitle, styles.primaryBtnText]}>{updating ? 'Updating...' : 'Update'}</Text>
+                </TouchableOpacity>
 
-        <TouchableOpacity
-          activeOpacity={0.9}
-          style={styles.primaryBtn}
-          onPress={() => {
-            setMode('pick');
-            setErrorMessage('');
-          }}
-        >
-          <Text style={[text.subtitle, styles.primaryBtnText]}>Try Again</Text>
-        </TouchableOpacity>
-      </>
-    )}
-  </BottomSheetView>
-</BottomSheetModal>
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  style={[styles.secondaryBtn, styles.Primarybtn]}
+                  onPress={() => setPickerVisible(false)}
+                >
+                  <Text style={[text.subtitle, styles.secondaryBtnText]}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : mode === 'success' ? (
+            <>
+              {/* Success State */}
+              <View style={[styles.iconCircle, { borderColor: COLORS.success }]}>
+                <Text style={[styles.iconCircleMark, { color: COLORS.success }]}>✓</Text>
+              </View>
+              <Text style={[text.title, styles.modalTitle, { color: COLORS.success }]}>Done</Text>
+              <Text style={[text.body, styles.successText]}>Lead status has been updated successfully!</Text>
 
-    {/* Delete Confirmation Bottom Sheet */}
-    <BottomSheetModal
-      ref={deleteSheetRef}
-      snapPoints={deleteSnapPoints}
-      enablePanDownToClose
-      enableContentPanningGesture={false}
-      onDismiss={handleDeleteCancel}
-      handleIndicatorStyle={styles.bsHandle}
-      handleStyle={{ backgroundColor: 'transparent' }}
-      backgroundStyle={styles.bsBackground}
-      backdropComponent={(props) => (
-        <BottomSheetBackdrop
-          {...props}
-          appearsOnIndex={0}
-          disappearsOnIndex={-1}
-          opacity={0.45}
-          pressBehavior="close"
-        />
-      )}
-    >
-      <BottomSheetView style={styles.bsContent}>
-        {/* Warning Icon */}
-        <View style={styles.deleteIconCircle}>
-          <Icon name="warning" size={rf(8)} color={COLORS.warning} />
-        </View>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                style={styles.primaryBtn}
+                onPress={() => setPickerVisible(false)}
+              >
+                <Text style={[text.subtitle, styles.primaryBtnText]}>Ok</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              {/* Error State */}
+              <View style={[styles.iconCircle, { borderColor: COLORS.warning }]}>
+                <Text style={[styles.iconCircleMark, { color: COLORS.warning }]}>!</Text>
+              </View>
+              <Text style={[text.title, styles.modalTitle, { color: COLORS.warning }]}>Error</Text>
+              <Text style={[text.body, styles.errorText]}>{errorMessage}</Text>
 
-        {/* Title */}
-        <Text style={[text.title, styles.deleteTitle]}>Are you Sure?</Text>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                style={styles.primaryBtn}
+                onPress={() => {
+                  setMode('pick');
+                  setErrorMessage('');
+                }}
+              >
+                <Text style={[text.subtitle, styles.primaryBtnText]}>Try Again</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </BottomSheetView>
+      </BottomSheetModal >
 
-        {/* Warning Message */}
-        <Text style={[text.body, styles.deleteMessage]}>You won't be able to revert this!</Text>
+      {/* Delete Confirmation Bottom Sheet */}
+      < BottomSheetModal
+        ref={deleteSheetRef}
+        snapPoints={deleteSnapPoints}
+        enablePanDownToClose
+        enableContentPanningGesture={false}
+        onDismiss={handleDeleteCancel}
+        handleIndicatorStyle={styles.bsHandle}
+        handleStyle={{ backgroundColor: 'transparent' }
+        }
+        backgroundStyle={styles.bsBackground}
+        backdropComponent={(props) => (
+          <BottomSheetBackdrop
+            {...props}
+            appearsOnIndex={0}
+            disappearsOnIndex={-1}
+            opacity={0.45}
+            pressBehavior="close"
+          />
+        )}
+      >
+        <BottomSheetView style={styles.bsContent}>
+          {/* Warning Icon */}
+          <View style={styles.deleteIconCircle}>
+            <Icon name="warning" size={rf(8)} color={COLORS.warning} />
+          </View>
 
-        {/* Action Buttons */}
-        <View style={styles.deleteActionRow}>
-          <TouchableOpacity 
-            style={styles.deleteConfirmBtn} 
-            activeOpacity={0.8}
-            onPress={handleDeleteConfirm}
-          >
-            <Text style={[text.subtitle, styles.deleteConfirmBtnText]}>Yes, delete it!</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.deleteCancelBtn} 
-            activeOpacity={0.8}
-            onPress={handleDeleteCancel}
-          >
-            <Text style={[text.subtitle, styles.deleteCancelBtnText]}>No, Cancel!</Text>
-          </TouchableOpacity>
-        </View>
-      </BottomSheetView>
-    </BottomSheetModal>
+          {/* Title */}
+          <Text style={[text.title, styles.deleteTitle]}>Are you Sure?</Text>
+
+          {/* Warning Message */}
+          <Text style={[text.body, styles.deleteMessage]}>You won't be able to revert this!</Text>
+
+          {/* Action Buttons */}
+          <View style={styles.deleteActionRow}>
+            <TouchableOpacity
+              style={styles.deleteConfirmBtn}
+              activeOpacity={0.8}
+              onPress={handleDeleteConfirm}
+            >
+              <Text style={[text.subtitle, styles.deleteConfirmBtnText]}>Yes, delete it!</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.deleteCancelBtn}
+              activeOpacity={0.8}
+              onPress={handleDeleteCancel}
+            >
+              <Text style={[text.subtitle, styles.deleteCancelBtnText]}>No, Cancel!</Text>
+            </TouchableOpacity>
+          </View>
+        </BottomSheetView>
+      </BottomSheetModal >
 
     </>
   );
@@ -681,7 +737,7 @@ const styles = StyleSheet.create({
   viewBtn: { borderColor: COLORS.primary },
   editBtn: { borderColor: COLORS.success },
   deleteBtn: { borderColor: COLORS.ButtonColor },
-  buttonNeutralFill: {  
+  buttonNeutralFill: {
     paddingVertical: hp(2),
     paddingHorizontal: SPACING.sm,
     borderRadius: RADIUS.md,
@@ -724,8 +780,8 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 9,
     fontWeight: '600',
-    padding: 1 
-  }, 
+    padding: 1
+  },
   bsHandle: {
     alignSelf: 'center',
     width: wp(18),
@@ -839,9 +895,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xl,
     borderRadius: RADIUS.md,
   },
-  Primarybtn:{
-  paddingHorizontal: wp(15),
-  paddingVertical: hp(1.4),
+  Primarybtn: {
+    paddingHorizontal: wp(15),
+    paddingVertical: hp(1.4),
 
   },
   primaryBtnText: {
@@ -877,7 +933,7 @@ const styles = StyleSheet.create({
     marginBottom: hp(1.6),
     paddingHorizontal: SPACING.lg,
   },
-  modalTitlebottom:{
+  modalTitlebottom: {
     textAlign: 'center',
     fontSize: TYPOGRAPHY.h2,
     fontWeight: '200',
@@ -955,20 +1011,20 @@ const styles = StyleSheet.create({
   btnsschedule: {
     color: COLORS.success,
   },
-  viewBtn : {
-    borderWidth:1,
+  viewBtn: {
+    borderWidth: 1,
     borderColor: COLORS.primary,
   },
   editBtn: {
-    borderWidth:1,
+    borderWidth: 1,
     borderColor: COLORS.info,
   },
   deleteBtn: {
-    borderWidth:1,
+    borderWidth: 1,
     borderColor: COLORS.delete,
   },
   scheduleBtn: {
-    borderWidth:1,
+    borderWidth: 1,
     borderColor: COLORS.success,
   },
   // Disabled button styles

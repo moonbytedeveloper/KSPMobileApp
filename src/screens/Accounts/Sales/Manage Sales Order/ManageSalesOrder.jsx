@@ -24,7 +24,7 @@ import AppHeader from '../../../../components/common/AppHeader';
 import { useNavigation, useRoute, useIsFocused } from '@react-navigation/native';
 import { formStyles } from '../../../styles/styles';
 import DatePickerBottomSheet from '../../../../components/common/CustomDatePicker';
-import { addSalesOrder, updateSalesOrder, addSalesOrderLine, updateSalesOrderLine, getCustomers, getCountries, getStates, getCities, getPaymentTerms, getPaymentMethods, fetchProjects, getAllSalesInquiryNumbers, getSalesOrderHeaderById, getItems, getSalesLines, getSalesOrderLines, deleteSalesOrderLine, getSalesOrderSlip, uploadFiles } from '../../../../api/authServices';
+import { addSalesOrder, updateSalesOrder, addSalesOrderLine, updateSalesOrderLine, getCustomers, getCountries, getStates, getCities, getPaymentTerms, getPaymentMethods, getProjectsByCustomer, getAllSalesInquiryNumbers, getSalesOrderHeaderById, getItems, getSalesLines, getSalesOrderLines, deleteSalesOrderLine, getSalesOrderSlip, uploadFiles } from '../../../../api/authServices';
 import { getCMPUUID, getENVUUID } from '../../../../api/tokenStorage';
 import { getErrorMessage } from '../../../../utils/errorMessage';
 import { pick, types, isCancel } from '@react-native-documents/picker';
@@ -1270,12 +1270,11 @@ const ManageSalesOrder = () => {
     (async () => {
       try {
         setIsInitialLoading(true);
-        const [custResp, termsResp, methodsResp, countriesResp, projectsResp, inquiriesResp, itemsResp] = await Promise.all([
+        const [custResp, termsResp, methodsResp, countriesResp, inquiriesResp, itemsResp] = await Promise.all([
           getCustomers(),
           getPaymentTerms(),
           getPaymentMethods(),
           getCountries(),
-          fetchProjects(),
           getAllSalesInquiryNumbers(),
           // load master items for Item dropdown (pass mode so API can return Sales-specific items)
           getItems({ mode: 'Sales' }),
@@ -1290,7 +1289,7 @@ const ManageSalesOrder = () => {
         const countriesList = extractArray(countriesResp);
         console.log(countriesList, '566');
 
-        const projectsList = extractArray(projectsResp);
+        const projectsList = [];
         const inquiriesList = extractArray(inquiriesResp);
         const itemsList = extractArray(itemsResp);
 
@@ -1307,6 +1306,7 @@ const ManageSalesOrder = () => {
         setPaymentTermsOptions(termsList);
         setPaymentMethodsOptions(methodsList);
         setCountriesOptions(countriesList);
+        // Projects will be loaded when a customer is selected
         setProjectsOptions(projectsList);
         setSalesInquiryNosOptions(normalizedInquiries);
         setMasterItems(itemsList);
@@ -2726,6 +2726,22 @@ const ManageSalesOrder = () => {
                                   CustomerUUID: custUuid,
                                 }));
                                 try { setFieldValue && setFieldValue('CustomerName', custName); setFieldValue && setFieldValue('CustomerUUID', custUuid); } catch (e) { }
+                                // Load projects for selected customer
+                                (async () => {
+                                  try {
+                                    if (custUuid) {
+                                      const resp = await getProjectsByCustomer({ customerUuid: custUuid });
+                                      const d = resp?.Data ?? resp;
+                                      const list = Array.isArray(d) ? d : (Array.isArray(d?.List) ? d.List : (Array.isArray(d?.Records) ? d.Records : []));
+                                      setProjectsOptions(list || []);
+                                    } else {
+                                      setProjectsOptions([]);
+                                    }
+                                  } catch (e) {
+                                    console.warn('Get projects by customer error', e?.message || e);
+                                    setProjectsOptions([]);
+                                  }
+                                })();
                               }}
                               inputBoxStyle={inputStyles.box}
                             />

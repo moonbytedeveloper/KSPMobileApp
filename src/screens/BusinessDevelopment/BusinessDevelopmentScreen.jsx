@@ -45,6 +45,7 @@ const BusinessDevelopmentScreen = () => {
       country: row?.Country ?? '',
       state: row?.State ?? '',
       city: row?.City ?? '',
+      Remark: row?.Remark ?? '',
       // Add UUID fields for location data 
     }));
   };
@@ -263,6 +264,7 @@ const BusinessDevelopmentScreen = () => {
                 srNo={index + 1}
                 uuid={item.uuid}
                 companyDetail={item.company}
+                Remark={item.Remark}
                 nextAction={item.nextAction}
                 OpportunityTitle={item.OpportunityTitle}
                 actionDueDate={item.actionDueDate}
