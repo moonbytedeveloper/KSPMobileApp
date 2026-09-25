@@ -20,7 +20,7 @@ const LoginScreen = ({ navigation }) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { setIsAuthenticated, setUserRole, setUserData, checkAuthStatus } = useUser();
-  
+
   // Bottom sheet ref
   const bottomSheetRef = useRef(null);
   const snapPoints = ['33%', '40%'];
@@ -142,7 +142,7 @@ const LoginScreen = ({ navigation }) => {
 
     // Lower-mid band - around password area
     { topPct: 50, leftPct: 12, size: 28 },
-   { topPct: 60, leftPct: 98, size: 26 },
+    { topPct: 60, leftPct: 98, size: 26 },
     { topPct: 50, leftPct: 88, size: 28 },
 
     // Bottom band - around login button area
@@ -247,18 +247,18 @@ const LoginScreen = ({ navigation }) => {
         </Defs>
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#loginGradient)" />
       </Svg>
-      
+
       {/* Floating business icons layer */}
       <View style={styles.floatingIconsLayer} pointerEvents="none">
         {randomIconsRef.current.map(item => (
           <Animated.View
             key={item.id}
             style={[
-              { 
-                position: 'absolute', 
-                top: hp(item.topPct), 
-                left: wp(item.leftPct), 
-                opacity: item.opacity 
+              {
+                position: 'absolute',
+                top: hp(item.topPct),
+                left: wp(item.leftPct),
+                opacity: item.opacity
               },
               getFloatStyle(item.anim, item.amplitude),
             ]}
@@ -273,10 +273,10 @@ const LoginScreen = ({ navigation }) => {
         { top: isKeyboardOpen ? safeAreaTop + hp(0) : safeAreaTop + hp(20) }
       ]}>
         <Icon
-          name="Ksp-logo" 
-          size={isKeyboardOpen ? hp(25) : hp(30)} 
-          color={COLORS.primary} 
-          style={styles.logo} 
+          name="Ksp-logo"
+          size={isKeyboardOpen ? hp(25) : hp(30)}
+          color={COLORS.primary}
+          style={styles.logo}
         />
       </View>
 
@@ -334,12 +334,12 @@ const LoginScreen = ({ navigation }) => {
           <Text style={styles.forgotText}>Forgot Password?</Text>
         </TouchableOpacity>
       </View>
-      
+
       {/* Floating Login Button */}
       <View style={[
         styles.floatingButtonContainer,
-        { 
-          bottom: isKeyboardOpen 
+        {
+          bottom: isKeyboardOpen
             ? (Platform.OS === 'ios' ? hp(40) : hp(4))
             : hp(4)
         }
@@ -354,15 +354,15 @@ const LoginScreen = ({ navigation }) => {
                 showError('Please enter username and password');
                 return;
               }
-              
+
               setIsLoading(true);
               console.log('[LOGIN] Attempting login for:', username);
               const user = await login({ username, password });
               console.log('[LOGIN] Response received:', JSON.stringify(user, null, 2));
-              
+
               // Update authentication context
               setIsAuthenticated(true);
-              
+
               // Set user data
               if (user?.Data) {
                 setUserData({
@@ -372,8 +372,8 @@ const LoginScreen = ({ navigation }) => {
                 });
               }
               // Reload stored auth/env data so dashboards get allowed/selected environment immediately
-              try { await checkAuthStatus(); } catch (_e) {}
-              
+              try { await checkAuthStatus(); } catch (_e) { }
+
               // Determine user role and navigate — scan all roles for admin flags
               const roles = user?.Data?.Roles || [];
               const isSuperAdmin = Array.isArray(roles) && roles.some(r => {
@@ -393,7 +393,7 @@ const LoginScreen = ({ navigation }) => {
             } catch (e) {
               console.log('[LOGIN] Error:', e?.response?.data || e.message);
               let errorMsg = 'Login failed. Please try again.';
-              
+
               if (e?.response?.data?.message) {
                 errorMsg = e.response.data.message;
               } else if (e?.response?.data?.Message) {
@@ -401,7 +401,7 @@ const LoginScreen = ({ navigation }) => {
               } else if (e?.message) {
                 errorMsg = e.message;
               }
-              
+
               showError(errorMsg);
             } finally {
               setIsLoading(false);
@@ -434,7 +434,7 @@ const LoginScreen = ({ navigation }) => {
             </View>
             <Text style={styles.errorTitle}>Login Error</Text>
             <Text style={styles.errorMessage}>{errorMessage}</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.errorButton}
               onPress={() => bottomSheetRef.current?.dismiss()}
               activeOpacity={0.8}

@@ -19,35 +19,43 @@ target 'ksp' do
 
   use_react_native!(
     :path => config[:reactNativePath],
-    # An absolute path to your application root.
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
+
   pod 'FirebaseCoreInternal', :modular_headers => true
   pod 'GoogleUtilities', :modular_headers => true
-  
-  # Ensure Firebase modules are properly linked
   pod 'FirebaseCore', :modular_headers => true
   pod 'FirebaseInstallations', :modular_headers => true
 
   post_install do |installer|
-    # https://github.com/facebook/react-native/blob/main/packages/react-native/scripts/react_native_pods.rb#L197-L202
     react_native_post_install(
       installer,
-      config[:reactNativePath],
-      :mac_catalyst_enabled => false,
-      # :ccache_enabled => true
+      config[:reactNativePath]
     )
 
-    # Work around Xcode 16 "non-modular-include-in-framework-module" errors
-    # seen with some Pods (e.g., RNSentry). Allow non-modular includes for
-    # all Pods and the app target to unblock builds.
+    # Fix fmt compilation issue with newer Xcode versions
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
+        if target.name == 'fmt'
+          config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+        end
+
+        # Work around non-modular include issues
         config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
         config.build_settings['CLANG_WARN_NON_MODULAR_INCLUDE_IN_FRAMEWORK_MODULES'] = 'NO'
       end
     end
 
+    # Configure react-native-config
+    installer.pods_project.targets.each do |target|
+      if target.name == 'react-native-config'
+        target.build_configurations.each do |config|
+          config.build_settings['ENVFILE'] = '.env.local'
+        end
+      end
+    end
+
+    # Apply non-modular include settings to the main app target
     installer.aggregate_targets.each do |aggregate|
       aggregate.user_project.targets.each do |target|
         target.build_configurations.each do |config|

@@ -4,15 +4,15 @@ import { Alert } from 'react-native'; // optional: show user messages in RN
 import Config from 'react-native-config';
 import { CommonActions } from '@react-navigation/native';
 
-const BASE_URL = Config.API_URL; // no fallback; must be provided by env
+const BASE_URL = Config.API_URL || 'https://wapi.kspconsults.com';
 const PATHS = {
-    login: Config.API_LOGIN_PATH,
-    refresh: Config.API_REFRESH_PATH,
-    kspAuth: Config.API_KSP_PATH,
-    forgotPassword: Config.API_FORGOT_PASSWORD_PATH,
-    verifyCode: Config.API_VERIFY_CODE_PATH,
-    resetPassword: Config.API_RESET_PASSWORD_PATH,
-    profile: Config.API_PROFILE_PATH,
+    login: Config.API_LOGIN_PATH || '/api/CompanySetup/login',
+    refresh: Config.API_REFRESH_PATH || '/api/CompanySetup/auth/refresh',
+    kspAuth: Config.API_KSP_PATH || '/api/CompanySetup/KSP',
+    forgotPassword: Config.API_FORGOT_PASSWORD_PATH || '/api/CompanySetup/forgot-password',
+    verifyCode: Config.API_VERIFY_CODE_PATH || '/api/CompanySetup/verify-code',
+    resetPassword: Config.API_RESET_PASSWORD_PATH || '/api/CompanySetup/reset-password',
+    profile: Config.API_PROFILE_PATH || '/api/CompanySetup/profile',
 };
 
 try {
